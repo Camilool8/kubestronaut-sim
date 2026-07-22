@@ -4,6 +4,7 @@ cd "$(dirname "$0")/.."
 
 fail() { echo "SMOKE FAIL: $1"; ./sim down; exit 1; }
 
+./sim purge   # cold start: the fresh-grade-0 assertion needs pristine cluster state
 ./sim up
 docker compose exec ckad-1 su - candidate -c 'kubectl get nodes --no-headers' | tee /tmp/nodes.txt
 [ "$(grep -c ' Ready ' /tmp/nodes.txt)" -eq 2 ] || fail "expected 2 Ready nodes"
