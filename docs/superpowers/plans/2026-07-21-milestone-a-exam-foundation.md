@@ -549,8 +549,8 @@ out=$(kubectl -n orbit get netpol api-guard \
 set -uo pipefail
 rules=$(kubectl -n orbit get netpol api-guard -o jsonpath='{.spec.ingress}' 2>/dev/null)
 n=$(echo "$rules" | jq 'length')
-from=$(echo "$rules" | jq -r '.[0].from | length, .[0].from[0].podSelector.matchLabels.role')
-ports=$(echo "$rules" | jq -r '.[0].ports | length, .[0].ports[0].port, (.[0].ports[0].protocol // "TCP")')
+from=$(echo "$rules" | jq -r '(.[0].from | length), .[0].from[0].podSelector.matchLabels.role')
+ports=$(echo "$rules" | jq -r '(.[0].ports | length), .[0].ports[0].port, (.[0].ports[0].protocol // "TCP")')
 [ "$n" = "1" ] && [ "$from" = "1
 frontend" ] && [ "$ports" = "1
 80
