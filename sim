@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")"
+cmd=${1:-help}
+case "$cmd" in
+  up)
+    BANK=${2:-ckad-mock-01} docker compose up -d --build --wait
+    echo "Exam environment ready. Connect: ./sim ssh ckad-1" ;;
+  down)  docker compose down ;;
+  purge) docker compose down -v ;;
+  ssh)   docker compose exec "${2:-ckad-1}" su - candidate ;;
+  status) docker compose ps ;;
+  grade) docker compose exec k8s-env /opt/sim/grade.sh ;;
+  help)  echo "usage: ./sim {up [bank]|down|purge|ssh [instance]|status|grade}" ;;
+  *) echo "usage: ./sim {up [bank]|down|purge|ssh [instance]|status|grade}"; exit 1 ;;
+esac

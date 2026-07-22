@@ -549,8 +549,8 @@ out=$(kubectl -n orbit get netpol api-guard \
 set -uo pipefail
 rules=$(kubectl -n orbit get netpol api-guard -o jsonpath='{.spec.ingress}' 2>/dev/null)
 n=$(echo "$rules" | jq 'length')
-from=$(echo "$rules" | jq -r '.[0].from | length, .[0].from[0].podSelector.matchLabels.role')
-ports=$(echo "$rules" | jq -r '.[0].ports | length, .[0].ports[0].port, (.[0].ports[0].protocol // "TCP")')
+from=$(echo "$rules" | jq -r '(.[0].from | length), .[0].from[0].podSelector.matchLabels.role')
+ports=$(echo "$rules" | jq -r '(.[0].ports | length), .[0].ports[0].port, (.[0].ports[0].protocol // "TCP")')
 [ "$n" = "1" ] && [ "$from" = "1
 frontend" ] && [ "$ports" = "1
 80
@@ -942,7 +942,7 @@ git add docker-compose.yaml sim && git commit -m "feat: compose stack and ./sim 
 set -uo pipefail
 BANK=${BANK:?}
 BANK_DIR="/banks/${BANK}"
-SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i /shared/ssh/id_ed25519"
+SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o BatchMode=yes -o ConnectTimeout=10 -i /shared/ssh/id_ed25519"
 earned=0; total=0
 echo "=== ${BANK} results ==="
 for qid in $(yq -r '.spec.questions[].id' "${BANK_DIR}/exam.yaml"); do
@@ -950,8 +950,9 @@ for qid in $(yq -r '.spec.questions[].id' "${BANK_DIR}/exam.yaml"); do
   echo ""
   echo "-- ${qid} (on ${instance})"
   for script in "${BANK_DIR}/${qid}"/validate.d/*.sh; do
-    pts=$(awk -F': ' '/^# points:/{print $2; exit}' "$script")
-    desc=$(awk -F': ' '/^# desc:/{print $2; exit}' "$script")
+    pts=$(sed -n 's/^# points: //p' "$script" | head -1)
+    desc=$(sed -n 's/^# desc: //p' "$script" | head -1)
+    case "$pts" in (''|*[!0-9]*) echo "  [SKIP] $(basename "$script"): bad '# points:' header"; continue ;; esac
     total=$((total + pts))
     msg=$($SSH "root@${instance}" \
       "KUBECONFIG=/home/candidate/.kube/config bash /banks/${BANK}/${qid}/validate.d/$(basename "$script")" 2>&1)
