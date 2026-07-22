@@ -50,4 +50,8 @@ directory per question.
 - Instances: candidate user `candidate` (password `candidate`), kubeconfig
   at `~/.kube/config`, writable `/opt/course/`, tools: kubectl, helm, yq,
   jq, vim, nano.
+- `/opt/course/<n>` is pre-created on every instance for each question
+  (`<n>` = the digits of the question id, e.g. `q01` → `/opt/course/1`),
+  owned by `candidate`. Questions must never require creating these
+  directories — candidates only write files into them, as on the real exam.
 - `/banks` mounted read-only on k8s-env and instances.

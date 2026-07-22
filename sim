@@ -8,9 +8,18 @@ case "$cmd" in
     echo "Exam environment ready. Connect: ./sim ssh ckad-1" ;;
   down)  docker compose down ;;
   purge) docker compose down -v ;;
+  reset)
+    echo "Resetting exam state (cluster + instances, cached images kept)..."
+    bank=$(docker compose exec -T k8s-env printenv BANK)   # keep the bank the stack was launched with
+    for i in ckad-1 ckad-2; do   # /opt/course is a persistent volume; recreate alone won't wipe it
+      docker compose exec "$i" find /opt/course -mindepth 1 -delete
+    done
+    docker compose exec k8s-env bash -c 'kind delete cluster --name sim || true; /opt/sim/bootstrap.sh'
+    BANK="$bank" docker compose up -d --force-recreate ckad-1 ckad-2
+    echo "Fresh exam ready." ;;
   ssh)   docker compose exec "${2:-ckad-1}" su - candidate ;;
   status) docker compose ps ;;
   grade) docker compose exec k8s-env /opt/sim/grade.sh ;;
-  help)  echo "usage: ./sim {up [bank]|down|purge|ssh [instance]|status|grade}" ;;
-  *) echo "usage: ./sim {up [bank]|down|purge|ssh [instance]|status|grade}"; exit 1 ;;
+  help)  echo "usage: ./sim {up [bank]|down|reset|purge|ssh [instance]|status|grade}" ;;
+  *) echo "usage: ./sim {up [bank]|down|reset|purge|ssh [instance]|status|grade}"; exit 1 ;;
 esac

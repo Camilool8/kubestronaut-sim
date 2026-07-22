@@ -8,16 +8,33 @@ rm -f /shared/ready
 mkdir -p /shared/ssh
 [ -f /shared/ssh/id_ed25519 ] || ssh-keygen -t ed25519 -N '' -f /shared/ssh/id_ed25519 -q
 
+created=0
 if ! kind get clusters 2>/dev/null | grep -qx sim; then
   kind create cluster --config /opt/sim/kind-config.yaml --image "${NODE_IMAGE}" --wait 180s
+  created=1
 fi
 kind get kubeconfig --name sim | sed 's#https://0\.0\.0\.0:6443#https://k8s-env:6443#' > /shared/kubeconfig
 kind export kubeconfig --name sim   # local admin access via ~/.kube/config
+
+# on warm restart the node containers auto-restart but the API server needs
+# time to come back; kubectl wait fails at discovery instead of waiting
+echo "waiting for API server..."
+for i in $(seq 1 60); do
+  kubectl get --raw /readyz >/dev/null 2>&1 && break
+  [ "$i" -eq 60 ] && { echo "API server not ready after 180s"; exit 1; }
+  sleep 3
+done
 kubectl wait --for=condition=Ready nodes --all --timeout=180s
 
-for qid in $(yq -r '.spec.questions[].id' "${BANK_DIR}/exam.yaml"); do
-  echo "seeding ${qid}"
-  bash "${BANK_DIR}/${qid}/setup.sh"
-done
+# seed only a freshly created cluster — re-seeding a resumed one would
+# overwrite candidate work (setup.sh scripts re-apply initial state)
+if [ "$created" = "1" ]; then
+  for qid in $(yq -r '.spec.questions[].id' "${BANK_DIR}/exam.yaml"); do
+    echo "seeding ${qid}"
+    bash "${BANK_DIR}/${qid}/setup.sh"
+  done
+else
+  echo "existing cluster resumed; skipping seed"
+fi
 
 touch /shared/ready

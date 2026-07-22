@@ -21,5 +21,20 @@ docker compose exec ckad-2 su - candidate -c 'bash /tests/solutions/q03.sh'
 read -r _ e1 t1 _ < <(grep '^RESULT ' /tmp/grade1.txt)
 [ "$e1" = "$t1" ] || fail "solved env should score ${t1}/${t1}, got ${e1}/${t1}"
 
+# warm restart: down + up must resume exam state
 ./sim down
-echo "SMOKE PASS (${e1}/${t1} after solutions, 0/${t0} before)"
+./sim up
+./sim grade | tee /tmp/grade2.txt
+read -r _ e2 t2 _ < <(grep '^RESULT ' /tmp/grade2.txt)
+[ "$e2" = "$t2" ] || fail "resumed env should keep score ${t2}/${t2}, got ${e2}/${t2}"
+
+# reset: fresh exam state, /opt/course dirs re-created empty
+./sim reset
+./sim grade | tee /tmp/grade3.txt
+read -r _ e3 _ _ < <(grep '^RESULT ' /tmp/grade3.txt)
+[ "$e3" = "0" ] || fail "reset env should score 0, got ${e3}"
+docker compose exec ckad-1 su - candidate -c 'test -d /opt/course/1 -a -w /opt/course/1 -a -z "$(ls -A /opt/course/1)"' \
+  || fail "reset should leave /opt/course/1 empty and writable"
+
+./sim down
+echo "SMOKE PASS (${e1}/${t1} solved, 0/${t0} fresh, ${e2}/${t2} resumed, ${e3} after reset)"

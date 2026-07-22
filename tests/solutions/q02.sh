@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-mkdir -p /opt/course/2
 kubectl -n nova get deploy nova-api \
   -o jsonpath='{.spec.template.spec.containers[0].image}' > /opt/course/2/old-image
 kubectl -n nova patch deploy nova-api --type=strategic -p '{
