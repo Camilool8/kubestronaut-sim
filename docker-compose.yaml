@@ -19,21 +19,29 @@ services:
   ckad-1:
     build: images/instance
     hostname: ckad-1
+    environment:
+      BANK: ${BANK:-ckad-mock-01}
     depends_on:
       k8s-env: {condition: service_healthy}
     volumes:
       - shared:/shared:ro
       - ./banks:/banks:ro
       - ./tests:/tests:ro
+      - course-1:/opt/course
   ckad-2:
     build: images/instance
     hostname: ckad-2
+    environment:
+      BANK: ${BANK:-ckad-mock-01}
     depends_on:
       k8s-env: {condition: service_healthy}
     volumes:
       - shared:/shared:ro
       - ./banks:/banks:ro
       - ./tests:/tests:ro
+      - course-2:/opt/course
 volumes:
   shared: {}
   dind: {}
+  course-1: {}
+  course-2: {}

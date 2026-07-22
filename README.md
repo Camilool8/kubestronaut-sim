@@ -16,7 +16,10 @@ Requires Docker Desktop (or docker + compose v2). ~8GB RAM free.
     cat banks/ckad-mock-01/q01/question.md
     ./sim ssh ckad-1         # solve it (user: candidate)
     ./sim grade              # killer.sh-style scoreboard
-    ./sim down               # stop (cluster images cached in a volume)
-    ./sim purge              # stop and delete all volumes (fresh exam next time)
+    ./sim reset              # wipe your answers, fresh exam (fast — keeps caches)
+    ./sim down               # stop (cluster state persists — resume where you left off)
+    ./sim purge              # stop and delete all volumes (full clean slate)
+
+Note: `down` + `up` resumes your exam state; use `reset` for a fresh attempt.
 
 Solutions: `banks/ckad-mock-01/<q>/solution.md`.

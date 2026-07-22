@@ -1,6 +1,5 @@
 # Solution 2
 
-    mkdir -p /opt/course/2
     k -n nova get deploy nova-api -o jsonpath='{.spec.template.spec.containers[0].image}' > /opt/course/2/old-image
     k -n nova edit deploy nova-api
 
