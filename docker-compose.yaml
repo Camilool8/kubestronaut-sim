@@ -1,0 +1,39 @@
+name: kubestronaut-sim
+services:
+  k8s-env:
+    build: images/k8s-env
+    hostname: k8s-env
+    privileged: true
+    environment:
+      BANK: ${BANK:-ckad-mock-01}
+    volumes:
+      - shared:/shared
+      - dind:/var/lib/docker
+      - ./banks:/banks:ro
+    healthcheck:
+      test: ["CMD", "test", "-f", "/shared/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 90
+      start_period: 60s
+  ckad-1:
+    build: images/instance
+    hostname: ckad-1
+    depends_on:
+      k8s-env: {condition: service_healthy}
+    volumes:
+      - shared:/shared:ro
+      - ./banks:/banks:ro
+      - ./tests:/tests:ro
+  ckad-2:
+    build: images/instance
+    hostname: ckad-2
+    depends_on:
+      k8s-env: {condition: service_healthy}
+    volumes:
+      - shared:/shared:ro
+      - ./banks:/banks:ro
+      - ./tests:/tests:ro
+volumes:
+  shared: {}
+  dind: {}
