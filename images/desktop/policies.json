@@ -1,0 +1,19 @@
+{
+  "policies": {
+    "Proxy": {
+      "Mode": "manual",
+      "HTTPProxy": "docs-proxy:3128",
+      "SSLProxy": "docs-proxy:3128",
+      "Locked": true
+    },
+    "Homepage": { "URL": "https://kubernetes.io/docs/", "Locked": true, "StartPage": "homepage" },
+    "OverrideFirstRunPage": "https://kubernetes.io/docs/",
+    "DisableTelemetry": true,
+    "DisableFirefoxStudies": true,
+    "DisableAppUpdate": true,
+    "DisablePrivateBrowsing": true,
+    "BlockAboutConfig": true,
+    "DontCheckDefaultBrowser": true,
+    "ExtensionSettings": { "*": { "installation_mode": "blocked" } }
+  }
+}
