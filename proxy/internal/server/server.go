@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"kubestronaut-sim/proxy/internal/allow"
@@ -19,6 +20,42 @@ func New(list *allow.List) http.Handler {
 
 type proxy struct{ list *allow.List }
 
+// hopByHopHeaders are connection-scoped headers that must not be relayed
+// across a proxy hop, per RFC 7230 §6.1.
+var hopByHopHeaders = []string{
+	"Connection",
+	"Proxy-Connection",
+	"Keep-Alive",
+	"Proxy-Authenticate",
+	"Proxy-Authorization",
+	"TE",
+	"Trailer",
+	"Transfer-Encoding",
+	"Upgrade",
+}
+
+// stripHopByHop removes hop-by-hop headers from h in place, including any
+// headers named in the Connection header's value, per RFC 7230 §6.1.
+func stripHopByHop(h http.Header) {
+	for _, f := range h.Values("Connection") {
+		for _, name := range strings.Split(f, ",") {
+			name = strings.TrimSpace(name)
+			if name != "" {
+				h.Del(name)
+			}
+		}
+	}
+	for _, name := range hopByHopHeaders {
+		h.Del(name)
+	}
+}
+
+// deny logs and rejects a request to a host not on the allowlist.
+func (p *proxy) deny(w http.ResponseWriter, host string) {
+	log.Printf("blocked host=%s", host)
+	http.Error(w, "blocked by exam docs allowlist", http.StatusForbidden)
+}
+
 func (p *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodConnect {
 		p.connect(w, r)
@@ -29,17 +66,19 @@ func (p *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !p.list.Host(r.Host) {
-		log.Printf("blocked host=%s", r.Host)
-		http.Error(w, "blocked by exam docs allowlist", http.StatusForbidden)
+		p.deny(w, r.Host)
 		return
 	}
-	r.RequestURI = ""
-	resp, err := http.DefaultTransport.RoundTrip(r)
+	outReq := r.Clone(r.Context())
+	outReq.RequestURI = ""
+	stripHopByHop(outReq.Header)
+	resp, err := http.DefaultTransport.RoundTrip(outReq)
 	if err != nil {
 		http.Error(w, "upstream error", http.StatusBadGateway)
 		return
 	}
 	defer resp.Body.Close()
+	stripHopByHop(resp.Header)
 	for k, vv := range resp.Header {
 		for _, v := range vv {
 			w.Header().Add(k, v)
@@ -51,8 +90,7 @@ func (p *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (p *proxy) connect(w http.ResponseWriter, r *http.Request) {
 	if !p.list.Host(r.Host) {
-		log.Printf("blocked host=%s", r.Host)
-		http.Error(w, "blocked by exam docs allowlist", http.StatusForbidden)
+		p.deny(w, r.Host)
 		return
 	}
 	dst, err := net.DialTimeout("tcp", r.Host, 10*time.Second)
@@ -71,11 +109,30 @@ func (p *proxy) connect(w http.ResponseWriter, r *http.Request) {
 		dst.Close()
 		return
 	}
+	defer src.Close()
+	defer dst.Close()
+
 	src.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+
+	done := make(chan struct{})
 	go func() {
 		io.Copy(dst, src)
-		dst.Close()
+		halfClose(dst)
+		close(done)
 	}()
 	io.Copy(src, dst)
-	src.Close()
+	halfClose(src)
+	<-done
+}
+
+// halfClose signals that no more data will be written to conn, without
+// closing the read side, so the peer can finish draining any in-flight
+// data before the connection is fully torn down. It falls back to a full
+// Close when conn doesn't support half-close (e.g. it isn't a *net.TCPConn).
+func halfClose(conn net.Conn) {
+	if cw, ok := conn.(interface{ CloseWrite() error }); ok {
+		cw.CloseWrite()
+		return
+	}
+	conn.Close()
 }

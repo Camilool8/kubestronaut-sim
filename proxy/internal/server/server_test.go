@@ -90,6 +90,41 @@ func TestPlainHTTPProxy(t *testing.T) {
 	}
 }
 
+func TestPlainHTTPProxyStripsHopByHopHeaders(t *testing.T) {
+	var sawProxyConnection, sawKeepAlive bool
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sawProxyConnection = r.Header.Get("Proxy-Connection") != ""
+		sawKeepAlive = r.Header.Get("Keep-Alive") != ""
+		io.WriteString(w, "plain-ok")
+	}))
+	defer backend.Close()
+
+	addr := startProxy(t, "127.0.0.1")
+	proxyURL, _ := url.Parse("http://" + addr)
+	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
+
+	req, err := http.NewRequest(http.MethodGet, backend.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Proxy-Connection", "keep-alive")
+	req.Header.Set("Keep-Alive", "timeout=5")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	io.ReadAll(resp.Body)
+
+	if sawProxyConnection {
+		t.Fatal("backend received Proxy-Connection header, want it stripped by proxy")
+	}
+	if sawKeepAlive {
+		t.Fatal("backend received Keep-Alive header, want it stripped by proxy")
+	}
+}
+
 func TestPlainHTTPBlocked(t *testing.T) {
 	addr := startProxy(t, "kubernetes.io")
 	proxyURL, _ := url.Parse("http://" + addr)
