@@ -31,6 +31,10 @@ this desktop via iframe).
   same no-NAT-egress guarantee while keeping the `127.0.0.1:6080` publish
   (asserted by smoke). Firefox policy lockdown is UX, the network is the
   guarantee.
+  Known limits (fine for local single-user; revisit for hosted): DNS
+  names still resolve from the desktop (only the data path is blocked,
+  not resolution); instances are a full-egress ssh hop by design;
+  masquerade-off still exposes the host at the examnet gateway.
 - **No VNC password, localhost-only publish**: single-user local stack;
   ports bind `127.0.0.1`.
 

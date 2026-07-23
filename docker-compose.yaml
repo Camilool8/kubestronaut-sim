@@ -51,6 +51,7 @@ services:
     volumes:
       - ./banks:/banks:ro
     networks: [default, examnet]
+    restart: unless-stopped
   desktop:
     build: images/desktop
     hostname: desktop
@@ -80,3 +81,4 @@ networks:
     driver: bridge
     driver_opts:
       com.docker.network.bridge.enable_ip_masquerade: "false"
+      com.docker.network.bridge.enable_ip6_masquerade: "false"

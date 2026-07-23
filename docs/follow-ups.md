@@ -20,3 +20,12 @@ Convert to GitHub issues once the repo has a remote.
 - bank-spec: note that `duration`, `passingScore`, `kubernetesVersion`, `environment.nodes` are informational in Milestone A (enforced by facilitator/evaluator in Milestone C).
 - README: mention `k8s-env` runs privileged (DinD requirement).
 - Cross-arch: amd64 build/run path never physically exercised (all local runs arm64) — cover in Milestone D CI.
+
+## Milestone B (desktop/proxy) — from final review
+- docs-proxy healthcheck + upgrade desktop `depends_on` to `service_healthy` (alpine image has no `curl`; consider a 3-line `/healthz` bypass in the handler or a wget-spider probe).
+- proxy image: run as non-root `USER`; pin base image tags; friendly error when `exam.yaml` is malformed (currently raw `yq` stderr).
+- desktop: run websockify as `candidate` (currently root while X/XFCE run as `candidate`).
+- proxy: response-direction + Connection-named hop-by-hop test coverage; whitespace-only `ALLOWED_DOMAINS` test; make 10s dial/header timeouts constants.
+- allowlist: decide semantics for explicitly-empty `allowedDomains: []` (currently silently becomes the default list; either honor empty=block-all via `os.LookupEnv` or document); multi-trailing-dot hosts over-block (cosmetic).
+- proxy: consider restricting CONNECT to ports 443/80.
+- smoke: re-assert desktop ssh after `./sim reset` (pins shared-key persistence).

@@ -8,8 +8,11 @@ import (
 	"strings"
 )
 
+// List is a set of allowed domains for host matching.
 type List struct{ domains []string }
 
+// New parses a comma-separated list of domains into a List, lowercasing
+// each entry, trimming whitespace and dots, and dropping empty entries.
 func New(commaSeparated string) *List {
 	l := &List{}
 	for _, d := range strings.Split(commaSeparated, ",") {
@@ -21,6 +24,8 @@ func New(commaSeparated string) *List {
 	return l
 }
 
+// Host reports whether hostport's host (with an optional ":port" suffix)
+// is an allowed domain or a subdomain of one.
 func (l *List) Host(hostport string) bool {
 	host := hostport
 	if h, _, err := net.SplitHostPort(hostport); err == nil {

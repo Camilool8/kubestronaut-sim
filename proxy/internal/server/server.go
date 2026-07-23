@@ -104,7 +104,7 @@ func (p *proxy) connect(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "hijacking unsupported", http.StatusInternalServerError)
 		return
 	}
-	src, _, err := hj.Hijack()
+	src, brw, err := hj.Hijack()
 	if err != nil {
 		dst.Close()
 		return
@@ -112,7 +112,15 @@ func (p *proxy) connect(w http.ResponseWriter, r *http.Request) {
 	defer src.Close()
 	defer dst.Close()
 
-	src.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+	if _, err := src.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n")); err != nil {
+		return
+	}
+
+	if n := brw.Reader.Buffered(); n > 0 {
+		if _, err := io.CopyN(dst, brw.Reader, int64(n)); err != nil {
+			return
+		}
+	}
 
 	done := make(chan struct{})
 	go func() {
