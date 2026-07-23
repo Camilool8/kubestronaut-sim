@@ -29,3 +29,4 @@ Convert to GitHub issues once the repo has a remote.
 - allowlist: decide semantics for explicitly-empty `allowedDomains: []` (currently silently becomes the default list; either honor empty=block-all via `os.LookupEnv` or document); multi-trailing-dot hosts over-block (cosmetic).
 - proxy: consider restricting CONNECT to ports 443/80.
 - smoke: re-assert desktop ssh after `./sim reset` (pins shared-key persistence).
+- proxy: unit test for CONNECT buffered-drain path (client pipelining bytes with CONNECT; assert they reach backend)
