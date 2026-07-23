@@ -23,10 +23,14 @@ this desktop via iframe).
   `exam.yaml`; defaults to `[kubernetes.io, helm.sh]` when absent.
   Matching is by domain suffix on whole labels (`kubernetes.io` allows
   `kubernetes.io` and `*.kubernetes.io`, never `evilkubernetes.io`).
-- **Network-enforced, not browser-enforced**: the desktop sits on an
-  `internal: true` compose network whose only egress path is the
-  `docs-proxy` container. Firefox policy lockdown is UX, the network is
-  the guarantee.
+- **Network-enforced, not browser-enforced**: the desktop sits on a
+  bridge compose network with
+  `com.docker.network.bridge.enable_ip_masquerade: "false"` whose only
+  egress path is the `docs-proxy` container. Docker doesn't forward
+  published ports on `internal: true` networks; masquerade-off gives the
+  same no-NAT-egress guarantee while keeping the `127.0.0.1:6080` publish
+  (asserted by smoke). Firefox policy lockdown is UX, the network is the
+  guarantee.
 - **No VNC password, localhost-only publish**: single-user local stack;
   ports bind `127.0.0.1`.
 
@@ -67,14 +71,15 @@ this desktop via iframe).
 
 - New services `docs-proxy` and `desktop`. Networks:
   - `default` — k8s-env, instances, docs-proxy (egress to internet).
-  - `examnet` (`internal: true`) — desktop, docs-proxy, instances,
-    k8s-env. Desktop joins only `examnet`: its sole internet path is the
-    proxy; ssh and kubectl stay internal.
+  - `examnet` (bridge, `com.docker.network.bridge.enable_ip_masquerade:
+    "false"`) — desktop, docs-proxy, instances, k8s-env. Desktop joins
+    only `examnet`: its sole internet path is the proxy; ssh and kubectl
+    stay internal.
 - `desktop` publishes `127.0.0.1:6080:6080`. Depends on `docs-proxy`
   (started) and `k8s-env` (healthy, for the shared ssh key).
-- `docs-proxy` gets `ALLOWED_DOMAINS` from `yq` at `./sim up` time
-  (wrapper extracts from the bank, exports env for compose interpolation;
-  default in compose file covers direct `docker compose up`).
+- The docs-proxy image entrypoint extracts `allowedDomains` from the
+  mounted bank when `ALLOWED_DOMAINS` isn't set, avoiding a host `yq`
+  dependency; the Go binary remains env-only.
 - `./sim up` final message includes `Desktop: http://localhost:6080`.
 - `./sim reset` unchanged: desktop and proxy are stateless.
 

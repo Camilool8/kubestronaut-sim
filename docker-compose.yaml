@@ -16,6 +16,7 @@ services:
       timeout: 3s
       retries: 90
       start_period: 60s
+    networks: [default, examnet]
   ckad-1:
     build: images/instance
     hostname: ckad-1
@@ -28,6 +29,7 @@ services:
       - ./banks:/banks:ro
       - ./tests:/tests:ro
       - course-1:/opt/course
+    networks: [default, examnet]
   ckad-2:
     build: images/instance
     hostname: ckad-2
@@ -40,8 +42,41 @@ services:
       - ./banks:/banks:ro
       - ./tests:/tests:ro
       - course-2:/opt/course
+    networks: [default, examnet]
+  docs-proxy:
+    build: proxy
+    hostname: docs-proxy
+    environment:
+      BANK: ${BANK:-ckad-mock-01}
+    volumes:
+      - ./banks:/banks:ro
+    networks: [default, examnet]
+  desktop:
+    build: images/desktop
+    hostname: desktop
+    ports:
+      - "127.0.0.1:6080:6080"
+    depends_on:
+      k8s-env: {condition: service_healthy}
+      docs-proxy: {condition: service_started}
+    volumes:
+      - shared:/shared:ro
+    networks: [examnet]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:6080/vnc.html"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+    restart: unless-stopped
 volumes:
   shared: {}
   dind: {}
   course-1: {}
   course-2: {}
+networks:
+  default: {}
+  examnet:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
