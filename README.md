@@ -10,9 +10,10 @@ Not affiliated with CNCF, The Linux Foundation, PSI, or killer.sh.
 
 ## Quickstart (Milestone A — CLI exam)
 
-Requires Docker Desktop (or docker + compose v2). ~8GB RAM free.
+Requires Docker Desktop (or docker + compose v2). ~9GB RAM free (XFCE desktop included).
 
     ./sim up                 # boots cluster + instances (first run: several minutes)
+    open http://localhost:6080/vnc.html   # exam desktop (Firefox = docs only)
     cat banks/ckad-mock-01/q01/question.md
     ./sim ssh ckad-1         # solve it (user: candidate)
     ./sim grade              # killer.sh-style scoreboard

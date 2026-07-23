@@ -10,6 +10,7 @@ spec:
   environment:
     provider: kind
     nodes: 2
+    allowedDomains: [kubernetes.io, helm.sh]
   instances:
     - name: ckad-1
     - name: ckad-2

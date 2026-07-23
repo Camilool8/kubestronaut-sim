@@ -9,6 +9,17 @@ fail() { echo "SMOKE FAIL: $1"; ./sim down; exit 1; }
 docker compose exec ckad-1 su - candidate -c 'kubectl get nodes --no-headers' | tee /tmp/nodes.txt
 [ "$(grep -c ' Ready ' /tmp/nodes.txt)" -eq 2 ] || fail "expected 2 Ready nodes"
 
+# desktop: noVNC served; proxy allowlist enforced; no direct egress; ssh works
+curl -fsS -o /dev/null http://localhost:6080/vnc.html || fail "noVNC not serving"
+docker compose exec desktop curl -fsS --max-time 15 -o /dev/null -x http://docs-proxy:3128 https://kubernetes.io \
+  || fail "proxy should allow kubernetes.io"
+docker compose exec desktop curl -fs --max-time 15 -o /dev/null -x http://docs-proxy:3128 https://example.com \
+  && fail "proxy should block example.com" || true
+docker compose exec desktop curl -s --max-time 5 -o /dev/null https://example.com \
+  && fail "desktop should have no direct egress" || true
+docker compose exec desktop su - candidate -c 'ssh -o BatchMode=yes ckad-1 kubectl get nodes --no-headers' \
+  | grep -q ' Ready ' || fail "desktop->ckad-1 ssh broken"
+
 ./sim grade | tee /tmp/grade0.txt
 read -r _ e0 t0 _ < <(grep '^RESULT ' /tmp/grade0.txt)
 [ "$e0" = "0" ] || fail "fresh env should score 0, got ${e0}"

@@ -55,3 +55,6 @@ directory per question.
   owned by `candidate`. Questions must never require creating these
   directories — candidates only write files into them, as on the real exam.
 - `/banks` mounted read-only on k8s-env and instances.
+- `spec.environment.allowedDomains` (optional, default
+  `[kubernetes.io, helm.sh]`): domain suffixes the exam desktop's browser
+  may reach through the docs proxy; subdomains included.

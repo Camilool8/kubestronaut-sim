@@ -5,7 +5,7 @@ cmd=${1:-help}
 case "$cmd" in
   up)
     BANK=${2:-ckad-mock-01} docker compose up -d --build --wait
-    echo "Exam environment ready. Connect: ./sim ssh ckad-1" ;;
+    echo "Exam environment ready. Desktop: http://localhost:6080/vnc.html — or ./sim ssh ckad-1" ;;
   down)  docker compose down ;;
   purge) docker compose down -v ;;
   reset)
