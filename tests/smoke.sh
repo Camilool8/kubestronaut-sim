@@ -11,9 +11,9 @@ docker compose exec ckad-1 su - candidate -c 'kubectl get nodes --no-headers' | 
 
 # desktop: noVNC served; proxy allowlist enforced; no direct egress; ssh works
 curl -fsS -o /dev/null http://localhost:6080/vnc.html || fail "noVNC not serving"
-docker compose exec desktop curl -fsS -o /dev/null -x http://docs-proxy:3128 https://kubernetes.io \
+docker compose exec desktop curl -fsS --max-time 15 -o /dev/null -x http://docs-proxy:3128 https://kubernetes.io \
   || fail "proxy should allow kubernetes.io"
-docker compose exec desktop curl -s -o /dev/null -x http://docs-proxy:3128 https://example.com \
+docker compose exec desktop curl -fs --max-time 15 -o /dev/null -x http://docs-proxy:3128 https://example.com \
   && fail "proxy should block example.com" || true
 docker compose exec desktop curl -s --max-time 5 -o /dev/null https://example.com \
   && fail "desktop should have no direct egress" || true
