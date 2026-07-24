@@ -1,0 +1,43 @@
+{
+  "apiVersion": "sim.kubestronaut.dev/v1alpha1",
+  "kind": "Exam",
+  "metadata": {
+    "name": "ckad-mock-01",
+    "title": "CKAD Mock Exam 01"
+  },
+  "spec": {
+    "duration": "120m",
+    "passingScore": 66,
+    "kubernetesVersion": "1.35",
+    "environment": {
+      "provider": "kind",
+      "nodes": 2,
+      "allowedDomains": [
+        "kubernetes.io",
+        "helm.sh"
+      ]
+    },
+    "instances": [
+      {
+        "name": "ckad-1"
+      },
+      {
+        "name": "ckad-2"
+      }
+    ],
+    "questions": [
+      {
+        "id": "q02",
+        "instance": "ckad-1",
+        "domain": "Application Deployment",
+        "weight": 7
+      },
+      {
+        "id": "q01",
+        "instance": "ckad-1",
+        "domain": "Application Environment, Configuration and Security",
+        "weight": 5
+      }
+    ]
+  }
+}
