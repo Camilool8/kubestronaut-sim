@@ -150,6 +150,10 @@ func New(path string, dur time.Duration, clock func() time.Time, onExpire func()
 	if m.state == stateRunning {
 		if m.remainingLocked() <= 0 {
 			if err := m.transitionToEndedLocked(reasonExpired); err != nil {
+				// Rolled back to running with no time left; there is no
+				// timer to retry this (remaining is already <= 0), so it
+				// stays running-in-memory until the next Snapshot call's
+				// lazy-expiry backstop retries the persist.
 				fmt.Fprintf(os.Stderr, "session: persist expiry on load %s: %v\n", path, err)
 			}
 		} else {
@@ -162,7 +166,10 @@ func New(path string, dur time.Duration, clock func() time.Time, onExpire func()
 
 // Start moves an idle session to running, recording startedAt as
 // clock() and arming the expiry timer for the full duration. It returns
-// ErrConflict if the session is not idle.
+// ErrConflict if the session is not idle. If persisting the transition
+// fails, the in-memory state is rolled back to idle (so a caller sees a
+// clean error and can retry) rather than left running with nothing
+// written to disk.
 func (m *Manager) Start() (Snapshot, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -171,6 +178,7 @@ func (m *Manager) Start() (Snapshot, error) {
 		return Snapshot{}, fmt.Errorf("session: start: %w", ErrConflict)
 	}
 
+	prev := m.captureLocked()
 	m.state = stateRunning
 	m.startedAt = m.clock()
 	m.endedAt = time.Time{}
@@ -179,6 +187,7 @@ func (m *Manager) Start() (Snapshot, error) {
 	m.gradeError = ""
 
 	if err := m.persistLocked(); err != nil {
+		m.restoreLocked(prev)
 		return Snapshot{}, fmt.Errorf("session: start: %w", err)
 	}
 	m.armTimerLocked(m.dur)
@@ -214,12 +223,14 @@ func (m *Manager) End(reason string) error {
 
 // Reset returns the session to idle from any state, clearing startedAt,
 // endedAt, endReason, results, and gradeError, and cancelling any armed
-// timer. It always succeeds.
+// timer. It always succeeds, unless persisting the reset fails, in which
+// case the in-memory state (and armed timer, if any) is left exactly as
+// it was.
 func (m *Manager) Reset() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.stopTimerLocked()
+	prev := m.captureLocked()
 	m.state = stateIdle
 	m.startedAt = time.Time{}
 	m.endedAt = time.Time{}
@@ -228,8 +239,10 @@ func (m *Manager) Reset() error {
 	m.gradeError = ""
 
 	if err := m.persistLocked(); err != nil {
+		m.restoreLocked(prev)
 		return fmt.Errorf("session: reset: %w", err)
 	}
+	m.stopTimerLocked()
 	return nil
 }
 
@@ -253,27 +266,33 @@ func (m *Manager) Snapshot() Snapshot {
 
 // SetResults records the graded results for the current session and
 // clears any prior gradeError (a successful grade supersedes an earlier
-// failed attempt).
+// failed attempt). On a persist failure, results/gradeError are left
+// unchanged.
 func (m *Manager) SetResults(r json.RawMessage) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	prev := m.captureLocked()
 	m.results = r
 	m.gradeError = ""
 	if err := m.persistLocked(); err != nil {
+		m.restoreLocked(prev)
 		return fmt.Errorf("session: set results: %w", err)
 	}
 	return nil
 }
 
 // SetGradeError records that grading failed with the given message, so
-// /api/results can surface it and a caller can retry via End.
+// /api/results can surface it and a caller can retry via End. On a
+// persist failure, gradeError is left unchanged.
 func (m *Manager) SetGradeError(msg string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	prev := m.captureLocked()
 	m.gradeError = msg
 	if err := m.persistLocked(); err != nil {
+		m.restoreLocked(prev)
 		return fmt.Errorf("session: set grade error: %w", err)
 	}
 	return nil
@@ -291,6 +310,44 @@ func (m *Manager) Results() (results json.RawMessage, gradeError string, graded 
 	return m.results, m.gradeError, graded
 }
 
+// mutableFields is the subset of Manager state a transition reads and
+// writes. Capturing it before a mutation and restoring it if the
+// subsequent persist fails keeps memory and disk from diverging: a
+// failed transition leaves no observable trace instead of committing an
+// in-memory change the disk never saw.
+type mutableFields struct {
+	state      string
+	startedAt  time.Time
+	endedAt    time.Time
+	endReason  string
+	results    json.RawMessage
+	gradeError string
+}
+
+// captureLocked snapshots the fields a transition may need to roll back.
+// The caller must hold m.mu.
+func (m *Manager) captureLocked() mutableFields {
+	return mutableFields{
+		state:      m.state,
+		startedAt:  m.startedAt,
+		endedAt:    m.endedAt,
+		endReason:  m.endReason,
+		results:    m.results,
+		gradeError: m.gradeError,
+	}
+}
+
+// restoreLocked reverts the fields captureLocked snapshotted. The caller
+// must hold m.mu.
+func (m *Manager) restoreLocked(f mutableFields) {
+	m.state = f.state
+	m.startedAt = f.startedAt
+	m.endedAt = f.endedAt
+	m.endReason = f.endReason
+	m.results = f.results
+	m.gradeError = f.gradeError
+}
+
 // remainingLocked returns the time left until expiry (dur since
 // startedAt as measured by clock()), clamped to zero. The caller must
 // hold m.mu.
@@ -303,27 +360,39 @@ func (m *Manager) remainingLocked() time.Duration {
 }
 
 // checkExpiryLocked lazily ends a running session whose time has run
-// out, returning whether it did so (in which case the caller must invoke
-// onExpire after releasing m.mu). The caller must hold m.mu.
+// out, returning whether it actually did so (in which case the caller
+// must invoke onExpire after releasing m.mu). It returns false — without
+// having changed anything observable — if persisting the transition
+// fails, so a transient disk error never reports an expiry that didn't
+// durably happen. The caller must hold m.mu.
 func (m *Manager) checkExpiryLocked() bool {
 	if m.state != stateRunning || m.remainingLocked() > 0 {
 		return false
 	}
 	if err := m.transitionToEndedLocked(reasonExpired); err != nil {
 		fmt.Fprintf(os.Stderr, "session: persist expiry: %v\n", err)
+		return false
 	}
 	return true
 }
 
 // transitionToEndedLocked moves the session to ended with the given
-// reason, stops any armed timer, and persists the change. The caller
-// must hold m.mu.
+// reason and persists the change, stopping the armed timer (if any) only
+// once the write succeeds. On a persist failure, the in-memory state is
+// rolled back to what it was before this call and the timer is left
+// untouched — both remain consistent with each other and with the
+// caller's error. The caller must hold m.mu.
 func (m *Manager) transitionToEndedLocked(reason string) error {
-	m.stopTimerLocked()
+	prev := m.captureLocked()
 	m.state = stateEnded
 	m.endedAt = m.clock()
 	m.endReason = reason
-	return m.persistLocked()
+	if err := m.persistLocked(); err != nil {
+		m.restoreLocked(prev)
+		return err
+	}
+	m.stopTimerLocked()
+	return nil
 }
 
 // armTimerLocked (re-)arms the real expiry timer for d, replacing any

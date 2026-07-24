@@ -490,6 +490,61 @@ func TestResultsNotGradedBeforeSet(t *testing.T) {
 	}
 }
 
+// TestStartPersistFailureRollsBack proves a failed persist doesn't leave
+// Start's in-memory mutation half-applied: a session directory whose
+// parent doesn't exist makes persistLocked's os.CreateTemp fail
+// deterministically (portable even when tests run as root, unlike
+// chmod-based permission tricks, which root ignores).
+func TestStartPersistFailureRollsBack(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "missing-subdir", "session.json")
+	clock, _ := fakeClock(epoch)
+	m, err := New(path, testDur, clock, func() {})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	if _, err := m.Start(); err == nil {
+		t.Fatal("Start with unwritable session dir: got nil error, want non-nil")
+	}
+
+	snap := m.Snapshot()
+	if snap.State != "idle" {
+		t.Errorf("State after failed Start = %q, want idle (rolled back)", snap.State)
+	}
+}
+
+// TestEndPersistFailureRollsBack covers the same rollback contract for
+// transitionToEndedLocked, shared by End, the real timer, and Snapshot's
+// lazy expiry.
+func TestEndPersistFailureRollsBack(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "session.json")
+	clock, _ := fakeClock(epoch)
+	m, err := New(path, testDur, clock, func() {})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if _, err := m.Start(); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	if err := os.RemoveAll(dir); err != nil {
+		t.Fatalf("RemoveAll: %v", err)
+	}
+
+	if err := m.End("submitted"); err == nil {
+		t.Fatal("End with removed session dir: got nil error, want non-nil")
+	}
+
+	snap := m.Snapshot()
+	if snap.State != "running" {
+		t.Errorf("State after failed End = %q, want running (rolled back)", snap.State)
+	}
+	if snap.EndReason != "" {
+		t.Errorf("EndReason after failed End = %q, want empty (rolled back)", snap.EndReason)
+	}
+}
+
 // TestRealTimerFiresOnExpiry is the one test allowed a real timer wait: it
 // uses the real clock and a short real duration to prove the time.Timer
 // mechanism itself (not just the lazy Snapshot check) auto-ends a session
