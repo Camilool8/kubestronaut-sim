@@ -1,6 +1,7 @@
 package exam
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -112,6 +113,16 @@ func TestLoad(t *testing.T) {
 func TestLoadUnknownExamPath(t *testing.T) {
 	if _, err := Load("testdata/does-not-exist.json", bankDir); err == nil {
 		t.Error("Load with unknown exam JSON path: got nil error, want non-nil")
+	}
+}
+
+func TestLoadNoValidateScripts(t *testing.T) {
+	_, err := Load("testdata/exam-no-validate.json", bankDir)
+	if err == nil {
+		t.Error("Load with question having no validate.d scripts: got nil error, want non-nil")
+	}
+	if err != nil && !strings.Contains(err.Error(), "has no validate.d scripts") {
+		t.Errorf("Load error = %v, want error mentioning 'has no validate.d scripts'", err)
 	}
 }
 

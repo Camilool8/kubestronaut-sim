@@ -121,6 +121,9 @@ func loadChecks(bankDir, qid string) ([]Check, error) {
 	if err != nil {
 		return nil, fmt.Errorf("exam: glob %s: %w", pattern, err)
 	}
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("exam: question %s has no validate.d scripts in %s", qid, filepath.Join(bankDir, qid, "validate.d"))
+	}
 	// filepath.Glob's ordering isn't part of its documented contract, so
 	// sort explicitly to guarantee lexical order.
 	sort.Strings(paths)
