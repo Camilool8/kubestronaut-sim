@@ -769,3 +769,226 @@
     padding: var(--space-4);
   }
 }
+
+/* ---- toast layer ---- */
+
+.toast-layer {
+  position: fixed;
+  bottom: var(--space-4);
+  right: var(--space-4);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: min(380px, calc(100vw - 2rem));
+}
+
+.toast-region {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-s);
+  box-shadow: var(--shadow-2);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+}
+
+.toast-warning {
+  border-left-color: var(--warn);
+}
+
+.toast-message {
+  flex: 1;
+}
+
+.toast-dismiss {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.2em;
+}
+
+.toast-dismiss:hover {
+  color: var(--text);
+}
+
+/* ---- tour ---- */
+
+.tour-layer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-tour);
+  pointer-events: none;
+}
+
+.tour-spotlight {
+  position: fixed;
+  border-radius: var(--radius-s);
+  box-shadow: 0 0 0 200vmax var(--overlay);
+  border: 2px solid var(--accent);
+  transition: all 0.25s ease;
+}
+
+.tour-card {
+  position: fixed;
+  pointer-events: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-3);
+  padding: var(--space-4) var(--space-5);
+  width: 340px;
+  max-width: calc(100vw - 2rem);
+}
+
+.tour-card h3 {
+  margin: 0 0 var(--space-2);
+}
+
+.tour-card p {
+  margin: 0 0 var(--space-3);
+  color: var(--text-muted);
+}
+
+.tour-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+.tour-progress {
+  margin-right: auto;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+/* ---- info button + drawer ---- */
+
+.info-button {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: var(--radius-pill);
+  width: 28px;
+  height: 28px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.info-button:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.info-button-floating {
+  position: fixed;
+  top: var(--space-4);
+  right: calc(var(--space-4) + 96px);
+  z-index: var(--z-panel);
+  background: var(--surface);
+}
+
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  z-index: var(--z-dialog);
+}
+
+.info-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: min(480px, 92vw);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-3);
+  overflow-y: auto;
+  padding: var(--space-5) var(--space-6);
+}
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.drawer-head h2 {
+  margin: 0;
+}
+
+.drawer-close {
+  padding: 0.1em 0.6em;
+}
+
+.info-drawer section {
+  margin-bottom: var(--space-6);
+}
+
+.info-drawer h3 {
+  font-size: var(--text-m);
+  margin-bottom: var(--space-3);
+}
+
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-s);
+}
+
+.compare-table th,
+.compare-table td {
+  text-align: left;
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.compare-table thead th {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.compare-table tbody th {
+  font-weight: 600;
+}
+
+.drawer-note {
+  color: var(--text-muted);
+  font-size: var(--text-s);
+  margin-top: var(--space-3);
+}
+
+.license-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--text-muted);
+}
+
+.license-list li {
+  margin-bottom: var(--space-1);
+}
+
+.start-footer {
+  margin: var(--space-5) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-align: center;
+}

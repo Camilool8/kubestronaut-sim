@@ -14,6 +14,8 @@ import { Exam } from "./screens/Exam";
 import { Score } from "./screens/Score";
 import { ControlProgress } from "./components/ControlProgress";
 import { ThemeToggle } from "./components/ThemeToggle";
+import { InfoButton } from "./components/InfoButton";
+import { ToastLayer } from "./components/Toast";
 import { strings } from "./strings";
 
 // Control-status poll cadence: fast while a job is running (the overlay
@@ -143,7 +145,13 @@ export default function App() {
   return (
     <>
       {screen}
-      {session.state !== "running" && <ThemeToggle floating />}
+      <ToastLayer />
+      {session.state !== "running" && (
+        <>
+          <ThemeToggle floating />
+          <InfoButton floating />
+        </>
+      )}
       {overlayJob && (
         <ControlProgress
           job={overlayJob}

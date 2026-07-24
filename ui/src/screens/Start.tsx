@@ -174,6 +174,8 @@ export function Start({ onSessionChange, onControlStart }: StartProps) {
             {starting ? strings.start.starting : strings.start.startExam}
           </button>
         </div>
+
+        <p className="start-footer">{strings.info.footerLine}</p>
       </div>
 
       {confirmBank && (
