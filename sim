@@ -5,20 +5,21 @@ cmd=${1:-help}
 case "$cmd" in
   up)
     BANK=${2:-ckad-mock-01} docker compose up -d --build --wait
-    echo "Exam environment ready. Exam UI: http://localhost:8080 — or ./sim ssh ckad-1" ;;
+    echo "Exam environment ready. Exam UI: http://localhost:8080 — or ./sim ssh instance-1" ;;
   down)  docker compose down ;;
   purge) docker compose down -v ;;
   reset)
     echo "Resetting exam state (cluster + instances, cached images kept)..."
-    bank=$(docker compose exec -T k8s-env printenv BANK)   # keep the bank the stack was launched with
-    for i in ckad-1 ckad-2; do   # /opt/course is a persistent volume; recreate alone won't wipe it
+    for i in instance-1 instance-2; do   # /opt/course is a persistent volume; recreate alone won't wipe it
       docker compose exec "$i" find /opt/course -mindepth 1 -delete
     done
+    # the active bank lives in /shared/bank; bootstrap.sh and the instance
+    # entrypoints read it directly, so no env threading is needed
     docker compose exec k8s-env bash -c 'kind delete cluster --name sim || true; /opt/sim/bootstrap.sh'
-    BANK="$bank" docker compose up -d --force-recreate ckad-1 ckad-2
+    docker compose up -d --force-recreate instance-1 instance-2
     curl -fsS -X DELETE http://localhost:8080/api/session >/dev/null || true
     echo "Fresh exam ready." ;;
-  ssh)   docker compose exec "${2:-ckad-1}" su - candidate ;;
+  ssh)   docker compose exec "${2:-instance-1}" su - candidate ;;
   status) docker compose ps ;;
   grade) docker compose exec facilitator /entrypoint.sh grade ;;
   help)  echo "usage: ./sim {up [bank]|down|reset|purge|ssh [instance]|status|grade}" ;;

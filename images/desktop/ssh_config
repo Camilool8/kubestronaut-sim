@@ -1,4 +1,4 @@
-Host ckad-1 ckad-2
+Host instance-1 instance-2
   User candidate
   IdentityFile ~/.ssh/id_ed25519
   StrictHostKeyChecking accept-new

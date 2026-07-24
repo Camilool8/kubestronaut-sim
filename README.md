@@ -43,7 +43,7 @@ disk regardless of what the API reports.
 While an exam is running (or any time, from your host), you can also:
 
     cat banks/ckad-mock-01/q01/question.md
-    ./sim ssh ckad-1         # solve it directly (user: candidate), no desktop needed
+    ./sim ssh instance-1         # solve it directly (user: candidate), no desktop needed
     ./sim grade              # killer.sh-style scoreboard (session-independent)
     ./sim reset              # wipe your answers, fresh exam (fast — keeps caches)
     ./sim down               # stop (cluster state persists — resume where you left off)

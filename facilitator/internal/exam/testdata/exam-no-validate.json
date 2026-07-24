@@ -19,13 +19,13 @@
     },
     "instances": [
       {
-        "name": "ckad-1"
+        "name": "instance-1"
       }
     ],
     "questions": [
       {
         "id": "q03",
-        "instance": "ckad-1",
+        "instance": "instance-1",
         "domain": "Test Domain",
         "weight": 5
       }

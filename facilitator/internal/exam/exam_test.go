@@ -47,8 +47,8 @@ func TestLoad(t *testing.T) {
 		t.Errorf("Questions[1].ID = %q, want %q (file order not preserved)", q01.ID, "q01")
 	}
 
-	if q02.Instance != "ckad-1" {
-		t.Errorf("q02.Instance = %q, want %q", q02.Instance, "ckad-1")
+	if q02.Instance != "instance-1" {
+		t.Errorf("q02.Instance = %q, want %q", q02.Instance, "instance-1")
 	}
 	if q02.Domain != "Application Deployment" {
 		t.Errorf("q02.Domain = %q, want %q", q02.Domain, "Application Deployment")

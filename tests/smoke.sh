@@ -24,7 +24,7 @@ print(data.get(os.environ["FIELD"], ""))
 
 ./sim purge   # cold start: the fresh-grade-0 assertion needs pristine cluster state
 ./sim up
-docker compose exec ckad-1 su - candidate -c 'kubectl get nodes --no-headers' | tee /tmp/nodes.txt
+docker compose exec instance-1 su - candidate -c 'kubectl get nodes --no-headers' | tee /tmp/nodes.txt
 [ "$(grep -c ' Ready ' /tmp/nodes.txt)" -eq 2 ] || fail "expected 2 Ready nodes"
 
 echo "== facilitator: healthz, exam metadata, built UI, single :8080 surface =="
@@ -56,8 +56,8 @@ docker compose exec desktop curl -fs --max-time 15 -o /dev/null -x http://docs-p
   && fail "proxy should block example.com" || true
 docker compose exec desktop curl -s --max-time 5 -o /dev/null https://example.com \
   && fail "desktop should have no direct egress" || true
-docker compose exec desktop su - candidate -c 'ssh -o BatchMode=yes ckad-1 kubectl get nodes --no-headers' \
-  | grep -q ' Ready ' || fail "desktop->ckad-1 ssh broken"
+docker compose exec desktop su - candidate -c 'ssh -o BatchMode=yes instance-1 kubectl get nodes --no-headers' \
+  | grep -q ' Ready ' || fail "desktop->instance-1 ssh broken"
 
 echo "== session lifecycle: start, countdown, desktop unlock =="
 status=$(req POST /api/session/start)
@@ -84,9 +84,9 @@ status=$(req GET /api/questions/q01/solution)
 read -r _ e0 t0 _ < <(grep '^RESULT ' /tmp/grade0.txt)
 [ "$e0" = "0" ] || fail "fresh env should score 0, got ${e0}"
 
-docker compose exec ckad-1 su - candidate -c 'bash /tests/solutions/q01.sh'
-docker compose exec ckad-1 su - candidate -c 'bash /tests/solutions/q02.sh'
-docker compose exec ckad-2 su - candidate -c 'bash /tests/solutions/q03.sh'
+docker compose exec instance-1 su - candidate -c 'bash /tests/solutions/q01.sh'
+docker compose exec instance-1 su - candidate -c 'bash /tests/solutions/q02.sh'
+docker compose exec instance-2 su - candidate -c 'bash /tests/solutions/q03.sh'
 
 ./sim grade | tee /tmp/grade1.txt
 read -r _ e1 t1 _ < <(grep '^RESULT ' /tmp/grade1.txt)
@@ -139,7 +139,7 @@ read -r _ e2 t2 _ < <(grep '^RESULT ' /tmp/grade2.txt)
 ./sim grade | tee /tmp/grade3.txt
 read -r _ e3 _ _ < <(grep '^RESULT ' /tmp/grade3.txt)
 [ "$e3" = "0" ] || fail "reset env should score 0, got ${e3}"
-docker compose exec ckad-1 su - candidate -c 'test -d /opt/course/1 -a -w /opt/course/1 -a -z "$(ls -A /opt/course/1)"' \
+docker compose exec instance-1 su - candidate -c 'test -d /opt/course/1 -a -w /opt/course/1 -a -z "$(ls -A /opt/course/1)"' \
   || fail "reset should leave /opt/course/1 empty and writable"
 
 status=$(req GET /api/session)

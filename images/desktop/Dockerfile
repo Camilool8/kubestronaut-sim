@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       firefox-esr openssh-client curl ca-certificates procps \
     && rm -rf /var/lib/apt/lists/*
 RUN useradd -m -s /bin/bash candidate \
-    && printf '\necho "Exam desktop — solve questions via: ssh ckad-1 (or ckad-2). Docs: Firefox (allowlisted)."\n' >> /home/candidate/.bashrc
+    && printf '\n[ -f /shared/exam/motd ] && cat /shared/exam/motd\n' >> /home/candidate/.bashrc
 COPY policies.json /etc/firefox-esr/policies/policies.json
 COPY policies.json /usr/lib/firefox-esr/distribution/policies.json
 COPY ssh_config /etc/sim/ssh_config

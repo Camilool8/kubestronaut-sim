@@ -12,18 +12,18 @@ spec:
     nodes: 2
     allowedDomains: [kubernetes.io, helm.sh]
   instances:
-    - name: ckad-1
-    - name: ckad-2
+    - name: instance-1
+    - name: instance-2
   questions:
     - id: q01
-      instance: ckad-1
+      instance: instance-1
       domain: Application Environment, Configuration and Security
       weight: 5
     - id: q02
-      instance: ckad-1
+      instance: instance-1
       domain: Application Deployment
       weight: 7
     - id: q03
-      instance: ckad-2
+      instance: instance-2
       domain: Services and Networking
       weight: 5

@@ -17,12 +17,14 @@ directory per question.
       environment:
         provider: kind
         nodes: 2                    # informational; 1 control-plane + N-1 workers
-      instances:                    # ssh targets; compose services must match
-        - name: ckad-1
-        - name: ckad-2
+      instances:                    # ssh targets; 1 or 2 entries, names MUST be
+        - name: instance-1          # instance-1 / instance-2 — the compose topology
+        - name: instance-2          # is generic so every bank runs unmodified.
+                                    # (Per-bank ssh aliases, e.g. cka-1 -> instance-1,
+                                    # are a possible future enhancement.)
       questions:
         - id: q01                   # directory name
-          instance: ckad-1          # where the candidate solves it
+          instance: instance-1          # where the candidate solves it
           domain: Application Design and Build
           weight: 5                 # informational; scoring = sum of check points
 

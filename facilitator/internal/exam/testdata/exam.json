@@ -19,22 +19,22 @@
     },
     "instances": [
       {
-        "name": "ckad-1"
+        "name": "instance-1"
       },
       {
-        "name": "ckad-2"
+        "name": "instance-2"
       }
     ],
     "questions": [
       {
         "id": "q02",
-        "instance": "ckad-1",
+        "instance": "instance-1",
         "domain": "Application Deployment",
         "weight": 7
       },
       {
         "id": "q01",
-        "instance": "ckad-1",
+        "instance": "instance-1",
         "domain": "Application Environment, Configuration and Security",
         "weight": 5
       }

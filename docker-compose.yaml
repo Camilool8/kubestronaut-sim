@@ -17,9 +17,9 @@ services:
       retries: 90
       start_period: 60s
     networks: [default, examnet]
-  ckad-1:
+  instance-1:
     build: images/instance
-    hostname: ckad-1
+    hostname: instance-1
     environment:
       BANK: ${BANK:-ckad-mock-01}
     depends_on:
@@ -30,9 +30,9 @@ services:
       - ./tests:/tests:ro
       - course-1:/opt/course
     networks: [default, examnet]
-  ckad-2:
+  instance-2:
     build: images/instance
-    hostname: ckad-2
+    hostname: instance-2
     environment:
       BANK: ${BANK:-ckad-mock-01}
     depends_on:
@@ -50,6 +50,7 @@ services:
       BANK: ${BANK:-ckad-mock-01}
     volumes:
       - ./banks:/banks:ro
+      - shared:/shared:ro
     networks: [default, examnet]
     restart: unless-stopped
   desktop:
@@ -86,8 +87,8 @@ services:
     depends_on:
       k8s-env: {condition: service_healthy}
       desktop: {condition: service_healthy}
-      ckad-1: {condition: service_started}
-      ckad-2: {condition: service_started}
+      instance-1: {condition: service_started}
+      instance-2: {condition: service_started}
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
       interval: 10s
