@@ -68,7 +68,7 @@ func newTestServer(t *testing.T) *testServer {
 	}
 
 	clock, setNow := fakeClock(epoch)
-	mgr, err := session.New(t.TempDir()+"/session.json", ex.Duration, clock, func() {})
+	mgr, err := session.New(t.TempDir()+"/session.json", ex.Name, ex.Duration, clock, func() {})
 	if err != nil {
 		t.Fatalf("session.New: %v", err)
 	}
@@ -356,7 +356,7 @@ func TestSessionEndLifecycle(t *testing.T) {
 	}
 
 	// once results are recorded, ended-with-results -> end: 409.
-	if err := ts.mgr.SetResults(mustJSON(t, map[string]int{"earned": 1})); err != nil {
+	if err := ts.mgr.SetResults(ts.mgr.AttemptToken(), mustJSON(t, map[string]int{"earned": 1})); err != nil {
 		t.Fatalf("SetResults: %v", err)
 	}
 	rec = ts.do(t, http.MethodPost, "/api/session/end")
@@ -416,7 +416,7 @@ func TestResultsLifecycle(t *testing.T) {
 	}
 
 	// gradeError set: 500 with the error message.
-	if err := ts.mgr.SetGradeError("ssh unreachable"); err != nil {
+	if err := ts.mgr.SetGradeError(ts.mgr.AttemptToken(), "ssh unreachable"); err != nil {
 		t.Fatalf("SetGradeError: %v", err)
 	}
 	rec = ts.do(t, http.MethodGet, "/api/results")
@@ -436,7 +436,7 @@ func TestResultsLifecycle(t *testing.T) {
 	// results recorded: 200 with the raw results JSON, superseding the
 	// earlier gradeError.
 	want := mustJSON(t, map[string]any{"earned": 9, "total": 9, "percent": 100})
-	if err := ts.mgr.SetResults(want); err != nil {
+	if err := ts.mgr.SetResults(ts.mgr.AttemptToken(), want); err != nil {
 		t.Fatalf("SetResults: %v", err)
 	}
 	rec = ts.do(t, http.MethodGet, "/api/results")

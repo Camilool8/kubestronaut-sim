@@ -8,6 +8,7 @@ export type SessionState = "idle" | "running" | "ended";
 
 export interface SessionSnapshot {
   state: SessionState;
+  bank: string;
   startedAt: string;
   durationSeconds: number;
   remainingSeconds: number;

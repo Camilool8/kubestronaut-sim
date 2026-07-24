@@ -216,6 +216,7 @@ func (s *server) handleSolution(w http.ResponseWriter, r *http.Request) {
 // and POST /api/session/end.
 type sessionResponse struct {
 	State            string `json:"state"`
+	Bank             string `json:"bank"`
 	StartedAt        string `json:"startedAt"`
 	DurationSeconds  int    `json:"durationSeconds"`
 	RemainingSeconds int    `json:"remainingSeconds"`
@@ -225,6 +226,7 @@ type sessionResponse struct {
 func toSessionResponse(snap session.Snapshot) sessionResponse {
 	resp := sessionResponse{
 		State:            snap.State,
+		Bank:             snap.Bank,
 		DurationSeconds:  snap.DurationSeconds,
 		RemainingSeconds: snap.RemainingSeconds,
 		EndReason:        snap.EndReason,

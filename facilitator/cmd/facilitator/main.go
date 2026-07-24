@@ -113,8 +113,13 @@ func runServer() error {
 	// calls whatever *gradeFn currently points to, and is only ever
 	// invoked after New returns (never synchronously from within it —
 	// see session.New's doc comment on the load-time-expiry case).
+	// The active bank id comes from the entrypoint (ACTIVE_BANK, derived
+	// from /shared/bank); ex.Name matches it by bank convention and is
+	// the natural fallback for direct/dev runs.
+	activeBank := envOr("ACTIVE_BANK", ex.Name)
+
 	var onExpire atomic.Pointer[func()]
-	mgr, err := session.New(sessionFile, dur, time.Now, func() {
+	mgr, err := session.New(sessionFile, activeBank, dur, time.Now, func() {
 		if fn := onExpire.Load(); fn != nil {
 			(*fn)()
 		}

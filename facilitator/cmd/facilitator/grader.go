@@ -50,6 +50,12 @@ func (g *grader) Grade() {
 	if !g.inFlight.CompareAndSwap(false, true) {
 		return
 	}
+	// Capture the attempt this run grades BEFORE any work happens: if the
+	// operator resets (even reset + start + end of a whole new attempt)
+	// while evaluate.Grade is running, the stale token makes every write
+	// below a clean ErrConflict instead of stamping attempt A's outcome
+	// onto attempt B.
+	token := g.mgr.AttemptToken()
 	go func() {
 		defer g.inFlight.Store(false)
 		// The design doc guarantees an evaluator failure never crashes
@@ -61,7 +67,7 @@ func (g *grader) Grade() {
 		// guarantee and lets a client re-POST end to retry.
 		defer func() {
 			if r := recover(); r != nil {
-				if setErr := g.mgr.SetGradeError(fmt.Sprintf("grading panicked: %v", r)); setErr != nil {
+				if setErr := g.mgr.SetGradeError(token, fmt.Sprintf("grading panicked: %v", r)); setErr != nil {
 					log.Printf("facilitator: record grade-panic failure: %v", setErr)
 				}
 			}
@@ -70,13 +76,13 @@ func (g *grader) Grade() {
 		res := evaluate.Grade(g.ex, g.bank, g.runner, g.timeout)
 		data, err := json.Marshal(res)
 		if err != nil {
-			if setErr := g.mgr.SetGradeError(err.Error()); setErr != nil {
+			if setErr := g.mgr.SetGradeError(token, err.Error()); setErr != nil {
 				log.Printf("facilitator: record grade-marshal failure: %v", setErr)
 			}
 			return
 		}
-		if err := g.mgr.SetResults(data); err != nil {
-			if setErr := g.mgr.SetGradeError(err.Error()); setErr != nil {
+		if err := g.mgr.SetResults(token, data); err != nil {
+			if setErr := g.mgr.SetGradeError(token, err.Error()); setErr != nil {
 				log.Printf("facilitator: record grade-results failure: %v", setErr)
 			}
 		}
