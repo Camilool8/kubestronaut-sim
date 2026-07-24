@@ -119,9 +119,11 @@ export default function App() {
 
   if (!session) {
     return (
-      <div className="loading-screen">
-        {pollError ? strings.app.cannotReach(pollError) : strings.app.loading}
-      </div>
+      <main>
+        <div className="loading-screen" role="status">
+          {pollError ? strings.app.cannotReach(pollError) : strings.app.loading}
+        </div>
+      </main>
     );
   }
 
@@ -144,7 +146,7 @@ export default function App() {
 
   return (
     <>
-      {screen}
+      <main>{screen}</main>
       <ToastLayer />
       {session.state !== "running" && (
         <>

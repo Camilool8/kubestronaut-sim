@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { strings } from "../strings";
 
 export interface TourStep {
@@ -34,12 +34,15 @@ export function resetTourSeen(): void {
 export function Tour({ steps, onDone }: TourProps) {
   const [index, setIndex] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   const step = steps[index];
 
   useEffect(() => {
     const el = step ? document.querySelector(step.target) : null;
     setRect(el ? el.getBoundingClientRect() : null);
+    // keyboard users follow the tour from the card itself
+    cardRef.current?.focus();
   }, [step]);
 
   useEffect(() => {
@@ -75,10 +78,11 @@ export function Tour({ steps, onDone }: TourProps) {
     <div className="tour-layer">
       <div className="tour-spotlight" style={spotlight} aria-hidden="true" />
       <div
+        ref={cardRef}
+        tabIndex={-1}
         className="tour-card"
         style={cardStyle}
         role="dialog"
-        aria-modal="true"
         aria-label={step.title}
       >
         <h3>{step.title}</h3>

@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef } from "react";
+import { useId, useRef } from "react";
+import { useFocusTrap } from "../lib/useFocusTrap";
 import { strings } from "../strings";
 
 interface InfoDrawerProps {
@@ -13,22 +14,13 @@ interface InfoDrawerProps {
 export function InfoDrawer({ onClose, onRestartTour }: InfoDrawerProps) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
-
-  useEffect(() => {
-    const el = ref.current;
-    el?.querySelector<HTMLElement>("button")?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  useFocusTrap(ref, onClose);
 
   const s = strings.info;
 
   return (
     <div className="drawer-overlay" onClick={onClose}>
-      <aside
+      <div
         ref={ref}
         className="info-drawer"
         role="dialog"
@@ -93,7 +85,7 @@ export function InfoDrawer({ onClose, onRestartTour }: InfoDrawerProps) {
             </button>
           </section>
         )}
-      </aside>
+      </div>
     </div>
   );
 }

@@ -992,3 +992,22 @@
   font-size: var(--text-xs);
   text-align: center;
 }
+
+/* ---- skip link (keyboard exit past the VNC canvas) ---- */
+
+.skip-link {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: var(--z-panel);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-s);
+  color: var(--accent);
+  padding: var(--space-2) var(--space-3);
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: none;
+}

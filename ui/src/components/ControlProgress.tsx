@@ -22,7 +22,9 @@ export function ControlProgress({ job, onRetry, onDismiss }: ControlProgressProp
     <div className="control-overlay">
       <div className="control-dialog" role="dialog" aria-modal="true" aria-label={title}>
         <h2>{failed ? strings.control.failedTitle : title}</h2>
-        <ul className="control-phases">
+        {/* polite live region: each phase transition is announced without
+            interrupting; the failure case below is an alert */}
+        <ul className="control-phases" aria-live="polite">
           {job.phases.map((p) => (
             <li key={p.id} className={`phase-${p.state}`}>
               <span className="phase-mark" aria-hidden="true">
@@ -34,7 +36,9 @@ export function ControlProgress({ job, onRetry, onDismiss }: ControlProgressProp
         </ul>
         {failed ? (
           <>
-            <p className="error-text">{job.error}</p>
+            <p className="error-text" role="alert">
+              {job.error}
+            </p>
             <div className="control-actions">
               <button className="btn" onClick={onDismiss}>
                 {strings.control.dismiss}

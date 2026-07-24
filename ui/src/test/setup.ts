@@ -1,6 +1,9 @@
 import "@testing-library/jest-dom/vitest";
-import { afterEach } from "vitest";
+import { afterEach, expect } from "vitest";
 import { cleanup } from "@testing-library/react";
+import * as axeMatchers from "vitest-axe/matchers";
+
+expect.extend(axeMatchers);
 
 // vitest runs without injected globals, so testing-library's automatic
 // per-test cleanup never registers itself; do it explicitly.

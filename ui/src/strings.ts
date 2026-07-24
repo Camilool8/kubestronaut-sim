@@ -123,7 +123,8 @@ export const strings = {
 
   desktop: {
     connecting: "Connecting to the exam desktop…",
-    reconnecting: "Desktop connection lost — reconnecting…",
+    reconnecting: "Desktop connection lost. Reconnecting…",
+    skip: "Skip past the exam desktop (it captures Tab while focused)",
   },
 
   lobby: {

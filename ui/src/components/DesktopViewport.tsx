@@ -72,6 +72,12 @@ export function DesktopViewport({ onStateChange }: DesktopViewportProps) {
 
   return (
     <div className="desktop-viewport">
+      {/* The VNC canvas swallows Tab once focused (it forwards keys to
+          the remote desktop) — this visually-hidden-until-focused link
+          is the documented keyboard exit, jumping to the End button. */}
+      <a className="skip-link" href="#end-exam-button">
+        {strings.desktop.skip}
+      </a>
       <div ref={mountRef} className="desktop-canvas" />
       {state !== "connected" && (
         <div className="desktop-status" role="status">

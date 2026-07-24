@@ -67,7 +67,7 @@ export function TimerBar({ session, fetchedAt, title, onEndClick, extras }: Time
       {extras}
       <ThemeToggle />
       <div className={`timer${isLow ? " timer-low" : ""}`}>{formatClock(remaining)}</div>
-      <button className="btn btn-danger" onClick={onEndClick}>
+      <button id="end-exam-button" className="btn btn-danger" onClick={onEndClick}>
         {strings.exam.endExam}
       </button>
     </header>
