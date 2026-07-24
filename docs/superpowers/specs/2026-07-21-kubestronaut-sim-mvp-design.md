@@ -92,6 +92,27 @@ MVP: `git clone` + `./sim up ckad-mock-01` (thin bash wrapper over `docker compo
 - Timer: session auto-ends and locks the desktop iframe at expiry.
 - CI smoke job: compose up on ubuntu runner, curl health endpoints, run one question's solve+evaluate cycle.
 
+## Deviations from this spec (Milestone C)
+
+Milestone C (`2026-07-24-milestone-c-facilitator-design.md`) implemented
+§5–7 with a few deliberate departures from this document:
+
+- **Session state is one JSON file, not SQLite** — `/session/session.json`
+  on its own named volume, atomic writes (temp file + rename). A single
+  in-process session doesn't need a database; SQLite is deferred to
+  whichever later milestone adds multi-session/attempt history.
+- **No separate `evaluator` container.** The evaluator logic (§6) lives as
+  an internal package inside the facilitator binary (`ssh`-exec based,
+  same flags/behavior as the retired `grade.sh`) rather than its own
+  compose service — one less container to build/wire for what is,
+  currently, a single synchronous-from-the-API's-perspective grading run
+  per session.
+- **The desktop is reachable only through the facilitator's `:8080`
+  same-origin reverse proxy** (`/desktop/*`), which also enforces the
+  session lock (403 unless `running`). The desktop container's own
+  `127.0.0.1:6080` host publish from Milestone B is removed entirely —
+  keeping it would let anyone bypass the lock by hitting 6080 directly.
+
 ## Later milestones (separate specs, not in this MVP)
 
 - **KCNA theory engine**: timed MCQ web app reusing the facilitator/UI shell; theory question spec added to the bank format.
