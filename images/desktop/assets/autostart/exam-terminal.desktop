@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Exam Terminal
+Comment=Opens the exam terminal with the welcome banner at session start
+Exec=xfce4-terminal --maximize
+Terminal=false
+X-GNOME-Autostart-enabled=true

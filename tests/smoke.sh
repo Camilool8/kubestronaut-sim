@@ -59,6 +59,13 @@ docker compose exec desktop curl -s --max-time 5 -o /dev/null https://example.co
 docker compose exec desktop su - candidate -c 'ssh -o BatchMode=yes instance-1 kubectl get nodes --no-headers' \
   | grep -q ' Ready ' || fail "desktop->instance-1 ssh broken"
 
+# ready-to-go desktop: the exam terminal is already open (autostart) and
+# the welcome banner follows the active bank
+docker compose exec desktop pgrep -f "xfce4-terminal" >/dev/null \
+  || fail "desktop should auto-open the exam terminal"
+docker compose exec desktop cat /shared/exam/motd | grep -q 'ssh instance-1' \
+  || fail "desktop motd should list the ssh targets"
+
 # conductor isolation: the docker-socket-holding sidecar must be invisible
 # from the host and from the exam network; its API is reachable only
 # through the facilitator's /api/control proxy on :8080
