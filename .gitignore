@@ -3,3 +3,5 @@
 .idea/
 .vscode/
 shared/
+ui/node_modules/
+ui/dist/
