@@ -472,6 +472,48 @@ func TestSetGradeErrorPersists(t *testing.T) {
 	}
 }
 
+// TestReloadEndedWithoutResultsAllowsRegrade is a regression test for a
+// nil-vs-literal-"null" json.RawMessage round-trip bug: json.RawMessage(nil)
+// marshals to the JSON literal null, but unmarshaling null into a
+// json.RawMessage (whose UnmarshalJSON just copies the raw input bytes,
+// regardless of content) yields a non-nil 4-byte RawMessage("null"), not
+// nil. Before the fix, an ended-without-results session reloaded via New
+// therefore had len(m.results) > 0, so Results() wrongly reported
+// graded==true and End's recovery re-grade path wrongly returned
+// ErrConflict.
+func TestReloadEndedWithoutResultsAllowsRegrade(t *testing.T) {
+	path := sessionPath(t)
+	clock, _ := fakeClock(epoch)
+
+	m1, err := New(path, testDur, clock, func() {})
+	if err != nil {
+		t.Fatalf("New (m1): %v", err)
+	}
+	if _, err := m1.Start(); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if err := m1.End("submitted"); err != nil {
+		t.Fatalf("End: %v", err)
+	}
+
+	m2, err := New(path, testDur, clock, func() {})
+	if err != nil {
+		t.Fatalf("New (m2, reload): %v", err)
+	}
+
+	results, gradeErr, graded := m2.Results()
+	if graded {
+		t.Errorf("reloaded Results() graded = true, want false (results=%v gradeErr=%q)", results, gradeErr)
+	}
+	if results != nil {
+		t.Errorf("reloaded Results() results = %v (%q), want nil", results, string(results))
+	}
+
+	if err := m2.End("submitted"); err != nil {
+		t.Errorf("End on reloaded ended-without-results session: got %v, want nil (regrade should be allowed)", err)
+	}
+}
+
 func TestResultsNotGradedBeforeSet(t *testing.T) {
 	clock, _ := fakeClock(epoch)
 	m, err := New(sessionPath(t), testDur, clock, func() {})

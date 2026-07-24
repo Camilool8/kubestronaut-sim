@@ -73,6 +73,13 @@ type Snapshot struct {
 
 // persistedState is the on-disk JSON shape written and read at path.
 // Version allows future migration.
+//
+// Results uses omitempty: json.RawMessage's UnmarshalJSON copies its
+// input bytes verbatim regardless of content, so a written literal null
+// (what a nil RawMessage marshals to) would read back as the non-nil
+// 4-byte RawMessage("null"), not nil — silently turning "not graded yet"
+// into "graded". Omitting the key entirely when results is unset avoids
+// ever writing that literal null, so a nil m.results reloads as nil.
 type persistedState struct {
 	Version         int             `json:"version"`
 	State           string          `json:"state"`
@@ -80,7 +87,7 @@ type persistedState struct {
 	DurationSeconds int             `json:"durationSeconds"`
 	EndedAt         *time.Time      `json:"endedAt"`
 	EndReason       string          `json:"endReason"`
-	Results         json.RawMessage `json:"results"`
+	Results         json.RawMessage `json:"results,omitempty"`
 	GradeError      string          `json:"gradeError"`
 }
 
@@ -395,9 +402,11 @@ func (m *Manager) transitionToEndedLocked(reason string) error {
 	return nil
 }
 
-// armTimerLocked (re-)arms the real expiry timer for d, replacing any
-// timer already set. The caller must hold m.mu.
+// armTimerLocked (re-)arms the real expiry timer for d, stopping any
+// timer already set first so it can't also fire. The caller must hold
+// m.mu.
 func (m *Manager) armTimerLocked(d time.Duration) {
+	m.stopTimerLocked()
 	if d < 0 {
 		d = 0
 	}
