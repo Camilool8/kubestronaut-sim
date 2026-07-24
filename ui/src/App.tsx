@@ -13,6 +13,7 @@ import { Start } from "./screens/Start";
 import { Exam } from "./screens/Exam";
 import { Score } from "./screens/Score";
 import { ControlProgress } from "./components/ControlProgress";
+import { ThemeToggle } from "./components/ThemeToggle";
 import { strings } from "./strings";
 
 // Control-status poll cadence: fast while a job is running (the overlay
@@ -135,13 +136,14 @@ export default function App() {
       );
       break;
     case "ended":
-      screen = <Score onNewAttempt={handleNewAttempt} />;
+      screen = <Score onNewAttempt={handleNewAttempt} endReason={session.endReason} />;
       break;
   }
 
   return (
     <>
       {screen}
+      {session.state !== "running" && <ThemeToggle floating />}
       {overlayJob && (
         <ControlProgress
           job={overlayJob}

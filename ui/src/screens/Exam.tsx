@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { endSession, getExam, type ExamInfo, type SessionSnapshot } from "../api";
 import { TimerBar } from "../components/TimerBar";
 import { QuestionPanel } from "../components/QuestionPanel";
+import { DesktopViewport } from "../components/DesktopViewport";
 import { strings } from "../strings";
 
 interface ExamProps {
@@ -10,18 +11,13 @@ interface ExamProps {
   onSessionChange: (session: SessionSnapshot) => void;
 }
 
-// The desktop iframe's src, exact per the milestone design (§3/§5): the
-// noVNC client autoconnects through the facilitator's same-origin
-// /desktop reverse proxy so its WebSocket also flows through the proxy.
-const DESKTOP_SRC =
-  "/desktop/vnc.html?autoconnect=true&resize=remote&reconnect=true&path=desktop/websockify";
-
 // Exam is only ever rendered by App while session.state === "running"
 // (screen = f(state), no router) — so the moment End succeeds and
 // App's session state flips to "ended", this whole component including
-// its iframe unmounts. The `session.state === "running"` guard on the
-// iframe itself is a second, redundant line of defense against ever
-// rendering the iframe on a stale/non-running snapshot.
+// its RFB viewport unmounts, severing the live WebSocket client-side.
+// The `session.state === "running"` guard on the viewport itself is a
+// second, redundant line of defense against ever rendering it on a
+// stale/non-running snapshot (the Go proxy independently 403s).
 export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
   const [exam, setExam] = useState<ExamInfo | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
@@ -81,10 +77,8 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
           open={panelOpen}
           onToggle={() => setPanelOpen((v) => !v)}
         />
-        <div className="desktop-pane">
-          {session.state === "running" && (
-            <iframe className="desktop-frame" title={strings.exam.desktopTitle} src={DESKTOP_SRC} />
-          )}
+        <div className="desktop-pane" aria-label={strings.exam.desktopTitle}>
+          {session.state === "running" && <DesktopViewport />}
         </div>
       </div>
 

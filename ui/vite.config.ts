@@ -9,6 +9,10 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: "dist",
+    // @novnc/novnc 1.7 uses top-level await (WebCodecs capability probe);
+    // es2022 is the earliest target that emits it natively. Local tool,
+    // evergreen browsers only.
+    target: "es2022",
   },
   server: {
     proxy: {
@@ -21,6 +25,8 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // A real (non-opaque) origin so jsdom provides working localStorage.
+    environmentOptions: { jsdom: { url: "http://localhost/" } },
     setupFiles: ["./src/test/setup.ts"],
   },
 });

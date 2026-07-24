@@ -45,6 +45,18 @@ export const strings = {
     expand: "Expand question panel",
     loading: "Loading…",
     points: (points: number) => `${points} pts`,
+    sshHint: (instance: string) => `ssh ${instance}`,
+  },
+
+  theme: {
+    labels: { system: "Auto", light: "Light", dark: "Dark" } as Record<string, string>,
+    icons: { system: "◐", light: "☀", dark: "☾" } as Record<string, string>,
+    ariaLabel: (current: string) => `Theme: ${current}. Activate to change.`,
+  },
+
+  desktop: {
+    connecting: "Connecting to the exam desktop…",
+    reconnecting: "Desktop connection lost — reconnecting…",
   },
 
   lobby: {
@@ -80,7 +92,11 @@ export const strings = {
     pass: "PASS",
     fail: "FAIL",
     pointsDetail: (earned: number, total: number, passingScore: number) =>
-      `${earned}/${total} points — passing score ${passingScore}%`,
+      `${earned}/${total} points (passing score ${passingScore}%)`,
+    endReason: (reason: string) =>
+      reason === "expired"
+        ? "Session ended automatically: time expired."
+        : "Session ended: answers submitted.",
     showSolution: "Show solution",
     loadingSolution: "Loading solution…",
   },

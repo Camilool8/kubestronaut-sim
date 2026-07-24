@@ -1,0 +1,133 @@
+/* Design tokens — the single source of truth for color, type, spacing,
+   radius, elevation, and layering. Light is the :root default; dark is
+   applied by explicit [data-theme="dark"] or, for the "system" choice
+   (no data-theme attribute), by prefers-color-scheme. Values exist for
+   BOTH themes for every semantic token — components never hardcode a
+   color. The teal-on-slate identity carries over from milestone C. */
+
+:root {
+  color-scheme: light;
+
+  /* surfaces */
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --surface-raised: #eaeef4;
+  --border: #d4dae3;
+  --overlay: rgba(15, 20, 28, 0.55);
+
+  /* text */
+  --text: #1a212b;
+  --text-muted: #57626f;
+
+  /* brand + state */
+  --accent: #0e7c6b;
+  --accent-strong: #0a6154;
+  --accent-soft: #d7efe9;
+  --accent-contrast: #ffffff;
+  --danger: #bb3730;
+  --danger-soft: #f7dedd;
+  --warn: #8a6100;
+  --success: #1a7f37;
+
+  --focus-ring: #0e7c6b;
+
+  /* elevation (tinted to the page, never pure black) */
+  --shadow-1: 0 1px 2px rgba(26, 33, 43, 0.08), 0 1px 6px rgba(26, 33, 43, 0.06);
+  --shadow-2: 0 4px 12px rgba(26, 33, 43, 0.1), 0 2px 4px rgba(26, 33, 43, 0.08);
+  --shadow-3: 0 12px 32px rgba(26, 33, 43, 0.16);
+
+  /* type */
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
+    monospace;
+  --text-xs: 0.75rem;
+  --text-s: 0.85rem;
+  --text-m: 0.9375rem; /* 15px base */
+  --text-l: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-hero: 3.25rem;
+
+  /* spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  /* radius — one soft system everywhere; pill for badges only */
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-pill: 999px;
+
+  /* layering */
+  --z-panel: 10;
+  --z-overlay: 20;
+  --z-dialog: 30;
+  --z-toast: 40;
+  --z-tour: 50;
+}
+
+/* Dark theme values — explicit user choice. The "system" choice sets no
+   data-theme attribute at all and is covered by the media query below
+   (same declarations; CSS has no mixins). */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0b0e14;
+  --surface: #11151d;
+  --surface-raised: #171c26;
+  --border: #262c38;
+  --overlay: rgba(2, 4, 8, 0.66);
+
+  --text: #d9dee5;
+  --text-muted: #97a0af;
+
+  --accent: #4fd6be;
+  --accent-strong: #74e2cf;
+  --accent-soft: #123a33;
+  --accent-contrast: #06201a;
+  --danger: #e5605a;
+  --danger-soft: #3d1a18;
+  --warn: #e0a850;
+  --success: #57d183;
+
+  --focus-ring: #4fd6be;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 6px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.45), 0 2px 4px rgba(0, 0, 0, 0.35);
+  --shadow-3: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    color-scheme: dark;
+
+    --bg: #0b0e14;
+    --surface: #11151d;
+    --surface-raised: #171c26;
+    --border: #262c38;
+    --overlay: rgba(2, 4, 8, 0.66);
+
+    --text: #d9dee5;
+    --text-muted: #97a0af;
+
+    --accent: #4fd6be;
+    --accent-strong: #74e2cf;
+    --accent-soft: #123a33;
+    --accent-contrast: #06201a;
+    --danger: #e5605a;
+    --danger-soft: #3d1a18;
+    --warn: #e0a850;
+    --success: #57d183;
+
+    --focus-ring: #4fd6be;
+
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 6px rgba(0, 0, 0, 0.3);
+    --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.45), 0 2px 4px rgba(0, 0, 0, 0.35);
+    --shadow-3: 0 12px 32px rgba(0, 0, 0, 0.55);
+  }
+}

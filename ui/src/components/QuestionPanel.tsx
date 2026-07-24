@@ -26,6 +26,8 @@ export function QuestionPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const selected = questions.find((q) => q.id === selectedId);
+
   useEffect(() => {
     if (!selectedId) return;
     let cancelled = false;
@@ -71,6 +73,11 @@ export function QuestionPanel({
               </li>
             ))}
           </ul>
+          {selected && (
+            <span className="instance-chip">
+              {strings.questionPanel.sshHint(selected.instance)}
+            </span>
+          )}
           <div className="question-markdown">
             {loading && <p>{strings.questionPanel.loading}</p>}
             {error && <p className="error-text">{error}</p>}

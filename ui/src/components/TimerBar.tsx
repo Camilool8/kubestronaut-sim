@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { SessionSnapshot } from "../api";
 import { formatClock } from "../lib/format";
 import { strings } from "../strings";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface TimerBarProps {
   session: SessionSnapshot;
@@ -30,12 +31,13 @@ export function TimerBar({ session, fetchedAt, title, onEndClick }: TimerBarProp
   const isLow = remaining < LOW_TIME_THRESHOLD_SECONDS;
 
   return (
-    <div className="topbar">
+    <header className="topbar">
       <div className="topbar-title">{title}</div>
+      <ThemeToggle />
       <div className={`timer${isLow ? " timer-low" : ""}`}>{formatClock(remaining)}</div>
       <button className="btn btn-danger" onClick={onEndClick}>
         {strings.exam.endExam}
       </button>
-    </div>
+    </header>
   );
 }

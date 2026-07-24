@@ -15,6 +15,7 @@ const GRADING_POLL_MS = 3000;
 
 interface ScoreProps {
   onNewAttempt: () => void;
+  endReason: string;
 }
 
 // Score screen: while /api/results is 202 ("grading"), poll every 3s;
@@ -23,7 +24,7 @@ interface ScoreProps {
 // without results — see §3); once 200, render the scoreboard with a
 // "New attempt" action that drives the conductor's reset (same code
 // path as ./sim reset).
-export function Score({ onNewAttempt }: ScoreProps) {
+export function Score({ onNewAttempt, endReason }: ScoreProps) {
   const [response, setResponse] = useState<ResultsResponse>({ status: "grading" });
   const intervalRef = useRef<number | null>(null);
 
@@ -90,6 +91,9 @@ export function Score({ onNewAttempt }: ScoreProps) {
         <div className="score-detail">
           {strings.score.pointsDetail(results.earned, results.total, results.passingScore)}
         </div>
+        {endReason && (
+          <div className="score-end-reason">{strings.score.endReason(endReason)}</div>
+        )}
       </div>
 
       <div className="score-questions">
