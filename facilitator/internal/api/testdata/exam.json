@@ -1,0 +1,27 @@
+{
+  "apiVersion": "sim.kubestronaut.dev/v1alpha1",
+  "kind": "Exam",
+  "metadata": {
+    "name": "test-bank",
+    "title": "Test Exam"
+  },
+  "spec": {
+    "duration": "10m",
+    "passingScore": 50,
+    "kubernetesVersion": "1.30",
+    "questions": [
+      {
+        "id": "q01",
+        "instance": "inst-1",
+        "domain": "Domain One",
+        "weight": 5
+      },
+      {
+        "id": "q02",
+        "instance": "inst-2",
+        "domain": "Domain Two",
+        "weight": 3
+      }
+    ]
+  }
+}

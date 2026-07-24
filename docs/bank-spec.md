@@ -11,12 +11,12 @@ directory per question.
       name: ckad-mock-01            # must equal directory name
       title: CKAD Mock Exam 01
     spec:
-      duration: 120m
-      passingScore: 66              # percent
-      kubernetesVersion: "1.35"
+      duration: 120m                # enforced: the facilitator auto-ends the session at 0:00
+      passingScore: 66              # percent; enforced: facilitator's Results.Passed
+      kubernetesVersion: "1.35"     # informational
       environment:
         provider: kind
-        nodes: 2                    # 1 control-plane + N-1 workers
+        nodes: 2                    # informational; 1 control-plane + N-1 workers
       instances:                    # ssh targets; compose services must match
         - name: ckad-1
         - name: ckad-2
@@ -43,6 +43,10 @@ directory per question.
   `# points: <int>` and `# desc: <one line>`.
 - Exit 0 = criterion met. Non-zero = failed. stdout = short message.
 - Must be side-effect free (never mutate cluster or files).
+- Must finish within 30 seconds. The facilitator runs each check under a
+  30s deadline; a check still running past it is killed and scored failed
+  (message: "check timed out"), regardless of what it would eventually have
+  returned.
 
 ## Runtime environment provided to scripts
 

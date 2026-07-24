@@ -8,7 +8,7 @@ RUN ARCH=$(uname -m); case "$ARCH" in x86_64) ARCH=amd64 ;; aarch64) ARCH=arm64 
     && curl -fsSL -o /usr/local/bin/kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-${ARCH}" \
     && curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" \
     && chmod +x /usr/local/bin/kind /usr/local/bin/kubectl
-COPY kind-config.yaml bootstrap.sh grade.sh /opt/sim/
+COPY kind-config.yaml bootstrap.sh /opt/sim/
 COPY start.sh /start.sh
-RUN chmod +x /start.sh /opt/sim/bootstrap.sh /opt/sim/grade.sh
+RUN chmod +x /start.sh /opt/sim/bootstrap.sh
 ENTRYPOINT ["/start.sh"]

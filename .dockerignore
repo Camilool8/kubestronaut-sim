@@ -1,0 +1,10 @@
+.git
+.superpowers
+docs
+images
+banks
+tests
+proxy
+shared
+ui/node_modules
+ui/dist
