@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -20,6 +21,18 @@ type countingRunner struct {
 func (r *countingRunner) Run(_ context.Context, _, _ string) (string, bool, error) {
 	r.calls.Add(1)
 	return "ok", true, nil
+}
+
+// panickingRunner records how many times Run was invoked and always
+// panics, simulating a bug or unexpected failure deep inside a
+// grading run (e.g. in evaluate.Grade or one of its dependencies).
+type panickingRunner struct {
+	calls atomic.Int32
+}
+
+func (r *panickingRunner) Run(_ context.Context, _, _ string) (string, bool, error) {
+	r.calls.Add(1)
+	panic("boom: simulated grading failure")
 }
 
 // testExam is a minimal hand-built *exam.Exam (no bank dir / JSON
@@ -100,6 +113,45 @@ func TestGradeSequentialRunsRecordResultsAndClearInFlight(t *testing.T) {
 	}
 
 	g.Grade() // sequential re-grade must actually run again, not no-op
+	waitForCalls(t, &runner.calls, 2)
+}
+
+// TestGradePanicRecoveredAndAllowsRegrade is the panic-safety
+// counterpart to the double-grading guard tests above: the design doc
+// guarantees an evaluator failure never crashes the facilitator, so a
+// panic anywhere inside the async grading goroutine (here, simulated
+// via a Runner that panics) must be recovered, recorded as a
+// gradeError, and — just as importantly — must not leave the in-flight
+// flag stuck, so a client re-POSTing end can still trigger a working
+// re-grade. The test itself surviving to its final assertions is
+// itself proof the process didn't crash: an unrecovered panic in this
+// goroutine would take the whole test binary down with it.
+func TestGradePanicRecoveredAndAllowsRegrade(t *testing.T) {
+	mgr := newTestManager(t)
+	runner := &panickingRunner{}
+	g := newGrader(testExam(), mgr, runner, time.Second)
+
+	g.Grade()
+	waitForCalls(t, &runner.calls, 1)
+	waitForGraded(t, mgr)
+
+	_, gradeErr, graded := mgr.Results()
+	if !graded {
+		t.Fatal("Results() graded = false after a panicking grade, want true (gradeError recorded)")
+	}
+	if gradeErr == "" {
+		t.Fatal("gradeError empty after a panicking grade, want a message describing the panic")
+	}
+	if !strings.Contains(gradeErr, "panic") {
+		t.Errorf("gradeError = %q, want it to mention the panic", gradeErr)
+	}
+	if g.inFlight.Load() {
+		t.Fatal("inFlight still true after a panicking grade, want false (must allow a re-grade, not wedge forever)")
+	}
+
+	// Re-POST /api/session/end after a failed grade must actually
+	// re-run, not silently no-op because of a stuck in-flight flag.
+	g.Grade()
 	waitForCalls(t, &runner.calls, 2)
 }
 

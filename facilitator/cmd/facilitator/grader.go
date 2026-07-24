@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"sync/atomic"
 	"time"
@@ -51,6 +52,20 @@ func (g *grader) Grade() {
 	}
 	go func() {
 		defer g.inFlight.Store(false)
+		// The design doc guarantees an evaluator failure never crashes
+		// the facilitator (ssh unreachable, all-checks errors, or —
+		// here — a bug that panics deep inside evaluate.Grade or a
+		// Runner implementation). Without this recover, an unhandled
+		// panic on this goroutine would take the whole process down;
+		// recovering it and recording it as a gradeError keeps that
+		// guarantee and lets a client re-POST end to retry.
+		defer func() {
+			if r := recover(); r != nil {
+				if setErr := g.mgr.SetGradeError(fmt.Sprintf("grading panicked: %v", r)); setErr != nil {
+					log.Printf("facilitator: record grade-panic failure: %v", setErr)
+				}
+			}
+		}()
 
 		res := evaluate.Grade(g.ex, g.bank, g.runner, g.timeout)
 		data, err := json.Marshal(res)

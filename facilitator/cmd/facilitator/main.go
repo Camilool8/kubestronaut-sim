@@ -86,6 +86,14 @@ func runServer() error {
 	desktopAddr := envOr("DESKTOP_ADDR", "desktop:6080")
 	durOverride := os.Getenv("SESSION_DURATION_OVERRIDE")
 
+	// Fail fast at boot with a clear message rather than only
+	// discovering a missing ssh key the first time a grade actually
+	// runs (the `grade` subcommand doesn't need this check: it fails
+	// the same way naturally, immediately, with no session involved).
+	if err := checkSSHKey(cfg.sshKey); err != nil {
+		return err
+	}
+
 	ex, err := exam.Load(cfg.examJSON, cfg.bankDir)
 	if err != nil {
 		return fmt.Errorf("load exam: %w", err)
@@ -120,18 +128,14 @@ func runServer() error {
 	gradeFn := g.Grade
 	onExpire.Store(&gradeFn)
 
-	// Crash recovery: session.New's own doc comment is explicit that it
-	// does not fire onExpire when it ends an already-expired "running"
-	// session found on disk at load time (no timer or live Snapshot
-	// call actually observed that expiry happen). The same gap applies
-	// if a prior process crashed mid-grade, after End() persisted
-	// "ended" but before SetResults/SetGradeError landed. Either way, a
-	// boot that finds the session already ended with no terminal
-	// grading outcome yet must kick the grader itself, exactly once.
-	if snap := mgr.Snapshot(); snap.State == "ended" {
-		if _, _, graded := mgr.Results(); !graded {
-			g.Grade()
-		}
+	// Crash recovery: see needsGradeRecovery's doc comment for exactly
+	// which gap this closes (session.New's own load-time-expiry
+	// correction not firing onExpire, or a prior process crashing
+	// mid-grade).
+	snap := mgr.Snapshot()
+	_, gradeErr, graded := mgr.Results()
+	if needsGradeRecovery(snap.State, graded, gradeErr) {
+		g.Grade()
 	}
 
 	desktopHandler := desktop.New(desktopAddr, func() bool {

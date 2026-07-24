@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -46,5 +48,22 @@ func TestResolveDurationWithOverride(t *testing.T) {
 func TestResolveDurationInvalidOverride(t *testing.T) {
 	if _, err := resolveDuration(time.Hour, "not-a-duration"); err == nil {
 		t.Error("resolveDuration with invalid override: got nil error, want non-nil")
+	}
+}
+
+func TestCheckSSHKeyMissing(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "does-not-exist")
+	if err := checkSSHKey(path); err == nil {
+		t.Error("checkSSHKey with a missing file: got nil error, want non-nil")
+	}
+}
+
+func TestCheckSSHKeyExists(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "id_ed25519")
+	if err := os.WriteFile(path, []byte("fake key material"), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	if err := checkSSHKey(path); err != nil {
+		t.Errorf("checkSSHKey with an existing file: got error %v, want nil", err)
 	}
 }

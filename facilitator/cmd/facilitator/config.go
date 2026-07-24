@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"time"
 )
@@ -24,4 +25,18 @@ func resolveDuration(dur time.Duration, overrideEnv string) (time.Duration, erro
 		return dur, nil
 	}
 	return time.ParseDuration(overrideEnv)
+}
+
+// checkSSHKey validates that the ssh private key at path exists on
+// disk, so the server (not the session-free `grade` subcommand, which
+// fails the same way naturally the first time it tries to connect)
+// fails fast at boot with a clear message — per the design's
+// "malformed/missing exam JSON, bank dir, or ssh key ⇒ facilitator
+// exits non-zero at boot" contract — instead of only surfacing as an
+// opaque ssh connection failure the first time a grade actually runs.
+func checkSSHKey(path string) error {
+	if _, err := os.Stat(path); err != nil {
+		return fmt.Errorf("ssh key %s: %w", path, err)
+	}
+	return nil
 }
