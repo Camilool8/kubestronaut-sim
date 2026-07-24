@@ -35,7 +35,7 @@ Convert to GitHub issues once the repo has a remote.
 - facilitator: kill established desktop WebSocket tunnels at session end (currently a live VNC socket survives into ended; UI unmounts iframe, reconnects are refused).
 - ui: add vitest harness for timer/format utils (no UI unit tests this milestone).
 - facilitator image: run as non-root `USER`; pin base image tags (mirror of the Milestone B proxy item).
-- facilitator: results/attempt history (single session.json overwritten per attempt).
+- facilitator: results/attempt history (single session.json overwritten per attempt). Related: add a session generation token captured by the grader and checked in `SetResults`/`SetGradeError` — the state guard can't distinguish attempt A's `ended` from attempt B's if a full second lifecycle completes inside one in-flight grading run (effectively unreachable with real exam durations).
 - `SESSION_DURATION_OVERRIDE` is test-only — document/guard once hosted.
 - `DELETE /api/session` is unauthenticated by design (localhost single-user); needs auth when hosted.
 - score page: skipped checks (bad `# points:` header) are JSON-indistinguishable from 0-point failed checks; add a skipped marker to the results schema if bank-authoring errors should surface in the UI.
