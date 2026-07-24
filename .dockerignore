@@ -1,0 +1,9 @@
+.git
+.superpowers
+docs
+images
+banks
+tests
+proxy
+ui/node_modules
+ui/dist

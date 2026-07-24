@@ -55,8 +55,6 @@ services:
   desktop:
     build: images/desktop
     hostname: desktop
-    ports:
-      - "127.0.0.1:6080:6080"
     depends_on:
       k8s-env: {condition: service_healthy}
       docs-proxy: {condition: service_started}
@@ -70,11 +68,39 @@ services:
       retries: 30
       start_period: 15s
     restart: unless-stopped
+  facilitator:
+    build:
+      context: .
+      dockerfile: facilitator/Dockerfile
+    hostname: facilitator
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      BANK: ${BANK:-ckad-mock-01}
+      SESSION_DURATION_OVERRIDE: ${SESSION_DURATION_OVERRIDE:-}
+    volumes:
+      - ./banks:/banks:ro
+      - shared:/shared:ro
+      - session:/session
+    networks: [examnet]
+    depends_on:
+      k8s-env: {condition: service_healthy}
+      desktop: {condition: service_healthy}
+      ckad-1: {condition: service_started}
+      ckad-2: {condition: service_started}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
 volumes:
   shared: {}
   dind: {}
   course-1: {}
   course-2: {}
+  session: {}
 networks:
   default: {}
   examnet:
