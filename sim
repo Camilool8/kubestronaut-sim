@@ -6,8 +6,8 @@ case "$cmd" in
   up)
     BANK=${2:-ckad-mock-01} docker compose up -d --build --wait
     echo "Exam environment ready. Exam UI: http://localhost:8080 — or ./sim ssh instance-1" ;;
-  down)  docker compose down ;;
-  purge) docker compose down -v ;;
+  down)  docker compose down --remove-orphans ;;
+  purge) docker compose down -v --remove-orphans ;;
   reset)
     echo "Resetting exam state (cluster + instances, cached images kept)..."
     for i in instance-1 instance-2; do   # /opt/course is a persistent volume; recreate alone won't wipe it
