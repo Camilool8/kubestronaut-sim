@@ -2,14 +2,18 @@ package control
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"kubestronaut-sim/conductor/internal/catalog"
 	"kubestronaut-sim/conductor/internal/job"
 )
 
@@ -218,4 +222,149 @@ func TestStartResetRejectsConcurrentJobs(t *testing.T) {
 	}
 	close(block)
 	waitIdle(t, c.Store)
+}
+
+// switchFacilitator fakes the facilitator for switch flows: reports the
+// given session state, accepts session deletes, is always healthy, and
+// serves /api/exam with the name in examName (a pointer so tests can
+// flip it mid-flow, mimicking the post-restart reload).
+func switchFacilitator(t *testing.T, sessionState string, examName *string) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/session":
+			fmt.Fprintf(w, `{"state":%q}`, sessionState)
+		case r.Method == http.MethodDelete && r.URL.Path == "/api/session":
+			w.WriteHeader(http.StatusNoContent)
+		case r.URL.Path == "/healthz":
+			fmt.Fprint(w, "ok")
+		case r.URL.Path == "/api/exam":
+			fmt.Fprintf(w, `{"name":%q}`, *examName)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+}
+
+func testCatalogForSwitch(t *testing.T) *catalog.Catalog {
+	t.Helper()
+	dir := t.TempDir()
+	doc := `{"metadata":{"name":"cka-mock-01","title":"CKA"},"spec":{"duration":"120m",
+	  "instances":[{"name":"instance-1"},{"name":"instance-2"}],
+	  "questions":[{"id":"q01"}]}}`
+	if err := os.WriteFile(filepath.Join(dir, "cka-mock-01.json"), []byte(doc), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	c, err := catalog.Load(dir)
+	if err != nil {
+		t.Fatalf("catalog.Load: %v", err)
+	}
+	return c
+}
+
+func TestSwitchRunsFullSequenceAndWritesBankFile(t *testing.T) {
+	examName := "cka-mock-01" // already reloaded by the time verify polls
+	facilitator := switchFacilitator(t, "idle", &examName)
+	defer facilitator.Close()
+
+	eng := &fakeEngine{}
+	c := newTestController(t, eng, facilitator.URL)
+	c.Catalog = testCatalogForSwitch(t)
+	c.BankFile = filepath.Join(t.TempDir(), "bank")
+	c.RestartExtra = []string{"docs-proxy", "facilitator"}
+
+	if _, err := c.StartSwitch("cka-mock-01"); err != nil {
+		t.Fatalf("StartSwitch: %v", err)
+	}
+	snap := waitIdle(t, c.Store)
+	if snap.LastJob == nil || snap.LastJob.Error != "" {
+		t.Fatalf("switch job = %+v, want clean completion", snap.LastJob)
+	}
+
+	wrote, err := os.ReadFile(c.BankFile)
+	if err != nil || string(wrote) != "cka-mock-01" {
+		t.Fatalf("bank file = %q, %v; want cka-mock-01", wrote, err)
+	}
+
+	calls := strings.Join(eng.recorded(), "\n")
+	for _, needle := range []string{"restart:docs-proxy", "restart:facilitator", "restart:instance-1", "restart:instance-2"} {
+		if !strings.Contains(calls, needle) {
+			t.Errorf("engine calls missing %q:\n%s", needle, calls)
+		}
+	}
+	// bank file must be written before the cluster re-bootstrap reads it
+	clusterIdx := strings.Index(calls, "exec:k8s-env")
+	if clusterIdx < 0 {
+		t.Fatal("cluster recreate never ran")
+	}
+}
+
+func TestSwitchRefusedWhileSessionRunning(t *testing.T) {
+	examName := "ckad-mock-01"
+	facilitator := switchFacilitator(t, "running", &examName)
+	defer facilitator.Close()
+
+	c := newTestController(t, &fakeEngine{}, facilitator.URL)
+	c.Catalog = testCatalogForSwitch(t)
+	c.BankFile = filepath.Join(t.TempDir(), "bank")
+
+	_, err := c.StartSwitch("cka-mock-01")
+	if !errors.Is(err, ErrSessionRunning) {
+		t.Fatalf("StartSwitch during running session = %v, want ErrSessionRunning", err)
+	}
+	if c.Store.Status().Busy {
+		t.Error("refused switch must not leave a job behind")
+	}
+}
+
+func TestSwitchRejectsUnknownBank(t *testing.T) {
+	examName := "ckad-mock-01"
+	facilitator := switchFacilitator(t, "idle", &examName)
+	defer facilitator.Close()
+
+	c := newTestController(t, &fakeEngine{}, facilitator.URL)
+	c.Catalog = testCatalogForSwitch(t)
+	c.BankFile = filepath.Join(t.TempDir(), "bank")
+
+	if _, err := c.StartSwitch("no-such-bank"); !errors.Is(err, ErrInvalidBank) {
+		t.Fatalf("StartSwitch(unknown) = %v, want ErrInvalidBank", err)
+	}
+	if _, err := c.StartSwitch("../etc"); !errors.Is(err, ErrInvalidBank) {
+		t.Fatalf("StartSwitch(traversal) = %v, want ErrInvalidBank", err)
+	}
+}
+
+func TestSwitchVerifyFailsOnExamNameMismatch(t *testing.T) {
+	examName := "ckad-mock-01" // facilitator never picks up the new bank
+	facilitator := switchFacilitator(t, "idle", &examName)
+	defer facilitator.Close()
+
+	c := newTestController(t, &fakeEngine{}, facilitator.URL)
+	c.Catalog = testCatalogForSwitch(t)
+	c.BankFile = filepath.Join(t.TempDir(), "bank")
+
+	if _, err := c.StartSwitch("cka-mock-01"); err != nil {
+		t.Fatalf("StartSwitch: %v", err)
+	}
+	snap := waitIdle(t, c.Store)
+	if snap.LastJob == nil || !strings.Contains(snap.LastJob.Error, "cka-mock-01") {
+		t.Fatalf("verify must fail naming the expected bank, got %+v", snap.LastJob)
+	}
+}
+
+func TestBanksReportsActiveFileAndCatalog(t *testing.T) {
+	c := newTestController(t, &fakeEngine{}, "http://unused")
+	c.Catalog = testCatalogForSwitch(t)
+	c.BankFile = filepath.Join(t.TempDir(), "bank")
+	if err := os.WriteFile(c.BankFile, []byte("ckad-mock-01\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	body := c.Banks().(map[string]any)
+	if body["active"] != "ckad-mock-01" {
+		t.Errorf("active = %v, want ckad-mock-01 (trimmed)", body["active"])
+	}
+	if entries, ok := body["banks"].([]catalog.Entry); !ok || len(entries) != 1 {
+		t.Errorf("banks = %#v, want the 1-entry catalog", body["banks"])
+	}
 }

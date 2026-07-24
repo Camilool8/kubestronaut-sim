@@ -269,3 +269,44 @@ export async function startControlReset(): Promise<ControlActionResponse> {
   }
   return { ok: false, error: await readError(res) };
 }
+
+export interface BankEntry {
+  id: string;
+  title: string;
+  certification?: string;
+  description?: string;
+  examType: string;
+  durationSeconds?: number;
+  passingScore?: number;
+  kubernetesVersion?: string;
+  questionCount?: number;
+  available: boolean;
+  comingSoon?: boolean;
+  note?: string;
+}
+
+export interface BanksResponse {
+  active: string;
+  banks: BankEntry[];
+}
+
+export async function getBanks(): Promise<BanksResponse> {
+  const res = await fetch("/api/control/banks");
+  if (!res.ok) {
+    throw new Error(await readError(res));
+  }
+  return (await res.json()) as BanksResponse;
+}
+
+export async function startControlSwitch(bank: string): Promise<ControlActionResponse> {
+  const res = await fetch("/api/control/switch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bank }),
+  });
+  if (res.status === 202) {
+    const body = (await res.json()) as { job: ControlJob };
+    return { ok: true, job: body.job };
+  }
+  return { ok: false, error: await readError(res) };
+}

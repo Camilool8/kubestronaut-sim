@@ -7,12 +7,27 @@ package control
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
+	"kubestronaut-sim/conductor/internal/catalog"
 	"kubestronaut-sim/conductor/internal/job"
 )
+
+// ErrInvalidBank rejects a switch to a bank that is unknown, malformed,
+// or not runnable (coming-soon / non-conforming topology). Mapped to 400.
+var ErrInvalidBank = errors.New("control: invalid bank")
+
+// ErrSessionRunning rejects a switch while an exam attempt is running —
+// ending someone's timed attempt as a side effect would be hostile.
+// Mapped to 409. (Reset intentionally has no such guard: it IS the
+// explicit "abandon this attempt" operation.)
+var ErrSessionRunning = errors.New("control: a session is running — end the exam first")
 
 // Engine is the slice of the Docker Engine API the controller needs.
 // containerIDs returned by FindContainer are opaque to this package.
@@ -33,6 +48,11 @@ type Controller struct {
 	HTTPClient     *http.Client
 	VerifyBudget   time.Duration
 	VerifyInterval time.Duration
+
+	// Switch-specific wiring (nil/empty disables StartSwitch).
+	Catalog      *catalog.Catalog
+	BankFile     string   // /shared/bank — the runtime bank source of truth
+	RestartExtra []string // services restarted after the instances on a switch, in order (facilitator last)
 }
 
 // resetPhases is the checklist a reset job walks through, in order.
@@ -98,6 +118,163 @@ func (c *Controller) runReset(jobID string) {
 	}
 
 	c.Store.Complete(jobID)
+}
+
+// switchPhases is the checklist a switch job walks through, in order.
+func switchPhases() []job.PhaseSpec {
+	return []job.PhaseSpec{
+		{ID: "end-session", Label: "End session and lock desktop"},
+		{ID: "wipe-instances", Label: "Wipe instance work directories"},
+		{ID: "write-bank", Label: "Activate the new exam bank"},
+		{ID: "recreate-cluster", Label: "Recreate Kubernetes cluster"},
+		{ID: "restart-services", Label: "Restart exam services"},
+		{ID: "verify", Label: "Verify the new exam is live"},
+	}
+}
+
+// StartSwitch begins an asynchronous bank-switch job after validating
+// the target (ErrInvalidBank) and confirming no attempt is running
+// (ErrSessionRunning). job.ErrBusy propagates as-is.
+func (c *Controller) StartSwitch(bank string) (job.Job, error) {
+	if c.Catalog == nil || c.BankFile == "" {
+		return job.Job{}, fmt.Errorf("control: switch not configured")
+	}
+	if err := c.Catalog.Switchable(bank); err != nil {
+		return job.Job{}, fmt.Errorf("%w: %v", ErrInvalidBank, err)
+	}
+	state, err := c.sessionState(context.Background())
+	if err != nil {
+		return job.Job{}, fmt.Errorf("control: check session state: %w", err)
+	}
+	if state == "running" {
+		return job.Job{}, ErrSessionRunning
+	}
+
+	j, err := c.Store.Begin("switch", bank, switchPhases())
+	if err != nil {
+		return job.Job{}, err
+	}
+	go c.runSwitch(j.ID, bank)
+	return j, nil
+}
+
+// runSwitch is runReset plus the two switch-specific steps: the bank
+// file is rewritten before the cluster re-bootstrap (which reads it),
+// and the bank-reading services restart after the instances, the
+// facilitator last (its entrypoint re-derives EXAM_JSON; its restart
+// also triggers the session manager's cross-bank discard).
+func (c *Controller) runSwitch(jobID, bank string) {
+	ctx := context.Background()
+
+	c.Store.StartPhase(jobID, "end-session")
+	if err := c.endSession(ctx); err != nil {
+		c.Store.Fail(jobID, err.Error())
+		return
+	}
+
+	c.Store.StartPhase(jobID, "wipe-instances")
+	for _, inst := range c.Instances {
+		if err := c.execChecked(ctx, inst, []string{"find", "/opt/course", "-mindepth", "1", "-delete"}); err != nil {
+			c.Store.Fail(jobID, err.Error())
+			return
+		}
+	}
+
+	c.Store.StartPhase(jobID, "write-bank")
+	if err := os.WriteFile(c.BankFile, []byte(bank), 0o644); err != nil {
+		c.Store.Fail(jobID, fmt.Sprintf("write %s: %v", c.BankFile, err))
+		return
+	}
+
+	c.Store.StartPhase(jobID, "recreate-cluster")
+	if err := c.execChecked(ctx, "k8s-env", []string{"bash", "-c", "kind delete cluster --name sim || true; /opt/sim/bootstrap.sh"}); err != nil {
+		c.Store.Fail(jobID, err.Error())
+		return
+	}
+
+	c.Store.StartPhase(jobID, "restart-services")
+	for _, svc := range append(append([]string{}, c.Instances...), c.RestartExtra...) {
+		if err := c.restart(ctx, svc); err != nil {
+			c.Store.Fail(jobID, err.Error())
+			return
+		}
+	}
+
+	c.Store.StartPhase(jobID, "verify")
+	if err := c.verifyHealthy(ctx); err != nil {
+		c.Store.Fail(jobID, err.Error())
+		return
+	}
+	if err := c.verifyExamName(ctx, bank); err != nil {
+		c.Store.Fail(jobID, err.Error())
+		return
+	}
+
+	c.Store.Complete(jobID)
+}
+
+// Banks returns the /api/control/banks response body: the active bank
+// (read from BankFile at call time — a switch may have just rewritten
+// it) plus the full catalog.
+func (c *Controller) Banks() any {
+	active := ""
+	if raw, err := os.ReadFile(c.BankFile); err == nil {
+		active = strings.TrimSpace(string(raw))
+	}
+	var list []catalog.Entry
+	if c.Catalog != nil {
+		list = c.Catalog.List()
+	}
+	return map[string]any{"active": active, "banks": list}
+}
+
+// sessionState asks the facilitator which state the session is in.
+func (c *Controller) sessionState(ctx context.Context) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.FacilitatorURL+"/api/session", nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	var body struct {
+		State string `json:"state"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return "", err
+	}
+	return body.State, nil
+}
+
+// verifyExamName confirms the restarted facilitator serves the target
+// bank, polling within the same budget style as verifyHealthy.
+func (c *Controller) verifyExamName(ctx context.Context, bank string) error {
+	deadline := time.Now().Add(c.VerifyBudget)
+	var last string
+	for time.Now().Before(deadline) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.FacilitatorURL+"/api/exam", nil)
+		if err != nil {
+			return err
+		}
+		resp, err := c.HTTPClient.Do(req)
+		if err == nil {
+			var body struct {
+				Name string `json:"name"`
+			}
+			decodeErr := json.NewDecoder(resp.Body).Decode(&body)
+			resp.Body.Close()
+			if decodeErr == nil {
+				if body.Name == bank {
+					return nil
+				}
+				last = body.Name
+			}
+		}
+		time.Sleep(c.VerifyInterval)
+	}
+	return fmt.Errorf("verify: facilitator still serves exam %q, want %q", last, bank)
 }
 
 // endSession clears any session on the facilitator; DELETE /api/session

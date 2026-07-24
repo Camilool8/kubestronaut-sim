@@ -4,6 +4,8 @@ import {
   getSession,
   pollSession,
   startControlReset,
+  startControlSwitch,
+  type ControlActionResponse,
   type ControlStatus,
   type SessionSnapshot,
 } from "./api";
@@ -75,19 +77,35 @@ export default function App() {
     };
   }, [applySession]);
 
-  const handleNewAttempt = useCallback(async () => {
-    const result = await startControlReset();
+  // Shared entry point for every control action's outcome (reset from
+  // Score, switch from the Lobby, retry from the overlay): an accepted
+  // job flips the overlay on immediately instead of waiting a poll.
+  const applyControlResult = useCallback(async (result: ControlActionResponse) => {
     if (result.ok) {
       setDismissedJobId(null);
       setControl({ busy: true, job: result.job });
       wasBusy.current = true;
     } else {
-      // Most likely 409 busy — surface whatever the conductor reports
-      // on the next poll; nothing else to do here.
+      // Most likely 409 busy — surface whatever the conductor reports.
       const current = await getControlStatus().catch(() => null);
       if (current) setControl(current);
     }
   }, []);
+
+  const handleNewAttempt = useCallback(async () => {
+    applyControlResult(await startControlReset());
+  }, [applyControlResult]);
+
+  const handleRetry = useCallback(
+    async (op: string, bank: string) => {
+      if (op === "switch" && bank) {
+        applyControlResult(await startControlSwitch(bank));
+      } else {
+        applyControlResult(await startControlReset());
+      }
+    },
+    [applyControlResult],
+  );
 
   const overlayJob =
     control?.busy && control.job
@@ -107,7 +125,9 @@ export default function App() {
   let screen = null;
   switch (session.state) {
     case "idle":
-      screen = <Start onSessionChange={applySession} />;
+      screen = (
+        <Start onSessionChange={applySession} onControlStart={applyControlResult} />
+      );
       break;
     case "running":
       screen = (
@@ -125,7 +145,7 @@ export default function App() {
       {overlayJob && (
         <ControlProgress
           job={overlayJob}
-          onRetry={handleNewAttempt}
+          onRetry={() => handleRetry(overlayJob.op, overlayJob.bank)}
           onDismiss={() => setDismissedJobId(overlayJob.id)}
         />
       )}

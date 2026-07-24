@@ -1,16 +1,23 @@
-# Question Bank Specification (v1alpha1)
+# Question Bank Specification (v1alpha2)
 
 A bank lives at `banks/<bank-id>/` and contains `exam.yaml` plus one
-directory per question.
+directory per question. The conductor scans every `banks/*/exam.yaml`
+into the exam catalog the UI's lobby renders; `banks/catalog.yaml` adds
+coming-soon entries whose exam engine doesn't exist yet.
 
 ## exam.yaml
 
-    apiVersion: sim.kubestronaut.dev/v1alpha1
+    apiVersion: sim.kubestronaut.dev/v1alpha2
     kind: Exam
     metadata:
       name: ckad-mock-01            # must equal directory name
       title: CKAD Mock Exam 01
+      certification: CKAD           # catalog badge (CKAD/CKA/CKS/...)
+      description: >-               # one-liner shown on the catalog card
+        Developer-track exercises.
     spec:
+      examType: hands-on            # only "hands-on" runs today; anything else
+                                    # is listed in the catalog but disabled
       duration: 120m                # enforced: the facilitator auto-ends the session at 0:00
       passingScore: 66              # percent; enforced: facilitator's Results.Passed
       kubernetesVersion: "1.35"     # informational

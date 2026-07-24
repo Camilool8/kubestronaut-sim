@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"kubestronaut-sim/conductor/internal/api"
+	"kubestronaut-sim/conductor/internal/catalog"
 	"kubestronaut-sim/conductor/internal/control"
 	"kubestronaut-sim/conductor/internal/docker"
 	"kubestronaut-sim/conductor/internal/job"
@@ -27,6 +28,12 @@ func main() {
 	facilitatorURL := envOr("FACILITATOR_URL", "http://facilitator:8080")
 	instances := strings.Split(envOr("INSTANCES", "instance-1,instance-2"), ",")
 
+	catalogDir := envOr("CATALOG_DIR", "/run/banks")
+	cat, err := catalog.Load(catalogDir)
+	if err != nil {
+		log.Fatalf("conductor: load catalog from %s: %v", catalogDir, err)
+	}
+
 	store := job.NewStore(time.Now)
 	ctrl := &control.Controller{
 		Engine:         docker.New(socket),
@@ -37,6 +44,9 @@ func main() {
 		HTTPClient:     &http.Client{Timeout: 15 * time.Second},
 		VerifyBudget:   90 * time.Second,
 		VerifyInterval: 2 * time.Second,
+		Catalog:        cat,
+		BankFile:       envOr("BANK_FILE", "/shared/bank"),
+		RestartExtra:   strings.Split(envOr("RESTART_EXTRA", "docs-proxy,facilitator"), ","),
 	}
 
 	srv := &http.Server{

@@ -1,9 +1,15 @@
-apiVersion: sim.kubestronaut.dev/v1alpha1
+apiVersion: sim.kubestronaut.dev/v1alpha2
 kind: Exam
 metadata:
   name: ckad-mock-01
   title: CKAD Mock Exam 01
+  certification: CKAD
+  description: >-
+    Developer-track exercises: namespaces and quotas, debugging a broken
+    Deployment, and NetworkPolicy lockdown. Two instances, kind-backed
+    cluster.
 spec:
+  examType: hands-on
   duration: 120m
   passingScore: 66
   kubernetesVersion: "1.35"

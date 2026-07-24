@@ -4,16 +4,21 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"kubestronaut-sim/conductor/internal/control"
 	"kubestronaut-sim/conductor/internal/job"
 )
 
 // fakeOps implements Ops without any real orchestration.
 type fakeOps struct {
-	store    *job.Store
-	resetErr error
+	store     *job.Store
+	resetErr  error
+	switchErr error
+	active    string
+	banks     []string
 }
 
 func (f *fakeOps) StartReset() (job.Job, error) {
@@ -99,5 +104,66 @@ func TestStatusReportsStore(t *testing.T) {
 	}
 	if !busy.Busy || busy.Job == nil || busy.Job.Phase != "verify" {
 		t.Fatalf("busy snapshot = %+v", busy)
+	}
+}
+
+func (f *fakeOps) StartSwitch(bank string) (job.Job, error) {
+	if f.switchErr != nil {
+		return job.Job{}, f.switchErr
+	}
+	return f.store.Begin("switch", bank, []job.PhaseSpec{{ID: "verify", Label: "Verify"}})
+}
+
+func (f *fakeOps) Banks() any {
+	return map[string]any{"active": f.active, "banks": f.banks}
+}
+
+func TestBanksEndpoint(t *testing.T) {
+	ops, h := newTestAPI(t)
+	ops.active = "ckad-mock-01"
+	ops.banks = []string{"ckad-mock-01", "cka-mock-01"}
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/control/banks", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("banks = %d, want 200", rec.Code)
+	}
+	var body struct {
+		Active string   `json:"active"`
+		Banks  []string `json:"banks"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body.Active != "ckad-mock-01" || len(body.Banks) != 2 {
+		t.Fatalf("body = %+v", body)
+	}
+}
+
+func TestSwitchEndpointStatusMapping(t *testing.T) {
+	cases := []struct {
+		name    string
+		body    string
+		err     error
+		want    int
+	}{
+		{"accepted", `{"bank":"cka-mock-01"}`, nil, http.StatusAccepted},
+		{"invalid bank", `{"bank":"nope"}`, control.ErrInvalidBank, http.StatusBadRequest},
+		{"session running", `{"bank":"cka-mock-01"}`, control.ErrSessionRunning, http.StatusConflict},
+		{"busy", `{"bank":"cka-mock-01"}`, job.ErrBusy, http.StatusConflict},
+		{"malformed body", `{`, nil, http.StatusBadRequest},
+		{"missing bank", `{}`, nil, http.StatusBadRequest},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ops, h := newTestAPI(t)
+			ops.switchErr = c.err
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPost, "/api/control/switch", strings.NewReader(c.body))
+			h.ServeHTTP(rec, req)
+			if rec.Code != c.want {
+				t.Fatalf("switch(%s) = %d, want %d, body=%s", c.name, rec.Code, c.want, rec.Body.String())
+			}
+		})
 	}
 }

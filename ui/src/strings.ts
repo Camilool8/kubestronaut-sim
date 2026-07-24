@@ -47,6 +47,19 @@ export const strings = {
     points: (points: number) => `${points} pts`,
   },
 
+  lobby: {
+    chooseExam: "Choose your exam",
+    active: "Active",
+    comingSoon: "Coming soon",
+    unavailable: "Unavailable",
+    questions: (n: number) => `${n} questions`,
+    switchConfirmTitle: (title: string) => `Switch to ${title}?`,
+    switchConfirmBody:
+      "Switching rebuilds the Kubernetes cluster and wipes all exam state. It usually takes 1–2 minutes.",
+    switchConfirm: "Switch exam",
+    cancel: "Cancel",
+  },
+
   control: {
     resetTitle: "Resetting exam environment",
     switchTitle: (bank: string) => `Switching exam to ${bank}`,

@@ -9,12 +9,16 @@ import (
 	"errors"
 	"net/http"
 
+	"kubestronaut-sim/conductor/internal/control"
 	"kubestronaut-sim/conductor/internal/job"
 )
 
 // Ops is the slice of the controller the HTTP layer invokes.
 type Ops interface {
 	StartReset() (job.Job, error)
+	StartSwitch(bank string) (job.Job, error)
+	// Banks returns the catalog response body: {active, banks:[...]}.
+	Banks() any
 }
 
 // New returns the conductor's HTTP handler.
@@ -32,17 +36,47 @@ func New(ops Ops, store *job.Store) http.Handler {
 	mux.HandleFunc("POST /api/control/reset", func(w http.ResponseWriter, r *http.Request) {
 		j, err := ops.StartReset()
 		if err != nil {
-			if errors.Is(err, job.ErrBusy) {
-				writeError(w, http.StatusConflict, "another control operation is in flight")
-				return
-			}
-			writeError(w, http.StatusInternalServerError, err.Error())
+			writeOpError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusAccepted, map[string]any{"job": j})
+	})
+
+	mux.HandleFunc("GET /api/control/banks", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, ops.Banks())
+	})
+
+	mux.HandleFunc("POST /api/control/switch", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Bank string `json:"bank"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Bank == "" {
+			writeError(w, http.StatusBadRequest, "body must be JSON with a non-empty \"bank\"")
+			return
+		}
+		j, err := ops.StartSwitch(body.Bank)
+		if err != nil {
+			writeOpError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusAccepted, map[string]any{"job": j})
 	})
 
 	return mux
+}
+
+// writeOpError maps controller sentinels onto HTTP statuses.
+func writeOpError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, job.ErrBusy):
+		writeError(w, http.StatusConflict, "another control operation is in flight")
+	case errors.Is(err, control.ErrSessionRunning):
+		writeError(w, http.StatusConflict, "a session is running — end the exam first")
+	case errors.Is(err, control.ErrInvalidBank):
+		writeError(w, http.StatusBadRequest, err.Error())
+	default:
+		writeError(w, http.StatusInternalServerError, err.Error())
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
