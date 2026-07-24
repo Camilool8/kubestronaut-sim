@@ -1,16 +1,10 @@
 import { useEffect, useState } from "react";
 import { getExam, getSession, startSession, type ExamInfo, type SessionSnapshot } from "../api";
+import { formatDuration } from "../lib/format";
+import { strings } from "../strings";
 
 interface StartProps {
   onSessionChange: (session: SessionSnapshot) => void;
-}
-
-function formatDuration(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.round((totalSeconds % 3600) / 60);
-  if (h === 0) return `${m}m`;
-  if (m === 0) return `${h}h`;
-  return `${h}h ${m}m`;
 }
 
 // Start screen: exam summary pulled from GET /api/exam, plus a Start
@@ -61,42 +55,41 @@ export function Start({ onSessionChange }: StartProps) {
   return (
     <div className="start-screen">
       <div className="start-card">
-        <h1>{exam?.title ?? "kubestronaut-sim"}</h1>
+        <h1>{exam?.title ?? strings.start.fallbackTitle}</h1>
         {examError && <p className="error-text">{examError}</p>}
 
         {exam && (
           <div className="start-stats">
             <div>
-              <div className="start-stat-label">Duration</div>
+              <div className="start-stat-label">{strings.start.durationLabel}</div>
               <div className="start-stat-value">{formatDuration(exam.durationSeconds)}</div>
             </div>
             <div>
-              <div className="start-stat-label">Passing score</div>
+              <div className="start-stat-label">{strings.start.passingScoreLabel}</div>
               <div className="start-stat-value">{exam.passingScore}%</div>
             </div>
             <div>
-              <div className="start-stat-label">Questions</div>
+              <div className="start-stat-label">{strings.start.questionsLabel}</div>
               <div className="start-stat-value">{exam.questions.length}</div>
             </div>
             <div>
-              <div className="start-stat-label">Kubernetes</div>
+              <div className="start-stat-label">{strings.start.kubernetesLabel}</div>
               <div className="start-stat-value">{exam.kubernetesVersion}</div>
             </div>
           </div>
         )}
 
         <ul className="start-tips">
-          <li>Solve questions over SSH on the named instance (user: candidate).</li>
-          <li>The desktop's Firefox is for documentation only — no copy/paste answers.</li>
-          <li>Each question has a working directory pre-created at /opt/course/&lt;n&gt;.</li>
-          <li>The timer starts the moment you click Start and cannot be paused.</li>
+          {strings.start.tips.map((tip) => (
+            <li key={tip}>{tip}</li>
+          ))}
         </ul>
 
         {startError && <p className="error-text">{startError}</p>}
 
         <div className="start-actions">
           <button className="btn btn-primary" onClick={handleStart} disabled={starting}>
-            {starting ? "Starting…" : "Start Exam"}
+            {starting ? strings.start.starting : strings.start.startExam}
           </button>
         </div>
       </div>

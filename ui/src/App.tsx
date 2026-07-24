@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { pollSession, type SessionSnapshot } from "./api";
+import { strings } from "./strings";
 import { Start } from "./screens/Start";
 import { Exam } from "./screens/Exam";
 import { Score } from "./screens/Score";
@@ -27,7 +28,7 @@ export default function App() {
   if (!session) {
     return (
       <div className="loading-screen">
-        {pollError ? `Cannot reach facilitator: ${pollError}` : "Loading…"}
+        {pollError ? strings.app.cannotReach(pollError) : strings.app.loading}
       </div>
     );
   }

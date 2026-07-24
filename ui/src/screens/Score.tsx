@@ -9,6 +9,7 @@ import {
   type SolutionDetail,
 } from "../api";
 import { CheckList } from "../components/CheckList";
+import { strings } from "../strings";
 
 const GRADING_POLL_MS = 3000;
 
@@ -41,8 +42,8 @@ export function Score() {
     load();
     intervalRef.current = window.setInterval(load, GRADING_POLL_MS);
     return clearPoll;
-    // `load` is stable in effect (module-level poll interval owns its
-    // own lifecycle here); intentionally mount-only.
+    // Poll lifecycle is intentionally mount-only; `load` reads no props.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleRetry = async () => {
@@ -57,8 +58,8 @@ export function Score() {
   if (response.status === "grading" || response.status === "not-ended") {
     return (
       <div className="score-screen score-loading">
-        <h1>Grading…</h1>
-        <p>Evaluating your exam over SSH. This can take a minute.</p>
+        <h1>{strings.score.gradingTitle}</h1>
+        <p>{strings.score.gradingBody}</p>
       </div>
     );
   }
@@ -66,10 +67,10 @@ export function Score() {
   if (response.status === "error") {
     return (
       <div className="score-screen score-error">
-        <h1>Grading failed</h1>
+        <h1>{strings.score.gradingFailedTitle}</h1>
         <p className="error-text">{response.message}</p>
         <button className="btn btn-primary" onClick={handleRetry}>
-          Retry
+          {strings.score.retry}
         </button>
       </div>
     );
@@ -81,9 +82,9 @@ export function Score() {
     <div className="score-screen">
       <div className={`score-banner ${results.passed ? "pass" : "fail"}`}>
         <div className="score-percent">{results.percent}%</div>
-        <div className="score-verdict">{results.passed ? "PASS" : "FAIL"}</div>
+        <div className="score-verdict">{results.passed ? strings.score.pass : strings.score.fail}</div>
         <div className="score-detail">
-          {results.earned}/{results.total} points — passing score {results.passingScore}%
+          {strings.score.pointsDetail(results.earned, results.total, results.passingScore)}
         </div>
       </div>
 
@@ -134,8 +135,8 @@ function QuestionResultDetails({ question }: { question: QuestionResult }) {
       </summary>
       <CheckList checks={question.checks} />
       <details className="solution-details" onToggle={handleToggle}>
-        <summary>Show solution</summary>
-        {loadingSolution && <p>Loading solution…</p>}
+        <summary>{strings.score.showSolution}</summary>
+        {loadingSolution && <p>{strings.score.loadingSolution}</p>}
         {solutionError && <p className="error-text">{solutionError}</p>}
         {solution && <ReactMarkdown>{solution.markdown}</ReactMarkdown>}
       </details>

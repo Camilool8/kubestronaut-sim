@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { endSession, getExam, type ExamInfo, type SessionSnapshot } from "../api";
 import { TimerBar } from "../components/TimerBar";
 import { QuestionPanel } from "../components/QuestionPanel";
+import { strings } from "../strings";
 
 interface ExamProps {
   session: SessionSnapshot;
@@ -69,7 +70,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
       <TimerBar
         session={session}
         fetchedAt={fetchedAt}
-        title={exam?.title ?? "Exam"}
+        title={exam?.title ?? strings.exam.fallbackTitle}
         onEndClick={() => setConfirmOpen(true)}
       />
       <div className="exam-body">
@@ -82,7 +83,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
         />
         <div className="desktop-pane">
           {session.state === "running" && (
-            <iframe className="desktop-frame" title="Exam desktop" src={DESKTOP_SRC} />
+            <iframe className="desktop-frame" title={strings.exam.desktopTitle} src={DESKTOP_SRC} />
           )}
         </div>
       </div>
@@ -90,11 +91,8 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
       {confirmOpen && (
         <div className="confirm-overlay">
           <div className="confirm-dialog">
-            <h2>End the exam?</h2>
-            <p>
-              This cannot be undone. The desktop will lock immediately and grading
-              will begin.
-            </p>
+            <h2>{strings.exam.confirmTitle}</h2>
+            <p>{strings.exam.confirmBody}</p>
             {endError && <p className="error-text">{endError}</p>}
             <div className="confirm-actions">
               <button
@@ -102,10 +100,10 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
                 onClick={() => setConfirmOpen(false)}
                 disabled={ending}
               >
-                Cancel
+                {strings.exam.cancel}
               </button>
               <button className="btn btn-danger" onClick={handleConfirmEnd} disabled={ending}>
-                {ending ? "Ending…" : "End Exam"}
+                {ending ? strings.exam.ending : strings.exam.endExam}
               </button>
             </div>
           </div>
