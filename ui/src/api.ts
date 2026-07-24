@@ -222,3 +222,50 @@ export function pollSession(
     window.removeEventListener("focus", onFocus);
   };
 }
+
+// ---- control plane (conductor, proxied by the facilitator) ----
+
+export type ControlPhaseState = "pending" | "running" | "done" | "failed";
+
+export interface ControlPhase {
+  id: string;
+  label: string;
+  state: ControlPhaseState;
+}
+
+export interface ControlJob {
+  id: string;
+  op: "reset" | "switch";
+  bank: string;
+  startedAt: string;
+  phase: string;
+  error?: string;
+  phases: ControlPhase[];
+}
+
+export interface ControlStatus {
+  busy: boolean;
+  job?: ControlJob;
+  lastJob?: ControlJob;
+}
+
+export async function getControlStatus(): Promise<ControlStatus> {
+  const res = await fetch("/api/control/status");
+  if (!res.ok) {
+    throw new Error(await readError(res));
+  }
+  return (await res.json()) as ControlStatus;
+}
+
+export type ControlActionResponse =
+  | { ok: true; job: ControlJob }
+  | { ok: false; error: string };
+
+export async function startControlReset(): Promise<ControlActionResponse> {
+  const res = await fetch("/api/control/reset", { method: "POST" });
+  if (res.status === 202) {
+    const body = (await res.json()) as { job: ControlJob };
+    return { ok: true, job: body.job };
+  }
+  return { ok: false, error: await readError(res) };
+}

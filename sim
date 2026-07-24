@@ -9,15 +9,19 @@ case "$cmd" in
   down)  docker compose down --remove-orphans ;;
   purge) docker compose down -v --remove-orphans ;;
   reset)
-    echo "Resetting exam state (cluster + instances, cached images kept)..."
-    for i in instance-1 instance-2; do   # /opt/course is a persistent volume; recreate alone won't wipe it
-      docker compose exec "$i" find /opt/course -mindepth 1 -delete
+    # Same code path the UI's "New attempt" button uses: the conductor
+    # owns the reset sequence; this is just a thin trigger + progress
+    # poll against the facilitator's /api/control proxy.
+    echo "Resetting exam state via conductor (cluster + instances, cached images kept)..."
+    curl -fsS -X POST http://localhost:8080/api/control/reset >/dev/null
+    while :; do
+      sleep 3
+      status=$(curl -fsS http://localhost:8080/api/control/status 2>/dev/null) || continue
+      busy=$(printf '%s' "$status" | python3 -c 'import json,sys; print(json.load(sys.stdin)["busy"])')
+      [ "$busy" = "False" ] && break
     done
-    # the active bank lives in /shared/bank; bootstrap.sh and the instance
-    # entrypoints read it directly, so no env threading is needed
-    docker compose exec k8s-env bash -c 'kind delete cluster --name sim || true; /opt/sim/bootstrap.sh'
-    docker compose up -d --force-recreate instance-1 instance-2
-    curl -fsS -X DELETE http://localhost:8080/api/session >/dev/null || true
+    err=$(printf '%s' "$status" | python3 -c 'import json,sys; print((json.load(sys.stdin).get("lastJob") or {}).get("error",""))')
+    [ -z "$err" ] || { echo "Reset failed: $err"; exit 1; }
     echo "Fresh exam ready." ;;
   ssh)   docker compose exec "${2:-instance-1}" su - candidate ;;
   status) docker compose ps ;;

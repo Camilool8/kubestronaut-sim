@@ -1,0 +1,20 @@
+# Exam catalog metadata that does not live in a bank directory.
+# Available banks are discovered by scanning banks/*/exam.yaml; entries
+# here are certifications we advertise but cannot run yet (their exam
+# engine is not built), shown disabled in the UI.
+comingSoon:
+  - id: kcna-mock
+    title: KCNA Mock Exam
+    certification: KCNA
+    examType: mcq
+    note: Multiple-choice engine not built yet
+  - id: kcsa-mock
+    title: KCSA Mock Exam
+    certification: KCSA
+    examType: mcq
+    note: Multiple-choice engine not built yet
+  - id: cks-mock
+    title: CKS Mock Exam
+    certification: CKS
+    examType: hands-on
+    note: Requires security add-ons (AppArmor, Falco) not in the kind environment yet

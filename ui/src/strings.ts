@@ -47,6 +47,18 @@ export const strings = {
     points: (points: number) => `${points} pts`,
   },
 
+  control: {
+    resetTitle: "Resetting exam environment",
+    switchTitle: (bank: string) => `Switching exam to ${bank}`,
+    failedTitle: "Operation failed",
+    hint: "This rebuilds the Kubernetes cluster and usually takes 1–2 minutes.",
+    retry: "Retry",
+    dismiss: "Dismiss",
+    newAttempt: "New attempt",
+    newAttemptHint:
+      "Wipes all cluster and instance state, then returns you to the start screen.",
+  },
+
   score: {
     gradingTitle: "Grading…",
     gradingBody: "Evaluating your exam over SSH. This can take a minute.",

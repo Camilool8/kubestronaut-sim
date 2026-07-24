@@ -59,6 +59,16 @@ docker compose exec desktop curl -s --max-time 5 -o /dev/null https://example.co
 docker compose exec desktop su - candidate -c 'ssh -o BatchMode=yes instance-1 kubectl get nodes --no-headers' \
   | grep -q ' Ready ' || fail "desktop->instance-1 ssh broken"
 
+# conductor isolation: the docker-socket-holding sidecar must be invisible
+# from the host and from the exam network; its API is reachable only
+# through the facilitator's /api/control proxy on :8080
+curl -fsS --max-time 5 -o /dev/null http://localhost:9000/healthz \
+  && fail "conductor should not be reachable from the host" || true
+docker compose exec desktop curl -fs --max-time 5 -o /dev/null http://conductor:9000/healthz \
+  && fail "conductor should not be reachable from the desktop" || true
+status=$(req GET /api/control/status)
+[ "$status" = "200" ] || fail "/api/control/status expected 200 via :8080, got $status"
+
 echo "== session lifecycle: start, countdown, desktop unlock =="
 status=$(req POST /api/session/start)
 [ "$status" = "200" ] || fail "session start expected 200, got $status"

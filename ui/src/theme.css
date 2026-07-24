@@ -540,15 +540,71 @@ a {
   cursor: pointer;
 }
 
-.reset-hint {
-  margin-top: 2rem;
+/* ---- control job overlay (reset / bank switch progress) ---- */
+
+.control-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 6, 10, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.control-dialog {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px 28px;
+  width: 440px;
+  max-width: 90vw;
+}
+
+.control-phases {
+  list-style: none;
+  margin: 16px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.control-phases li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
   color: var(--fg-dim);
+}
+
+.control-phases li.phase-done { color: var(--fg); }
+.control-phases li.phase-running { color: var(--accent); }
+.control-phases li.phase-failed { color: var(--danger); }
+
+.phase-mark {
+  width: 1em;
   text-align: center;
+}
+
+.control-hint {
+  color: var(--fg-dim);
   font-size: 0.85rem;
 }
 
-.reset-hint code {
-  background: var(--bg-raised);
-  padding: 0.1em 0.4em;
-  border-radius: 3px;
+.control-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.score-actions {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.score-actions-hint {
+  color: var(--fg-dim);
+  font-size: 0.85rem;
+  margin-top: 8px;
 }

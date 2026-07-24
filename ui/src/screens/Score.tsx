@@ -13,13 +13,17 @@ import { strings } from "../strings";
 
 const GRADING_POLL_MS = 3000;
 
+interface ScoreProps {
+  onNewAttempt: () => void;
+}
+
 // Score screen: while /api/results is 202 ("grading"), poll every 3s;
 // on 500 (gradeError persisted), show the error with a Retry button
 // that re-POSTs /api/session/end (the API re-grades an ended session
-// without results — see §3); once 200, render the scoreboard. No reset
-// control here by design — resetting wipes cluster state and stays a
-// CLI-only decision (`./sim reset`).
-export function Score() {
+// without results — see §3); once 200, render the scoreboard with a
+// "New attempt" action that drives the conductor's reset (same code
+// path as ./sim reset).
+export function Score({ onNewAttempt }: ScoreProps) {
   const [response, setResponse] = useState<ResultsResponse>({ status: "grading" });
   const intervalRef = useRef<number | null>(null);
 
@@ -94,10 +98,12 @@ export function Score() {
         ))}
       </div>
 
-      <p className="reset-hint">
-        To start a new attempt, run <code>./sim reset</code> from the CLI — it wipes
-        cluster state and returns you to the start screen.
-      </p>
+      <div className="score-actions">
+        <button className="btn btn-primary" onClick={onNewAttempt}>
+          {strings.control.newAttempt}
+        </button>
+        <p className="score-actions-hint">{strings.control.newAttemptHint}</p>
+      </div>
     </div>
   );
 }

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"sync/atomic"
 	"time"
@@ -147,7 +149,16 @@ func runServer() error {
 		return mgr.Snapshot().State == "running"
 	})
 
-	handler := api.New(ex, cfg.bankDir, mgr, g.Grade, desktopHandler, web.FS())
+	// Reverse proxy for the conductor's control API: the browser only
+	// ever talks to :8080, and the conductor is only reachable from this
+	// container (they share the internal control network).
+	conductorURL, err := url.Parse("http://" + envOr("CONDUCTOR_ADDR", "conductor:9000"))
+	if err != nil {
+		return fmt.Errorf("parse CONDUCTOR_ADDR: %w", err)
+	}
+	controlProxy := httputil.NewSingleHostReverseProxy(conductorURL)
+
+	handler := api.New(ex, cfg.bankDir, mgr, g.Grade, desktopHandler, controlProxy, web.FS())
 
 	srv := &http.Server{
 		Addr:              listen,
