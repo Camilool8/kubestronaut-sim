@@ -1,0 +1,142 @@
+package docker
+
+import (
+	"context"
+	"encoding/binary"
+	"encoding/json"
+	"fmt"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// newFakeDaemon serves a minimal Docker Engine API on a unix socket and
+// returns a Client pointed at it.
+func newFakeDaemon(t *testing.T, handler http.Handler) *Client {
+	t.Helper()
+	sock := filepath.Join(t.TempDir(), "docker.sock")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatalf("listen unix: %v", err)
+	}
+	srv := httptest.NewUnstartedServer(handler)
+	srv.Listener = ln
+	srv.Start()
+	t.Cleanup(srv.Close)
+	return New(sock)
+}
+
+// stdcopyFrame encodes one docker multiplexed-stream frame.
+func stdcopyFrame(stream byte, payload string) []byte {
+	head := make([]byte, 8)
+	head[0] = stream
+	binary.BigEndian.PutUint32(head[4:], uint32(len(payload)))
+	return append(head, payload...)
+}
+
+func TestFindContainerFiltersByComposeLabels(t *testing.T) {
+	var gotFilters string
+	c := newFakeDaemon(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasSuffix(r.URL.Path, "/containers/json") {
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+		gotFilters = r.URL.Query().Get("filters")
+		fmt.Fprint(w, `[{"Id":"abc123"}]`)
+	}))
+
+	id, err := c.FindContainer(context.Background(), "kubestronaut-sim", "instance-1")
+	if err != nil {
+		t.Fatalf("FindContainer: %v", err)
+	}
+	if id != "abc123" {
+		t.Errorf("id = %q, want abc123", id)
+	}
+
+	var filters map[string][]string
+	if err := json.Unmarshal([]byte(gotFilters), &filters); err != nil {
+		t.Fatalf("filters not JSON: %v (%q)", err, gotFilters)
+	}
+	labels := strings.Join(filters["label"], ",")
+	if !strings.Contains(labels, "com.docker.compose.project=kubestronaut-sim") ||
+		!strings.Contains(labels, "com.docker.compose.service=instance-1") {
+		t.Errorf("filters missing compose labels: %q", labels)
+	}
+}
+
+func TestFindContainerErrorsWhenAbsent(t *testing.T) {
+	c := newFakeDaemon(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `[]`)
+	}))
+	if _, err := c.FindContainer(context.Background(), "p", "ghost"); err == nil {
+		t.Fatal("want error for missing container")
+	}
+}
+
+func TestExecRunsCommandAndReturnsExitAndOutput(t *testing.T) {
+	var execBody struct {
+		AttachStdout bool     `json:"AttachStdout"`
+		AttachStderr bool     `json:"AttachStderr"`
+		Cmd          []string `json:"Cmd"`
+	}
+	c := newFakeDaemon(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/containers/abc/exec"):
+			if err := json.NewDecoder(r.Body).Decode(&execBody); err != nil {
+				t.Errorf("decode exec create: %v", err)
+			}
+			fmt.Fprint(w, `{"Id":"e1"}`)
+		case strings.HasSuffix(r.URL.Path, "/exec/e1/start"):
+			w.Write(stdcopyFrame(1, "seeding q01\n"))
+			w.Write(stdcopyFrame(2, "warning: slow\n"))
+		case strings.HasSuffix(r.URL.Path, "/exec/e1/json"):
+			fmt.Fprint(w, `{"ExitCode":3}`)
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+	}))
+
+	exit, out, err := c.Exec(context.Background(), "abc", []string{"bash", "-c", "true"})
+	if err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	if exit != 3 {
+		t.Errorf("exit = %d, want 3", exit)
+	}
+	if !strings.Contains(out, "seeding q01") || !strings.Contains(out, "warning: slow") {
+		t.Errorf("output should carry both streams, got %q", out)
+	}
+	if !execBody.AttachStdout || !execBody.AttachStderr {
+		t.Error("exec create must attach stdout+stderr")
+	}
+	if strings.Join(execBody.Cmd, " ") != "bash -c true" {
+		t.Errorf("cmd = %v", execBody.Cmd)
+	}
+}
+
+func TestRestartHitsRestartEndpoint(t *testing.T) {
+	var restarted string
+	c := newFakeDaemon(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		restarted = r.URL.Path + "?" + r.URL.RawQuery
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	if err := c.Restart(context.Background(), "abc", 10); err != nil {
+		t.Fatalf("Restart: %v", err)
+	}
+	if !strings.Contains(restarted, "/containers/abc/restart") || !strings.Contains(restarted, "t=10") {
+		t.Errorf("restart request = %q", restarted)
+	}
+}
+
+func TestErrorStatusSurfacesDaemonMessage(t *testing.T) {
+	c := newFakeDaemon(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, `{"message":"broken daemon"}`)
+	}))
+	_, err := c.FindContainer(context.Background(), "p", "s")
+	if err == nil || !strings.Contains(err.Error(), "broken daemon") {
+		t.Fatalf("err = %v, want daemon message surfaced", err)
+	}
+}
