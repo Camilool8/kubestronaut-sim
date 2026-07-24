@@ -273,11 +273,20 @@ func (m *Manager) Snapshot() Snapshot {
 
 // SetResults records the graded results for the current session and
 // clears any prior gradeError (a successful grade supersedes an earlier
-// failed attempt). On a persist failure, results/gradeError are left
-// unchanged.
+// failed attempt). It returns ErrConflict without modifying anything if
+// the session is not currently ended: an asynchronous grading run is
+// keyed to the attempt that was ended when it started, and if the
+// operator has since Reset (or Reset then Start'd a new attempt) before
+// the grade completes, that late write must not stamp a previous
+// attempt's results onto the new session state. On a persist failure,
+// results/gradeError are also left unchanged.
 func (m *Manager) SetResults(r json.RawMessage) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	if m.state != stateEnded {
+		return fmt.Errorf("session: set results: %w", ErrConflict)
+	}
 
 	prev := m.captureLocked()
 	m.results = r
@@ -290,11 +299,18 @@ func (m *Manager) SetResults(r json.RawMessage) error {
 }
 
 // SetGradeError records that grading failed with the given message, so
-// /api/results can surface it and a caller can retry via End. On a
-// persist failure, gradeError is left unchanged.
+// /api/results can surface it and a caller can retry via End. Like
+// SetResults, it returns ErrConflict without modifying anything if the
+// session is not currently ended, guarding against the same stale-write
+// race (a late-arriving grade failure from a since-Reset attempt). On a
+// persist failure, gradeError is also left unchanged.
 func (m *Manager) SetGradeError(msg string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	if m.state != stateEnded {
+		return fmt.Errorf("session: set grade error: %w", ErrConflict)
+	}
 
 	prev := m.captureLocked()
 	m.gradeError = msg

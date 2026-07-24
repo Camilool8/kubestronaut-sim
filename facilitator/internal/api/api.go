@@ -109,6 +109,9 @@ func (s *server) handleExam(w http.ResponseWriter, r *http.Request) {
 		DurationSeconds:   int(s.ex.Duration.Seconds()),
 		PassingScore:      s.ex.PassingScore,
 		KubernetesVersion: s.ex.KubernetesVersion,
+		// Pre-sized (not nil) so an exam with zero questions still
+		// marshals Questions as JSON "[]" rather than "null".
+		Questions: make([]examQuestionInfo, 0, len(s.ex.Questions)),
 	}
 	for _, q := range s.ex.Questions {
 		resp.Questions = append(resp.Questions, examQuestionInfo{

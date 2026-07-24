@@ -53,11 +53,25 @@ func testExam() *exam.Exam {
 	}
 }
 
+// newTestManager returns a Manager already Start()ed and End()ed, i.e.
+// in the "ended" state Grade's real callers always put it in before
+// invoking Grade (the end-session handler calls it only after
+// Manager.End succeeds; the expiry timer's onExpire fires after the
+// session has transitioned to ended too). SetResults/SetGradeError
+// reject writes unless the session is currently ended, so grader tests
+// that skip this setup would see every Grade() run's outcome silently
+// rejected as ErrConflict instead of recorded.
 func newTestManager(t *testing.T) *session.Manager {
 	t.Helper()
 	mgr, err := session.New(t.TempDir()+"/session.json", time.Hour, time.Now, func() {})
 	if err != nil {
 		t.Fatalf("session.New: %v", err)
+	}
+	if _, err := mgr.Start(); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if err := mgr.End("submitted"); err != nil {
+		t.Fatalf("End: %v", err)
 	}
 	return mgr
 }

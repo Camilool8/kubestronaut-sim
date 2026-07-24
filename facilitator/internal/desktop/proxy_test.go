@@ -72,7 +72,7 @@ func TestProxyPreservesQueryString(t *testing.T) {
 	}
 }
 
-func TestLockedRejectsWithout403(t *testing.T) {
+func TestLockedRejects403WithoutBackendHit(t *testing.T) {
 	cases := []struct {
 		name       string
 		path       string

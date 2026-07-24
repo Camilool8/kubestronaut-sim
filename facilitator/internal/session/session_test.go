@@ -472,6 +472,135 @@ func TestSetGradeErrorPersists(t *testing.T) {
 	}
 }
 
+// TestSetResultsAndGradeErrorRejectedUnlessEnded is a regression test for
+// a stale-write race: a grading goroutine started against one attempt
+// (session ended, grading in flight) must not be able to stamp its
+// result onto a later attempt after the operator has Reset (or
+// Reset+Start'd) the session in the meantime. Both SetResults and
+// SetGradeError must reject with ErrConflict — and leave state/results
+// untouched, in memory and on disk — whenever the current state is not
+// "ended".
+func TestSetResultsAndGradeErrorRejectedUnlessEnded(t *testing.T) {
+	cases := []struct {
+		name  string
+		setup func(t *testing.T, m *Manager)
+	}{
+		{
+			name:  "idle (never started)",
+			setup: func(t *testing.T, m *Manager) {},
+		},
+		{
+			name: "reset after end (late grade vs. Reset)",
+			setup: func(t *testing.T, m *Manager) {
+				t.Helper()
+				if _, err := m.Start(); err != nil {
+					t.Fatalf("Start: %v", err)
+				}
+				if err := m.End("submitted"); err != nil {
+					t.Fatalf("End: %v", err)
+				}
+				if err := m.Reset(); err != nil {
+					t.Fatalf("Reset: %v", err)
+				}
+			},
+		},
+		{
+			name: "reset+start after end (late grade vs. Reset+Start of new attempt)",
+			setup: func(t *testing.T, m *Manager) {
+				t.Helper()
+				if _, err := m.Start(); err != nil {
+					t.Fatalf("Start: %v", err)
+				}
+				if err := m.End("submitted"); err != nil {
+					t.Fatalf("End: %v", err)
+				}
+				if err := m.Reset(); err != nil {
+					t.Fatalf("Reset: %v", err)
+				}
+				if _, err := m.Start(); err != nil {
+					t.Fatalf("Start (new attempt): %v", err)
+				}
+			},
+		},
+		{
+			name: "running (grade arriving before End at all)",
+			setup: func(t *testing.T, m *Manager) {
+				t.Helper()
+				if _, err := m.Start(); err != nil {
+					t.Fatalf("Start: %v", err)
+				}
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name+"/SetResults", func(t *testing.T) {
+			path := sessionPath(t)
+			clock, _ := fakeClock(epoch)
+			m, err := New(path, testDur, clock, func() {})
+			if err != nil {
+				t.Fatalf("New: %v", err)
+			}
+			c.setup(t, m)
+			beforeResults, beforeGradeErr, beforeGraded := m.Results()
+
+			stale := json.RawMessage(`{"earned":999,"total":999}`)
+			if err := m.SetResults(stale); !errors.Is(err, ErrConflict) {
+				t.Fatalf("SetResults error = %v, want ErrConflict", err)
+			}
+
+			results, gradeErr, graded := m.Results()
+			if string(results) != string(beforeResults) || gradeErr != beforeGradeErr || graded != beforeGraded {
+				t.Errorf("Results() after rejected SetResults = (%s, %q, %v), want unchanged (%s, %q, %v)",
+					results, gradeErr, graded, beforeResults, beforeGradeErr, beforeGraded)
+			}
+
+			// Reload from disk to prove the rejected write persisted nothing.
+			m2, err := New(path, testDur, clock, func() {})
+			if err != nil {
+				t.Fatalf("New (reload): %v", err)
+			}
+			reloadedResults, reloadedGradeErr, reloadedGraded := m2.Results()
+			if string(reloadedResults) != string(beforeResults) || reloadedGradeErr != beforeGradeErr || reloadedGraded != beforeGraded {
+				t.Errorf("reloaded Results() = (%s, %q, %v), want unchanged (%s, %q, %v)",
+					reloadedResults, reloadedGradeErr, reloadedGraded, beforeResults, beforeGradeErr, beforeGraded)
+			}
+		})
+
+		t.Run(c.name+"/SetGradeError", func(t *testing.T) {
+			path := sessionPath(t)
+			clock, _ := fakeClock(epoch)
+			m, err := New(path, testDur, clock, func() {})
+			if err != nil {
+				t.Fatalf("New: %v", err)
+			}
+			c.setup(t, m)
+			beforeResults, beforeGradeErr, beforeGraded := m.Results()
+
+			if err := m.SetGradeError("ssh: connection refused (stale)"); !errors.Is(err, ErrConflict) {
+				t.Fatalf("SetGradeError error = %v, want ErrConflict", err)
+			}
+
+			results, gradeErr, graded := m.Results()
+			if string(results) != string(beforeResults) || gradeErr != beforeGradeErr || graded != beforeGraded {
+				t.Errorf("Results() after rejected SetGradeError = (%s, %q, %v), want unchanged (%s, %q, %v)",
+					results, gradeErr, graded, beforeResults, beforeGradeErr, beforeGraded)
+			}
+
+			// Reload from disk to prove the rejected write persisted nothing.
+			m2, err := New(path, testDur, clock, func() {})
+			if err != nil {
+				t.Fatalf("New (reload): %v", err)
+			}
+			reloadedResults, reloadedGradeErr, reloadedGraded := m2.Results()
+			if string(reloadedResults) != string(beforeResults) || reloadedGradeErr != beforeGradeErr || reloadedGraded != beforeGraded {
+				t.Errorf("reloaded Results() = (%s, %q, %v), want unchanged (%s, %q, %v)",
+					reloadedResults, reloadedGradeErr, reloadedGraded, beforeResults, beforeGradeErr, beforeGraded)
+			}
+		})
+	}
+}
+
 // TestReloadEndedWithoutResultsAllowsRegrade is a regression test for a
 // nil-vs-literal-"null" json.RawMessage round-trip bug: json.RawMessage(nil)
 // marshals to the JSON literal null, but unmarshaling null into a

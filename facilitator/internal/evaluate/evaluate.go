@@ -182,6 +182,13 @@ func gradeCheck(r Runner, bank string, q exam.Question, c exam.Check, checkTimeo
 
 	cr := CheckResult{Name: c.Name, Desc: c.Desc, Points: c.Points}
 	switch {
+	// Deliberate precedence tradeoff: ctx.Err() is read only after Run
+	// has already returned, so a check whose Run call completes within
+	// a hair of checkTimeout can still observe ctx.Err() != nil (the
+	// deadline fired concurrently, just after Run finished) and be
+	// reported as "check timed out" even though it actually finished in
+	// time. Accepted at the current 30s per-check timeout: narrowing
+	// this window is not worth the added complexity.
 	case ctx.Err() != nil:
 		cr.Message = "check timed out"
 	case err != nil:
