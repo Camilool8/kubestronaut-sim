@@ -1373,17 +1373,14 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  /* Additive only: `.screen`'s resting style (outside this block, and
+     whenever this animation hasn't started or has already finished) is
+     the plain, fully-visible element. This keyframe only ever plays
+     forward from opacity: 0 to the element's real style, so a screen
+     that never gets to run it — or runs it in a hidden tab whose timeline
+     is paused — still ends up visible rather than stuck invisible. */
   .screen {
-    opacity: 0;
-    transform: translateY(4px);
-    transition:
-      opacity var(--dur-base) var(--ease-out),
-      transform var(--dur-base) var(--ease-out);
-  }
-
-  .screen-entered {
-    opacity: 1;
-    transform: none;
+    animation: screen-in var(--dur-base) var(--ease-out) both;
   }
 
   .confirm-overlay,
@@ -1416,6 +1413,13 @@
   .control-phases li:nth-child(5) { animation-delay: 160ms; }
   .control-phases li:nth-child(6) { animation-delay: 200ms; }
   .control-phases li:nth-child(n + 7) { animation-delay: 240ms; }
+}
+
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 
 @keyframes scrim-in {
