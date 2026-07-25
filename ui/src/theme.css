@@ -177,6 +177,13 @@
   opacity: 1;
 }
 
+/* On --accent-soft the plain --accent only reaches 4.0:1; --accent-strong
+   is the accent for text sitting on that fill (5.4:1). */
+.bank-card.bank-active .bank-badge {
+  color: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+
 .bank-title {
   font-weight: 700;
   display: flex;
@@ -463,6 +470,7 @@
 .copy-value:focus-visible code {
   border-color: var(--accent);
   background: var(--accent-soft);
+  color: var(--accent-strong);
 }
 
 .copy-value-icon {

@@ -11,6 +11,6 @@
   <property name="scrolling-unlimited" type="bool" value="true"/>
   <property name="font-name" type="string" value="JetBrains Mono 11"/>
   <property name="color-foreground" type="string" value="#d9dee5"/>
-  <property name="color-background" type="string" value="#0b0e14"/>
-  <property name="color-cursor" type="string" value="#4fd6be"/>
+  <property name="color-background" type="string" value="#0b1220"/>
+  <property name="color-cursor" type="string" value="#7aa2f7"/>
 </channel>
