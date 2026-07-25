@@ -20,7 +20,12 @@ import { strings } from "../strings";
 
 interface StartProps {
   onSessionChange: (session: SessionSnapshot) => void;
-  onControlStart: (result: ControlActionResponse) => void;
+  // Takes the *starter*, not its result, so the switch runs inside App's
+  // runControlAction: that wrapper is what turns both a refused job
+  // ({ok:false}) and a rejected fetch into a toast. Handing it a result
+  // could only ever cover the first, and a bank switch fails the second
+  // way whenever the conductor's host is unreachable.
+  onControlStart: (start: () => Promise<ControlActionResponse>) => void;
   // Bumped by App whenever a control job finishes: a completed bank
   // switch changes the active exam while Start stays mounted, so the
   // exam summary and catalog must be refetched, not kept from mount.
@@ -92,16 +97,22 @@ export function Start({
     }
   };
 
-  const handleConfirmSwitch = async () => {
+  // The dialog's own concerns (close on acceptance, release the disabled
+  // state either way) live inside the starter; whether the user hears
+  // about a failure is App's, through the wrapper it already owns.
+  const handleConfirmSwitch = () => {
     if (!confirmBank) return;
+    const bank = confirmBank;
     setSwitching(true);
-    try {
-      const result = await startControlSwitch(confirmBank.id);
-      onControlStart(result);
-      if (result.ok) setConfirmBank(null);
-    } finally {
-      setSwitching(false);
-    }
+    onControlStart(async () => {
+      try {
+        const result = await startControlSwitch(bank.id);
+        if (result.ok) setConfirmBank(null);
+        return result;
+      } finally {
+        setSwitching(false);
+      }
+    });
   };
 
   const bankBadge = (b: BankEntry, banks: BanksResponse): string | null => {

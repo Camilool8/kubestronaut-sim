@@ -238,6 +238,87 @@ describe("App control failures", () => {
     const alert = await screen.findByText(/control plane/i);
     expect(alert).toBeInTheDocument();
   });
+
+  // The third control-action entry point. `handleNewAttempt` (above) and
+  // the overlay's Retry (below) both go through App's runControlAction;
+  // the lobby's bank switch called startControlSwitch directly with no
+  // catch, so a rejected fetch was an unhandled rejection: the confirm
+  // dialog just sat there, spinner off, saying nothing.
+  test("tells the user when the bank switch request itself fails", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const json = (body: unknown, status = 200) =>
+          new Response(JSON.stringify(body), { status });
+
+        if (url.endsWith("/api/control/switch") && init?.method === "POST") {
+          throw new TypeError("Failed to fetch");
+        }
+        if (url.endsWith("/api/control/status")) return json({ busy: false });
+        if (url.endsWith("/api/session")) return json(idleSession);
+        if (url.endsWith("/api/exam")) return json(exam);
+        if (url.endsWith("/api/control/banks")) return json(banks);
+        return json({});
+      }),
+    );
+
+    render(<App />);
+    await screen.findByText("CKAD Mock Exam 01", { selector: "h1" });
+    await user.click(screen.getByRole("button", { name: /CKA Mock Exam 01/ }));
+    await user.click(screen.getByRole("button", { name: "Switch exam" }));
+
+    expect(await screen.findByText(/control plane/i)).toBeInTheDocument();
+    // The dialog stays open and re-armed, so the user can try again once
+    // they have acted on what the toast told them.
+    const confirm = screen.getByRole("button", { name: "Switch exam" });
+    expect(confirm).toBeInTheDocument();
+    await waitFor(() => expect(confirm).not.toBeDisabled());
+  });
+});
+
+// `pollError` was written on every failed session poll and read only by
+// the pre-first-session loading screen — i.e. never, after the first
+// success. The app's most central fetch failed silently forever.
+describe("App session polling", () => {
+  test("warns when the session poll fails after the first success, and withdraws it on recovery", async () => {
+    let sessionDown = false;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        const json = (body: unknown, status = 200) =>
+          new Response(JSON.stringify(body), { status });
+
+        if (url.endsWith("/api/session")) {
+          if (sessionDown) throw new TypeError("Failed to fetch");
+          return json(idleSession);
+        }
+        if (url.endsWith("/api/control/status")) return json({ busy: false });
+        if (url.endsWith("/api/exam")) return json(exam);
+        if (url.endsWith("/api/control/banks")) return json(banks);
+        return json({});
+      }),
+    );
+
+    render(<App />);
+    await screen.findByText("CKAD Mock Exam 01", { selector: "h1" });
+
+    // pollSession refetches on window focus as well as on its 10s timer —
+    // the same path a candidate takes returning to the tab.
+    sessionDown = true;
+    window.dispatchEvent(new Event("focus"));
+
+    expect(await screen.findByText(/cannot reach facilitator/i)).toBeInTheDocument();
+
+    // ...and it must not outlive the outage it describes.
+    sessionDown = false;
+    window.dispatchEvent(new Event("focus"));
+    await waitFor(() =>
+      expect(screen.queryByText(/cannot reach facilitator/i)).toBeNull(),
+    );
+  });
 });
 
 // handleRetry is only reachable through the control overlay's Retry

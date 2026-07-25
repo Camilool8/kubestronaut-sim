@@ -56,6 +56,12 @@ export default function App() {
   // finally fires. Restarting the effect polls again immediately.
   const [jobNonce, setJobNonce] = useState(0);
   const wasBusy = useRef(false);
+  // Whether a session has ever arrived, and the id of the toast standing
+  // in for `pollError` once one has. Refs, not state: the poll callbacks
+  // are created once (they are the effect's deps) and must not re-arm the
+  // poller every time either value changes.
+  const seenSession = useRef(false);
+  const pollToastId = useRef<number | null>(null);
 
   const gateVerdict = useDesktopGate();
   // A desktop user who merely shrank their window can wave the gate
@@ -65,14 +71,36 @@ export default function App() {
     gateVerdict === "blocked" || (gateVerdict === "narrow" && !gateOverridden());
 
   const applySession = useCallback((next: SessionSnapshot) => {
+    seenSession.current = true;
     setSession(next);
     setFetchedAt(Date.now());
     setPollError(null);
+    // The facilitator answered again: take the warning back rather than
+    // leaving a stale "cannot reach" toast on a working app.
+    if (pollToastId.current !== null) {
+      toastStore.dismiss(pollToastId.current);
+      pollToastId.current = null;
+    }
+  }, []);
+
+  // `pollError` is rendered by the pre-first-session loading screen below.
+  // Every later failure — i.e. all of them, in normal use — used to be
+  // written to that state and never read again, so the app's most central
+  // fetch failed in silence. After the first success the toast is the
+  // signal, and applySession above withdraws it when the poll recovers.
+  const handlePollError = useCallback((err: unknown) => {
+    setPollError(String(err));
+    if (!seenSession.current) return;
+    pollToastId.current = toastStore.push({
+      kind: "warning",
+      message: strings.app.cannotReach(String(err)),
+      dedupeKey: "session-poll",
+    });
   }, []);
 
   useEffect(() => {
-    return pollSession(applySession, (err) => setPollError(String(err)));
-  }, [applySession]);
+    return pollSession(applySession, handlePollError);
+  }, [applySession, handlePollError]);
 
   useEffect(() => {
     let stopped = false;
@@ -192,7 +220,7 @@ export default function App() {
       screen = (
         <Start
           onSessionChange={applySession}
-          onControlStart={applyControlResult}
+          onControlStart={runControlAction}
           catalogVersion={catalogVersion}
           onBanksLoaded={handleBanksLoaded}
         />

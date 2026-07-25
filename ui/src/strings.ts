@@ -38,6 +38,10 @@ export const strings = {
     fallbackTitle: "Exam",
     endExam: "End Exam",
     ending: "Ending…",
+    // Submitting is the one control that must never fail silently: the
+    // server-side clock keeps running whatever the button looks like.
+    endFailed: (detail: string) =>
+      `Couldn't submit the exam (${detail}). The session is still running — try again, or submit from a desktop.`,
     confirmTitle: "End the exam?",
     confirmBody:
       "This cannot be undone. The desktop will lock immediately and grading will begin.",
@@ -204,6 +208,15 @@ export const strings = {
     gradingBody: "Evaluating your exam over SSH. This can take a minute.",
     gradingFailedTitle: "Grading failed",
     retry: "Retry",
+    // The poll could not reach the facilitator. Not terminal — the poll is
+    // still running — so the copy says what is happening and that it will
+    // keep trying, rather than reading like a dead end.
+    pollFailed: (detail: string) =>
+      `Still trying to reach the facilitator (${detail}). Retrying every few seconds — leave this tab open.`,
+    // The re-grade request itself failed. The Retry button is showing
+    // again underneath this, so the copy names the likely check.
+    retryFailed: (detail: string) =>
+      `Couldn't ask the facilitator to grade again (${detail}). Check the stack is up with \`docker compose ps\`, then retry.`,
     pass: "PASS",
     fail: "FAIL",
     pointsDetail: (earned: number, total: number, passingScore: number) =>
