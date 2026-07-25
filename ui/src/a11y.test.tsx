@@ -118,7 +118,7 @@ describe("axe: no WCAG violations", () => {
 
   test("lobby (Start)", async () => {
     const { container } = render(
-      <Start onSessionChange={() => {}} onControlStart={() => {}} />,
+      <Start onSessionChange={() => {}} onControlStart={() => {}} catalogVersion={0} />,
     );
     await screen.findByText("CKAD Mock Exam 01", { selector: "h1" });
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();

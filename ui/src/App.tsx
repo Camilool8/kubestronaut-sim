@@ -36,6 +36,10 @@ export default function App() {
   const [pollError, setPollError] = useState<string | null>(null);
   const [control, setControl] = useState<ControlStatus | null>(null);
   const [dismissedJobId, setDismissedJobId] = useState<string | null>(null);
+  // Incremented whenever a control job finishes so the Start screen
+  // refetches the exam summary and bank catalog — a completed switch
+  // changes both while Start stays mounted on the idle screen.
+  const [catalogVersion, setCatalogVersion] = useState(0);
   const wasBusy = useRef(false);
 
   const applySession = useCallback((next: SessionSnapshot) => {
@@ -67,6 +71,7 @@ export default function App() {
         // 10s session poll.
         if (wasBusy.current && !next.busy) {
           getSession().then(applySession).catch(() => {});
+          setCatalogVersion((v) => v + 1);
         }
         wasBusy.current = next.busy;
       }
@@ -131,7 +136,11 @@ export default function App() {
   switch (session.state) {
     case "idle":
       screen = (
-        <Start onSessionChange={applySession} onControlStart={applyControlResult} />
+        <Start
+          onSessionChange={applySession}
+          onControlStart={applyControlResult}
+          catalogVersion={catalogVersion}
+        />
       );
       break;
     case "running":

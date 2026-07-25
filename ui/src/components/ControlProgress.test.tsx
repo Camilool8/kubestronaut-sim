@@ -50,4 +50,14 @@ describe("ControlProgress", () => {
     render(<ControlProgress job={runningJob} onRetry={() => {}} onDismiss={() => {}} />);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
+
+  test("running phase shows an animated spinner, settled phases don't", () => {
+    render(<ControlProgress job={runningJob} onRetry={() => {}} onDismiss={() => {}} />);
+    const running = screen.getByText("Recreate Kubernetes cluster").closest("li");
+    expect(running?.querySelector(".phase-mark-spinner")).not.toBeNull();
+    const done = screen.getByText("End session and lock desktop").closest("li");
+    expect(done?.querySelector(".phase-mark-spinner")).toBeNull();
+    const pending = screen.getByText("Verify environment").closest("li");
+    expect(pending?.querySelector(".phase-mark-spinner")).toBeNull();
+  });
 });

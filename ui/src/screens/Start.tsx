@@ -17,6 +17,10 @@ import { strings } from "../strings";
 interface StartProps {
   onSessionChange: (session: SessionSnapshot) => void;
   onControlStart: (result: ControlActionResponse) => void;
+  // Bumped by App whenever a control job finishes: a completed bank
+  // switch changes the active exam while Start stays mounted, so the
+  // exam summary and catalog must be refetched, not kept from mount.
+  catalogVersion: number;
 }
 
 // Lobby: the exam catalog (pick/switch banks via the conductor) plus the
@@ -25,7 +29,7 @@ interface StartProps {
 // just observed the exam began) is handled by refetching the
 // authoritative session state rather than showing an error — App will
 // then route to whatever screen that state implies.
-export function Start({ onSessionChange, onControlStart }: StartProps) {
+export function Start({ onSessionChange, onControlStart, catalogVersion }: StartProps) {
   const [exam, setExam] = useState<ExamInfo | null>(null);
   const [examError, setExamError] = useState<string | null>(null);
   const [banks, setBanks] = useState<BanksResponse | null>(null);
@@ -54,7 +58,7 @@ export function Start({ onSessionChange, onControlStart }: StartProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [catalogVersion]);
 
   const handleStart = async () => {
     setStarting(true);

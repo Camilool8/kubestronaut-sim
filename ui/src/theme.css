@@ -728,6 +728,27 @@
   text-align: center;
 }
 
+/* The running phase gets a spinning arc instead of a static glyph:
+   cluster re-bootstrap can take minutes, and without visible motion the
+   dialog reads as frozen. Under prefers-reduced-motion the global rule
+   in base.css stops the rotation, leaving a static arc as the marker. */
+.phase-mark-spinner {
+  width: 0.75em;
+  height: 0.75em;
+  margin: 0 0.125em;
+  align-self: center;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: phase-spin 0.8s linear infinite;
+}
+
+@keyframes phase-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .control-hint {
   color: var(--text-muted);
   font-size: var(--text-s);

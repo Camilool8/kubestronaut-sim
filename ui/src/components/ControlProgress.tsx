@@ -27,9 +27,13 @@ export function ControlProgress({ job, onRetry, onDismiss }: ControlProgressProp
         <ul className="control-phases" aria-live="polite">
           {job.phases.map((p) => (
             <li key={p.id} className={`phase-${p.state}`}>
-              <span className="phase-mark" aria-hidden="true">
-                {p.state === "done" ? "✓" : p.state === "failed" ? "✗" : p.state === "running" ? "…" : "·"}
-              </span>
+              {p.state === "running" ? (
+                <span className="phase-mark phase-mark-spinner" aria-hidden="true" />
+              ) : (
+                <span className="phase-mark" aria-hidden="true">
+                  {p.state === "done" ? "✓" : p.state === "failed" ? "✗" : "·"}
+                </span>
+              )}
               <span className="phase-label">{p.label}</span>
             </li>
           ))}
