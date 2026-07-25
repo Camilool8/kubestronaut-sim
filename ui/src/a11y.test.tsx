@@ -87,6 +87,15 @@ const resultsJSON = {
   ],
 };
 
+// Exercises both markdown surfaces the shared renderer produces: a fenced
+// block (figure.code-block, figcaption, language chip, copy-block button)
+// and an inline value (the CopyableCode button). Opening the solution
+// disclosure is what puts both on screen for the scan below.
+const solutionJSON = {
+  id: "q01",
+  markdown: "Apply it with `kubectl apply -f pod.yaml`:\n\n```yaml\nkind: Pod\n```\n",
+};
+
 function stubFetch() {
   vi.stubGlobal(
     "fetch",
@@ -98,7 +107,9 @@ function stubFetch() {
           ? banksJSON
           : url.includes("/api/results")
             ? resultsJSON
-            : {};
+            : url.includes("/solution")
+              ? solutionJSON
+              : {};
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -162,9 +173,64 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
+  // A 502 from /api/control/banks used to leave the lobby blank — see
+  // Async's comment on why its error prop is mandatory. This suite never
+  // scanned that state, so the role="alert" card's name/role/value
+  // (title, body, dynamic Retry button) never had an axe pass.
+  test("lobby catalog error card", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/api/control/banks")) {
+          return new Response(JSON.stringify({ error: "banks unavailable" }), { status: 502 });
+        }
+        const body = url.includes("/api/exam") ? examJSON : {};
+        return new Response(JSON.stringify(body), { status: 200 });
+      }),
+    );
+    const { container } = render(
+      <Start
+        onSessionChange={() => {}}
+        onControlStart={() => {}}
+        catalogVersion={0}
+        onBanksLoaded={() => {}}
+      />,
+    );
+    // Confirm the error card is actually the thing on screen, not a
+    // loading or empty state a mis-routed mock would leave behind.
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
   test("score screen with results", async () => {
     const { container } = render(<Score onNewAttempt={() => {}} endReason="submitted" />);
     await screen.findByText("PASS");
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  // Solutions used to render through a bare, unstyled ReactMarkdown and this
+  // suite never scanned one open, so the shared renderer's code-block chrome
+  // (figure/figcaption, a copy button with a dynamic per-language aria-label,
+  // and inline CopyableCode buttons) never had an axe pass. It also nests a
+  // <details> (solution) inside a <details> (question), each with its own
+  // interactive summary and now buttons inside both — exactly the shape
+  // nested-interactive-content violations hide in. Assert both disclosures
+  // are actually expanded before scanning, not merely present in the DOM.
+  test("score screen with an open solution", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+    await screen.findByText("PASS");
+
+    await user.click(screen.getByText("q01"));
+    await user.click(screen.getByText(/show solution/i));
+
+    // The shared renderer's code-block chrome, present only once the
+    // solution has actually loaded and rendered.
+    expect(await screen.findByText("yaml")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /copy yaml code block/i })).toBeInTheDocument();
+
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
