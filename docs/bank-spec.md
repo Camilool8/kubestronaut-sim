@@ -59,6 +59,16 @@ expected. Any other tag, or a typo, silently falls back to the same plain
 — just never guess a supported tag for content that isn't actually that
 language, since the wrong color reads as a wrong answer on a study tool.
 
+A shell heredoc wrapping a manifest (`k apply -f - <<'EOF'` … `EOF`) is a
+`bash` block, not a `yaml` one. It is one command the candidate copies and
+runs as a unit, so splitting the wrapper from the payload would hand them
+two halves neither of which works alone — and the copy-whole-block button
+would copy the wrong thing. Tagged `bash`, the heredoc body renders plain
+(the highlighter colors only the quoted delimiter), which is the correct
+"can't claim this, so don't color it" outcome. Tagged `yaml`, the command
+line itself would be colored as a manifest, which is precisely the wrong
+color this section warns about.
+
 ## Validate script contract
 
 - Executed ON the question's instance, as root, with

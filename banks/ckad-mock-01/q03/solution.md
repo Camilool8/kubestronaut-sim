@@ -1,6 +1,6 @@
 # Solution 3
 
-```yaml
+```bash
 k -n orbit apply -f - <<'EOF'
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
