@@ -93,8 +93,28 @@ The app misrepresents itself as single-exam. Reproduced the same way.
 
 `useAsync(fn, deps, opts?) → {status: 'idle'|'loading'|'success'|'error',
 data, error, reload}`. Owns the cancel-on-unmount pattern currently
-hand-rolled in `QuestionPanel.tsx:83-101`. Every fetch in the app goes
-through it.
+hand-rolled in `QuestionPanel.tsx:83-101`.
+
+**Corrected 2026-07-25 after the final review.** This section originally
+read "Every fetch in the app goes through it." That is not what shipped,
+and it was not attempted. What shipped is the primitive plus **one**
+consumer: the lobby's bank catalog (`Start.tsx:74`), with `Async` at the
+single call site where that consumer renders its error card. The other
+ten of the eleven API functions the app calls outside `api.ts` still
+handle their own async — App's session and control polls, Start's exam
+summary and its start/switch actions, Exam's and Score's
+end/results/solution calls, and `QuestionPanel`'s question fetch, which
+still hand-rolls the very `cancelled` flag this primitive was written to
+replace.
+
+That was the right scope for the defects (#1 and #4 both live at the
+catalog), and the primitive is tested and proven where it runs. But the
+consequence has to be stated plainly: the type-enforced error branch
+binds one call site, and every other one is bound only by review. Five of
+the final review's findings were silent failures at exactly those
+unconverted sites. Converting the rest is mechanical but touches every
+screen, so it is recorded in `docs/follow-ups.md` as the next step rather
+than claimed here as done.
 
 By default an in-flight call registers with the progress store. Pollers
 must pass `{background: true}` to opt out: the Score screen polls results
@@ -152,8 +172,11 @@ to match the convention documented at `theme.css:1239-1251`.
   fetch also speaks.
 - `Start.tsx` — catalog via `useAsync`; 502 renders an error card with
   Retry instead of an empty section.
-- `Score.tsx` — solution renders through `<Markdown>`; results polling
-  moves to `useAsync`-shaped state with a skeleton while grading.
+- `Score.tsx` — solution renders through `<Markdown>`. (Shipped: the
+  results poll keeps its own `ResultsResponse` union and its centered
+  "Grading…" panel; it was not moved to `useAsync` and there is no
+  skeleton. The final review's fix wave gave that poll the error branch
+  it never had.)
 - `theme.css` — skip-link hide rewritten; `.md` namespace; score
   responsive rules.
 

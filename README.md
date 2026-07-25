@@ -6,9 +6,9 @@ banks today; KCNA/KCSA (multiple choice) and CKS are on the roadmap and
 appear in the catalog as coming soon.
 
 **Status: Milestone F — UI polish (one markdown renderer for questions and
-solutions, a required-error-branch async primitive, a non-strobing
-progress bar, and a real-browser pass that caught bugs the automated
-gates could not).**
+solutions, a required-error-branch async primitive behind the exam
+catalog, a non-strobing progress bar, and a real-browser pass that caught
+bugs the automated gates could not).**
 
 Code: Apache-2.0. Question banks: CC BY-SA 4.0 (see `banks/LICENSE`).
 Not affiliated with CNCF, The Linux Foundation, PSI, or killer.sh.

@@ -112,3 +112,23 @@ Convert to GitHub issues once the repo has a remote.
 - test: no test covers the success-after-retry path on the lobby's catalog
   error card — click Retry, confirm the catalog renders. The wiring was
   traced by hand and is correct, but it's unexercised.
+- ui: **convert the remaining API call sites to `useAsync`/`Async`.** The
+  milestone's design claimed every fetch went through the primitive; one
+  does. The unconverted ones, as of the final fix wave:
+  - `App.tsx` — `getControlStatus` (the control poll, needs
+    `{background: true}`), `getSession` on job completion, and the
+    `pollSession` helper in `api.ts` that owns the session poll.
+  - `Start.tsx` — `getExam` (still a hand-rolled `cancelled` effect),
+    `startSession`, `getSession` on the 409 refetch, `startControlSwitch`.
+  - `Exam.tsx` — `getExam` (hand-rolled `cancelled`), `endSession` in both
+    the confirm dialog and the mobile gate.
+  - `Score.tsx` — `getResults` (the 3s poll), `endSession` behind Retry,
+    `getSolution` per expanded question.
+  - `QuestionPanel.tsx` — `getQuestion`, the original hand-rolled
+    `cancelled` flag `useAsync` was written to replace.
+  Every one of these now has an error branch, but it is hand-written and
+  therefore optional: the review found five that were missing. The
+  primitive makes the branch a type error to omit. Mechanical work, but it
+  touches every screen, so it wants its own pass with the tests to match —
+  the pollers especially (`background: true`, and a failed poll must not
+  tear the poll down; see `Score.tsx`'s `pollError`).
