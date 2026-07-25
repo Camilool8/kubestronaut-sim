@@ -6,6 +6,7 @@ export const strings = {
   app: {
     loading: "Loading…",
     cannotReach: (err: string) => `Cannot reach facilitator: ${err}`,
+    working: "Loading…",
   },
 
   errorBoundary: {

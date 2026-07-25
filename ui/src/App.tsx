@@ -18,6 +18,7 @@ import { ControlProgress } from "./components/ControlProgress";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { InfoButton } from "./components/InfoButton";
 import { ToastLayer } from "./components/Toast";
+import { TopProgress } from "./components/TopProgress";
 import { toastStore } from "./components/toastStore";
 import { strings } from "./strings";
 
@@ -222,6 +223,7 @@ export default function App() {
 
   return (
     <>
+      <TopProgress />
       <main>{screen}</main>
       <ToastLayer />
       {session.state !== "running" && (

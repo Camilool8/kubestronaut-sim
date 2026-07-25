@@ -1256,6 +1256,48 @@
   }
 }
 
+/* ---- global progress bar ---- */
+
+.top-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-toast);
+  pointer-events: none;
+}
+
+.top-progress-track {
+  height: 3px;
+  overflow: hidden;
+  background: transparent;
+}
+
+.top-progress-bar {
+  height: 100%;
+  width: 100%;
+  background: var(--accent);
+  /* Calm default: a static full-width accent rule. The travelling
+     animation is layered on only for users who accept motion. */
+  transform-origin: 0 50%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .top-progress-bar {
+    width: 40%;
+    animation: top-progress-slide 1.1s var(--ease-out) infinite;
+  }
+
+  @keyframes top-progress-slide {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(350%);
+    }
+  }
+}
+
 /* ---- motion ----
    Written motion-additive: the calm state is the default and animation
    is layered on only when the user has expressed no preference against
