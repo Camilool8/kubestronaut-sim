@@ -440,6 +440,43 @@
   border-radius: 3px;
 }
 
+/* Every inline value in a question is a click-to-copy button. It has to
+   read as part of the sentence, not as a form control, so it borrows
+   the inline-code look and only reveals its affordance on hover/focus. */
+.copy-value {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-s);
+}
+
+.copy-value code {
+  border: 1px solid transparent;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.copy-value:hover code,
+.copy-value:focus-visible code {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.copy-value-icon {
+  font-size: 0.75em;
+  margin-left: 0.25em;
+  color: var(--text-muted);
+  opacity: 0;
+}
+
+.copy-value:hover .copy-value-icon,
+.copy-value:focus-visible .copy-value-icon {
+  opacity: 1;
+}
+
 .question-markdown pre code {
   background: none;
   padding: 0;

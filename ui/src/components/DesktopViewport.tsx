@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import RFB from "@novnc/novnc";
+import { desktopClipboard } from "../lib/desktopClipboard";
 import { strings } from "../strings";
 
 type ViewportState = "connecting" | "connected" | "disconnected";
@@ -43,10 +44,25 @@ export function DesktopViewport({ onStateChange }: DesktopViewportProps) {
       rfb.scaleViewport = true; // and scale while the resize settles
       rfb.background = "transparent";
 
+      // Selections made inside the desktop follow the candidate out to
+      // the browser, so copying from the terminal works in both
+      // directions. TigerVNC carries UTF-8 over the extended clipboard
+      // encoding; writeText can still be refused without a gesture, and
+      // that is not worth surfacing.
+      rfb.addEventListener("clipboard", (event: CustomEvent<{ text: string }>) => {
+        const text = event.detail?.text;
+        if (text) void navigator.clipboard?.writeText(text).catch(() => {});
+      });
+
       rfb.addEventListener("connect", () => {
-        if (!disposed) report("connected");
+        if (disposed) return;
+        report("connected");
+        // Only now can clipboardPasteFrom do anything — it is a no-op
+        // until the connection is established.
+        if (rfb) desktopClipboard.connect(rfb);
       });
       rfb.addEventListener("disconnect", () => {
+        if (rfb) desktopClipboard.disconnect(rfb);
         if (disposed) return;
         report("disconnected");
         // The desktop container restarts during resets/switches and the
@@ -62,6 +78,7 @@ export function DesktopViewport({ onStateChange }: DesktopViewportProps) {
     return () => {
       disposed = true;
       window.clearTimeout(retryTimer);
+      if (rfb) desktopClipboard.disconnect(rfb);
       try {
         rfb?.disconnect();
       } catch {

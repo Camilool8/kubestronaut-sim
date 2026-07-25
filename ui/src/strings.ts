@@ -46,6 +46,10 @@ export const strings = {
     loading: "Loading…",
     points: (points: number) => `${points} pts`,
     sshHint: (instance: string) => `ssh ${instance}`,
+    copyValue: (value: string) => `Copy ${value}`,
+    copiedToDesktop: (value: string) => `Copied ${value} — paste with Ctrl+Shift+V`,
+    copied: (value: string) => `Copied ${value}`,
+    copyFailed: "Could not copy that value.",
   },
 
   toast: {

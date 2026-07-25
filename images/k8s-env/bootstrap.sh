@@ -60,6 +60,8 @@ title=$(yq -r '.metadata.title' "${BANK_DIR}/exam.yaml")
   done
   echo " Working directories are pre-created at /opt/course/<n>."
   echo " Firefox is limited to the allowlisted documentation sites."
+  echo " Click any value in the question panel to copy it, then paste"
+  echo " here with Ctrl+Shift+V."
   echo "=============================================================="
 } > /shared/exam/motd
 
