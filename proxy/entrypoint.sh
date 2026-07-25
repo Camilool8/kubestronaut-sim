@@ -8,8 +8,10 @@ set -eu
 if [ -f /shared/bank ]; then
   BANK=$(cat /shared/bank)
 fi
+# A bank that declares no allowedDomains falls through to the binary's
+# own default (allow.DefaultDomains) rather than a copy maintained here.
 if [ -z "${ALLOWED_DOMAINS:-}" ] && [ -n "${BANK:-}" ] && [ -f "/banks/${BANK}/exam.yaml" ]; then
-  ALLOWED_DOMAINS=$(yq -r '(.spec.environment.allowedDomains // ["kubernetes.io","helm.sh"]) | join(",")' "/banks/${BANK}/exam.yaml")
+  ALLOWED_DOMAINS=$(yq -r '(.spec.environment.allowedDomains // []) | join(",")' "/banks/${BANK}/exam.yaml")
   export ALLOWED_DOMAINS
 fi
 exec /docs-proxy

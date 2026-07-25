@@ -15,7 +15,7 @@ spec:
   environment:
     provider: kind
     nodes: 2
-    allowedDomains: [kubernetes.io, helm.sh]
+    allowedDomains: [kubernetes.io, helm.sh, code.jquery.com, fonts.googleapis.com, fonts.gstatic.com, algolia.net, algolianet.com, gateway-api.sigs.k8s.io]
   instances:
     - name: instance-1
     - name: instance-2

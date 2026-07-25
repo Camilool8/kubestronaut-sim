@@ -6,7 +6,16 @@ install -d -m 700 -o candidate -g candidate /home/candidate/.ssh
 install -m 600 -o candidate -g candidate /shared/ssh/id_ed25519 /home/candidate/.ssh/id_ed25519
 install -m 644 -o candidate -g candidate /etc/sim/ssh_config /home/candidate/.ssh/config
 
-su - candidate -c 'Xvnc :1 -geometry 1440x900 -depth 24 -SecurityTypes None -localhost yes' &
+# Clipboard flags are TigerVNC's defaults, set explicitly because the
+# exam depends on them: the UI pushes values from the question panel
+# into this session's clipboard so candidates never retype a resource
+# name. TigerVNC >= 1.8 bridges the X selections itself (no vncconfig,
+# no autocutsel — a second clipboard owner causes copy-twice bugs), and
+# >= 1.10 carries UTF-8 via the extended clipboard encoding.
+# MaxCutText is raised from the 256KiB default so pasting a whole
+# manifest is not silently truncated.
+clipboard_args='-AcceptCutText=1 -SendCutText=1 -SetPrimary=1 -SendPrimary=1 -MaxCutText 2097152'
+su - candidate -c "Xvnc :1 -geometry 1440x900 -depth 24 -SecurityTypes None -localhost yes ${clipboard_args}" &
 xvnc_pid=$!
 until su - candidate -c 'DISPLAY=:1 xset q' >/dev/null 2>&1; do
   kill -0 "$xvnc_pid" 2>/dev/null || { echo "Xvnc failed to start" >&2; exit 1; }
