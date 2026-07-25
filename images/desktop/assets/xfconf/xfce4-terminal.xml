@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- xfce4-terminal 1.1+ reads its settings from this xfconf channel and
+     only migrates assets/terminalrc if the channel does not already
+     exist. Debian 12 ships 1.0.4, which uses the rc file — both are
+     shipped so the image keeps behaving the same if the base image's
+     terminal is ever newer. Keep the two in sync. -->
+<channel name="xfce4-terminal" version="1.0">
+  <property name="misc-show-unsafe-paste-dialog" type="bool" value="false"/>
+  <property name="misc-menubar-default" type="bool" value="false"/>
+  <property name="misc-borders-default" type="bool" value="true"/>
+  <property name="scrolling-unlimited" type="bool" value="true"/>
+  <property name="font-name" type="string" value="JetBrains Mono 11"/>
+  <property name="color-foreground" type="string" value="#d9dee5"/>
+  <property name="color-background" type="string" value="#0b1220"/>
+  <property name="color-cursor" type="string" value="#7aa2f7"/>
+</channel>

@@ -46,6 +46,10 @@ export const strings = {
     loading: "Loading…",
     points: (points: number) => `${points} pts`,
     sshHint: (instance: string) => `ssh ${instance}`,
+    copyValue: (value: string) => `Copy ${value}`,
+    copiedToDesktop: (value: string) => `Copied ${value} — paste with Ctrl+Shift+V`,
+    copied: (value: string) => `Copied ${value}`,
+    copyFailed: "Could not copy that value.",
   },
 
   toast: {
@@ -112,7 +116,6 @@ export const strings = {
     ],
     restartTour: "Replay the exam tour",
     footerLine: "Independent study tool. Not affiliated with CNCF, The Linux Foundation, PSI, or killer.sh.",
-    footerLink: "About & licenses",
   },
 
   theme: {
@@ -135,21 +138,47 @@ export const strings = {
     questions: (n: number) => `${n} questions`,
     switchConfirmTitle: (title: string) => `Switch to ${title}?`,
     switchConfirmBody:
-      "Switching rebuilds the Kubernetes cluster and wipes all exam state. It usually takes 1–2 minutes.",
+      "This wipes all cluster and instance state and rebuilds from scratch. It usually takes about 2–4 minutes.",
     switchConfirm: "Switch exam",
     cancel: "Cancel",
   },
 
   control: {
-    resetTitle: "Resetting exam environment",
-    switchTitle: (bank: string) => `Switching exam to ${bank}`,
-    failedTitle: "Operation failed",
-    hint: "This rebuilds the Kubernetes cluster and usually takes 1–2 minutes.",
+    resetTitle: "Rebuilding your exam environment",
+    // Takes the exam's catalog title ("CKA Mock Exam 01"), never the
+    // bank slug — the slug is an implementation detail.
+    switchTitle: (exam: string) => `Switching to ${exam}`,
+    failedTitle: (op: string) => (op === "switch" ? "Switch failed" : "Reset failed"),
+    // The measured cluster rebuild is 90–240s. Promising "1–2 minutes"
+    // and then blowing past it turns a normal wait into a perceived hang.
+    hint: "Rebuilding the Kubernetes cluster. Usually about 2–4 minutes — you can leave this tab open.",
+    stepOf: (step: number, total: number, label: string) =>
+      `Step ${step} of ${total}: ${label}`,
+    elapsed: (span: string) => `Elapsed ${span}`,
+    reconnecting: "Restarting the exam services. The page will reconnect on its own.",
+    background: "Run in background",
     retry: "Retry",
     dismiss: "Dismiss",
     newAttempt: "New attempt",
     newAttemptHint:
       "Wipes all cluster and instance state and returns you to the lobby, where you can retry this exam or pick a different one.",
+  },
+
+  mobile: {
+    // Names the constraint instead of apologising for it, and says why
+    // it is a real capability limit rather than a layout preference.
+    title: "This exam needs a desktop",
+    why: "You work through a full Linux terminal and remote desktop, side by side with the questions — the same split screen as the real exam. That needs a keyboard and room to see both.",
+    requirements: [
+      "A desktop or laptop browser",
+      "A physical keyboard",
+      "A window at least 1024px wide",
+    ],
+    stillAvailable: "You can still browse the exam catalog and read past scores here.",
+    continueAnyway: "Continue anyway",
+    startDisabled: "Open this on a desktop to start the exam.",
+    sessionRunning:
+      "An exam is running. The clock keeps going wherever you are — submit here if you cannot get to a desktop in time.",
   },
 
   score: {
@@ -165,6 +194,12 @@ export const strings = {
       reason === "expired"
         ? "Session ended automatically: time expired."
         : "Session ended: answers submitted.",
+    checkResult: "Result",
+    checkDescription: "Check",
+    checkPoints: "Points",
+    checkMessage: "Detail",
+    checkPassed: "Passed:",
+    checkFailed: "Failed:",
     showSolution: "Show solution",
     loadingSolution: "Loading solution…",
   },

@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -69,7 +70,13 @@ func (c *Client) FindContainer(ctx context.Context, project, service string) (st
 
 // Exec runs cmd inside containerID, waiting for completion, and returns
 // the exit code plus the combined stdout+stderr output.
-func (c *Client) Exec(ctx context.Context, containerID string, cmd []string) (int, string, error) {
+//
+// onLine (may be nil) receives each complete output line as it arrives,
+// not when the command exits. The conductor uses it to surface live
+// progress from multi-minute commands — a kind cluster rebuild prints
+// its own checklist, and without this the UI has nothing to show for
+// minutes at a time.
+func (c *Client) Exec(ctx context.Context, containerID string, cmd []string, onLine func(string)) (int, string, error) {
 	var created struct {
 		ID string `json:"Id"`
 	}
@@ -90,12 +97,11 @@ func (c *Client) Exec(ctx context.Context, containerID string, cmd []string) (in
 	if err != nil {
 		return 0, "", fmt.Errorf("docker: start exec: %w", err)
 	}
-	raw, err := io.ReadAll(resp.Body)
+	output, err := drainExec(resp.Body, onLine)
 	resp.Body.Close()
 	if err != nil {
 		return 0, "", fmt.Errorf("docker: read exec output: %w", err)
 	}
-	output := demuxStdcopy(raw)
 
 	var inspect struct {
 		ExitCode int `json:"ExitCode"`
@@ -172,31 +178,84 @@ func (c *Client) postJSON(ctx context.Context, path string, in, out any) error {
 	return json.NewDecoder(resp.Body).Decode(out)
 }
 
-// demuxStdcopy flattens docker's multiplexed stream format (8-byte
-// header: stream byte, 3 zero bytes, big-endian length; then payload)
-// into one combined string, interleaved in arrival order. Truncated or
-// non-multiplexed input is returned as-is rather than dropped.
-func demuxStdcopy(raw []byte) string {
-	var buf bytes.Buffer
-	rest := raw
-	for len(rest) >= 8 {
-		stream := rest[0]
-		if stream > 2 || rest[1] != 0 || rest[2] != 0 || rest[3] != 0 {
-			// not a stdcopy header — treat the remainder as plain output
-			buf.Write(rest)
-			return buf.String()
+// drainExec reads docker's multiplexed exec stream to EOF and returns
+// the combined stdout+stderr output, passing each complete line to
+// onLine (may be nil) as soon as it arrives.
+//
+// The wire format is an 8-byte header — stream byte, 3 zero bytes,
+// big-endian payload length — followed by the payload. Frames arrive
+// split across reads and a single line may span several frames, so both
+// the frame boundary and the line boundary are tracked incrementally.
+// Input that isn't multiplexed (or is truncated mid-frame) is passed
+// through rather than dropped, matching what the daemon does when the
+// exec was allocated a TTY.
+func drainExec(r io.Reader, onLine func(string)) (string, error) {
+	var out bytes.Buffer
+	var line []byte
+	var pending []byte
+	plain := false // the stream turned out not to be stdcopy-framed
+
+	emit := func(payload []byte) {
+		out.Write(payload)
+		if onLine == nil {
+			return
 		}
-		n := binary.BigEndian.Uint32(rest[4:8])
-		frameEnd := 8 + int(n)
-		if frameEnd > len(rest) {
-			buf.Write(rest[8:])
-			return buf.String()
+		line = append(line, payload...)
+		for {
+			i := bytes.IndexByte(line, '\n')
+			if i < 0 {
+				return
+			}
+			if s := strings.TrimSpace(string(line[:i])); s != "" {
+				onLine(s)
+			}
+			line = line[i+1:]
 		}
-		buf.Write(rest[8:frameEnd])
-		rest = rest[frameEnd:]
 	}
-	if len(rest) > 0 {
-		buf.Write(rest)
+
+	buf := make([]byte, 32*1024)
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			pending = append(pending, buf[:n]...)
+			for !plain && len(pending) >= 8 {
+				if pending[0] > 2 || pending[1] != 0 || pending[2] != 0 || pending[3] != 0 {
+					plain = true
+					break
+				}
+				frameEnd := 8 + int(binary.BigEndian.Uint32(pending[4:8]))
+				if frameEnd > len(pending) {
+					break // wait for the rest of this frame
+				}
+				emit(pending[8:frameEnd])
+				pending = pending[frameEnd:]
+			}
+			if plain {
+				emit(pending)
+				pending = nil
+			}
+		}
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return out.String(), err
+		}
 	}
-	return buf.String()
+
+	// Flush a truncated trailing frame, then any final line the command
+	// left without a newline.
+	if len(pending) > 0 {
+		if !plain && len(pending) > 8 {
+			emit(pending[8:])
+		} else if plain {
+			emit(pending)
+		}
+	}
+	if len(line) > 0 && onLine != nil {
+		if s := strings.TrimSpace(string(line)); s != "" {
+			onLine(s)
+		}
+	}
+	return out.String(), nil
 }

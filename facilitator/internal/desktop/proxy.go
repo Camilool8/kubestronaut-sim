@@ -130,26 +130,26 @@ const lockedHTML = `<!doctype html>
 <style>
   :root {
     color-scheme: light;
-    --bg: #f4f6f9;
+    --bg: #f7f9fc;
     --surface: #ffffff;
-    --border: #d4dae3;
+    --border: #cbd4e1;
     --text: #1a212b;
     --text-muted: #57626f;
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --bg: #0b0e14;
-    --surface: #11151d;
-    --border: #262c38;
+    --bg: #0b1220;
+    --surface: #121a2b;
+    --border: #28324a;
     --text: #d9dee5;
     --text-muted: #97a0af;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]):not([data-theme="dark"]) {
       color-scheme: dark;
-      --bg: #0b0e14;
-      --surface: #11151d;
-      --border: #262c38;
+      --bg: #0b1220;
+      --surface: #121a2b;
+      --border: #28324a;
       --text: #d9dee5;
       --text-muted: #97a0af;
     }

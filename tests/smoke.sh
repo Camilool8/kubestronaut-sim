@@ -54,6 +54,19 @@ docker compose exec desktop curl -fsS --max-time 15 -o /dev/null -x http://docs-
   || fail "proxy should allow kubernetes.io"
 docker compose exec desktop curl -fs --max-time 15 -o /dev/null -x http://docs-proxy:3128 https://example.com \
   && fail "proxy should block example.com" || true
+# kubernetes.io's docs JS is one big jQuery IIFE: block this and the search
+# box, tab panes and sidebar never wire up, which reads as "the docs are broken".
+docker compose exec desktop curl -fsS --max-time 15 -o /dev/null -x http://docs-proxy:3128 https://code.jquery.com/jquery-3.7.1.min.js \
+  || fail "proxy should allow code.jquery.com (kubernetes.io docs depend on it)"
+# Widening the allowlist must not turn the exam browser into general web access.
+docker compose exec desktop curl -fs --max-time 15 -o /dev/null -x http://docs-proxy:3128 https://www.googletagmanager.com \
+  && fail "proxy should still block analytics" || true
+docker compose exec desktop curl -fs --max-time 15 -o /dev/null -x http://docs-proxy:3128 https://www.google.com \
+  && fail "proxy should still block open web search (kubernetes.io falls back to its own Pagefind index)" || true
+# The unsafe-paste dialog would interrupt every paste of an exam value.
+docker compose exec desktop grep -q '^MiscShowUnsafePasteDialog=FALSE' \
+  /home/candidate/.config/xfce4/terminal/terminalrc \
+  || fail "terminal unsafe-paste dialog is not disabled"
 docker compose exec desktop curl -s --max-time 5 -o /dev/null https://example.com \
   && fail "desktop should have no direct egress" || true
 docker compose exec desktop su - candidate -c 'ssh -o BatchMode=yes instance-1 kubectl get nodes --no-headers' \

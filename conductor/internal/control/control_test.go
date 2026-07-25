@@ -22,9 +22,11 @@ import (
 type fakeEngine struct {
 	mu       sync.Mutex
 	calls    []string
-	execErr  map[string]error  // keyed by service name
-	execExit map[string]int    // keyed by service name, default 0
-	execOut  map[string]string // keyed by service name
+	execErr   map[string]error    // keyed by service name
+	execExit  map[string]int      // keyed by service name, default 0
+	execOut   map[string]string   // keyed by service name
+	execLines map[string][]string // streamed output lines, keyed by service name
+	afterLine func()              // ran after each streamed line, to observe store state
 }
 
 func (f *fakeEngine) FindContainer(_ context.Context, project, service string) (string, error) {
@@ -32,11 +34,17 @@ func (f *fakeEngine) FindContainer(_ context.Context, project, service string) (
 	return "id-" + service, nil
 }
 
-func (f *fakeEngine) Exec(_ context.Context, containerID string, cmd []string) (int, string, error) {
+func (f *fakeEngine) Exec(_ context.Context, containerID string, cmd []string, onLine func(string)) (int, string, error) {
 	service := strings.TrimPrefix(containerID, "id-")
 	f.record("exec:" + service + ":" + strings.Join(cmd, " "))
 	if err := f.execErr[service]; err != nil {
 		return 0, "", err
+	}
+	for _, line := range f.execLines[service] {
+		onLine(line)
+		if f.afterLine != nil {
+			f.afterLine()
+		}
 	}
 	return f.execExit[service], f.execOut[service], nil
 }
@@ -228,6 +236,22 @@ func TestStartResetRejectsConcurrentJobs(t *testing.T) {
 // given session state, accepts session deletes, is always healthy, and
 // serves /api/exam with the name in examName (a pointer so tests can
 // flip it mid-flow, mimicking the post-restart reload).
+// healthyFacilitator is the minimum a reset job needs to run clean:
+// DELETE /api/session succeeds and /healthz answers 200.
+func healthyFacilitator(t *testing.T) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodDelete && r.URL.Path == "/api/session":
+			w.WriteHeader(http.StatusNoContent)
+		case r.URL.Path == "/healthz":
+			fmt.Fprint(w, "ok")
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+}
+
 func switchFacilitator(t *testing.T, sessionState string, examName *string) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -296,6 +320,94 @@ func TestSwitchRunsFullSequenceAndWritesBankFile(t *testing.T) {
 	clusterIdx := strings.Index(calls, "exec:k8s-env")
 	if clusterIdx < 0 {
 		t.Fatal("cluster recreate never ran")
+	}
+}
+
+// The facilitator restart takes the browser's only server down for a
+// few seconds. It gets its own phase so the UI can say "reconnecting"
+// instead of appearing to freeze — and it must come after the instances.
+func TestSwitchSeparatesTheFacilitatorRestartIntoItsOwnPhase(t *testing.T) {
+	examName := "cka-mock-01"
+	facilitator := switchFacilitator(t, "idle", &examName)
+	defer facilitator.Close()
+
+	eng := &fakeEngine{}
+	c := newTestController(t, eng, facilitator.URL)
+	c.Catalog = testCatalogForSwitch(t)
+	c.BankFile = filepath.Join(t.TempDir(), "bank")
+	c.RestartExtra = []string{"docs-proxy", "facilitator"}
+
+	if _, err := c.StartSwitch("cka-mock-01"); err != nil {
+		t.Fatalf("StartSwitch: %v", err)
+	}
+	snap := waitIdle(t, c.Store)
+	if snap.LastJob == nil || snap.LastJob.Error != "" {
+		t.Fatalf("switch job = %+v, want clean completion", snap.LastJob)
+	}
+
+	ids := make([]string, 0, len(snap.LastJob.Phases))
+	for _, p := range snap.LastJob.Phases {
+		ids = append(ids, p.ID)
+	}
+	joined := strings.Join(ids, ",")
+	if !strings.Contains(joined, "restart-instances,restart-facilitator") {
+		t.Fatalf("phase order = %s, want restart-instances then restart-facilitator", joined)
+	}
+	if strings.Contains(joined, "restart-services") {
+		t.Errorf("the combined restart-services phase should be gone, got %s", joined)
+	}
+
+	// Instances restart before the facilitator: taking the facilitator
+	// down first would blind the UI for the rest of the restarts.
+	calls := strings.Join(eng.recorded(), "\n")
+	if strings.Index(calls, "restart:instance-2") > strings.Index(calls, "restart:facilitator") {
+		t.Errorf("facilitator restarted before the instances:\n%s", calls)
+	}
+}
+
+// A multi-minute command must give the UI something that changes: its
+// output lines become the running phase's detail.
+func TestClusterRebuildPublishesItsOutputAsPhaseDetail(t *testing.T) {
+	facilitator := healthyFacilitator(t)
+	defer facilitator.Close()
+
+	eng := &fakeEngine{execLines: map[string][]string{
+		"k8s-env": {"Ensuring node image", "Preparing nodes", "Installing CNI"},
+	}}
+	c := newTestController(t, eng, facilitator.URL)
+
+	// Sampled from inside the exec, right after each line is published —
+	// what a UI poll arriving at that instant would have seen.
+	var seen []string
+	eng.afterLine = func() {
+		for _, p := range c.Store.Status().Job.Phases {
+			if p.ID == "recreate-cluster" {
+				seen = append(seen, p.Detail)
+			}
+		}
+	}
+
+	if _, err := c.StartReset(); err != nil {
+		t.Fatalf("StartReset: %v", err)
+	}
+	waitIdle(t, c.Store)
+
+	want := []string{"Ensuring node image", "Preparing nodes", "Installing CNI"}
+	if len(seen) != len(want) {
+		t.Fatalf("phase detail over time = %q, want %q", seen, want)
+	}
+	for i := range want {
+		if seen[i] != want[i] {
+			t.Errorf("detail after line %d = %q, want %q", i, seen[i], want[i])
+		}
+	}
+
+	// A settled phase must not keep a stale line.
+	snap := c.Store.Status()
+	for _, p := range snap.LastJob.Phases {
+		if p.Detail != "" {
+			t.Errorf("finished phase %s kept detail %q", p.ID, p.Detail)
+		}
 	}
 }
 

@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
 import { Start } from "./screens/Start";
 import { Score } from "./screens/Score";
 import { ControlProgress } from "./components/ControlProgress";
+import { DesktopRequired } from "./components/DesktopRequired";
 import { Dialog } from "./components/Dialog";
 import { InfoDrawer } from "./components/InfoDrawer";
 import { ToastLayer } from "./components/Toast";
@@ -39,6 +41,15 @@ const banksJSON = {
       examType: "hands-on",
       durationSeconds: 7200,
       questionCount: 3,
+      available: true,
+    },
+    {
+      id: "cka-mock-01",
+      title: "CKA Mock Exam 01",
+      certification: "CKA",
+      examType: "hands-on",
+      durationSeconds: 7200,
+      questionCount: 2,
       available: true,
     },
     {
@@ -118,9 +129,36 @@ describe("axe: no WCAG violations", () => {
 
   test("lobby (Start)", async () => {
     const { container } = render(
-      <Start onSessionChange={() => {}} onControlStart={() => {}} />,
+      <Start
+        onSessionChange={() => {}}
+        onControlStart={() => {}}
+        catalogVersion={0}
+        onBanksLoaded={() => {}}
+      />,
     );
     await screen.findByText("CKAD Mock Exam 01", { selector: "h1" });
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  // The switch-confirm used to be hand-rolled divs with no role, no
+  // aria-modal and no focus trap, and this suite never caught it because
+  // the lobby scan never opened it. Scan it open.
+  test("lobby with the switch-confirm dialog open", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <Start
+        onSessionChange={() => {}}
+        onControlStart={() => {}}
+        catalogVersion={0}
+        onBanksLoaded={() => {}}
+      />,
+    );
+    await screen.findByText("CKAD Mock Exam 01", { selector: "h1" });
+    await user.click(screen.getByRole("button", { name: /CKA Mock Exam 01/ }));
+    // Assert it actually opened — a disabled card would leave this suite
+    // silently scanning a closed dialog, which is how the original gap
+    // survived.
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
@@ -132,7 +170,7 @@ describe("axe: no WCAG violations", () => {
 
   test("control progress overlay, running and failed", async () => {
     const { container, rerender } = render(
-      <ControlProgress job={runningJob} onRetry={() => {}} onDismiss={() => {}} />,
+      <ControlProgress job={runningJob} onRetry={() => {}} onDismiss={() => {}} onBackground={() => {}} />,
     );
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
 
@@ -141,8 +179,15 @@ describe("axe: no WCAG violations", () => {
         job={{ ...runningJob, error: "verify: facilitator not healthy" }}
         onRetry={() => {}}
         onDismiss={() => {}}
+        onBackground={() => {}}
       />,
     );
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  test("desktop-required gate", async () => {
+    // The one screen a phone or a 400%-zoomed desktop ever sees.
+    const { container } = render(<DesktopRequired verdict="narrow" />);
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 

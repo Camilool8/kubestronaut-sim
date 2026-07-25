@@ -10,7 +10,9 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 // newFakeDaemon serves a minimal Docker Engine API on a unix socket and
@@ -98,7 +100,7 @@ func TestExecRunsCommandAndReturnsExitAndOutput(t *testing.T) {
 		}
 	}))
 
-	exit, out, err := c.Exec(context.Background(), "abc", []string{"bash", "-c", "true"})
+	exit, out, err := c.Exec(context.Background(), "abc", []string{"bash", "-c", "true"}, nil)
 	if err != nil {
 		t.Fatalf("Exec: %v", err)
 	}
@@ -113,6 +115,74 @@ func TestExecRunsCommandAndReturnsExitAndOutput(t *testing.T) {
 	}
 	if strings.Join(execBody.Cmd, " ") != "bash -c true" {
 		t.Errorf("cmd = %v", execBody.Cmd)
+	}
+}
+
+// The exam UI shows the running phase's most recent output line, so
+// lines must reach the caller as the command produces them rather than
+// only when it exits — a kind bootstrap runs for minutes.
+func TestExecStreamsCompleteLinesAsTheyArrive(t *testing.T) {
+	release := make(chan struct{})
+	c := newFakeDaemon(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/containers/abc/exec"):
+			fmt.Fprint(w, `{"Id":"e1"}`)
+		case strings.HasSuffix(r.URL.Path, "/exec/e1/start"):
+			// A frame split across writes, plus a line split across two
+			// frames — both shapes the daemon really produces.
+			w.Write(stdcopyFrame(1, "Ensuring node image\nPreparing "))
+			w.(http.Flusher).Flush()
+			<-release
+			w.Write(stdcopyFrame(1, "nodes\n"))
+			w.Write(stdcopyFrame(2, "Installing CNI\ntrailing-no-newline"))
+		case strings.HasSuffix(r.URL.Path, "/exec/e1/json"):
+			fmt.Fprint(w, `{"ExitCode":0}`)
+		}
+	}))
+
+	var mu sync.Mutex
+	var lines []string
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, _, err := c.Exec(context.Background(), "abc", []string{"x"}, func(line string) {
+			mu.Lock()
+			lines = append(lines, line)
+			mu.Unlock()
+		})
+		if err != nil {
+			t.Errorf("Exec: %v", err)
+		}
+	}()
+
+	// The first line must be delivered before the command finishes.
+	deadline := time.After(5 * time.Second)
+	for {
+		mu.Lock()
+		got := len(lines)
+		mu.Unlock()
+		if got > 0 {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatal("no line delivered before the exec completed")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	close(release)
+	<-done
+
+	want := []string{"Ensuring node image", "Preparing nodes", "Installing CNI", "trailing-no-newline"}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(lines) != len(want) {
+		t.Fatalf("lines = %q, want %q", lines, want)
+	}
+	for i := range want {
+		if lines[i] != want[i] {
+			t.Errorf("line %d = %q, want %q", i, lines[i], want[i])
+		}
 	}
 }
 

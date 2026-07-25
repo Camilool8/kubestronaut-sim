@@ -8,12 +8,47 @@
     },
     "Homepage": { "URL": "https://kubernetes.io/docs/", "Locked": true, "StartPage": "homepage" },
     "OverrideFirstRunPage": "https://kubernetes.io/docs/",
+    "OverridePostUpdatePage": "",
     "DisableTelemetry": true,
     "DisableFirefoxStudies": true,
     "DisableAppUpdate": true,
     "DisablePrivateBrowsing": true,
+    "DisableFirefoxAccounts": true,
+    "DisablePocket": true,
+    "DisableProfileImport": true,
+    "DisableFeedbackCommands": true,
+    "NoDefaultBookmarks": true,
     "BlockAboutConfig": true,
     "DontCheckDefaultBrowser": true,
-    "ExtensionSettings": { "*": { "installation_mode": "blocked" } }
+    "ExtensionSettings": { "*": { "installation_mode": "blocked" } },
+    "UserMessaging": {
+      "WhatsNew": false,
+      "ExtensionRecommendations": false,
+      "FeatureRecommendations": false,
+      "UrlbarInterventions": false,
+      "MoreFromMozilla": false,
+      "SkipOnboarding": true,
+      "Locked": true
+    },
+    "Preferences": {
+      "browser.aboutwelcome.enabled": { "Value": false, "Status": "locked" },
+      "network.captive-portal-service.enabled": { "Value": false, "Status": "locked" },
+      "network.connectivity-service.enabled": { "Value": false, "Status": "locked" },
+      "network.trr.mode": { "Value": 5, "Status": "locked" },
+      "browser.safebrowsing.malware.enabled": { "Value": false, "Status": "locked" },
+      "browser.safebrowsing.phishing.enabled": { "Value": false, "Status": "locked" },
+      "browser.safebrowsing.downloads.enabled": { "Value": false, "Status": "locked" },
+      "dom.push.enabled": { "Value": false, "Status": "locked" },
+      "extensions.getAddons.showPane": { "Value": false, "Status": "locked" },
+      "browser.newtabpage.activity-stream.feeds.section.topstories": {
+        "Value": false,
+        "Status": "locked"
+      },
+      "browser.newtabpage.activity-stream.showSponsored": { "Value": false, "Status": "locked" },
+      "browser.newtabpage.activity-stream.showSponsoredTopSites": {
+        "Value": false,
+        "Status": "locked"
+      }
+    }
   }
 }

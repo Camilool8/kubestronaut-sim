@@ -33,23 +33,35 @@ type PhaseSpec struct {
 }
 
 // Phase is one entry of a job's progress checklist.
+//
+// StartedAt/FinishedAt exist so the UI can show a live duration on the
+// running phase and a settled one on each finished phase: a control job
+// holds a single phase for minutes at a time, and without timing there
+// is nothing on screen that changes between polls. Detail carries the
+// most recent line of output from the phase's command (kind's own
+// "Preparing nodes" / "Installing CNI" progress, bootstrap.sh's
+// milestones) — a one-line tail, not a log.
 type Phase struct {
-	ID    string     `json:"id"`
-	Label string     `json:"label"`
-	State PhaseState `json:"state"`
+	ID         string     `json:"id"`
+	Label      string     `json:"label"`
+	State      PhaseState `json:"state"`
+	StartedAt  string     `json:"startedAt,omitempty"`
+	FinishedAt string     `json:"finishedAt,omitempty"`
+	Detail     string     `json:"detail,omitempty"`
 }
 
 // Job is one control operation's progress record. Snapshots returned by
 // Status are deep copies — callers can never mutate store state.
 type Job struct {
-	ID        string  `json:"id"`
-	Op        string  `json:"op"`   // "reset" | "switch"
-	Bank      string  `json:"bank"` // target bank for switch, "" for reset
-	StartedAt string  `json:"startedAt"`
-	Phase     string  `json:"phase"` // id of the phase currently running ("" before the first)
-	Error     string  `json:"error,omitempty"`
-	Phases    []Phase `json:"phases"`
-	done      bool
+	ID         string  `json:"id"`
+	Op         string  `json:"op"`   // "reset" | "switch"
+	Bank       string  `json:"bank"` // target bank for switch, "" for reset
+	StartedAt  string  `json:"startedAt"`
+	FinishedAt string  `json:"finishedAt,omitempty"`
+	Phase      string  `json:"phase"` // id of the phase currently running ("" before the first)
+	Error      string  `json:"error,omitempty"`
+	Phases     []Phase `json:"phases"`
+	done       bool
 }
 
 // Snapshot is Status's view: whether a job is in flight, that job, and
@@ -90,7 +102,7 @@ func (s *Store) Begin(op, bank string, phases []PhaseSpec) (Job, error) {
 		ID:        fmt.Sprintf("job-%d", s.seq),
 		Op:        op,
 		Bank:      bank,
-		StartedAt: s.clock().UTC().Format(time.RFC3339),
+		StartedAt: s.stampLocked(),
 	}
 	for _, p := range phases {
 		j.Phases = append(j.Phases, Phase{ID: p.ID, Label: p.Label, State: PhasePending})
@@ -110,15 +122,42 @@ func (s *Store) StartPhase(jobID, id string) {
 	if j == nil {
 		return
 	}
+	now := s.stampLocked()
 	for i := range j.Phases {
 		if j.Phases[i].State == PhaseRunning {
 			j.Phases[i].State = PhaseDone
+			j.Phases[i].FinishedAt = now
+			// A settled row shows its duration, not the last line it
+			// happened to print; a frozen half-finished line reads as
+			// a phase that is still working.
+			j.Phases[i].Detail = ""
 		}
 		if j.Phases[i].ID == id {
 			j.Phases[i].State = PhaseRunning
+			j.Phases[i].StartedAt = now
 		}
 	}
 	j.Phase = id
+}
+
+// SetPhaseDetail replaces phase id's one-line output tail on job jobID.
+// Calls naming a stale job (or a phase that has already settled) are
+// ignored, so a goroutine still draining a dead job's output can never
+// write into the live one.
+func (s *Store) SetPhaseDetail(jobID, id, detail string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	j := s.currentIfLocked(jobID)
+	if j == nil {
+		return
+	}
+	for i := range j.Phases {
+		if j.Phases[i].ID == id && j.Phases[i].State == PhaseRunning {
+			j.Phases[i].Detail = detail
+			return
+		}
+	}
 }
 
 // Complete finishes job jobID successfully: every non-failed phase is
@@ -131,11 +170,15 @@ func (s *Store) Complete(jobID string) {
 	if j == nil {
 		return
 	}
+	now := s.stampLocked()
 	for i := range j.Phases {
 		if j.Phases[i].State == PhaseRunning || j.Phases[i].State == PhasePending {
 			j.Phases[i].State = PhaseDone
+			j.Phases[i].FinishedAt = now
+			j.Phases[i].Detail = ""
 		}
 	}
+	j.FinishedAt = now
 	j.done = true
 	s.last = j
 	s.current = nil
@@ -152,12 +195,15 @@ func (s *Store) Fail(jobID, msg string) {
 	if j == nil {
 		return
 	}
+	now := s.stampLocked()
 	for i := range j.Phases {
 		if j.Phases[i].State == PhaseRunning {
 			j.Phases[i].State = PhaseFailed
+			j.Phases[i].FinishedAt = now
 		}
 	}
 	j.Error = msg
+	j.FinishedAt = now
 	j.done = true
 	s.last = j
 	s.current = nil
@@ -173,6 +219,14 @@ func (s *Store) Status() Snapshot {
 		Job:     cloneJob(s.current),
 		LastJob: cloneJob(s.last),
 	}
+}
+
+// stampLocked returns the current time in the wire format every
+// timestamp in this package uses. Nanosecond precision matters: several
+// phases finish in well under a second, and at second resolution they
+// would all render as "0s". The caller must hold s.mu.
+func (s *Store) stampLocked() string {
+	return s.clock().UTC().Format(time.RFC3339Nano)
 }
 
 // currentIfLocked returns the in-flight job only if it matches jobID.

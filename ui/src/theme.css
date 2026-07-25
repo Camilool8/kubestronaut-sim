@@ -73,11 +73,20 @@
   border-color: var(--accent);
 }
 
-.theme-toggle-floating {
+/* Both floating controls live in one cluster, so their spacing comes
+   from the layout rather than from a hardcoded offset that had to guess
+   the theme toggle's label width. */
+.floating-controls {
   position: fixed;
   top: var(--space-4);
   right: var(--space-4);
   z-index: var(--z-panel);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.theme-toggle-floating {
   background: var(--surface);
 }
 
@@ -177,6 +186,13 @@
   opacity: 1;
 }
 
+/* On --accent-soft the plain --accent only reaches 4.0:1; --accent-strong
+   is the accent for text sitting on that fill (5.4:1). */
+.bank-card.bank-active .bank-badge {
+  color: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+
 .bank-title {
   font-weight: 700;
   display: flex;
@@ -260,10 +276,14 @@
   flex-direction: column;
 }
 
+/* Wraps rather than compressing: the row packs a title, two icon
+   buttons, the countdown and End Exam, and below ~500px the countdown
+   and the button were being squeezed off the edge. */
 .topbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-2) var(--space-4);
   padding: var(--space-2) var(--space-4);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -271,7 +291,8 @@
 }
 
 .topbar-title {
-  flex: 1;
+  flex: 1 1 8rem;
+  min-width: 0;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -440,6 +461,44 @@
   border-radius: 3px;
 }
 
+/* Every inline value in a question is a click-to-copy button. It has to
+   read as part of the sentence, not as a form control, so it borrows
+   the inline-code look and only reveals its affordance on hover/focus. */
+.copy-value {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-s);
+}
+
+.copy-value code {
+  border: 1px solid transparent;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.copy-value:hover code,
+.copy-value:focus-visible code {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.copy-value-icon {
+  font-size: 0.75em;
+  margin-left: 0.25em;
+  color: var(--text-muted);
+  opacity: 0;
+}
+
+.copy-value:hover .copy-value-icon,
+.copy-value:focus-visible .copy-value-icon {
+  opacity: 1;
+}
+
 .question-markdown pre code {
   background: none;
   padding: 0;
@@ -491,6 +550,9 @@
 
 .confirm-dialog {
   width: min(440px, 90%);
+  max-height: min(85dvh, 40rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
@@ -680,14 +742,26 @@
   z-index: var(--z-overlay);
 }
 
+/* Header and actions stay pinned; only the checklist scrolls, so the
+   progress a user is waiting on can never scroll out of view and a long
+   checklist can never run off a short viewport. */
 .control-dialog {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
   box-shadow: var(--shadow-3);
   padding: var(--space-5) var(--space-6);
-  width: 460px;
-  max-width: 90vw;
+  width: 520px;
+  max-width: min(92vw, 520px);
+  max-height: min(85dvh, 42rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.control-dialog .control-phases {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
 }
 
 .control-dialog h2 {
@@ -703,11 +777,46 @@
   gap: var(--space-2);
 }
 
+/* Each row is mark | label | elapsed, with the running phase's output
+   line spanning the full width underneath it. */
 .control-phases li {
-  display: flex;
-  gap: var(--space-3);
+  display: grid;
+  grid-template-columns: 1em 1fr auto;
+  gap: var(--space-1) var(--space-3);
   align-items: baseline;
   color: var(--text-muted);
+}
+
+.control-status {
+  color: var(--text);
+  font-weight: 600;
+  margin: 0;
+}
+
+.phase-elapsed {
+  font-family: var(--font-mono);
+  font-size: var(--text-s);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+/* The live output tail: monospace because it is literally command
+   output, clipped to one line so a long line can't reflow the dialog
+   on every poll. */
+.phase-detail {
+  grid-column: 2 / -1;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.control-elapsed {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  margin-left: var(--space-2);
 }
 
 .control-phases li.phase-done {
@@ -726,6 +835,27 @@
   font-family: var(--font-mono);
   width: 1em;
   text-align: center;
+}
+
+/* The running phase gets a spinning arc instead of a static glyph:
+   cluster re-bootstrap can take minutes, and without visible motion the
+   dialog reads as frozen. Under prefers-reduced-motion the global rule
+   in base.css stops the rotation, leaving a static arc as the marker. */
+.phase-mark-spinner {
+  width: 0.75em;
+  height: 0.75em;
+  margin: 0 0.125em;
+  align-self: center;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: phase-spin 0.8s linear infinite;
+}
+
+@keyframes phase-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .control-hint {
@@ -894,10 +1024,6 @@
 }
 
 .info-button-floating {
-  position: fixed;
-  top: var(--space-4);
-  right: calc(var(--space-4) + 96px);
-  z-index: var(--z-panel);
   background: var(--surface);
 }
 
@@ -1010,4 +1136,182 @@
 
 .skip-link:focus {
   transform: none;
+}
+
+/* ---- desktop-required gate ---- */
+
+/* This is the page for a phone, not an overlay over a hidden app, and
+   it has to stay fully usable at 320px — it is the one screen these
+   users will ever see (WCAG 1.4.10 counts 320px as a 1280px window at
+   400% zoom, which is why the gate is capability-based, not width-only). */
+.desktop-required {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5) var(--space-4);
+}
+
+.desktop-required-card {
+  width: min(34rem, 100%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-2);
+  padding: var(--space-5);
+}
+
+.desktop-required-card h1 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xl);
+}
+
+.desktop-required-needs {
+  margin: var(--space-4) 0;
+  padding-left: 1.2rem;
+  color: var(--text-muted);
+}
+
+.desktop-required-still,
+.start-blocked {
+  color: var(--text-muted);
+  font-size: var(--text-s);
+}
+
+/* A running session must stay submittable from a phone: the server-side
+   clock keeps counting regardless of what the candidate is holding. */
+.gate-session {
+  margin: var(--space-5) 0;
+  padding: var(--space-4);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.gate-session-timer {
+  margin: 0;
+}
+
+/* ---- narrow viewports ---- */
+
+@media (max-width: 600px) {
+  .start-card,
+  .desktop-required-card {
+    padding: var(--space-4);
+  }
+
+  .start-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Full-bleed rather than a desktop dialog shrunk onto a phone. */
+  .confirm-dialog,
+  .control-dialog {
+    width: 100%;
+    max-width: 100%;
+    max-height: 100dvh;
+    border-radius: 0;
+  }
+}
+
+/* Wide content scrolls inside itself instead of pushing the page
+   sideways. */
+.compare-table-scroll,
+.check-list-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+/* Touch targets on the screens a phone can actually reach. */
+@media (any-pointer: coarse) {
+  .panel-toggle,
+  .info-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* ---- motion ----
+   Written motion-additive: the calm state is the default and animation
+   is layered on only when the user has expressed no preference against
+   it. base.css also carries a global reduce guard, so this is belt and
+   braces — but writing it this way means a reduced-motion user never
+   depends on an animation being neutralised correctly, and never
+   downloads a frame of it.
+
+   Durations and the easing curve come from tokens.css: short, sharp,
+   no overshoot. Only transform and opacity are animated — both are
+   compositor-only, which matters for the overlay that stays on screen
+   for minutes. */
+
+@media (prefers-reduced-motion: no-preference) {
+  .confirm-overlay,
+  .control-overlay,
+  .drawer-overlay {
+    animation: scrim-in var(--dur-quick) var(--ease-out) both;
+  }
+
+  .confirm-dialog,
+  .control-dialog {
+    animation: dialog-in var(--dur-modal-in) var(--ease-out) both;
+  }
+
+  .info-drawer {
+    animation: drawer-in var(--dur-modal-in) var(--ease-out) both;
+  }
+
+  .toast {
+    animation: toast-in var(--dur-base) var(--ease-out) both;
+  }
+
+  /* Staggered only on first mount of the checklist — re-staggering on
+     every poll would make the list feel unstable for four minutes. */
+  .control-phases li {
+    animation: row-in var(--dur-base) var(--ease-out) both;
+  }
+  .control-phases li:nth-child(2) { animation-delay: 40ms; }
+  .control-phases li:nth-child(3) { animation-delay: 80ms; }
+  .control-phases li:nth-child(4) { animation-delay: 120ms; }
+  .control-phases li:nth-child(5) { animation-delay: 160ms; }
+  .control-phases li:nth-child(6) { animation-delay: 200ms; }
+  .control-phases li:nth-child(n + 7) { animation-delay: 240ms; }
+}
+
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }

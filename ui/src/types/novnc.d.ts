@@ -19,6 +19,17 @@ declare module "@novnc/novnc" {
     disconnect(): void;
     focus(): void;
     blur(): void;
+    /**
+     * Pushes text into the remote session's clipboard. A no-op unless
+     * the connection is established and viewOnly is false.
+     */
     clipboardPasteFrom(text: string): void;
+
+    /** Typed overload for the "clipboard" event's CustomEvent detail. */
+    addEventListener(
+      type: "clipboard",
+      listener: (event: CustomEvent<{ text: string }>) => void,
+    ): void;
+    addEventListener(type: string, listener: EventListenerOrEventListenerObject): void;
   }
 }

@@ -1,5 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusTrap } from "../lib/useFocusTrap";
 import { strings } from "../strings";
+
+const TOUR_CARD_WIDTH = 360;
+const TOUR_EDGE_GAP = 8;
 
 export interface TourStep {
   /** CSS selector of the element to spotlight. */
@@ -41,19 +45,23 @@ export function Tour({ steps, onDone }: TourProps) {
   useEffect(() => {
     const el = step ? document.querySelector(step.target) : null;
     setRect(el ? el.getBoundingClientRect() : null);
-    // keyboard users follow the tour from the card itself
-    cardRef.current?.focus();
   }, [step]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onDone();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onDone]);
+  // Tour was the one dialog that skipped the shared trap, so Tab walked
+  // straight out of it into the page behind — including, during an exam,
+  // the desktop viewport that swallows keystrokes. useFocusTrap also
+  // brings Escape-to-close and focus restoration, replacing the
+  // hand-rolled window listener this used to carry.
+  const close = useCallback(() => onDone(), [onDone]);
+  useFocusTrap(cardRef, close);
 
   if (!step) return null;
+
+  // The card is 340px wide with a calc(100vw - 2rem) cap. Below ~360px
+  // the old `innerWidth - 360` went negative and pushed the card off the
+  // left edge entirely, so the tour was unreadable on a narrow window.
+  const clampLeft = (left: number) =>
+    Math.max(TOUR_EDGE_GAP, Math.min(left, window.innerWidth - TOUR_CARD_WIDTH));
 
   const spotlight = rect
     ? {
@@ -68,8 +76,8 @@ export function Tour({ steps, onDone }: TourProps) {
   const cardBelow = rect ? rect.bottom + 180 < window.innerHeight : true;
   const cardStyle = rect
     ? cardBelow
-      ? { top: rect.bottom + 14, left: Math.min(rect.left, window.innerWidth - 360) }
-      : { bottom: window.innerHeight - rect.top + 14, left: Math.min(rect.left, window.innerWidth - 360) }
+      ? { top: rect.bottom + 14, left: clampLeft(rect.left) }
+      : { bottom: window.innerHeight - rect.top + 14, left: clampLeft(rect.left) }
     : { top: "40%", left: "50%" };
 
   const last = index === steps.length - 1;

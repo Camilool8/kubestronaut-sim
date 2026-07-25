@@ -1,40 +1,60 @@
 /* Design tokens — the single source of truth for color, type, spacing,
-   radius, elevation, and layering. Light is the :root default; dark is
-   applied by explicit [data-theme="dark"] or, for the "system" choice
-   (no data-theme attribute), by prefers-color-scheme. Values exist for
-   BOTH themes for every semantic token — components never hardcode a
-   color. The teal-on-slate identity carries over from milestone C. */
+   radius, elevation, motion, and layering. Light is the :root default;
+   dark is applied by explicit [data-theme="dark"] or, for the "system"
+   choice (no data-theme attribute), by prefers-color-scheme. Values
+   exist for BOTH themes for every semantic token — components never
+   hardcode a color.
+
+   Identity: Kubernetes blue on cool slate. The accent is the official
+   Kubernetes blue (#326CE5) used referentially; no Kubernetes or CNCF
+   logo, wordmark or mark appears anywhere in this product, and the
+   non-affiliation notice stays in the footer and the About panel.
+
+   Every text pair below is checked against WCAG 2.1 AA (4.5:1). The
+   axe suite cannot catch contrast — jsdom has no layout engine, so the
+   color-contrast rule is skipped there — so the ratios are recorded
+   here and re-checked by hand when a value changes.
+
+   Three mirrors of these values live outside this file and must move
+   with it: the Go locked page (facilitator/internal/desktop/proxy.go),
+   the favicon (ui/public/favicon.svg), and the exam terminal's palette
+   (images/desktop/assets/terminalrc + its xfconf twin). */
 
 :root {
   color-scheme: light;
 
   /* surfaces */
-  --bg: #f4f6f9;
+  --bg: #f7f9fc;
   --surface: #ffffff;
-  --surface-raised: #eaeef4;
-  --border: #d4dae3;
-  --overlay: rgba(15, 20, 28, 0.55);
+  --surface-raised: #eaeff7;
+  --border: #cbd4e1;
+  --overlay: rgba(11, 18, 32, 0.55);
 
-  /* text */
+  /* text — 15.4:1 and 5.9:1 on --bg */
   --text: #1a212b;
   --text-muted: #57626f;
 
-  /* brand + state */
-  --accent: #0e7c6b;
-  --accent-strong: #0a6154;
-  --accent-soft: #d7efe9;
+  /* brand + state
+     --accent 4.8:1 on --surface, 4.5:1 on --bg
+     --accent-contrast 4.8:1 on --accent (the primary button)
+     --accent-strong 6.4:1 on --surface, 5.4:1 on --accent-soft — it is
+     the accent used for TEXT sitting on --accent-soft, because --accent
+     itself only reaches 4.0:1 there */
+  --accent: #326ce5;
+  --accent-strong: #2557c7;
+  --accent-soft: #e4ecfd;
   --accent-contrast: #ffffff;
   --danger: #bb3730;
   --danger-soft: #f7dedd;
   --warn: #8a6100;
   --success: #1a7f37;
 
-  --focus-ring: #0e7c6b;
+  --focus-ring: #326ce5;
 
   /* elevation (tinted to the page, never pure black) */
-  --shadow-1: 0 1px 2px rgba(26, 33, 43, 0.08), 0 1px 6px rgba(26, 33, 43, 0.06);
-  --shadow-2: 0 4px 12px rgba(26, 33, 43, 0.1), 0 2px 4px rgba(26, 33, 43, 0.08);
-  --shadow-3: 0 12px 32px rgba(26, 33, 43, 0.16);
+  --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.08), 0 1px 6px rgba(16, 24, 40, 0.06);
+  --shadow-2: 0 4px 12px rgba(16, 24, 40, 0.1), 0 2px 4px rgba(16, 24, 40, 0.08);
+  --shadow-3: 0 12px 32px rgba(16, 24, 40, 0.16);
 
   /* type */
   --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -63,10 +83,28 @@
   --radius-m: 10px;
   --radius-pill: 999px;
 
-  /* layering */
+  /* motion — durations short enough to feel immediate, and an easing
+     curve that decelerates without overshoot. This product is an
+     instrument panel for people about to sit a proctored exam; a spring
+     or a bounce reads as unserious. Exits are shorter than entrances.
+     Every use is gated on prefers-reduced-motion (see base.css). */
+  --dur-instant: 100ms;
+  --dur-quick: 160ms;
+  --dur-base: 220ms;
+  --dur-modal-in: 280ms;
+  --dur-modal-out: 200ms;
+  --dur-progress: 400ms;
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  /* layering — the control overlay sits ABOVE dialogs and drawers: it
+     blocks a destructive operation and must survive every screen
+     transition underneath it. It previously sat below them, so an open
+     About drawer covered the rebuild it was blocking. Toasts stay above
+     the overlay so a confirmation is never rendered invisible. */
   --z-panel: 10;
-  --z-overlay: 20;
-  --z-dialog: 30;
+  --z-dialog: 20;
+  --z-overlay: 30;
   --z-toast: 40;
   --z-tour: 50;
 }
@@ -77,25 +115,30 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --bg: #0b0e14;
-  --surface: #11151d;
-  --surface-raised: #171c26;
-  --border: #262c38;
-  --overlay: rgba(2, 4, 8, 0.66);
+  --bg: #0b1220;
+  --surface: #121a2b;
+  --surface-raised: #1a2437;
+  --border: #28324a;
+  --overlay: rgba(2, 6, 16, 0.66);
 
+  /* 13.9:1 and 7.1:1 on --bg */
   --text: #d9dee5;
   --text-muted: #97a0af;
 
-  --accent: #4fd6be;
-  --accent-strong: #74e2cf;
-  --accent-soft: #123a33;
-  --accent-contrast: #06201a;
+  /* --accent 7.4:1 on --bg, 6.9:1 on --surface; --accent-contrast
+     7.4:1 on --accent; --accent-strong 9.5:1 on --surface. A tint of
+     the same Kubernetes blue: #326CE5 itself only reaches ~4.1:1 on
+     this background and would fail as body text. */
+  --accent: #7aa2f7;
+  --accent-strong: #a4c0fb;
+  --accent-soft: #16294a;
+  --accent-contrast: #0b1220;
   --danger: #e5605a;
   --danger-soft: #3d1a18;
   --warn: #e0a850;
   --success: #57d183;
 
-  --focus-ring: #4fd6be;
+  --focus-ring: #7aa2f7;
 
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 6px rgba(0, 0, 0, 0.3);
   --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.45), 0 2px 4px rgba(0, 0, 0, 0.35);
@@ -106,25 +149,25 @@
   :root:not([data-theme="light"]):not([data-theme="dark"]) {
     color-scheme: dark;
 
-    --bg: #0b0e14;
-    --surface: #11151d;
-    --surface-raised: #171c26;
-    --border: #262c38;
-    --overlay: rgba(2, 4, 8, 0.66);
+    --bg: #0b1220;
+    --surface: #121a2b;
+    --surface-raised: #1a2437;
+    --border: #28324a;
+    --overlay: rgba(2, 6, 16, 0.66);
 
     --text: #d9dee5;
     --text-muted: #97a0af;
 
-    --accent: #4fd6be;
-    --accent-strong: #74e2cf;
-    --accent-soft: #123a33;
-    --accent-contrast: #06201a;
+    --accent: #7aa2f7;
+    --accent-strong: #a4c0fb;
+    --accent-soft: #16294a;
+    --accent-contrast: #0b1220;
     --danger: #e5605a;
     --danger-soft: #3d1a18;
     --warn: #e0a850;
     --success: #57d183;
 
-    --focus-ring: #4fd6be;
+    --focus-ring: #7aa2f7;
 
     --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 6px rgba(0, 0, 0, 0.3);
     --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.45), 0 2px 4px rgba(0, 0, 0, 0.35);

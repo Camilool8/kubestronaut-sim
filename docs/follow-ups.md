@@ -48,3 +48,31 @@ Convert to GitHub issues once the repo has a remote.
 - ui: visual regression pass in a real browser (Chrome extension was unavailable during development; WS upgrade + xfconf state verified instead). Do a manual light/dark + tour + toast walkthrough.
 - desktop: xfdesktop may show a one-time "untrusted launcher" prompt on the Desktop icons (panel launchers are the primary path); investigate gio trust metadata if it annoys.
 - ui: bundle is ~470KB min (noVNC + React); consider code-splitting the RFB client if cold loads matter.
+
+## Milestone E (UI/UX overhaul) — new
+
+- proxy: the allowlist matches host-or-subdomain with no deny-override, so
+  allowing `kubernetes.io` necessarily allows `discuss.kubernetes.io`, which
+  the real exam disallows. A small deny list on top of the allow list would
+  close it (asserted in `allow_test.go` so the gap stays visible).
+- proxy: `allowedDomains: []` in a bank still falls through to the default
+  list rather than blocking everything — carried over from milestone B and
+  still unresolved.
+- ui: the control-progress bar is indeterminate. Making it determinate needs
+  historical phase durations; the per-phase timings added in this milestone
+  are the input, so a later pass can persist observed medians and weight the
+  bar honestly.
+- ui: no live log *pane*, only a one-line tail per phase. The conductor now
+  streams exec output, so a "show full log" disclosure is cheap if wanted.
+- accessibility: WCAG 2.2.1 (Timing Adjustable) is weaker here than for a
+  real assessment — this is a practice tool, so the essential-exception is
+  hard to lean on. A practice mode (untimed, or a 1.25x/1.5x/2x multiplier
+  on the lobby) would close it properly. Product decision, not a bug.
+- trademark: "Kubestronaut" is a CNCF program name and the Linux Foundation's
+  usage terms prohibit using their marks as part of a product name. The
+  palette is fine (colours are not the exposed part); the *name* is. Worth
+  resolving with trademarks@linuxfoundation.org before the repo is public.
+- verification: the live CKAD->CKA switch round-trip was not re-run at the end
+  of this milestone because a timed session was in progress and ending it
+  would have destroyed an attempt. Everything else was verified; run
+  `tests/smoke.sh` from an idle stack before merging.

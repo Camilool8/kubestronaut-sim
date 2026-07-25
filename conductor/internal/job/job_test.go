@@ -127,6 +127,143 @@ func TestStaleJobIDsAreIgnored(t *testing.T) {
 	}
 }
 
+// stepClock advances one second per call, so timing assertions can tell
+// "stamped" from "not stamped" and one phase's stamps from the next's.
+func stepClock() func() time.Time {
+	t0 := time.Date(2026, 7, 24, 12, 0, 0, 0, time.UTC)
+	n := 0
+	return func() time.Time {
+		t := t0.Add(time.Duration(n) * time.Second)
+		n++
+		return t
+	}
+}
+
+func TestPhasesRecordStartAndFinishTimes(t *testing.T) {
+	s := NewStore(stepClock())
+	j, _ := s.Begin("reset", "", testPhases())
+
+	s.StartPhase(j.ID, "end-session")
+	s.StartPhase(j.ID, "wipe-instances")
+	snap := s.Status()
+
+	first := phase(t, snap.Job, "end-session")
+	if first.StartedAt == "" {
+		t.Error("a started phase must record startedAt")
+	}
+	if first.FinishedAt == "" {
+		t.Error("a phase closed by the next StartPhase must record finishedAt")
+	}
+	second := phase(t, snap.Job, "wipe-instances")
+	if second.StartedAt == "" {
+		t.Error("the newly running phase must record startedAt")
+	}
+	if second.FinishedAt != "" {
+		t.Errorf("a running phase must not record finishedAt, got %q", second.FinishedAt)
+	}
+	if pending := phase(t, snap.Job, "verify"); pending.StartedAt != "" {
+		t.Errorf("an unreached phase must not record startedAt, got %q", pending.StartedAt)
+	}
+
+	// Stamps must be parseable and ordered — the UI subtracts them.
+	startedAt := mustParse(t, second.StartedAt)
+	if firstFinished := mustParse(t, first.FinishedAt); startedAt.Before(firstFinished) {
+		t.Errorf("phase 2 started %v before phase 1 finished %v", startedAt, firstFinished)
+	}
+}
+
+func TestCompleteStampsJobAndRemainingPhases(t *testing.T) {
+	s := NewStore(stepClock())
+	j, _ := s.Begin("reset", "", testPhases())
+	s.StartPhase(j.ID, "end-session")
+	s.Complete(j.ID)
+
+	snap := s.Status()
+	if snap.LastJob.FinishedAt == "" {
+		t.Error("a completed job must record finishedAt")
+	}
+	for _, p := range snap.LastJob.Phases {
+		if p.FinishedAt == "" {
+			t.Errorf("phase %s of a completed job must record finishedAt", p.ID)
+		}
+	}
+}
+
+func TestFailStampsFailingPhaseAndJobButNotUnreachedPhases(t *testing.T) {
+	s := NewStore(stepClock())
+	j, _ := s.Begin("reset", "", testPhases())
+	s.StartPhase(j.ID, "end-session")
+	s.Fail(j.ID, "boom")
+
+	snap := s.Status()
+	if snap.LastJob.FinishedAt == "" {
+		t.Error("a failed job must record finishedAt")
+	}
+	if failed := phase(t, snap.LastJob, "end-session"); failed.FinishedAt == "" {
+		t.Error("the failing phase must record finishedAt")
+	}
+	if unreached := phase(t, snap.LastJob, "verify"); unreached.FinishedAt != "" {
+		t.Errorf("an unreached phase must not record finishedAt, got %q", unreached.FinishedAt)
+	}
+}
+
+func TestSetPhaseDetailTracksTheRunningPhase(t *testing.T) {
+	s := NewStore(stepClock())
+	j, _ := s.Begin("reset", "", testPhases())
+	s.StartPhase(j.ID, "end-session")
+
+	s.SetPhaseDetail(j.ID, "end-session", "Preparing nodes")
+	if got := phase(t, s.Status().Job, "end-session").Detail; got != "Preparing nodes" {
+		t.Fatalf("detail = %q, want %q", got, "Preparing nodes")
+	}
+
+	// The newest line replaces the previous one — this is a tail, not a log.
+	s.SetPhaseDetail(j.ID, "end-session", "Installing CNI")
+	if got := phase(t, s.Status().Job, "end-session").Detail; got != "Installing CNI" {
+		t.Fatalf("detail = %q, want the newest line", got)
+	}
+
+	// A stale job id must not write into the live job.
+	s.SetPhaseDetail("job-999", "end-session", "from a dead goroutine")
+	if got := phase(t, s.Status().Job, "end-session").Detail; got != "Installing CNI" {
+		t.Fatalf("stale SetPhaseDetail overwrote the live phase: %q", got)
+	}
+}
+
+func TestCompletedPhaseKeepsNoStaleDetail(t *testing.T) {
+	s := NewStore(stepClock())
+	j, _ := s.Begin("reset", "", testPhases())
+	s.StartPhase(j.ID, "end-session")
+	s.SetPhaseDetail(j.ID, "end-session", "Installing CNI")
+	s.StartPhase(j.ID, "wipe-instances")
+
+	// A settled row shows its duration, not the last thing it happened to
+	// print — a frozen half-finished log line reads as a stuck phase.
+	if got := phase(t, s.Status().Job, "end-session").Detail; got != "" {
+		t.Fatalf("finished phase kept detail %q, want it cleared", got)
+	}
+}
+
+func mustParse(t *testing.T, stamp string) time.Time {
+	t.Helper()
+	parsed, err := time.Parse(time.RFC3339Nano, stamp)
+	if err != nil {
+		t.Fatalf("timestamp %q is not RFC3339Nano: %v", stamp, err)
+	}
+	return parsed
+}
+
+func phase(t *testing.T, j *Job, id string) Phase {
+	t.Helper()
+	for _, p := range j.Phases {
+		if p.ID == id {
+			return p
+		}
+	}
+	t.Fatalf("phase %s not found in %+v", id, j.Phases)
+	return Phase{}
+}
+
 func phaseState(t *testing.T, j *Job, id string) PhaseState {
 	t.Helper()
 	for _, p := range j.Phases {

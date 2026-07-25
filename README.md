@@ -5,7 +5,8 @@ certifications. Deliberately harder than the real exams. CKAD and CKA
 banks today; KCNA/KCSA (multiple choice) and CKS are on the roadmap and
 appear in the catalog as coming soon.
 
-**Status: Milestone D — UI-driven product (facilitator + conductor + exam UI).**
+**Status: Milestone E — product polish (live control plane, clipboard,
+Kubernetes-blue design system, responsive + mobile gate).**
 
 Code: Apache-2.0. Question banks: CC BY-SA 4.0 (see `banks/LICENSE`).
 Not affiliated with CNCF, The Linux Foundation, PSI, or killer.sh.
@@ -25,11 +26,20 @@ Everything after `up` happens in the browser: pick an exam from the
 lobby catalog, start the timed session, work on the embedded desktop,
 submit, read your score with per-check results and solutions, then start
 a **new attempt** or **switch to a different exam** — both buttons drive
-the full environment rebuild with a live progress checklist.
+the full environment rebuild with a live progress checklist that shows
+each step's duration and the cluster's own output as it goes.
+
+**Click any value in a question to copy it**, then paste in the exam
+terminal with Ctrl+Shift+V. Resource names, labels, image tags and
+`/opt/course` paths all have to be exact, and retyping them is how
+avoidable zeros happen.
 
 `down` + `up` resumes your exam state (including an in-progress
 session). Light and dark themes follow your system, with a toggle in the
-corner.
+corner. The exam itself needs a desktop — a keyboard and room for a
+terminal beside the questions — so phones get a screen saying so rather
+than a broken layout, while the catalog and past scores stay readable
+there.
 
 ## What the exam feels like
 

@@ -37,7 +37,8 @@ export function InfoDrawer({ onClose, onRestartTour }: InfoDrawerProps) {
 
         <section>
           <h3>{s.compareTitle}</h3>
-          <table className="compare-table">
+          <div className="compare-table-scroll">
+            <table className="compare-table">
             <thead>
               <tr>
                 <th scope="col">{s.compareAspect}</th>
@@ -55,6 +56,7 @@ export function InfoDrawer({ onClose, onRestartTour }: InfoDrawerProps) {
               ))}
             </tbody>
           </table>
+          </div>
           <p className="drawer-note">{s.compareNote}</p>
         </section>
 

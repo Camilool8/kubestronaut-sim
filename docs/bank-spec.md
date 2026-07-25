@@ -68,6 +68,16 @@ coming-soon entries whose exam engine doesn't exist yet.
   owned by `candidate`. Questions must never require creating these
   directories — candidates only write files into them, as on the real exam.
 - `/banks` mounted read-only on k8s-env and instances.
-- `spec.environment.allowedDomains` (optional, default
-  `[kubernetes.io, helm.sh]`): domain suffixes the exam desktop's browser
-  may reach through the docs proxy; subdomains included.
+- `spec.environment.allowedDomains` (optional): domain suffixes the exam
+  desktop's browser may reach through the docs proxy; subdomains
+  included. Omit it to inherit `allow.DefaultDomains`
+  (`proxy/internal/allow/allow.go`), which is the smallest set that
+  leaves the documentation sites actually usable — the docs themselves,
+  `code.jquery.com` (kubernetes.io's JS is a jQuery IIFE; without it the
+  search box and sidebar never wire up), the font hosts, and helm.sh's
+  Algolia search hosts. Analytics and Google Programmable Search are
+  deliberately excluded: with Google unreachable, kubernetes.io falls
+  back to Pagefind, the search index it serves itself, which matches the
+  real exam's rule that the docs search is allowed but external search
+  results are not. Adding a host here widens what a candidate can reach,
+  so keep it to things a documentation page genuinely needs.

@@ -8,6 +8,28 @@ import (
 	"strings"
 )
 
+// DefaultDomains is the allowlist a bank inherits when it declares no
+// allowedDomains of its own. It is the smallest set that makes the two
+// documentation sites actually usable:
+//
+//   - kubernetes.io covers the docs, the blog and the versioned
+//     v1-NN.docs.kubernetes.io archives (subdomains match).
+//   - code.jquery.com is a hard dependency, not a nicety: kubernetes.io's
+//     main.min.js is one big jQuery IIFE, so blocking it throws before
+//     the search box, tab panes and sidebar toggle are ever wired up.
+//   - the font hosts serve the typeface the docs are designed in.
+//   - helm.sh's search is Algolia-hosted and has no local fallback, so
+//     its read hosts and their retry aliases have to be reachable.
+//
+// Deliberately absent: analytics (www.googletagmanager.com), and Google
+// Programmable Search. kubernetes.io probes whether Google is reachable
+// and falls back to Pagefind — a search index it serves itself — when
+// it isn't. Letting that probe fail is both simpler and closer to the
+// real exam, where using the docs search is allowed but opening
+// external search results is not.
+const DefaultDomains = "kubernetes.io,helm.sh,code.jquery.com," +
+	"fonts.googleapis.com,fonts.gstatic.com,algolia.net,algolianet.com"
+
 // List is a set of allowed domains for host matching.
 type List struct{ domains []string }
 

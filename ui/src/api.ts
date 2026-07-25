@@ -231,6 +231,12 @@ export interface ControlPhase {
   id: string;
   label: string;
   state: ControlPhaseState;
+  /** RFC3339Nano; absent until the phase starts. */
+  startedAt?: string;
+  /** RFC3339Nano; absent while the phase is still running. */
+  finishedAt?: string;
+  /** Most recent output line from the phase's command; cleared once it settles. */
+  detail?: string;
 }
 
 export interface ControlJob {
@@ -238,6 +244,8 @@ export interface ControlJob {
   op: "reset" | "switch";
   bank: string;
   startedAt: string;
+  /** RFC3339Nano; absent while the job is in flight. */
+  finishedAt?: string;
   phase: string;
   error?: string;
   phases: ControlPhase[];
