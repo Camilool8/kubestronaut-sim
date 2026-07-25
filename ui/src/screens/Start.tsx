@@ -124,7 +124,7 @@ export function Start({
             <div className="catalog-error" role="alert">
               <p className="catalog-error-title">{strings.start.catalogErrorTitle}</p>
               <p className="catalog-error-body">{strings.start.catalogErrorBody(message)}</p>
-              <button type="button" className="btn btn-secondary" onClick={reload}>
+              <button type="button" className="btn" onClick={reload}>
                 {strings.start.catalogRetry}
               </button>
             </div>
