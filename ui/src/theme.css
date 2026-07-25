@@ -1119,23 +1119,43 @@
   text-align: center;
 }
 
-/* ---- skip link (keyboard exit past the VNC canvas) ---- */
+/* ---- skip link (keyboard exit past the VNC canvas) ----
+   Hidden with the same clip idiom as .sr-only (base.css), NOT with a
+   transform: a translate is proportional to the element's own height, so
+   whether it clears the viewport depends on how far down the page its
+   container starts and whether the label wrapped. That is how it ended up
+   21px visible under the topbar. Clipping is height- and container-
+   independent, and :focus restores it as position: fixed so the visible
+   state is anchored to the viewport rather than to the desktop pane. */
 
 .skip-link {
   position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link:focus {
+  position: fixed;
   top: var(--space-2);
   left: var(--space-2);
   z-index: var(--z-panel);
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  overflow: visible;
+  clip-path: none;
+  white-space: normal;
   background: var(--surface);
   border: 1px solid var(--accent);
   border-radius: var(--radius-s);
   color: var(--accent);
-  padding: var(--space-2) var(--space-3);
-  transform: translateY(-200%);
-}
-
-.skip-link:focus {
-  transform: none;
 }
 
 /* ---- desktop-required gate ---- */
