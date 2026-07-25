@@ -33,10 +33,20 @@ type CallAction<T> =
   | { type: "success"; data: T }
   | { type: "error"; message: string };
 
-function callReducer<T>(state: CallState<T>, action: CallAction<T>): CallState<T> {
+export function callReducer<T>(state: CallState<T>, action: CallAction<T>): CallState<T> {
   switch (action.type) {
     case "start":
-      return { status: "loading", data: state.data, error: null };
+      // Bail out when nothing would change. An unstable dep entry (e.g. an
+      // inline object/array literal in the caller's deps array) makes the
+      // effect re-run every render; without this guard dispatch({type:
+      // "start"}) would always allocate a new state object, driving a
+      // render -> effect -> dispatch cascade that never settles. The
+      // three-useState version this replaced degraded to a request storm
+      // in that case instead of a runaway loop, so this bail-out is the
+      // one place the reducer conversion has to match that behavior.
+      return state.status === "loading" && state.error === null
+        ? state
+        : { status: "loading", data: state.data, error: null };
     case "success":
       return { status: "success", data: action.data, error: null };
     case "error":
