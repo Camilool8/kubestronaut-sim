@@ -57,6 +57,14 @@ export const strings = {
     copyFailed: "Could not copy that value.",
   },
 
+  markdown: {
+    plainLanguage: "text",
+    copyBlock: "Copy",
+    copiedBlockToDesktop: "Copied to the exam desktop — paste with Ctrl+Shift+V.",
+    copiedBlock: "Copied to the clipboard.",
+    copyFailed: "Couldn't copy that.",
+  },
+
   toast: {
     dismiss: "Dismiss notification",
     timeWarning: (minutes: number) => `${minutes} minutes remaining.`,
