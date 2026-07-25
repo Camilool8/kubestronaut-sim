@@ -118,7 +118,12 @@ describe("axe: no WCAG violations", () => {
 
   test("lobby (Start)", async () => {
     const { container } = render(
-      <Start onSessionChange={() => {}} onControlStart={() => {}} catalogVersion={0} />,
+      <Start
+        onSessionChange={() => {}}
+        onControlStart={() => {}}
+        catalogVersion={0}
+        onBanksLoaded={() => {}}
+      />,
     );
     await screen.findByText("CKAD Mock Exam 01", { selector: "h1" });
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
@@ -132,7 +137,7 @@ describe("axe: no WCAG violations", () => {
 
   test("control progress overlay, running and failed", async () => {
     const { container, rerender } = render(
-      <ControlProgress job={runningJob} onRetry={() => {}} onDismiss={() => {}} />,
+      <ControlProgress job={runningJob} onRetry={() => {}} onDismiss={() => {}} onBackground={() => {}} />,
     );
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
 
@@ -141,6 +146,7 @@ describe("axe: no WCAG violations", () => {
         job={{ ...runningJob, error: "verify: facilitator not healthy" }}
         onRetry={() => {}}
         onDismiss={() => {}}
+        onBackground={() => {}}
       />,
     );
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();

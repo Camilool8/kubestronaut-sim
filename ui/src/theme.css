@@ -680,14 +680,26 @@
   z-index: var(--z-overlay);
 }
 
+/* Header and actions stay pinned; only the checklist scrolls, so the
+   progress a user is waiting on can never scroll out of view and a long
+   checklist can never run off a short viewport. */
 .control-dialog {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
   box-shadow: var(--shadow-3);
   padding: var(--space-5) var(--space-6);
-  width: 460px;
-  max-width: 90vw;
+  width: 520px;
+  max-width: min(92vw, 520px);
+  max-height: min(85dvh, 42rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.control-dialog .control-phases {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
 }
 
 .control-dialog h2 {
@@ -703,11 +715,46 @@
   gap: var(--space-2);
 }
 
+/* Each row is mark | label | elapsed, with the running phase's output
+   line spanning the full width underneath it. */
 .control-phases li {
-  display: flex;
-  gap: var(--space-3);
+  display: grid;
+  grid-template-columns: 1em 1fr auto;
+  gap: var(--space-1) var(--space-3);
   align-items: baseline;
   color: var(--text-muted);
+}
+
+.control-status {
+  color: var(--text);
+  font-weight: 600;
+  margin: 0;
+}
+
+.phase-elapsed {
+  font-family: var(--font-mono);
+  font-size: var(--text-s);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+/* The live output tail: monospace because it is literally command
+   output, clipped to one line so a long line can't reflow the dialog
+   on every poll. */
+.phase-detail {
+  grid-column: 2 / -1;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.control-elapsed {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  margin-left: var(--space-2);
 }
 
 .control-phases li.phase-done {

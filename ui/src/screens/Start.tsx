@@ -21,6 +21,10 @@ interface StartProps {
   // switch changes the active exam while Start stays mounted, so the
   // exam summary and catalog must be refetched, not kept from mount.
   catalogVersion: number;
+  // Lifts the catalog's id -> title map to App, so the control overlay
+  // can name the exam a switch targets instead of showing its slug.
+  // Reported from here rather than refetched so there's one request.
+  onBanksLoaded: (banks: BanksResponse) => void;
 }
 
 // Lobby: the exam catalog (pick/switch banks via the conductor) plus the
@@ -29,7 +33,12 @@ interface StartProps {
 // just observed the exam began) is handled by refetching the
 // authoritative session state rather than showing an error — App will
 // then route to whatever screen that state implies.
-export function Start({ onSessionChange, onControlStart, catalogVersion }: StartProps) {
+export function Start({
+  onSessionChange,
+  onControlStart,
+  catalogVersion,
+  onBanksLoaded,
+}: StartProps) {
   const [exam, setExam] = useState<ExamInfo | null>(null);
   const [examError, setExamError] = useState<string | null>(null);
   const [banks, setBanks] = useState<BanksResponse | null>(null);
@@ -49,7 +58,9 @@ export function Start({ onSessionChange, onControlStart, catalogVersion }: Start
       });
     getBanks()
       .then((b) => {
-        if (!cancelled) setBanks(b);
+        if (cancelled) return;
+        setBanks(b);
+        onBanksLoaded(b);
       })
       .catch(() => {
         // Catalog unavailable is non-fatal: the active exam still works;
@@ -58,7 +69,7 @@ export function Start({ onSessionChange, onControlStart, catalogVersion }: Start
     return () => {
       cancelled = true;
     };
-  }, [catalogVersion]);
+  }, [catalogVersion, onBanksLoaded]);
 
   const handleStart = async () => {
     setStarting(true);

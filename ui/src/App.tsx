@@ -5,6 +5,7 @@ import {
   pollSession,
   startControlReset,
   startControlSwitch,
+  type BanksResponse,
   type ControlActionResponse,
   type ControlStatus,
   type SessionSnapshot,
@@ -36,10 +37,20 @@ export default function App() {
   const [pollError, setPollError] = useState<string | null>(null);
   const [control, setControl] = useState<ControlStatus | null>(null);
   const [dismissedJobId, setDismissedJobId] = useState<string | null>(null);
+  const [backgroundedJobId, setBackgroundedJobId] = useState<string | null>(null);
+  // Bank id -> catalog title, so the overlay can name the exam a switch
+  // is heading to instead of showing its slug.
+  const [bankTitles, setBankTitles] = useState<Record<string, string>>({});
   // Incremented whenever a control job finishes so the Start screen
   // refetches the exam summary and bank catalog — a completed switch
   // changes both while Start stays mounted on the idle screen.
   const [catalogVersion, setCatalogVersion] = useState(0);
+  // Incremented whenever a job is accepted, to restart the control-poll
+  // effect. Without it the poll timer armed at the idle cadence (15s)
+  // keeps running, and since the job returned by POST has every phase
+  // still "pending", the checklist sits visibly frozen until that timer
+  // finally fires. Restarting the effect polls again immediately.
+  const [jobNonce, setJobNonce] = useState(0);
   const wasBusy = useRef(false);
 
   const applySession = useCallback((next: SessionSnapshot) => {
@@ -83,7 +94,7 @@ export default function App() {
       stopped = true;
       window.clearTimeout(timer);
     };
-  }, [applySession]);
+  }, [applySession, jobNonce]);
 
   // Shared entry point for every control action's outcome (reset from
   // Score, switch from the Lobby, retry from the overlay): an accepted
@@ -91,13 +102,21 @@ export default function App() {
   const applyControlResult = useCallback(async (result: ControlActionResponse) => {
     if (result.ok) {
       setDismissedJobId(null);
+      setBackgroundedJobId(null);
       setControl({ busy: true, job: result.job });
       wasBusy.current = true;
+      // Tear down the idle-cadence timer and poll again now — the job
+      // we just optimistically rendered has no phase running yet.
+      setJobNonce((n) => n + 1);
     } else {
       // Most likely 409 busy — surface whatever the conductor reports.
       const current = await getControlStatus().catch(() => null);
       if (current) setControl(current);
     }
+  }, []);
+
+  const handleBanksLoaded = useCallback((banks: BanksResponse) => {
+    setBankTitles(Object.fromEntries(banks.banks.map((b) => [b.id, b.title])));
   }, []);
 
   const handleNewAttempt = useCallback(async () => {
@@ -122,6 +141,10 @@ export default function App() {
         ? control.lastJob
         : null;
 
+  // A backgrounded job stays running; only the overlay is hidden, and a
+  // new job (or a failure) brings it back.
+  const showOverlay = overlayJob !== null && overlayJob.id !== backgroundedJobId;
+
   if (!session) {
     return (
       <main>
@@ -140,6 +163,7 @@ export default function App() {
           onSessionChange={applySession}
           onControlStart={applyControlResult}
           catalogVersion={catalogVersion}
+          onBanksLoaded={handleBanksLoaded}
         />
       );
       break;
@@ -163,11 +187,13 @@ export default function App() {
           <InfoButton floating />
         </>
       )}
-      {overlayJob && (
+      {showOverlay && overlayJob && (
         <ControlProgress
           job={overlayJob}
+          bankTitle={bankTitles[overlayJob.bank]}
           onRetry={() => handleRetry(overlayJob.op, overlayJob.bank)}
           onDismiss={() => setDismissedJobId(overlayJob.id)}
+          onBackground={() => setBackgroundedJobId(overlayJob.id)}
         />
       )}
     </>

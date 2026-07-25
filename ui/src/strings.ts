@@ -135,16 +135,25 @@ export const strings = {
     questions: (n: number) => `${n} questions`,
     switchConfirmTitle: (title: string) => `Switch to ${title}?`,
     switchConfirmBody:
-      "Switching rebuilds the Kubernetes cluster and wipes all exam state. It usually takes 1–2 minutes.",
+      "This wipes all cluster and instance state and rebuilds from scratch. It usually takes about 2–4 minutes.",
     switchConfirm: "Switch exam",
     cancel: "Cancel",
   },
 
   control: {
-    resetTitle: "Resetting exam environment",
-    switchTitle: (bank: string) => `Switching exam to ${bank}`,
-    failedTitle: "Operation failed",
-    hint: "This rebuilds the Kubernetes cluster and usually takes 1–2 minutes.",
+    resetTitle: "Rebuilding your exam environment",
+    // Takes the exam's catalog title ("CKA Mock Exam 01"), never the
+    // bank slug — the slug is an implementation detail.
+    switchTitle: (exam: string) => `Switching to ${exam}`,
+    failedTitle: (op: string) => (op === "switch" ? "Switch failed" : "Reset failed"),
+    // The measured cluster rebuild is 90–240s. Promising "1–2 minutes"
+    // and then blowing past it turns a normal wait into a perceived hang.
+    hint: "Rebuilding the Kubernetes cluster. Usually about 2–4 minutes — you can leave this tab open.",
+    stepOf: (step: number, total: number, label: string) =>
+      `Step ${step} of ${total}: ${label}`,
+    elapsed: (span: string) => `Elapsed ${span}`,
+    reconnecting: "Restarting the exam services. The page will reconnect on its own.",
+    background: "Run in background",
     retry: "Retry",
     dismiss: "Dismiss",
     newAttempt: "New attempt",

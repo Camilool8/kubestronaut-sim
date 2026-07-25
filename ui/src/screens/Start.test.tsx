@@ -47,14 +47,14 @@ describe("Start catalog refresh", () => {
     mockApi(ckadExam, banksFor("ckad"));
     const noop = () => {};
     const { rerender } = render(
-      <Start catalogVersion={0} onSessionChange={noop} onControlStart={noop} />,
+      <Start catalogVersion={0} onSessionChange={noop} onControlStart={noop} onBanksLoaded={noop} />,
     );
     expect(await screen.findByText("CKAD Simulator")).toBeInTheDocument();
 
     // A completed switch job changed the active bank behind our back —
     // App bumps catalogVersion; Start must refetch, not show stale data.
     mockApi(ckaExam, banksFor("cka"));
-    rerender(<Start catalogVersion={1} onSessionChange={noop} onControlStart={noop} />);
+    rerender(<Start catalogVersion={1} onSessionChange={noop} onControlStart={noop} onBanksLoaded={noop} />);
     expect(await screen.findByText("CKA Simulator")).toBeInTheDocument();
   });
 });
