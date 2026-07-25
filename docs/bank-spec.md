@@ -44,6 +44,21 @@ coming-soon entries whose exam engine doesn't exist yet.
 | `validate.d/NN_name.sh` | One scoring criterion each, run in lexical order. |
 | `solution.md`   | Full walkthrough, shown after the exam. |
 
+## Code blocks in `question.md` / `solution.md`
+
+Use fenced blocks (` ``` `), never 4-space indentation — the UI's syntax
+highlighter only recognizes a fenced block's language tag, so an indented
+block always renders as plain, uncolored text. Tag each fence with what the
+content actually is: `bash` for shell commands (`kubectl`/`k`, pipelines,
+redirects), `yaml` for Kubernetes manifests and manifest fragments, `json`
+for JSON payloads. `sh` and `shell` are also accepted and alias to `bash`.
+Omit the tag entirely for anything else (plain command output, non-YAML/JSON
+file contents) — that renders as a plain "text" block, which is correct and
+expected. Any other tag, or a typo, silently falls back to the same plain
+"text" rendering, so there's no harm in leaving a block untagged when unsure
+— just never guess a supported tag for content that isn't actually that
+language, since the wrong color reads as a wrong answer on a study tool.
+
 ## Validate script contract
 
 - Executed ON the question's instance, as root, with
