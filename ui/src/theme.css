@@ -1457,3 +1457,28 @@
   padding: var(--space-3);
   overflow-x: auto;
 }
+
+/* highlight.js class names, mapped onto theme tokens so both themes work.
+   Contrast ratios against --surface-raised are recorded in tokens.css.
+   Plain --accent only reaches 4.1:1 on --surface-raised in the light
+   theme — under the 4.5:1 floor — so the keyword group below uses
+   --accent-strong instead, the same substitution tokens.css already
+   documents for --accent on --accent-soft. */
+.md .hljs-attr,
+.md .hljs-attribute,
+.md .hljs-keyword,
+.md .hljs-built_in {
+  color: var(--accent-strong);
+}
+
+.md .hljs-string,
+.md .hljs-number,
+.md .hljs-literal {
+  color: var(--text);
+}
+
+.md .hljs-comment,
+.md .hljs-meta {
+  color: var(--text-muted);
+  font-style: italic;
+}

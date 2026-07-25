@@ -1,6 +1,8 @@
 import type { ReactElement, ReactNode } from "react";
+import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { desktopClipboard } from "../lib/desktopClipboard";
+import { highlightTo } from "../lib/highlight";
 import { strings } from "../strings";
 import { toastStore } from "./toastStore";
 
@@ -66,6 +68,19 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
     });
   };
 
+  // Renders plain first, then swaps in highlighted markup once the grammar
+  // resolves. Same font, size and spacing either way, so nothing moves.
+  const [html, setHtml] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    highlightTo(language, body).then((result) => {
+      if (!cancelled) setHtml(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [language, body]);
+
   return (
     <figure className="code-block">
       <figcaption className="code-block-head">
@@ -84,7 +99,11 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
         </button>
       </figcaption>
       <pre>
-        <code className={className}>{body}</code>
+        {html === null ? (
+          <code className={className}>{body}</code>
+        ) : (
+          <code className={className} dangerouslySetInnerHTML={{ __html: html }} />
+        )}
       </pre>
     </figure>
   );
