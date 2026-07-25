@@ -1498,10 +1498,22 @@
   border-color: var(--accent);
 }
 
+/* A code block reads as ONE object: the figure above owns the border,
+   the radius and the body background. `.md pre` (a prose rule that
+   predates this chrome, and still styles fenced code that renders
+   without it) sets its own background/border/border-radius; since this
+   selector has the same specificity and comes later in the cascade, it
+   has to null those three out explicitly or they leak through and
+   occlude the figure's background with a second, redundant border drawn
+   just inside the first. overflow-x stays — a long line scrolls inside
+   the block instead of moving the page. */
 .code-block pre {
   margin: 0;
   padding: var(--space-3);
   overflow-x: auto;
+  background: transparent;
+  border: none;
+  border-radius: 0;
 }
 
 /* highlight.js class names, mapped onto theme tokens so both themes work.
