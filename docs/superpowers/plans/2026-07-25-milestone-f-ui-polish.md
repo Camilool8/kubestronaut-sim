@@ -1616,25 +1616,26 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Score } from "./Score";
 
+// The BARE Results object. getResults() (api.ts:171-186) wraps a 200 body
+// as {status: "ready", results: <body>} itself, so a fixture that already
+// carries `status`/`results` gets double-wrapped and Score crashes before
+// rendering anything.
 const results = {
-  status: "ready",
-  results: {
-    percent: 0,
-    passed: false,
-    earned: 0,
-    total: 5,
-    passingScore: 66,
-    questions: [
-      {
-        id: "q01",
-        instance: "instance-1",
-        domain: "Application Environment",
-        earned: 0,
-        total: 5,
-        checks: [],
-      },
-    ],
-  },
+  percent: 0,
+  passed: false,
+  earned: 0,
+  total: 5,
+  passingScore: 66,
+  questions: [
+    {
+      id: "q01",
+      instance: "instance-1",
+      domain: "Application Environment",
+      earned: 0,
+      total: 5,
+      checks: [],
+    },
+  ],
 };
 
 beforeEach(() => {
