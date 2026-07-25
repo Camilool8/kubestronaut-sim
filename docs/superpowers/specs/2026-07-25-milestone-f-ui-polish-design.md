@@ -39,8 +39,12 @@ returned the session to `idle`. Its sibling, defect #4, *was* reproduced
 through the UI in exactly that state and shares the code path.
 **The server is not at fault.**
 
-Note the empty body: surfacing `error` verbatim would show a blank
-toast. `readError()` needs a fallback.
+Note on the empty body: `readError()` (`api.ts:80-87`) already handles
+it — `res.json()` throws on an empty body and it falls back to
+`HTTP 502`. So no fallback is needed. What *is* needed is human-facing
+copy: "HTTP 502" is a true string and a useless toast. The message shown
+must name the likely cause (control plane unreachable) and the recovery,
+with the raw status kept as secondary detail.
 
 ### 2. Skip-link banner clipped at the viewport top
 
@@ -142,8 +146,8 @@ to match the convention documented at `theme.css:1239-1251`.
 
 ### Modified
 
-- `api.ts` — `readError()` returns a fallback string for empty bodies.
-- `App.tsx` — `applyControlResult` toasts on `ok:false`;
+- `App.tsx` — `applyControlResult` toasts on `ok:false` using new
+  human-facing copy in `strings.control`, with the raw status as detail;
   `handleNewAttempt`/`handleRetry` wrapped in try/catch so a rejected
   fetch also speaks.
 - `Start.tsx` — catalog via `useAsync`; 502 renders an error card with
@@ -162,7 +166,8 @@ again if the topbar grows or the string wraps.
 
 ## Error-handling contract
 
-- Every control action surfaces a message; empty bodies get a fallback.
+- Every control action surfaces a message the user can act on, never a
+  bare status code.
 - Every `useAsync` consumer renders an error branch — enforced by type.
 - Toasts for user-initiated actions; inline error cards with Retry for
   data a screen needs to be correct.
