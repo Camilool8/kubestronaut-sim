@@ -49,6 +49,7 @@ function CopyableCode({ children }: { children: ReactNode }) {
 // a pre that scrolls inside itself rather than pushing the page sideways.
 function CodeBlock({ className, children }: { className?: string; children?: ReactNode }) {
   const language = /language-(\w+)/.exec(className ?? "")?.[1] ?? "";
+  const displayLanguage = language || strings.markdown.plainLanguage;
   const body = String(children ?? "").replace(/\n$/, "");
 
   const copy = async () => {
@@ -68,8 +69,17 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
   return (
     <figure className="code-block">
       <figcaption className="code-block-head">
-        <span className="code-block-lang">{language || strings.markdown.plainLanguage}</span>
-        <button type="button" className="code-block-copy" onClick={copy}>
+        <span className="code-block-lang">{displayLanguage}</span>
+        {/* A screen reader with several fenced blocks on one screen needs
+            more than "Copy" repeated — the language is the one thing that
+            tells them apart, so it goes in the accessible name while the
+            visible label stays the terse "Copy". */}
+        <button
+          type="button"
+          className="code-block-copy"
+          onClick={copy}
+          aria-label={strings.markdown.copyBlockLabel(displayLanguage)}
+        >
           {strings.markdown.copyBlock}
         </button>
       </figcaption>

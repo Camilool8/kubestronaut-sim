@@ -466,7 +466,14 @@
   align-self: flex-start;
 }
 
-.md {
+/* Pane layout only — how the question panel's scroll region sizes and
+   insets itself. Deliberately separate from `.md` below: `.md` is
+   Markdown's own wrapper and is also dropped straight into
+   `.solution-details` on the Score screen, which has no flex ancestor
+   and no matching padding to pair with this. Bundling the two onto one
+   selector previously nested `.md` inside a `.question-pane`-flavored
+   `.md`, doubling the inset. */
+.question-pane {
   flex: 1;
   overflow-y: auto;
   padding: var(--space-4);

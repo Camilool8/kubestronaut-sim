@@ -60,6 +60,7 @@ export const strings = {
   markdown: {
     plainLanguage: "text",
     copyBlock: "Copy",
+    copyBlockLabel: (language: string) => `Copy ${language} code block`,
     copiedBlockToDesktop: "Copied to the exam desktop — paste with Ctrl+Shift+V.",
     copiedBlock: "Copied to the clipboard.",
     copyFailed: "Couldn't copy that.",

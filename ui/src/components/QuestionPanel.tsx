@@ -78,7 +78,7 @@ export function QuestionPanel({
               {strings.questionPanel.sshHint(selected.instance)}
             </span>
           )}
-          <div className="md">
+          <div className="question-pane">
             {loading && <p>{strings.questionPanel.loading}</p>}
             {error && <p className="error-text">{error}</p>}
             {!loading && !error && <Markdown>{selectedId ? markdown : ""}</Markdown>}
