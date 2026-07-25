@@ -58,3 +58,34 @@ describe("Start catalog refresh", () => {
     expect(await screen.findByText("CKA Simulator")).toBeInTheDocument();
   });
 });
+
+describe("Start catalog failures", () => {
+  // Reproduced 2026-07-25 by stopping the conductor: GET /api/control/banks
+  // returns 502, the catch left the catalog null, and the entire "CHOOSE
+  // YOUR EXAM" section disappeared with no error. The lobby looked like a
+  // single-exam app.
+  test("shows an error with a retry when the catalog cannot be loaded", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/api/control/banks")) return new Response("", { status: 502 });
+        if (url.endsWith("/api/exam"))
+          return new Response(JSON.stringify(ckadExam), { status: 200 });
+        return new Response(JSON.stringify({}), { status: 200 });
+      }),
+    );
+
+    render(
+      <Start
+        onSessionChange={() => {}}
+        onControlStart={() => {}}
+        catalogVersion={0}
+        onBanksLoaded={() => {}}
+      />,
+    );
+
+    expect(await screen.findByText(/couldn't load the exam catalog/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+  });
+});

@@ -28,6 +28,10 @@ export const strings = {
     ],
     startExam: "Start Exam",
     starting: "Starting…",
+    catalogErrorTitle: "Couldn't load the exam catalog",
+    catalogErrorBody: (detail: string) =>
+      `The control plane did not answer (${detail}). Your current exam below still works — the list of other exams needs the conductor container.`,
+    catalogRetry: "Retry",
   },
 
   exam: {
