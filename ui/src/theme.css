@@ -1366,7 +1366,26 @@
    compositor-only, which matters for the overlay that stays on screen
    for minutes. */
 
+/* Outside the media query so layout is identical for reduced-motion
+   users: the wrapper's box model must not depend on motion being on. */
+.screen {
+  height: 100%;
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  .screen {
+    opacity: 0;
+    transform: translateY(4px);
+    transition:
+      opacity var(--dur-base) var(--ease-out),
+      transform var(--dur-base) var(--ease-out);
+  }
+
+  .screen-entered {
+    opacity: 1;
+    transform: none;
+  }
+
   .confirm-overlay,
   .control-overlay,
   .drawer-overlay {

@@ -19,6 +19,7 @@ import { ThemeToggle } from "./components/ThemeToggle";
 import { InfoButton } from "./components/InfoButton";
 import { ToastLayer } from "./components/Toast";
 import { TopProgress } from "./components/TopProgress";
+import { ScreenTransition } from "./components/ScreenTransition";
 import { toastStore } from "./components/toastStore";
 import { strings } from "./strings";
 
@@ -224,7 +225,9 @@ export default function App() {
   return (
     <>
       <TopProgress />
-      <main>{screen}</main>
+      <main>
+        <ScreenTransition screenKey={session.state}>{screen}</ScreenTransition>
+      </main>
       <ToastLayer />
       {session.state !== "running" && (
         <div className="floating-controls">
