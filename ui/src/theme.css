@@ -1269,6 +1269,29 @@
     max-height: 100dvh;
     border-radius: 0;
   }
+
+  .score-screen {
+    padding: var(--space-4) var(--space-3);
+  }
+
+  .score-banner {
+    padding: var(--space-4);
+  }
+
+  /* Four flex columns in one row squeeze the domain to nothing on a
+     phone; let it take its own line under the id and points. */
+  .question-result summary {
+    flex-wrap: wrap;
+  }
+
+  .qr-domain {
+    flex-basis: 100%;
+    order: 3;
+  }
+
+  .score-actions .btn {
+    width: 100%;
+  }
 }
 
 /* Wide content scrolls inside itself instead of pushing the page

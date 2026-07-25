@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type SyntheticEvent } from "react";
-import ReactMarkdown from "react-markdown";
 import {
   endSession,
   getResults,
@@ -9,6 +8,7 @@ import {
   type SolutionDetail,
 } from "../api";
 import { CheckList } from "../components/CheckList";
+import { Markdown } from "../components/Markdown";
 import { strings } from "../strings";
 
 const GRADING_POLL_MS = 3000;
@@ -148,7 +148,7 @@ function QuestionResultDetails({ question }: { question: QuestionResult }) {
         <summary>{strings.score.showSolution}</summary>
         {loadingSolution && <p>{strings.score.loadingSolution}</p>}
         {solutionError && <p className="error-text">{solutionError}</p>}
-        {solution && <ReactMarkdown>{solution.markdown}</ReactMarkdown>}
+        {solution && <Markdown>{solution.markdown}</Markdown>}
       </details>
     </details>
   );
