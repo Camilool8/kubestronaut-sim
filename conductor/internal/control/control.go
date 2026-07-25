@@ -33,7 +33,7 @@ var ErrSessionRunning = errors.New("control: a session is running — end the ex
 // containerIDs returned by FindContainer are opaque to this package.
 type Engine interface {
 	FindContainer(ctx context.Context, project, service string) (string, error)
-	Exec(ctx context.Context, containerID string, cmd []string) (exitCode int, output string, err error)
+	Exec(ctx context.Context, containerID string, cmd []string, onLine func(string)) (exitCode int, output string, err error)
 	Restart(ctx context.Context, containerID string, timeoutSec int) error
 }
 
@@ -55,13 +55,22 @@ type Controller struct {
 	RestartExtra []string // services restarted after the instances on a switch, in order (facilitator last)
 }
 
+// The two commands both control operations run inside containers.
+// bootstrapCmd is the long pole of either job: it tears the kind cluster
+// down and rebuilds it, printing its own progress, which execChecked
+// republishes as the running phase's detail.
+var (
+	wipeCmd      = []string{"find", "/opt/course", "-mindepth", "1", "-delete"}
+	bootstrapCmd = []string{"bash", "-c", "kind delete cluster --name sim || true; /opt/sim/bootstrap.sh"}
+)
+
 // resetPhases is the checklist a reset job walks through, in order.
 func resetPhases() []job.PhaseSpec {
 	return []job.PhaseSpec{
 		{ID: "end-session", Label: "End session and lock desktop"},
 		{ID: "wipe-instances", Label: "Wipe instance work directories"},
 		{ID: "recreate-cluster", Label: "Recreate Kubernetes cluster"},
-		{ID: "restart-services", Label: "Restart exam instances"},
+		{ID: "restart-instances", Label: "Restart exam instances"},
 		{ID: "verify", Label: "Verify environment"},
 	}
 }
@@ -91,19 +100,19 @@ func (c *Controller) runReset(jobID string) {
 
 	c.Store.StartPhase(jobID, "wipe-instances")
 	for _, inst := range c.Instances {
-		if err := c.execChecked(ctx, inst, []string{"find", "/opt/course", "-mindepth", "1", "-delete"}); err != nil {
+		if err := c.execChecked(ctx, jobID, "wipe-instances", inst, wipeCmd); err != nil {
 			c.Store.Fail(jobID, err.Error())
 			return
 		}
 	}
 
 	c.Store.StartPhase(jobID, "recreate-cluster")
-	if err := c.execChecked(ctx, "k8s-env", []string{"bash", "-c", "kind delete cluster --name sim || true; /opt/sim/bootstrap.sh"}); err != nil {
+	if err := c.execChecked(ctx, jobID, "recreate-cluster", "k8s-env", bootstrapCmd); err != nil {
 		c.Store.Fail(jobID, err.Error())
 		return
 	}
 
-	c.Store.StartPhase(jobID, "restart-services")
+	c.Store.StartPhase(jobID, "restart-instances")
 	for _, inst := range c.Instances {
 		if err := c.restart(ctx, inst); err != nil {
 			c.Store.Fail(jobID, err.Error())
@@ -127,7 +136,12 @@ func switchPhases() []job.PhaseSpec {
 		{ID: "wipe-instances", Label: "Wipe instance work directories"},
 		{ID: "write-bank", Label: "Activate the new exam bank"},
 		{ID: "recreate-cluster", Label: "Recreate Kubernetes cluster"},
-		{ID: "restart-services", Label: "Restart exam services"},
+		{ID: "restart-instances", Label: "Restart exam instances"},
+		// Split out from the instance restart because this is the phase
+		// that takes the facilitator — and therefore the browser's only
+		// server — down for a few seconds. Naming it lets the UI say
+		// "reconnecting" instead of appearing to freeze.
+		{ID: "restart-facilitator", Label: "Restart exam services"},
 		{ID: "verify", Label: "Verify the new exam is live"},
 	}
 }
@@ -174,7 +188,7 @@ func (c *Controller) runSwitch(jobID, bank string) {
 
 	c.Store.StartPhase(jobID, "wipe-instances")
 	for _, inst := range c.Instances {
-		if err := c.execChecked(ctx, inst, []string{"find", "/opt/course", "-mindepth", "1", "-delete"}); err != nil {
+		if err := c.execChecked(ctx, jobID, "wipe-instances", inst, wipeCmd); err != nil {
 			c.Store.Fail(jobID, err.Error())
 			return
 		}
@@ -187,13 +201,21 @@ func (c *Controller) runSwitch(jobID, bank string) {
 	}
 
 	c.Store.StartPhase(jobID, "recreate-cluster")
-	if err := c.execChecked(ctx, "k8s-env", []string{"bash", "-c", "kind delete cluster --name sim || true; /opt/sim/bootstrap.sh"}); err != nil {
+	if err := c.execChecked(ctx, jobID, "recreate-cluster", "k8s-env", bootstrapCmd); err != nil {
 		c.Store.Fail(jobID, err.Error())
 		return
 	}
 
-	c.Store.StartPhase(jobID, "restart-services")
-	for _, svc := range append(append([]string{}, c.Instances...), c.RestartExtra...) {
+	c.Store.StartPhase(jobID, "restart-instances")
+	for _, inst := range c.Instances {
+		if err := c.restart(ctx, inst); err != nil {
+			c.Store.Fail(jobID, err.Error())
+			return
+		}
+	}
+
+	c.Store.StartPhase(jobID, "restart-facilitator")
+	for _, svc := range c.RestartExtra {
 		if err := c.restart(ctx, svc); err != nil {
 			c.Store.Fail(jobID, err.Error())
 			return
@@ -299,12 +321,17 @@ func (c *Controller) endSession(ctx context.Context) error {
 // execChecked runs cmd in the named compose service's container and
 // fails on a non-zero exit, surfacing the command output (that output is
 // what the UI shows on a failed phase, so it must carry the real cause).
-func (c *Controller) execChecked(ctx context.Context, service string, cmd []string) error {
+// Each output line is published as the running phase's detail, giving a
+// long command a visible heartbeat instead of a frozen row.
+func (c *Controller) execChecked(ctx context.Context, jobID, phaseID, service string, cmd []string) error {
 	id, err := c.Engine.FindContainer(ctx, c.Project, service)
 	if err != nil {
 		return fmt.Errorf("%s: %w", service, err)
 	}
-	exit, out, err := c.Engine.Exec(ctx, id, cmd)
+	onLine := func(line string) {
+		c.Store.SetPhaseDetail(jobID, phaseID, tail(line, maxDetailBytes))
+	}
+	exit, out, err := c.Engine.Exec(ctx, id, cmd, onLine)
 	if err != nil {
 		return fmt.Errorf("%s: exec: %w", service, err)
 	}
@@ -349,6 +376,11 @@ func (c *Controller) verifyHealthy(ctx context.Context) error {
 	}
 	return fmt.Errorf("verify: facilitator not healthy within %s: %v", c.VerifyBudget, lastErr)
 }
+
+// maxDetailBytes caps the per-phase output line the UI polls. A stray
+// very long line (a kubectl dump, a wall of base64) should not bloat
+// every /api/control/status response for the rest of the phase.
+const maxDetailBytes = 160
 
 // tail returns at most the last n bytes of s — failed-phase output is
 // surfaced to the UI, and the end of a build/bootstrap log is where the
