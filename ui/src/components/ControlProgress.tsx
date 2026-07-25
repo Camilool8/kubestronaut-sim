@@ -1,6 +1,7 @@
-import { useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { ControlJob, ControlPhase } from "../api";
 import { formatElapsed } from "../lib/format";
+import { useFocusTrap } from "../lib/useFocusTrap";
 import { strings } from "../strings";
 
 interface ControlProgressProps {
@@ -54,6 +55,22 @@ export function ControlProgress({
 }: ControlProgressProps) {
   const failed = Boolean(job.error);
   const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // The dialog declared aria-modal="true" while trapping nothing, so
+  // focus walked straight out to the screen behind an overlay that is
+  // supposed to be blocking — the markup was lying to assistive tech.
+  //
+  // Escape does not close: this is an in-flight destructive rebuild with
+  // no cancel operation behind it. It backgrounds instead, which keeps
+  // the gesture meaningful and keeps the dialog from being a keyboard
+  // dead end for the several minutes a rebuild takes. Once the job has
+  // failed, Escape dismisses as usual.
+  const onEscape = useCallback(
+    () => (failed ? onDismiss() : onBackground()),
+    [failed, onDismiss, onBackground],
+  );
+  useFocusTrap(dialogRef, onEscape);
 
   // 1Hz tick purely to re-render; every displayed duration is recomputed
   // from the server's stamps, so it resyncs on its own and never drifts.
@@ -76,6 +93,7 @@ export function ControlProgress({
   return (
     <div className="control-overlay">
       <div
+        ref={dialogRef}
         className="control-dialog"
         role="dialog"
         aria-modal="true"

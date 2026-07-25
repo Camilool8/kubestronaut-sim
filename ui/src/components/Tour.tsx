@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusTrap } from "../lib/useFocusTrap";
 import { strings } from "../strings";
 
 const TOUR_CARD_WIDTH = 360;
@@ -44,17 +45,15 @@ export function Tour({ steps, onDone }: TourProps) {
   useEffect(() => {
     const el = step ? document.querySelector(step.target) : null;
     setRect(el ? el.getBoundingClientRect() : null);
-    // keyboard users follow the tour from the card itself
-    cardRef.current?.focus();
   }, [step]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onDone();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onDone]);
+  // Tour was the one dialog that skipped the shared trap, so Tab walked
+  // straight out of it into the page behind — including, during an exam,
+  // the desktop viewport that swallows keystrokes. useFocusTrap also
+  // brings Escape-to-close and focus restoration, replacing the
+  // hand-rolled window listener this used to carry.
+  const close = useCallback(() => onDone(), [onDone]);
+  useFocusTrap(cardRef, close);
 
   if (!step) return null;
 

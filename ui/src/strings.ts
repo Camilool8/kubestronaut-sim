@@ -116,7 +116,6 @@ export const strings = {
     ],
     restartTour: "Replay the exam tour",
     footerLine: "Independent study tool. Not affiliated with CNCF, The Linux Foundation, PSI, or killer.sh.",
-    footerLink: "About & licenses",
   },
 
   theme: {
@@ -195,6 +194,12 @@ export const strings = {
       reason === "expired"
         ? "Session ended automatically: time expired."
         : "Session ended: answers submitted.",
+    checkResult: "Result",
+    checkDescription: "Check",
+    checkPoints: "Points",
+    checkMessage: "Detail",
+    checkPassed: "Passed:",
+    checkFailed: "Failed:",
     showSolution: "Show solution",
     loadingSolution: "Loading solution…",
   },

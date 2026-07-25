@@ -11,6 +11,7 @@ import {
   type ExamInfo,
   type SessionSnapshot,
 } from "../api";
+import { Dialog } from "../components/Dialog";
 import { useDesktopGate } from "../components/DesktopRequired";
 import { formatDuration } from "../lib/format";
 import { strings } from "../strings";
@@ -203,29 +204,33 @@ export function Start({
         <p className="start-footer">{strings.info.footerLine}</p>
       </div>
 
+      {/* Was a bare pair of divs duplicating Dialog's markup without any
+          of its behaviour — no role, no aria-modal, no focus trap, no
+          Escape. The axe suite missed it because the lobby scan never
+          opened it. */}
       {confirmBank && (
-        <div className="confirm-overlay">
-          <div className="confirm-dialog">
-            <h2>{strings.lobby.switchConfirmTitle(confirmBank.title)}</h2>
-            <p>{strings.lobby.switchConfirmBody}</p>
-            <div className="confirm-actions">
-              <button
-                className="btn"
-                onClick={() => setConfirmBank(null)}
-                disabled={switching}
-              >
-                {strings.lobby.cancel}
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleConfirmSwitch}
-                disabled={switching}
-              >
-                {strings.lobby.switchConfirm}
-              </button>
-            </div>
+        <Dialog
+          title={strings.lobby.switchConfirmTitle(confirmBank.title)}
+          onClose={() => setConfirmBank(null)}
+        >
+          <p>{strings.lobby.switchConfirmBody}</p>
+          <div className="confirm-actions">
+            <button
+              className="btn"
+              onClick={() => setConfirmBank(null)}
+              disabled={switching}
+            >
+              {strings.lobby.cancel}
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleConfirmSwitch}
+              disabled={switching}
+            >
+              {strings.lobby.switchConfirm}
+            </button>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

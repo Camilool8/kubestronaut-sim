@@ -1235,3 +1235,83 @@
     min-height: 44px;
   }
 }
+
+/* ---- motion ----
+   Written motion-additive: the calm state is the default and animation
+   is layered on only when the user has expressed no preference against
+   it. base.css also carries a global reduce guard, so this is belt and
+   braces — but writing it this way means a reduced-motion user never
+   depends on an animation being neutralised correctly, and never
+   downloads a frame of it.
+
+   Durations and the easing curve come from tokens.css: short, sharp,
+   no overshoot. Only transform and opacity are animated — both are
+   compositor-only, which matters for the overlay that stays on screen
+   for minutes. */
+
+@media (prefers-reduced-motion: no-preference) {
+  .confirm-overlay,
+  .control-overlay,
+  .drawer-overlay {
+    animation: scrim-in var(--dur-quick) var(--ease-out) both;
+  }
+
+  .confirm-dialog,
+  .control-dialog {
+    animation: dialog-in var(--dur-modal-in) var(--ease-out) both;
+  }
+
+  .info-drawer {
+    animation: drawer-in var(--dur-modal-in) var(--ease-out) both;
+  }
+
+  .toast {
+    animation: toast-in var(--dur-base) var(--ease-out) both;
+  }
+
+  /* Staggered only on first mount of the checklist — re-staggering on
+     every poll would make the list feel unstable for four minutes. */
+  .control-phases li {
+    animation: row-in var(--dur-base) var(--ease-out) both;
+  }
+  .control-phases li:nth-child(2) { animation-delay: 40ms; }
+  .control-phases li:nth-child(3) { animation-delay: 80ms; }
+  .control-phases li:nth-child(4) { animation-delay: 120ms; }
+  .control-phases li:nth-child(5) { animation-delay: 160ms; }
+  .control-phases li:nth-child(6) { animation-delay: 200ms; }
+  .control-phases li:nth-child(n + 7) { animation-delay: 240ms; }
+}
+
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
