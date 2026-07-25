@@ -165,6 +165,23 @@ export const strings = {
       "Wipes all cluster and instance state and returns you to the lobby, where you can retry this exam or pick a different one.",
   },
 
+  mobile: {
+    // Names the constraint instead of apologising for it, and says why
+    // it is a real capability limit rather than a layout preference.
+    title: "This exam needs a desktop",
+    why: "You work through a full Linux terminal and remote desktop, side by side with the questions — the same split screen as the real exam. That needs a keyboard and room to see both.",
+    requirements: [
+      "A desktop or laptop browser",
+      "A physical keyboard",
+      "A window at least 1024px wide",
+    ],
+    stillAvailable: "You can still browse the exam catalog and read past scores here.",
+    continueAnyway: "Continue anyway",
+    startDisabled: "Open this on a desktop to start the exam.",
+    sessionRunning:
+      "An exam is running. The clock keeps going wherever you are — submit here if you cannot get to a desktop in time.",
+  },
+
   score: {
     gradingTitle: "Grading…",
     gradingBody: "Evaluating your exam over SSH. This can take a minute.",

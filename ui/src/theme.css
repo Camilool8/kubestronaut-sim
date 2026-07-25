@@ -73,11 +73,20 @@
   border-color: var(--accent);
 }
 
-.theme-toggle-floating {
+/* Both floating controls live in one cluster, so their spacing comes
+   from the layout rather than from a hardcoded offset that had to guess
+   the theme toggle's label width. */
+.floating-controls {
   position: fixed;
   top: var(--space-4);
   right: var(--space-4);
   z-index: var(--z-panel);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.theme-toggle-floating {
   background: var(--surface);
 }
 
@@ -267,10 +276,14 @@
   flex-direction: column;
 }
 
+/* Wraps rather than compressing: the row packs a title, two icon
+   buttons, the countdown and End Exam, and below ~500px the countdown
+   and the button were being squeezed off the edge. */
 .topbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-2) var(--space-4);
   padding: var(--space-2) var(--space-4);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -278,7 +291,8 @@
 }
 
 .topbar-title {
-  flex: 1;
+  flex: 1 1 8rem;
+  min-width: 0;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -536,6 +550,9 @@
 
 .confirm-dialog {
   width: min(440px, 90%);
+  max-height: min(85dvh, 40rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
@@ -1007,10 +1024,6 @@
 }
 
 .info-button-floating {
-  position: fixed;
-  top: var(--space-4);
-  right: calc(var(--space-4) + 96px);
-  z-index: var(--z-panel);
   background: var(--surface);
 }
 
@@ -1123,4 +1136,102 @@
 
 .skip-link:focus {
   transform: none;
+}
+
+/* ---- desktop-required gate ---- */
+
+/* This is the page for a phone, not an overlay over a hidden app, and
+   it has to stay fully usable at 320px — it is the one screen these
+   users will ever see (WCAG 1.4.10 counts 320px as a 1280px window at
+   400% zoom, which is why the gate is capability-based, not width-only). */
+.desktop-required {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5) var(--space-4);
+}
+
+.desktop-required-card {
+  width: min(34rem, 100%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-2);
+  padding: var(--space-5);
+}
+
+.desktop-required-card h1 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xl);
+}
+
+.desktop-required-needs {
+  margin: var(--space-4) 0;
+  padding-left: 1.2rem;
+  color: var(--text-muted);
+}
+
+.desktop-required-still,
+.start-blocked {
+  color: var(--text-muted);
+  font-size: var(--text-s);
+}
+
+/* A running session must stay submittable from a phone: the server-side
+   clock keeps counting regardless of what the candidate is holding. */
+.gate-session {
+  margin: var(--space-5) 0;
+  padding: var(--space-4);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.gate-session-timer {
+  margin: 0;
+}
+
+/* ---- narrow viewports ---- */
+
+@media (max-width: 600px) {
+  .start-card,
+  .desktop-required-card {
+    padding: var(--space-4);
+  }
+
+  .start-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Full-bleed rather than a desktop dialog shrunk onto a phone. */
+  .confirm-dialog,
+  .control-dialog {
+    width: 100%;
+    max-width: 100%;
+    max-height: 100dvh;
+    border-radius: 0;
+  }
+}
+
+/* Wide content scrolls inside itself instead of pushing the page
+   sideways. */
+.compare-table-scroll,
+.check-list-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+/* Touch targets on the screens a phone can actually reach. */
+@media (any-pointer: coarse) {
+  .panel-toggle,
+  .info-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }

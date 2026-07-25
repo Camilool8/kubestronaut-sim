@@ -7,12 +7,55 @@ import { Dialog } from "../components/Dialog";
 import { InfoButton } from "../components/InfoButton";
 import { Tour, markTourSeen, resetTourSeen, tourSeen, type TourStep } from "../components/Tour";
 import { toastStore } from "../components/toastStore";
+import { formatClock } from "../lib/format";
 import { strings } from "../strings";
 
 interface ExamProps {
   session: SessionSnapshot;
   fetchedAt: number;
   onSessionChange: (session: SessionSnapshot) => void;
+}
+
+// Shown inside the "desktop required" screen when a session is already
+// running. The server-side timer keeps counting whatever device the
+// candidate happens to be holding, so the countdown and a way to submit
+// have to remain reachable — otherwise opening the tab on a phone
+// silently burns the attempt.
+export function ExamGateControls({ session, fetchedAt, onSessionChange }: ExamProps) {
+  const [now, setNow] = useState(() => Date.now());
+  const [ending, setEnding] = useState(false);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const remaining = Math.max(
+    0,
+    session.remainingSeconds - Math.floor((now - fetchedAt) / 1000),
+  );
+
+  const end = async () => {
+    setEnding(true);
+    try {
+      const result = await endSession();
+      if (result.ok) onSessionChange(result.session);
+    } finally {
+      setEnding(false);
+    }
+  };
+
+  return (
+    <div className="gate-session">
+      <p className="gate-session-timer">
+        <span className="timer">{formatClock(remaining)}</span>
+      </p>
+      <p>{strings.mobile.sessionRunning}</p>
+      <button className="btn btn-danger" onClick={end} disabled={ending}>
+        {ending ? strings.exam.ending : strings.exam.endExam}
+      </button>
+    </div>
+  );
 }
 
 const TOUR_STEPS: TourStep[] = [

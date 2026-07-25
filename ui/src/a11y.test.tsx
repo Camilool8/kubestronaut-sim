@@ -4,6 +4,7 @@ import { axe } from "vitest-axe";
 import { Start } from "./screens/Start";
 import { Score } from "./screens/Score";
 import { ControlProgress } from "./components/ControlProgress";
+import { DesktopRequired } from "./components/DesktopRequired";
 import { Dialog } from "./components/Dialog";
 import { InfoDrawer } from "./components/InfoDrawer";
 import { ToastLayer } from "./components/Toast";
@@ -149,6 +150,12 @@ describe("axe: no WCAG violations", () => {
         onBackground={() => {}}
       />,
     );
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  test("desktop-required gate", async () => {
+    // The one screen a phone or a 400%-zoomed desktop ever sees.
+    const { container } = render(<DesktopRequired verdict="narrow" />);
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 

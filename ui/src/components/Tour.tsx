@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { strings } from "../strings";
 
+const TOUR_CARD_WIDTH = 360;
+const TOUR_EDGE_GAP = 8;
+
 export interface TourStep {
   /** CSS selector of the element to spotlight. */
   target: string;
@@ -55,6 +58,12 @@ export function Tour({ steps, onDone }: TourProps) {
 
   if (!step) return null;
 
+  // The card is 340px wide with a calc(100vw - 2rem) cap. Below ~360px
+  // the old `innerWidth - 360` went negative and pushed the card off the
+  // left edge entirely, so the tour was unreadable on a narrow window.
+  const clampLeft = (left: number) =>
+    Math.max(TOUR_EDGE_GAP, Math.min(left, window.innerWidth - TOUR_CARD_WIDTH));
+
   const spotlight = rect
     ? {
         top: rect.top - 6,
@@ -68,8 +77,8 @@ export function Tour({ steps, onDone }: TourProps) {
   const cardBelow = rect ? rect.bottom + 180 < window.innerHeight : true;
   const cardStyle = rect
     ? cardBelow
-      ? { top: rect.bottom + 14, left: Math.min(rect.left, window.innerWidth - 360) }
-      : { bottom: window.innerHeight - rect.top + 14, left: Math.min(rect.left, window.innerWidth - 360) }
+      ? { top: rect.bottom + 14, left: clampLeft(rect.left) }
+      : { bottom: window.innerHeight - rect.top + 14, left: clampLeft(rect.left) }
     : { top: "40%", left: "50%" };
 
   const last = index === steps.length - 1;

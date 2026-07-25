@@ -8,7 +8,8 @@ interface CheckListProps {
 // earned/points, and the grader's message.
 export function CheckList({ checks }: CheckListProps) {
   return (
-    <table className="check-list">
+    <div className="check-list-scroll">
+      <table className="check-list">
       <tbody>
         {checks.map((c) => (
           <tr key={c.name} className={c.passed ? "check-pass" : "check-fail"}>
@@ -21,6 +22,7 @@ export function CheckList({ checks }: CheckListProps) {
           </tr>
         ))}
       </tbody>
-    </table>
+      </table>
+    </div>
   );
 }

@@ -37,3 +37,39 @@ Object.defineProperty(window, "localStorage", {
   value: new MemoryStorage(),
   configurable: true,
 });
+
+// jsdom has no CSS engine and therefore no matchMedia. Default every
+// query to "no match", which is the desktop case — components that gate
+// on viewport or pointer then behave as they would on a laptop unless a
+// test opts in with matchMediaMock().
+Object.defineProperty(window, "matchMedia", {
+  value: (query: string) => matchMediaResult(query, false),
+  configurable: true,
+  writable: true,
+});
+
+function matchMediaResult(query: string, matches: boolean): MediaQueryList {
+  return {
+    matches,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  } as unknown as MediaQueryList;
+}
+
+/**
+ * Makes the listed queries match. Pass the exported query constants
+ * (NARROW_QUERY, TOUCH_ONLY_QUERY) so a test states the device it is
+ * simulating rather than duplicating a media string.
+ */
+export function matchMediaMock(matching: string[]): void {
+  Object.defineProperty(window, "matchMedia", {
+    value: (query: string) => matchMediaResult(query, matching.includes(query)),
+    configurable: true,
+    writable: true,
+  });
+}

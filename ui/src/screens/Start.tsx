@@ -11,6 +11,7 @@ import {
   type ExamInfo,
   type SessionSnapshot,
 } from "../api";
+import { useDesktopGate } from "../components/DesktopRequired";
 import { formatDuration } from "../lib/format";
 import { strings } from "../strings";
 
@@ -46,6 +47,8 @@ export function Start({
   const [switching, setSwitching] = useState(false);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  // A phone can browse the catalog; it cannot run the exam.
+  const examBlocked = useDesktopGate() === "blocked";
 
   useEffect(() => {
     let cancelled = false;
@@ -185,9 +188,16 @@ export function Start({
         {startError && <p className="error-text">{startError}</p>}
 
         <div className="start-actions">
-          <button className="btn btn-primary" onClick={handleStart} disabled={starting}>
+          <button
+            className="btn btn-primary"
+            onClick={handleStart}
+            disabled={starting || examBlocked}
+          >
             {starting ? strings.start.starting : strings.start.startExam}
           </button>
+          {/* Say why rather than leaving a dead button: the catalog is
+              worth browsing on a phone, starting an exam is not. */}
+          {examBlocked && <p className="start-blocked">{strings.mobile.startDisabled}</p>}
         </div>
 
         <p className="start-footer">{strings.info.footerLine}</p>

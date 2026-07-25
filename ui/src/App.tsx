@@ -11,8 +11,9 @@ import {
   type SessionSnapshot,
 } from "./api";
 import { Start } from "./screens/Start";
-import { Exam } from "./screens/Exam";
+import { Exam, ExamGateControls } from "./screens/Exam";
 import { Score } from "./screens/Score";
+import { DesktopRequired, gateOverridden, useDesktopGate } from "./components/DesktopRequired";
 import { ControlProgress } from "./components/ControlProgress";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { InfoButton } from "./components/InfoButton";
@@ -52,6 +53,13 @@ export default function App() {
   // finally fires. Restarting the effect polls again immediately.
   const [jobNonce, setJobNonce] = useState(0);
   const wasBusy = useRef(false);
+
+  const gateVerdict = useDesktopGate();
+  // A desktop user who merely shrank their window can wave the gate
+  // through; a touch-only device cannot, because the capability is
+  // genuinely missing.
+  const gateBlocked =
+    gateVerdict === "blocked" || (gateVerdict === "narrow" && !gateOverridden());
 
   const applySession = useCallback((next: SessionSnapshot) => {
     setSession(next);
@@ -168,9 +176,23 @@ export default function App() {
       );
       break;
     case "running":
-      screen = (
-        <Exam session={session} fetchedAt={fetchedAt} onSessionChange={applySession} />
-      );
+      // The exam is a terminal beside a remote desktop; on a phone there
+      // is no layout that works. The lobby and score screens stay usable,
+      // and a running session still shows its countdown and an End exam
+      // control here — the server-side timer keeps going regardless, so
+      // nobody may be stranded without a way to submit.
+      screen =
+        gateBlocked ? (
+          <DesktopRequired verdict={gateVerdict}>
+            <ExamGateControls
+              session={session}
+              fetchedAt={fetchedAt}
+              onSessionChange={applySession}
+            />
+          </DesktopRequired>
+        ) : (
+          <Exam session={session} fetchedAt={fetchedAt} onSessionChange={applySession} />
+        );
       break;
     case "ended":
       screen = <Score onNewAttempt={handleNewAttempt} endReason={session.endReason} />;
@@ -182,10 +204,10 @@ export default function App() {
       <main>{screen}</main>
       <ToastLayer />
       {session.state !== "running" && (
-        <>
-          <ThemeToggle floating />
+        <div className="floating-controls">
           <InfoButton floating />
-        </>
+          <ThemeToggle floating />
+        </div>
       )}
       {showOverlay && overlayJob && (
         <ControlProgress
