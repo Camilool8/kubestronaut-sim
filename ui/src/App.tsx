@@ -18,6 +18,7 @@ import { ControlProgress } from "./components/ControlProgress";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { InfoButton } from "./components/InfoButton";
 import { ToastLayer } from "./components/Toast";
+import { toastStore } from "./components/toastStore";
 import { strings } from "./strings";
 
 // Control-status poll cadence: fast while a job is running (the overlay
@@ -117,7 +118,13 @@ export default function App() {
       // we just optimistically rendered has no phase running yet.
       setJobNonce((n) => n + 1);
     } else {
-      // Most likely 409 busy — surface whatever the conductor reports.
+      // Most likely 409 busy or 502 (conductor down). Either way the user
+      // pressed a button and must be told why nothing is happening.
+      toastStore.push({
+        kind: "warning",
+        message: strings.control.actionFailed(result.error),
+        dedupeKey: "control-action",
+      });
       const current = await getControlStatus().catch(() => null);
       if (current) setControl(current);
     }
@@ -127,19 +134,33 @@ export default function App() {
     setBankTitles(Object.fromEntries(banks.banks.map((b) => [b.id, b.title])));
   }, []);
 
-  const handleNewAttempt = useCallback(async () => {
-    applyControlResult(await startControlReset());
-  }, [applyControlResult]);
-
-  const handleRetry = useCallback(
-    async (op: string, bank: string) => {
-      if (op === "switch" && bank) {
-        applyControlResult(await startControlSwitch(bank));
-      } else {
-        applyControlResult(await startControlReset());
+  const runControlAction = useCallback(
+    async (start: () => Promise<ControlActionResponse>) => {
+      try {
+        applyControlResult(await start());
+      } catch (err) {
+        // fetch itself rejected (facilitator unreachable, network down).
+        toastStore.push({
+          kind: "warning",
+          message: strings.control.actionFailed(String(err)),
+          dedupeKey: "control-action",
+        });
       }
     },
     [applyControlResult],
+  );
+
+  const handleNewAttempt = useCallback(
+    () => runControlAction(startControlReset),
+    [runControlAction],
+  );
+
+  const handleRetry = useCallback(
+    (op: string, bank: string) =>
+      runControlAction(() =>
+        op === "switch" && bank ? startControlSwitch(bank) : startControlReset(),
+      ),
+    [runControlAction],
   );
 
   const overlayJob =

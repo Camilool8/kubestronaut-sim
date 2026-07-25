@@ -159,6 +159,10 @@ export const strings = {
     background: "Run in background",
     retry: "Retry",
     dismiss: "Dismiss",
+    // "HTTP 502" is true and useless. Name the likely cause and the
+    // check that confirms it; keep the raw status as trailing detail.
+    actionFailed: (detail: string) =>
+      `Couldn't reach the control plane (${detail}). The conductor container may be down — check it with \`docker compose ps conductor\`.`,
     newAttempt: "New attempt",
     newAttemptHint:
       "Wipes all cluster and instance state and returns you to the lobby, where you can retry this exam or pick a different one.",

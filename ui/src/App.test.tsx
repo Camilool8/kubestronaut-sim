@@ -137,3 +137,62 @@ describe("App control polling", () => {
     expect(statusPolls).toBeGreaterThan(pollsBeforeSwitch);
   });
 });
+
+const endedSession: SessionSnapshot = {
+  state: "ended",
+  bank: "ckad-mock-01",
+  startedAt: "2026-07-25T12:00:00Z",
+  durationSeconds: 7200,
+  remainingSeconds: 0,
+  endReason: "submitted",
+};
+
+// GET /api/results returns the flat Results payload on 200 — getControl
+// status already wraps it as {status:"ready", results} in api.ts, so the
+// mock must not double-wrap it (that made Score crash on
+// results.questions.map before the button under test ever rendered).
+const results = {
+  percent: 0,
+  passed: false,
+  earned: 0,
+  total: 17,
+  passingScore: 66,
+  questions: [],
+};
+
+describe("App control failures", () => {
+  // The reported bug: with the conductor container down the facilitator's
+  // proxy returns 502, startControlReset resolves {ok:false}, and the
+  // ok:false branch rendered nothing at all — no toast, no overlay. The
+  // button looked dead while the server was working correctly.
+  test("tells the user when a control action is refused instead of doing nothing", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const json = (body: unknown, status = 200) =>
+          new Response(JSON.stringify(body), { status });
+
+        if (url.endsWith("/api/control/reset") && init?.method === "POST") {
+          // Exactly what the proxy returns when the conductor is down:
+          // 502 with an empty body.
+          return new Response("", { status: 502 });
+        }
+        if (url.endsWith("/api/control/status")) return json({ busy: false });
+        if (url.endsWith("/api/session")) return json(endedSession);
+        if (url.endsWith("/api/results")) return json(results);
+        if (url.endsWith("/api/exam")) return json(exam);
+        if (url.endsWith("/api/control/banks")) return json(banks);
+        return json({});
+      }),
+    );
+
+    render(<App />);
+    const button = await screen.findByRole("button", { name: "New attempt" });
+    await user.click(button);
+
+    const alert = await screen.findByText(/control plane/i);
+    expect(alert).toBeInTheDocument();
+  });
+});
