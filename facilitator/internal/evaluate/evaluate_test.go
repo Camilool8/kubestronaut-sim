@@ -71,7 +71,7 @@ func TestGrade(t *testing.T) {
 			ex: &exam.Exam{
 				PassingScore: 100,
 				Questions: []exam.Question{
-					{ID: "q01", Instance: "ckad-1", Checks: []exam.Check{
+					{ID: "q01", Instance: "instance-1", Checks: []exam.Check{
 						{Name: "10_a.sh", Desc: "a", Points: 3},
 						{Name: "20_b.sh", Desc: "b", Points: 4},
 					}},
@@ -92,7 +92,7 @@ func TestGrade(t *testing.T) {
 			ex: &exam.Exam{
 				PassingScore: 50,
 				Questions: []exam.Question{
-					{ID: "q01", Instance: "ckad-1", Checks: []exam.Check{
+					{ID: "q01", Instance: "instance-1", Checks: []exam.Check{
 						{Name: "10_a.sh", Desc: "a", Points: 3},
 						{Name: "20_b.sh", Desc: "b", Points: 4},
 					}},
@@ -113,7 +113,7 @@ func TestGrade(t *testing.T) {
 			ex: &exam.Exam{
 				PassingScore: 30,
 				Questions: []exam.Question{
-					{ID: "q01", Instance: "ckad-1", Checks: []exam.Check{
+					{ID: "q01", Instance: "instance-1", Checks: []exam.Check{
 						{Name: "10_a.sh", Desc: "a", Points: 5},
 						{Name: "20_b.sh", Desc: "b", Points: 12},
 					}},
@@ -134,7 +134,7 @@ func TestGrade(t *testing.T) {
 			ex: &exam.Exam{
 				PassingScore: 60,
 				Questions: []exam.Question{
-					{ID: "q01", Instance: "ckad-1", Checks: []exam.Check{
+					{ID: "q01", Instance: "instance-1", Checks: []exam.Check{
 						{Name: "10_a.sh", Desc: "a", Points: 6},
 						{Name: "20_b.sh", Desc: "b", Points: 4},
 					}},
@@ -155,7 +155,7 @@ func TestGrade(t *testing.T) {
 			ex: &exam.Exam{
 				PassingScore: 100,
 				Questions: []exam.Question{
-					{ID: "q01", Instance: "ckad-1", Checks: []exam.Check{
+					{ID: "q01", Instance: "instance-1", Checks: []exam.Check{
 						{Name: "10_a.sh", Desc: "a", Points: 5},
 						{Name: "20_bad.sh", Skip: true},
 					}},
@@ -175,7 +175,7 @@ func TestGrade(t *testing.T) {
 			ex: &exam.Exam{
 				PassingScore: 0,
 				Questions: []exam.Question{
-					{ID: "q01", Instance: "ckad-1", Checks: []exam.Check{
+					{ID: "q01", Instance: "instance-1", Checks: []exam.Check{
 						{Name: "10_bad.sh", Skip: true},
 					}},
 				},
@@ -210,7 +210,7 @@ func TestGradeCheckResultFields(t *testing.T) {
 	ex := &exam.Exam{
 		PassingScore: 50,
 		Questions: []exam.Question{
-			{ID: "q01", Instance: "ckad-1", Domain: "Storage", Checks: []exam.Check{
+			{ID: "q01", Instance: "instance-1", Domain: "Storage", Checks: []exam.Check{
 				{Name: "10_pass.sh", Desc: "pass check", Points: 3},
 				{Name: "20_fail.sh", Desc: "fail check", Points: 4},
 			}},
@@ -228,8 +228,8 @@ func TestGradeCheckResultFields(t *testing.T) {
 		t.Fatalf("len(Questions) = %d, want 1", len(res.Questions))
 	}
 	q := res.Questions[0]
-	if q.ID != "q01" || q.Instance != "ckad-1" || q.Domain != "Storage" {
-		t.Errorf("question identity = %+v, want ID=q01 Instance=ckad-1 Domain=Storage", q)
+	if q.ID != "q01" || q.Instance != "instance-1" || q.Domain != "Storage" {
+		t.Errorf("question identity = %+v, want ID=q01 Instance=instance-1 Domain=Storage", q)
 	}
 	if q.Earned != 3 || q.Total != 7 {
 		t.Errorf("question totals = earned:%d total:%d, want 3/7", q.Earned, q.Total)
@@ -254,7 +254,7 @@ func TestGradeCheckResultFields(t *testing.T) {
 func TestGradeComposesRemoteCommand(t *testing.T) {
 	ex := &exam.Exam{
 		Questions: []exam.Question{
-			{ID: "q01", Instance: "ckad-1", Checks: []exam.Check{
+			{ID: "q01", Instance: "instance-1", Checks: []exam.Check{
 				{Name: "10_ok.sh", Desc: "x", Points: 3},
 			}},
 		},
@@ -269,7 +269,7 @@ func TestGradeComposesRemoteCommand(t *testing.T) {
 		t.Fatalf("calls = %d, want 1", len(runner.calls))
 	}
 	want := call{
-		instance: "ckad-1",
+		instance: "instance-1",
 		cmd:      "KUBECONFIG=/home/candidate/.kube/config bash /banks/ckad-mock-01/q01/validate.d/10_ok.sh",
 	}
 	if runner.calls[0] != want {
@@ -280,7 +280,7 @@ func TestGradeComposesRemoteCommand(t *testing.T) {
 func TestGradeCheckTimeout(t *testing.T) {
 	ex := &exam.Exam{
 		Questions: []exam.Question{
-			{ID: "q01", Instance: "ckad-1", Checks: []exam.Check{
+			{ID: "q01", Instance: "instance-1", Checks: []exam.Check{
 				{Name: "10_slow.sh", Desc: "slow", Points: 5},
 			}},
 		},
@@ -304,7 +304,7 @@ func TestGradeRunnerTransportError(t *testing.T) {
 	wantErr := errors.New("dial tcp: connection refused")
 	ex := &exam.Exam{
 		Questions: []exam.Question{
-			{ID: "q01", Instance: "ckad-1", Checks: []exam.Check{
+			{ID: "q01", Instance: "instance-1", Checks: []exam.Check{
 				{Name: "10_a.sh", Desc: "a", Points: 5},
 			}},
 		},
@@ -331,11 +331,11 @@ func TestScoreboardGolden(t *testing.T) {
 	ex := &exam.Exam{
 		PassingScore: 50,
 		Questions: []exam.Question{
-			{ID: "q01", Instance: "ckad-1", Checks: []exam.Check{
+			{ID: "q01", Instance: "instance-1", Checks: []exam.Check{
 				{Name: "10_ok.sh", Desc: "x", Points: 3},
 				{Name: "20_bad.sh", Skip: true},
 			}},
-			{ID: "q02", Instance: "ckad-2", Checks: []exam.Check{
+			{ID: "q02", Instance: "instance-2", Checks: []exam.Check{
 				{Name: "10_two.sh", Desc: "y", Points: 2},
 			}},
 		},
@@ -349,11 +349,11 @@ func TestScoreboardGolden(t *testing.T) {
 
 	want := "=== ckad-mock-01 results ===\n" +
 		"\n" +
-		"-- q01 (on ckad-1)\n" +
+		"-- q01 (on instance-1)\n" +
 		"  [PASS] x (3 pts) — ok\n" +
 		"  [SKIP] 20_bad.sh: bad '# points:' header\n" +
 		"\n" +
-		"-- q02 (on ckad-2)\n" +
+		"-- q02 (on instance-2)\n" +
 		"  [FAIL] y (0/2 pts) — bad\n" +
 		"\n" +
 		"=== Score: 3/5 (60%) ===\n" +
@@ -373,7 +373,7 @@ func TestRemoteCommand(t *testing.T) {
 }
 
 func TestSSHArgs(t *testing.T) {
-	got := sshArgs("/shared/ssh/id_ed25519", "ckad-1", "echo hi")
+	got := sshArgs("/shared/ssh/id_ed25519", "instance-1", "echo hi")
 	want := []string{
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null",
@@ -381,7 +381,7 @@ func TestSSHArgs(t *testing.T) {
 		"-o", "BatchMode=yes",
 		"-o", "ConnectTimeout=10",
 		"-i", "/shared/ssh/id_ed25519",
-		"root@ckad-1",
+		"root@instance-1",
 		"echo hi",
 	}
 	if !reflect.DeepEqual(got, want) {

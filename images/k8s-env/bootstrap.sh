@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
-BANK=${BANK:?BANK env var required}
+# Runtime bank file wins over the compose-time env default. k8s-env owns
+# first-boot creation of /shared/bank; the conductor rewrites it on a
+# bank switch (then re-runs this script), so a warm `./sim up <other>`
+# deliberately keeps the active bank — switching is the conductor's job.
+if [ -f /shared/bank ]; then
+  BANK=$(cat /shared/bank)
+fi
+BANK=${BANK:?BANK env var or /shared/bank required}
 BANK_DIR="/banks/${BANK}"
 [ -f "${BANK_DIR}/exam.yaml" ] || { echo "no exam.yaml in ${BANK_DIR}"; exit 1; }
+[ -f /shared/bank ] || printf '%s' "${BANK}" > /shared/bank
 
 rm -f /shared/ready
 mkdir -p /shared/ssh
@@ -36,5 +44,23 @@ if [ "$created" = "1" ]; then
 else
   echo "existing cluster resumed; skipping seed"
 fi
+
+# regenerate the desktop's login banner for the active bank (consumed by
+# the desktop image's .bashrc; regenerated on every bootstrap so a bank
+# switch or reset updates it)
+mkdir -p /shared/exam
+title=$(yq -r '.metadata.title' "${BANK_DIR}/exam.yaml")
+{
+  echo "=============================================================="
+  echo " ${title}"
+  echo "=============================================================="
+  echo " Solve questions on the exam instances:"
+  for inst in $(yq -r '.spec.instances[].name' "${BANK_DIR}/exam.yaml"); do
+    echo "   ssh ${inst}"
+  done
+  echo " Working directories are pre-created at /opt/course/<n>."
+  echo " Firefox is limited to the allowlisted documentation sites."
+  echo "=============================================================="
+} > /shared/exam/motd
 
 touch /shared/ready

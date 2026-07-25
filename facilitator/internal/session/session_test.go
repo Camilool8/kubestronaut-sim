@@ -28,7 +28,7 @@ var epoch = time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 
 func TestStartIdleToRunning(t *testing.T) {
 	clock, _ := fakeClock(epoch)
-	m, err := New(sessionPath(t), testDur, clock, func() {})
+	m, err := New(sessionPath(t), testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestStartIdleToRunning(t *testing.T) {
 
 func TestStartTwiceConflict(t *testing.T) {
 	clock, _ := fakeClock(epoch)
-	m, err := New(sessionPath(t), testDur, clock, func() {})
+	m, err := New(sessionPath(t), testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestStartTwiceConflict(t *testing.T) {
 
 func TestSnapshotRemainingDecreasesWithClock(t *testing.T) {
 	clock, set := fakeClock(epoch)
-	m, err := New(sessionPath(t), testDur, clock, func() {})
+	m, err := New(sessionPath(t), testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestSnapshotRemainingDecreasesWithClock(t *testing.T) {
 func TestSnapshotLazyExpiryFiresOnExpireOnce(t *testing.T) {
 	clock, set := fakeClock(epoch)
 	fired := 0
-	m, err := New(sessionPath(t), testDur, clock, func() { fired++ })
+	m, err := New(sessionPath(t), testBank, testDur, clock, func() { fired++ })
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestSnapshotLazyExpiryFiresOnExpireOnce(t *testing.T) {
 
 func TestEndSubmittedFromRunning(t *testing.T) {
 	clock, _ := fakeClock(epoch)
-	m, err := New(sessionPath(t), testDur, clock, func() {})
+	m, err := New(sessionPath(t), testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -182,7 +182,7 @@ func TestEndConflicts(t *testing.T) {
 				if err := m.End("submitted"); err != nil {
 					t.Fatalf("End: %v", err)
 				}
-				if err := m.SetResults(json.RawMessage(`{"earned":1}`)); err != nil {
+				if err := m.SetResults(m.AttemptToken(), json.RawMessage(`{"earned":1}`)); err != nil {
 					t.Fatalf("SetResults: %v", err)
 				}
 			},
@@ -194,7 +194,7 @@ func TestEndConflicts(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clock, _ := fakeClock(epoch)
-			m, err := New(sessionPath(t), testDur, clock, func() {})
+			m, err := New(sessionPath(t), testBank, testDur, clock, func() {})
 			if err != nil {
 				t.Fatalf("New: %v", err)
 			}
@@ -243,7 +243,7 @@ func TestResetFromEveryState(t *testing.T) {
 			if err := m.End("submitted"); err != nil {
 				t.Fatalf("End: %v", err)
 			}
-			if err := m.SetResults(json.RawMessage(`{"earned":1}`)); err != nil {
+			if err := m.SetResults(m.AttemptToken(), json.RawMessage(`{"earned":1}`)); err != nil {
 				t.Fatalf("SetResults: %v", err)
 			}
 		}},
@@ -252,7 +252,7 @@ func TestResetFromEveryState(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			clock, _ := fakeClock(epoch)
-			m, err := New(sessionPath(t), testDur, clock, func() {})
+			m, err := New(sessionPath(t), testBank, testDur, clock, func() {})
 			if err != nil {
 				t.Fatalf("New: %v", err)
 			}
@@ -286,7 +286,7 @@ func TestPersistenceRoundTrip(t *testing.T) {
 	path := sessionPath(t)
 	clock, _ := fakeClock(epoch)
 
-	m1, err := New(path, testDur, clock, func() {})
+	m1, err := New(path, testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New (m1): %v", err)
 	}
@@ -294,7 +294,7 @@ func TestPersistenceRoundTrip(t *testing.T) {
 		t.Fatalf("Start: %v", err)
 	}
 
-	m2, err := New(path, testDur, clock, func() {})
+	m2, err := New(path, testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New (m2): %v", err)
 	}
@@ -314,7 +314,7 @@ func TestReloadRunningPastExpiryEndsImmediately(t *testing.T) {
 	path := sessionPath(t)
 	clock, set := fakeClock(epoch)
 
-	m1, err := New(path, testDur, clock, func() {})
+	m1, err := New(path, testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New (m1): %v", err)
 	}
@@ -325,7 +325,7 @@ func TestReloadRunningPastExpiryEndsImmediately(t *testing.T) {
 	set(epoch.Add(testDur + time.Minute))
 
 	fired := 0
-	m2, err := New(path, testDur, clock, func() { fired++ })
+	m2, err := New(path, testBank, testDur, clock, func() { fired++ })
 	if err != nil {
 		t.Fatalf("New (m2): %v", err)
 	}
@@ -346,7 +346,7 @@ func TestReloadRunningPastExpiryEndsImmediately(t *testing.T) {
 
 	// The immediate end-on-load must itself be persisted (Persist BEFORE
 	// returning applies here too), independent of any later Snapshot call.
-	m3, err := New(path, testDur, clock, func() {})
+	m3, err := New(path, testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New (m3): %v", err)
 	}
@@ -363,7 +363,7 @@ func TestCorruptFileStartsIdle(t *testing.T) {
 	}
 
 	clock, _ := fakeClock(epoch)
-	m, err := New(path, testDur, clock, func() {})
+	m, err := New(path, testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New with corrupt file: %v", err)
 	}
@@ -376,7 +376,7 @@ func TestCorruptFileStartsIdle(t *testing.T) {
 func TestNewMissingFileStartsIdle(t *testing.T) {
 	path := sessionPath(t) // never written
 	clock, _ := fakeClock(epoch)
-	m, err := New(path, testDur, clock, func() {})
+	m, err := New(path, testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New with missing file: %v", err)
 	}
@@ -389,7 +389,7 @@ func TestNewMissingFileStartsIdle(t *testing.T) {
 func TestSetResultsPersists(t *testing.T) {
 	path := sessionPath(t)
 	clock, _ := fakeClock(epoch)
-	m, err := New(path, testDur, clock, func() {})
+	m, err := New(path, testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -401,7 +401,7 @@ func TestSetResultsPersists(t *testing.T) {
 	}
 
 	want := json.RawMessage(`{"earned":5,"total":17}`)
-	if err := m.SetResults(want); err != nil {
+	if err := m.SetResults(m.AttemptToken(), want); err != nil {
 		t.Fatalf("SetResults: %v", err)
 	}
 
@@ -417,7 +417,7 @@ func TestSetResultsPersists(t *testing.T) {
 	}
 
 	// Reload from disk on a fresh Manager to prove it was persisted.
-	m2, err := New(path, testDur, clock, func() {})
+	m2, err := New(path, testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New (reload): %v", err)
 	}
@@ -433,7 +433,7 @@ func TestSetResultsPersists(t *testing.T) {
 func TestSetGradeErrorPersists(t *testing.T) {
 	path := sessionPath(t)
 	clock, _ := fakeClock(epoch)
-	m, err := New(path, testDur, clock, func() {})
+	m, err := New(path, testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -444,7 +444,7 @@ func TestSetGradeErrorPersists(t *testing.T) {
 		t.Fatalf("End: %v", err)
 	}
 
-	if err := m.SetGradeError("ssh: connection refused"); err != nil {
+	if err := m.SetGradeError(m.AttemptToken(), "ssh: connection refused"); err != nil {
 		t.Fatalf("SetGradeError: %v", err)
 	}
 
@@ -459,7 +459,7 @@ func TestSetGradeErrorPersists(t *testing.T) {
 		t.Errorf("Results() graded = false, want true (gradeError counts as a terminal grading outcome)")
 	}
 
-	m2, err := New(path, testDur, clock, func() {})
+	m2, err := New(path, testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New (reload): %v", err)
 	}
@@ -537,7 +537,7 @@ func TestSetResultsAndGradeErrorRejectedUnlessEnded(t *testing.T) {
 		t.Run(c.name+"/SetResults", func(t *testing.T) {
 			path := sessionPath(t)
 			clock, _ := fakeClock(epoch)
-			m, err := New(path, testDur, clock, func() {})
+			m, err := New(path, testBank, testDur, clock, func() {})
 			if err != nil {
 				t.Fatalf("New: %v", err)
 			}
@@ -545,7 +545,7 @@ func TestSetResultsAndGradeErrorRejectedUnlessEnded(t *testing.T) {
 			beforeResults, beforeGradeErr, beforeGraded := m.Results()
 
 			stale := json.RawMessage(`{"earned":999,"total":999}`)
-			if err := m.SetResults(stale); !errors.Is(err, ErrConflict) {
+			if err := m.SetResults(m.AttemptToken(), stale); !errors.Is(err, ErrConflict) {
 				t.Fatalf("SetResults error = %v, want ErrConflict", err)
 			}
 
@@ -556,7 +556,7 @@ func TestSetResultsAndGradeErrorRejectedUnlessEnded(t *testing.T) {
 			}
 
 			// Reload from disk to prove the rejected write persisted nothing.
-			m2, err := New(path, testDur, clock, func() {})
+			m2, err := New(path, testBank, testDur, clock, func() {})
 			if err != nil {
 				t.Fatalf("New (reload): %v", err)
 			}
@@ -570,14 +570,14 @@ func TestSetResultsAndGradeErrorRejectedUnlessEnded(t *testing.T) {
 		t.Run(c.name+"/SetGradeError", func(t *testing.T) {
 			path := sessionPath(t)
 			clock, _ := fakeClock(epoch)
-			m, err := New(path, testDur, clock, func() {})
+			m, err := New(path, testBank, testDur, clock, func() {})
 			if err != nil {
 				t.Fatalf("New: %v", err)
 			}
 			c.setup(t, m)
 			beforeResults, beforeGradeErr, beforeGraded := m.Results()
 
-			if err := m.SetGradeError("ssh: connection refused (stale)"); !errors.Is(err, ErrConflict) {
+			if err := m.SetGradeError(m.AttemptToken(), "ssh: connection refused (stale)"); !errors.Is(err, ErrConflict) {
 				t.Fatalf("SetGradeError error = %v, want ErrConflict", err)
 			}
 
@@ -588,7 +588,7 @@ func TestSetResultsAndGradeErrorRejectedUnlessEnded(t *testing.T) {
 			}
 
 			// Reload from disk to prove the rejected write persisted nothing.
-			m2, err := New(path, testDur, clock, func() {})
+			m2, err := New(path, testBank, testDur, clock, func() {})
 			if err != nil {
 				t.Fatalf("New (reload): %v", err)
 			}
@@ -614,7 +614,7 @@ func TestReloadEndedWithoutResultsAllowsRegrade(t *testing.T) {
 	path := sessionPath(t)
 	clock, _ := fakeClock(epoch)
 
-	m1, err := New(path, testDur, clock, func() {})
+	m1, err := New(path, testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New (m1): %v", err)
 	}
@@ -625,7 +625,7 @@ func TestReloadEndedWithoutResultsAllowsRegrade(t *testing.T) {
 		t.Fatalf("End: %v", err)
 	}
 
-	m2, err := New(path, testDur, clock, func() {})
+	m2, err := New(path, testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New (m2, reload): %v", err)
 	}
@@ -645,7 +645,7 @@ func TestReloadEndedWithoutResultsAllowsRegrade(t *testing.T) {
 
 func TestResultsNotGradedBeforeSet(t *testing.T) {
 	clock, _ := fakeClock(epoch)
-	m, err := New(sessionPath(t), testDur, clock, func() {})
+	m, err := New(sessionPath(t), testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -669,7 +669,7 @@ func TestResultsNotGradedBeforeSet(t *testing.T) {
 func TestStartPersistFailureRollsBack(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "missing-subdir", "session.json")
 	clock, _ := fakeClock(epoch)
-	m, err := New(path, testDur, clock, func() {})
+	m, err := New(path, testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -691,7 +691,7 @@ func TestEndPersistFailureRollsBack(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "session.json")
 	clock, _ := fakeClock(epoch)
-	m, err := New(path, testDur, clock, func() {})
+	m, err := New(path, testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -723,7 +723,7 @@ func TestEndPersistFailureRollsBack(t *testing.T) {
 // time.Sleep-based assertions.
 func TestRealTimerFiresOnExpiry(t *testing.T) {
 	firedCh := make(chan struct{}, 1)
-	m, err := New(sessionPath(t), 50*time.Millisecond, time.Now, func() {
+	m, err := New(sessionPath(t), testBank, 50*time.Millisecond, time.Now, func() {
 		firedCh <- struct{}{}
 	})
 	if err != nil {

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Documentation (Firefox)
+Comment=Kubernetes documentation, allowlisted sites only
+Exec=firefox-esr https://kubernetes.io/docs/
+Icon=firefox-esr
+Terminal=false
+Categories=Network;WebBrowser;

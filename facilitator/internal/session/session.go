@@ -17,6 +17,8 @@
 package session
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -49,12 +51,14 @@ var ErrConflict = errors.New("session: invalid state transition")
 type Manager struct {
 	mu       sync.Mutex
 	path     string
+	bank     string
 	dur      time.Duration
 	clock    func() time.Time
 	onExpire func()
 	timer    *time.Timer
 
 	state      string
+	attempt    string
 	startedAt  time.Time
 	endedAt    time.Time
 	endReason  string
@@ -65,6 +69,7 @@ type Manager struct {
 // Snapshot is a read-only view of a session at one instant.
 type Snapshot struct {
 	State            string    // "idle" | "running" | "ended"
+	Bank             string    // the bank this manager (and any session) belongs to
 	StartedAt        time.Time // zero when never started
 	DurationSeconds  int
 	RemainingSeconds int    // 0 when not running
@@ -82,6 +87,8 @@ type Snapshot struct {
 // ever writing that literal null, so a nil m.results reloads as nil.
 type persistedState struct {
 	Version         int             `json:"version"`
+	Bank            string          `json:"bank"`
+	Attempt         string          `json:"attempt"`
 	State           string          `json:"state"`
 	StartedAt       time.Time       `json:"startedAt"`
 	DurationSeconds int             `json:"durationSeconds"`
@@ -90,6 +97,11 @@ type persistedState struct {
 	Results         json.RawMessage `json:"results,omitempty"`
 	GradeError      string          `json:"gradeError"`
 }
+
+// persistedVersion is the on-disk format this build reads and writes.
+// Version 1 files predate bank identity and attempt tokens; they are
+// discarded on load (treated as belonging to an unknown bank).
+const persistedVersion = 2
 
 // New loads the session persisted at path, or starts idle if the file is
 // missing or unreadable/corrupt (any non-missing read or parse failure is
@@ -113,9 +125,10 @@ type persistedState struct {
 // running process experiences. Callers that need to notice an
 // already-ended, not-yet-graded session on boot should inspect the first
 // Snapshot themselves.
-func New(path string, dur time.Duration, clock func() time.Time, onExpire func()) (*Manager, error) {
+func New(path, bank string, dur time.Duration, clock func() time.Time, onExpire func()) (*Manager, error) {
 	m := &Manager{
 		path:     path,
+		bank:     bank,
 		dur:      dur,
 		clock:    clock,
 		onExpire: onExpire,
@@ -141,11 +154,23 @@ func New(path string, dur time.Duration, clock func() time.Time, onExpire func()
 		fmt.Fprintf(os.Stderr, "session: session file %s has unknown state %q (starting idle)\n", path, doc.State)
 		return m, nil
 	}
+	// A session may only be resumed by the bank it belongs to: v1 files
+	// predate bank identity (unknown bank), and a file written by another
+	// bank must never leak its state — or its results — into this one.
+	if doc.Version != persistedVersion {
+		fmt.Fprintf(os.Stderr, "session: session file %s has version %d, want %d (starting idle)\n", path, doc.Version, persistedVersion)
+		return m, nil
+	}
+	if doc.Bank != bank {
+		fmt.Fprintf(os.Stderr, "session: session file %s belongs to bank %q, active bank is %q (starting idle)\n", path, doc.Bank, bank)
+		return m, nil
+	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	m.state = doc.State
+	m.attempt = doc.Attempt
 	m.startedAt = doc.StartedAt
 	m.endReason = doc.EndReason
 	m.results = doc.Results
@@ -187,6 +212,7 @@ func (m *Manager) Start() (Snapshot, error) {
 
 	prev := m.captureLocked()
 	m.state = stateRunning
+	m.attempt = newAttemptToken()
 	m.startedAt = m.clock()
 	m.endedAt = time.Time{}
 	m.endReason = ""
@@ -200,6 +226,30 @@ func (m *Manager) Start() (Snapshot, error) {
 	m.armTimerLocked(m.dur)
 
 	return m.snapshotLocked(), nil
+}
+
+// newAttemptToken mints the random identity for one attempt. Grading
+// runs capture it when they begin; SetResults/SetGradeError verify it,
+// so a grade from attempt A can never be stamped onto attempt B even
+// when both happen to be in the ended state.
+func newAttemptToken() string {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		// crypto/rand failing means the platform's entropy source is
+		// broken; fall back to the clock rather than refusing to start
+		// an exam over a token whose only job is stale-write detection.
+		return fmt.Sprintf("t-%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b[:])
+}
+
+// AttemptToken returns the current attempt's token ("" when no attempt
+// has been started, or after a Reset). A grader must capture this at the
+// moment grading begins and pass it back to SetResults/SetGradeError.
+func (m *Manager) AttemptToken() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.attempt
 }
 
 // End moves a running session to ended, recording reason and endedAt as
@@ -239,6 +289,7 @@ func (m *Manager) Reset() error {
 
 	prev := m.captureLocked()
 	m.state = stateIdle
+	m.attempt = ""
 	m.startedAt = time.Time{}
 	m.endedAt = time.Time{}
 	m.endReason = ""
@@ -271,21 +322,21 @@ func (m *Manager) Snapshot() Snapshot {
 	return snap
 }
 
-// SetResults records the graded results for the current session and
-// clears any prior gradeError (a successful grade supersedes an earlier
-// failed attempt). It returns ErrConflict without modifying anything if
-// the session is not currently ended: an asynchronous grading run is
-// keyed to the attempt that was ended when it started, and if the
-// operator has since Reset (or Reset then Start'd a new attempt) before
-// the grade completes, that late write must not stamp a previous
-// attempt's results onto the new session state. On a persist failure,
-// results/gradeError are also left unchanged.
-func (m *Manager) SetResults(r json.RawMessage) error {
+// SetResults records the graded results for the attempt identified by
+// token and clears any prior gradeError (a successful grade supersedes
+// an earlier failed attempt). It returns ErrConflict without modifying
+// anything unless the session is currently ended AND token matches the
+// current attempt: an asynchronous grading run is keyed to the attempt
+// that was ended when it began, and if the operator has since Reset —
+// even through a full second start/end lifecycle — that late write must
+// not stamp a previous attempt's results onto the new session state. On
+// a persist failure, results/gradeError are also left unchanged.
+func (m *Manager) SetResults(token string, r json.RawMessage) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if m.state != stateEnded {
-		return fmt.Errorf("session: set results: %w", ErrConflict)
+	if err := m.checkGradeWriteLocked(token); err != nil {
+		return fmt.Errorf("session: set results: %w", err)
 	}
 
 	prev := m.captureLocked()
@@ -298,18 +349,18 @@ func (m *Manager) SetResults(r json.RawMessage) error {
 	return nil
 }
 
-// SetGradeError records that grading failed with the given message, so
-// /api/results can surface it and a caller can retry via End. Like
-// SetResults, it returns ErrConflict without modifying anything if the
-// session is not currently ended, guarding against the same stale-write
-// race (a late-arriving grade failure from a since-Reset attempt). On a
-// persist failure, gradeError is also left unchanged.
-func (m *Manager) SetGradeError(msg string) error {
+// SetGradeError records that grading the attempt identified by token
+// failed with the given message, so /api/results can surface it and a
+// caller can retry via End. Like SetResults, it returns ErrConflict
+// without modifying anything unless the session is ended and token
+// matches the current attempt. On a persist failure, gradeError is also
+// left unchanged.
+func (m *Manager) SetGradeError(token, msg string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if m.state != stateEnded {
-		return fmt.Errorf("session: set grade error: %w", ErrConflict)
+	if err := m.checkGradeWriteLocked(token); err != nil {
+		return fmt.Errorf("session: set grade error: %w", err)
 	}
 
 	prev := m.captureLocked()
@@ -317,6 +368,20 @@ func (m *Manager) SetGradeError(msg string) error {
 	if err := m.persistLocked(); err != nil {
 		m.restoreLocked(prev)
 		return fmt.Errorf("session: set grade error: %w", err)
+	}
+	return nil
+}
+
+// checkGradeWriteLocked is the shared guard for grade-outcome writes:
+// the session must be ended and token must identify the current attempt
+// (empty tokens never match — an idle/reset session has no attempt). The
+// caller must hold m.mu.
+func (m *Manager) checkGradeWriteLocked(token string) error {
+	if m.state != stateEnded {
+		return ErrConflict
+	}
+	if token == "" || token != m.attempt {
+		return fmt.Errorf("stale attempt token: %w", ErrConflict)
 	}
 	return nil
 }
@@ -340,6 +405,7 @@ func (m *Manager) Results() (results json.RawMessage, gradeError string, graded 
 // in-memory change the disk never saw.
 type mutableFields struct {
 	state      string
+	attempt    string
 	startedAt  time.Time
 	endedAt    time.Time
 	endReason  string
@@ -352,6 +418,7 @@ type mutableFields struct {
 func (m *Manager) captureLocked() mutableFields {
 	return mutableFields{
 		state:      m.state,
+		attempt:    m.attempt,
 		startedAt:  m.startedAt,
 		endedAt:    m.endedAt,
 		endReason:  m.endReason,
@@ -364,6 +431,7 @@ func (m *Manager) captureLocked() mutableFields {
 // must hold m.mu.
 func (m *Manager) restoreLocked(f mutableFields) {
 	m.state = f.state
+	m.attempt = f.attempt
 	m.startedAt = f.startedAt
 	m.endedAt = f.endedAt
 	m.endReason = f.endReason
@@ -455,6 +523,7 @@ func (m *Manager) onTimerFire() {
 func (m *Manager) snapshotLocked() Snapshot {
 	snap := Snapshot{
 		State:           m.state,
+		Bank:            m.bank,
 		StartedAt:       m.startedAt,
 		DurationSeconds: int(m.dur.Seconds()),
 		EndReason:       m.endReason,
@@ -470,7 +539,9 @@ func (m *Manager) snapshotLocked() Snapshot {
 // hold m.mu.
 func (m *Manager) persistLocked() error {
 	doc := persistedState{
-		Version:         1,
+		Version:         persistedVersion,
+		Bank:            m.bank,
+		Attempt:         m.attempt,
 		State:           m.state,
 		StartedAt:       m.startedAt,
 		DurationSeconds: int(m.dur.Seconds()),

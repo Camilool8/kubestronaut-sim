@@ -8,6 +8,7 @@ export type SessionState = "idle" | "running" | "ended";
 
 export interface SessionSnapshot {
   state: SessionState;
+  bank: string;
   startedAt: string;
   durationSeconds: number;
   remainingSeconds: number;
@@ -220,4 +221,92 @@ export function pollSession(
     window.clearInterval(interval);
     window.removeEventListener("focus", onFocus);
   };
+}
+
+// ---- control plane (conductor, proxied by the facilitator) ----
+
+export type ControlPhaseState = "pending" | "running" | "done" | "failed";
+
+export interface ControlPhase {
+  id: string;
+  label: string;
+  state: ControlPhaseState;
+}
+
+export interface ControlJob {
+  id: string;
+  op: "reset" | "switch";
+  bank: string;
+  startedAt: string;
+  phase: string;
+  error?: string;
+  phases: ControlPhase[];
+}
+
+export interface ControlStatus {
+  busy: boolean;
+  job?: ControlJob;
+  lastJob?: ControlJob;
+}
+
+export async function getControlStatus(): Promise<ControlStatus> {
+  const res = await fetch("/api/control/status");
+  if (!res.ok) {
+    throw new Error(await readError(res));
+  }
+  return (await res.json()) as ControlStatus;
+}
+
+export type ControlActionResponse =
+  | { ok: true; job: ControlJob }
+  | { ok: false; error: string };
+
+export async function startControlReset(): Promise<ControlActionResponse> {
+  const res = await fetch("/api/control/reset", { method: "POST" });
+  if (res.status === 202) {
+    const body = (await res.json()) as { job: ControlJob };
+    return { ok: true, job: body.job };
+  }
+  return { ok: false, error: await readError(res) };
+}
+
+export interface BankEntry {
+  id: string;
+  title: string;
+  certification?: string;
+  description?: string;
+  examType: string;
+  durationSeconds?: number;
+  passingScore?: number;
+  kubernetesVersion?: string;
+  questionCount?: number;
+  available: boolean;
+  comingSoon?: boolean;
+  note?: string;
+}
+
+export interface BanksResponse {
+  active: string;
+  banks: BankEntry[];
+}
+
+export async function getBanks(): Promise<BanksResponse> {
+  const res = await fetch("/api/control/banks");
+  if (!res.ok) {
+    throw new Error(await readError(res));
+  }
+  return (await res.json()) as BanksResponse;
+}
+
+export async function startControlSwitch(bank: string): Promise<ControlActionResponse> {
+  const res = await fetch("/api/control/switch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bank }),
+  });
+  if (res.status === 202) {
+    const body = (await res.json()) as { job: ControlJob };
+    return { ok: true, job: body.job };
+  }
+  return { ok: false, error: await readError(res) };
 }

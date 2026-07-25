@@ -24,7 +24,7 @@ print(data.get(os.environ["FIELD"], ""))
 
 ./sim purge   # cold start: the fresh-grade-0 assertion needs pristine cluster state
 ./sim up
-docker compose exec ckad-1 su - candidate -c 'kubectl get nodes --no-headers' | tee /tmp/nodes.txt
+docker compose exec instance-1 su - candidate -c 'kubectl get nodes --no-headers' | tee /tmp/nodes.txt
 [ "$(grep -c ' Ready ' /tmp/nodes.txt)" -eq 2 ] || fail "expected 2 Ready nodes"
 
 echo "== facilitator: healthz, exam metadata, built UI, single :8080 surface =="
@@ -56,8 +56,25 @@ docker compose exec desktop curl -fs --max-time 15 -o /dev/null -x http://docs-p
   && fail "proxy should block example.com" || true
 docker compose exec desktop curl -s --max-time 5 -o /dev/null https://example.com \
   && fail "desktop should have no direct egress" || true
-docker compose exec desktop su - candidate -c 'ssh -o BatchMode=yes ckad-1 kubectl get nodes --no-headers' \
-  | grep -q ' Ready ' || fail "desktop->ckad-1 ssh broken"
+docker compose exec desktop su - candidate -c 'ssh -o BatchMode=yes instance-1 kubectl get nodes --no-headers' \
+  | grep -q ' Ready ' || fail "desktop->instance-1 ssh broken"
+
+# ready-to-go desktop: the exam terminal is already open (autostart) and
+# the welcome banner follows the active bank
+docker compose exec desktop pgrep -f "xfce4-terminal" >/dev/null \
+  || fail "desktop should auto-open the exam terminal"
+docker compose exec desktop cat /shared/exam/motd | grep -q 'ssh instance-1' \
+  || fail "desktop motd should list the ssh targets"
+
+# conductor isolation: the docker-socket-holding sidecar must be invisible
+# from the host and from the exam network; its API is reachable only
+# through the facilitator's /api/control proxy on :8080
+curl -fsS --max-time 5 -o /dev/null http://localhost:9000/healthz \
+  && fail "conductor should not be reachable from the host" || true
+docker compose exec desktop curl -fs --max-time 5 -o /dev/null http://conductor:9000/healthz \
+  && fail "conductor should not be reachable from the desktop" || true
+status=$(req GET /api/control/status)
+[ "$status" = "200" ] || fail "/api/control/status expected 200 via :8080, got $status"
 
 echo "== session lifecycle: start, countdown, desktop unlock =="
 status=$(req POST /api/session/start)
@@ -84,9 +101,9 @@ status=$(req GET /api/questions/q01/solution)
 read -r _ e0 t0 _ < <(grep '^RESULT ' /tmp/grade0.txt)
 [ "$e0" = "0" ] || fail "fresh env should score 0, got ${e0}"
 
-docker compose exec ckad-1 su - candidate -c 'bash /tests/solutions/q01.sh'
-docker compose exec ckad-1 su - candidate -c 'bash /tests/solutions/q02.sh'
-docker compose exec ckad-2 su - candidate -c 'bash /tests/solutions/q03.sh'
+docker compose exec instance-1 su - candidate -c 'bash /tests/solutions/ckad-mock-01/q01.sh'
+docker compose exec instance-1 su - candidate -c 'bash /tests/solutions/ckad-mock-01/q02.sh'
+docker compose exec instance-2 su - candidate -c 'bash /tests/solutions/ckad-mock-01/q03.sh'
 
 ./sim grade | tee /tmp/grade1.txt
 read -r _ e1 t1 _ < <(grep '^RESULT ' /tmp/grade1.txt)
@@ -109,8 +126,9 @@ if [ "$rstatus" = "200" ]; then
   earned=$(json_field earned)
   total=$(json_field total)
   passed=$(json_field passed)
-  [ "$earned" = "17" ] || fail "facilitator results: earned should be 17, got ${earned}"
-  [ "$total" = "17" ] || fail "facilitator results: total should be 17, got ${total}"
+  # totals come from the grade run above, not a hardcoded bank size
+  [ "$earned" = "$t1" ] || fail "facilitator results: earned should be ${t1}, got ${earned}"
+  [ "$total" = "$t1" ] || fail "facilitator results: total should be ${t1}, got ${total}"
   [ "$passed" = "True" ] || fail "facilitator results: passed should be true, got ${passed}"
 fi
 
@@ -139,12 +157,66 @@ read -r _ e2 t2 _ < <(grep '^RESULT ' /tmp/grade2.txt)
 ./sim grade | tee /tmp/grade3.txt
 read -r _ e3 _ _ < <(grep '^RESULT ' /tmp/grade3.txt)
 [ "$e3" = "0" ] || fail "reset env should score 0, got ${e3}"
-docker compose exec ckad-1 su - candidate -c 'test -d /opt/course/1 -a -w /opt/course/1 -a -z "$(ls -A /opt/course/1)"' \
+docker compose exec instance-1 su - candidate -c 'test -d /opt/course/1 -a -w /opt/course/1 -a -z "$(ls -A /opt/course/1)"' \
   || fail "reset should leave /opt/course/1 empty and writable"
 
 status=$(req GET /api/session)
 state=$(json_field state)
 [ "$state" = "idle" ] || fail "session should be idle after ./sim reset, got $state"
+
+echo "== bank switch: CKAD -> CKA -> CKAD round-trip via the conductor =="
+# wait_control polls the control status until the conductor goes idle,
+# failing the smoke if the finished job carries an error.
+wait_control() {
+  local budget=300 elapsed=0 body busy err
+  while [ "$elapsed" -lt "$budget" ]; do
+    if body=$(curl -fsS http://localhost:8080/api/control/status 2>/dev/null); then
+      busy=$(printf '%s' "$body" | python3 -c 'import json,sys; print(json.load(sys.stdin)["busy"])')
+      if [ "$busy" = "False" ]; then
+        err=$(printf '%s' "$body" | python3 -c 'import json,sys; print((json.load(sys.stdin).get("lastJob") or {}).get("error",""))')
+        [ -z "$err" ] || fail "control job failed: $err"
+        return 0
+      fi
+    fi
+    sleep 3; elapsed=$((elapsed + 3))
+  done
+  fail "control job did not finish within ${budget}s"
+}
+
+status=$(req GET /api/control/banks)
+[ "$status" = "200" ] || fail "/api/control/banks expected 200, got $status"
+active=$(json_field active)
+[ "$active" = "ckad-mock-01" ] || fail "active bank should be ckad-mock-01, got $active"
+
+curl -fsS -X POST -H 'Content-Type: application/json' -d '{"bank":"cka-mock-01"}' \
+  http://localhost:8080/api/control/switch >/dev/null || fail "switch to cka-mock-01 not accepted"
+wait_control
+
+status=$(req GET /api/exam)
+api_name=$(json_field name)
+[ "$api_name" = "cka-mock-01" ] || fail "active exam should be cka-mock-01, got $api_name"
+docker compose exec desktop cat /shared/exam/motd | grep -q 'CKA Mock Exam 01' \
+  || fail "desktop motd should mention the CKA exam after the switch"
+
+./sim grade | tee /tmp/grade-cka0.txt
+read -r _ ce0 ct0 _ < <(grep '^RESULT ' /tmp/grade-cka0.txt)
+[ "$ce0" = "0" ] || fail "fresh cka env should score 0, got ${ce0}"
+
+docker compose exec instance-1 su - candidate -c 'bash /tests/solutions/cka-mock-01/q01.sh'
+./sim grade | tee /tmp/grade-cka1.txt
+read -r _ ce1 _ _ < <(grep '^RESULT ' /tmp/grade-cka1.txt)
+[ "$ce1" -gt 0 ] 2>/dev/null || fail "solved cka q01 should score > 0, got ${ce1}"
+
+curl -fsS -X POST -H 'Content-Type: application/json' -d '{"bank":"ckad-mock-01"}' \
+  http://localhost:8080/api/control/switch >/dev/null || fail "switch back to ckad-mock-01 not accepted"
+wait_control
+
+status=$(req GET /api/exam)
+api_name=$(json_field name)
+[ "$api_name" = "ckad-mock-01" ] || fail "active exam should be back to ckad-mock-01, got $api_name"
+./sim grade | tee /tmp/grade-back.txt
+read -r _ be0 _ _ < <(grep '^RESULT ' /tmp/grade-back.txt)
+[ "$be0" = "0" ] || fail "ckad after switch-back should score 0, got ${be0}"
 
 echo "== auto-end: session expires unattended and re-locks the desktop =="
 SESSION_DURATION_OVERRIDE=20s docker compose up -d --wait facilitator

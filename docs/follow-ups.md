@@ -32,12 +32,19 @@ Convert to GitHub issues once the repo has a remote.
 - proxy: unit test for CONNECT buffered-drain path (client pipelining bytes with CONNECT; assert they reach backend)
 
 ## Milestone C (facilitator/UI) — from reviews
-- facilitator: kill established desktop WebSocket tunnels at session end (currently a live VNC socket survives into ended; UI unmounts iframe, reconnects are refused).
-- ui: add vitest harness for timer/format utils (no UI unit tests this milestone).
+- facilitator: kill established desktop WebSocket tunnels at session end (still open; Milestone D's first-party RFB client disconnects on unmount, reconnects are refused server-side, but a live socket in a stale tab still survives into ended).
+- ~~ui: add vitest harness for timer/format utils~~ (done in Milestone D: vitest + testing-library + axe; 31 tests).
 - facilitator image: run as non-root `USER`; pin base image tags (mirror of the Milestone B proxy item).
-- facilitator: results/attempt history (single session.json overwritten per attempt). Related: add a session generation token captured by the grader and checked in `SetResults`/`SetGradeError` — the state guard can't distinguish attempt A's `ended` from attempt B's if a full second lifecycle completes inside one in-flight grading run (effectively unreachable with real exam durations).
+- facilitator: results/attempt history (single session.json overwritten per attempt). ~~Related: add a session generation token~~ — DONE in milestone D: `Start()` mints an attempt token, the grader captures it, and `SetResults`/`SetGradeError` reject mismatches; session.json v2 also records its bank and cross-bank files are discarded on load.
 - `SESSION_DURATION_OVERRIDE` is test-only — document/guard once hosted.
 - `DELETE /api/session` is unauthenticated by design (localhost single-user); needs auth when hosted.
 - score page: skipped checks (bad `# points:` header) are JSON-indistinguishable from 0-point failed checks; add a skipped marker to the results schema if bank-authoring errors should surface in the UI.
 - desktop proxy: path.Clean stripped paths before proxying (../ segments currently forwarded verbatim while unlocked; hardening, not a bypass).
-- smoke: GET / UI assertion should also check HTTP status; results assertion hardcodes 17 twice instead of reusing parsed total.
+- ~~smoke: results assertion hardcodes 17 twice~~ (done in Milestone D: totals parsed from the grade run). GET / UI assertion should also check HTTP status (still open).
+
+## Milestone D (conductor/catalog/design system) — new
+- conductor: image runs as root and holds the docker socket by design; consider a socket proxy (e.g. filtered API) if the tool is ever multi-user.
+- conductor: catalog is read once at boot; adding a bank requires a conductor restart. Fine locally; revisit if bank authoring becomes iterative.
+- ui: visual regression pass in a real browser (Chrome extension was unavailable during development; WS upgrade + xfconf state verified instead). Do a manual light/dark + tour + toast walkthrough.
+- desktop: xfdesktop may show a one-time "untrusted launcher" prompt on the Desktop icons (panel launchers are the primary path); investigate gio trust metadata if it annoys.
+- ui: bundle is ~470KB min (noVNC + React); consider code-splitting the RFB client if cold loads matter.

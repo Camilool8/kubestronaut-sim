@@ -5,20 +5,25 @@ cmd=${1:-help}
 case "$cmd" in
   up)
     BANK=${2:-ckad-mock-01} docker compose up -d --build --wait
-    echo "Exam environment ready. Exam UI: http://localhost:8080 — or ./sim ssh ckad-1" ;;
-  down)  docker compose down ;;
-  purge) docker compose down -v ;;
+    echo "Exam environment ready. Exam UI: http://localhost:8080 — or ./sim ssh instance-1" ;;
+  down)  docker compose down --remove-orphans ;;
+  purge) docker compose down -v --remove-orphans ;;
   reset)
-    echo "Resetting exam state (cluster + instances, cached images kept)..."
-    bank=$(docker compose exec -T k8s-env printenv BANK)   # keep the bank the stack was launched with
-    for i in ckad-1 ckad-2; do   # /opt/course is a persistent volume; recreate alone won't wipe it
-      docker compose exec "$i" find /opt/course -mindepth 1 -delete
+    # Same code path the UI's "New attempt" button uses: the conductor
+    # owns the reset sequence; this is just a thin trigger + progress
+    # poll against the facilitator's /api/control proxy.
+    echo "Resetting exam state via conductor (cluster + instances, cached images kept)..."
+    curl -fsS -X POST http://localhost:8080/api/control/reset >/dev/null
+    while :; do
+      sleep 3
+      status=$(curl -fsS http://localhost:8080/api/control/status 2>/dev/null) || continue
+      busy=$(printf '%s' "$status" | python3 -c 'import json,sys; print(json.load(sys.stdin)["busy"])')
+      [ "$busy" = "False" ] && break
     done
-    docker compose exec k8s-env bash -c 'kind delete cluster --name sim || true; /opt/sim/bootstrap.sh'
-    BANK="$bank" docker compose up -d --force-recreate ckad-1 ckad-2
-    curl -fsS -X DELETE http://localhost:8080/api/session >/dev/null || true
+    err=$(printf '%s' "$status" | python3 -c 'import json,sys; print((json.load(sys.stdin).get("lastJob") or {}).get("error",""))')
+    [ -z "$err" ] || { echo "Reset failed: $err"; exit 1; }
     echo "Fresh exam ready." ;;
-  ssh)   docker compose exec "${2:-ckad-1}" su - candidate ;;
+  ssh)   docker compose exec "${2:-instance-1}" su - candidate ;;
   status) docker compose ps ;;
   grade) docker compose exec facilitator /entrypoint.sh grade ;;
   help)  echo "usage: ./sim {up [bank]|down|reset|purge|ssh [instance]|status|grade}" ;;

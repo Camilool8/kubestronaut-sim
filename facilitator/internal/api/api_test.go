@@ -68,7 +68,7 @@ func newTestServer(t *testing.T) *testServer {
 	}
 
 	clock, setNow := fakeClock(epoch)
-	mgr, err := session.New(t.TempDir()+"/session.json", ex.Duration, clock, func() {})
+	mgr, err := session.New(t.TempDir()+"/session.json", ex.Name, ex.Duration, clock, func() {})
 	if err != nil {
 		t.Fatalf("session.New: %v", err)
 	}
@@ -79,9 +79,16 @@ func newTestServer(t *testing.T) *testServer {
 		"assets/app.js": &fstest.MapFile{Data: []byte("console.log('hi');")},
 	}
 
-	h := api.New(ex, bankDir, mgr, grader.Grade, fakeDesktop, ui)
+	h := api.New(ex, bankDir, mgr, grader.Grade, fakeDesktop, fakeControl, ui)
 	return &testServer{handler: h, mgr: mgr, grader: grader, setNow: setNow}
 }
+
+// fakeControl proves that api.New mounts the conductor proxy under
+// /api/control/ with unstripped paths.
+var fakeControl = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusAccepted)
+	w.Write([]byte("control:" + r.URL.Path))
+})
 
 func (ts *testServer) do(t *testing.T, method, path string) *httptest.ResponseRecorder {
 	t.Helper()
@@ -356,7 +363,7 @@ func TestSessionEndLifecycle(t *testing.T) {
 	}
 
 	// once results are recorded, ended-with-results -> end: 409.
-	if err := ts.mgr.SetResults(mustJSON(t, map[string]int{"earned": 1})); err != nil {
+	if err := ts.mgr.SetResults(ts.mgr.AttemptToken(), mustJSON(t, map[string]int{"earned": 1})); err != nil {
 		t.Fatalf("SetResults: %v", err)
 	}
 	rec = ts.do(t, http.MethodPost, "/api/session/end")
@@ -416,7 +423,7 @@ func TestResultsLifecycle(t *testing.T) {
 	}
 
 	// gradeError set: 500 with the error message.
-	if err := ts.mgr.SetGradeError("ssh unreachable"); err != nil {
+	if err := ts.mgr.SetGradeError(ts.mgr.AttemptToken(), "ssh unreachable"); err != nil {
 		t.Fatalf("SetGradeError: %v", err)
 	}
 	rec = ts.do(t, http.MethodGet, "/api/results")
@@ -436,7 +443,7 @@ func TestResultsLifecycle(t *testing.T) {
 	// results recorded: 200 with the raw results JSON, superseding the
 	// earlier gradeError.
 	want := mustJSON(t, map[string]any{"earned": 9, "total": 9, "percent": 100})
-	if err := ts.mgr.SetResults(want); err != nil {
+	if err := ts.mgr.SetResults(ts.mgr.AttemptToken(), want); err != nil {
 		t.Fatalf("SetResults: %v", err)
 	}
 	rec = ts.do(t, http.MethodGet, "/api/results")
@@ -563,5 +570,23 @@ func TestRootServesIndex(t *testing.T) {
 	}
 	if got := rec.Body.String(); got != "<html>ui placeholder</html>" {
 		t.Errorf("GET / body = %q, want the embedded index.html", got)
+	}
+}
+
+func TestControlProxyMounted(t *testing.T) {
+	ts := newTestServer(t)
+
+	rec := ts.do(t, http.MethodPost, "/api/control/reset")
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("control status = %d, want 202 from the control handler", rec.Code)
+	}
+	if got := rec.Body.String(); got != "control:/api/control/reset" {
+		t.Errorf("control body = %q — the proxy must see the full unstripped path", got)
+	}
+
+	// The /api/* JSON-404 guard for unknown endpoints must be unaffected.
+	rec = ts.do(t, http.MethodGet, "/api/nonexistent")
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("unknown api path = %d, want 404", rec.Code)
 	}
 }

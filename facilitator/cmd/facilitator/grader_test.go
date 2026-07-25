@@ -63,7 +63,7 @@ func testExam() *exam.Exam {
 // rejected as ErrConflict instead of recorded.
 func newTestManager(t *testing.T) *session.Manager {
 	t.Helper()
-	mgr, err := session.New(t.TempDir()+"/session.json", time.Hour, time.Now, func() {})
+	mgr, err := session.New(t.TempDir()+"/session.json", "test-bank", time.Hour, time.Now, func() {})
 	if err != nil {
 		t.Fatalf("session.New: %v", err)
 	}

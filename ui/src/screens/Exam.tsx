@@ -1,7 +1,13 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { endSession, getExam, type ExamInfo, type SessionSnapshot } from "../api";
 import { TimerBar } from "../components/TimerBar";
 import { QuestionPanel } from "../components/QuestionPanel";
+import { DesktopViewport } from "../components/DesktopViewport";
+import { Dialog } from "../components/Dialog";
+import { InfoButton } from "../components/InfoButton";
+import { Tour, markTourSeen, resetTourSeen, tourSeen, type TourStep } from "../components/Tour";
+import { toastStore } from "../components/toastStore";
+import { strings } from "../strings";
 
 interface ExamProps {
   session: SessionSnapshot;
@@ -9,18 +15,20 @@ interface ExamProps {
   onSessionChange: (session: SessionSnapshot) => void;
 }
 
-// The desktop iframe's src, exact per the milestone design (§3/§5): the
-// noVNC client autoconnects through the facilitator's same-origin
-// /desktop reverse proxy so its WebSocket also flows through the proxy.
-const DESKTOP_SRC =
-  "/desktop/vnc.html?autoconnect=true&resize=remote&reconnect=true&path=desktop/websockify";
+const TOUR_STEPS: TourStep[] = [
+  { target: ".question-panel", ...strings.tour.steps.questions },
+  { target: ".timer", ...strings.tour.steps.timer },
+  { target: ".desktop-pane", ...strings.tour.steps.desktop },
+  { target: ".btn-danger", ...strings.tour.steps.end },
+];
 
 // Exam is only ever rendered by App while session.state === "running"
 // (screen = f(state), no router) — so the moment End succeeds and
 // App's session state flips to "ended", this whole component including
-// its iframe unmounts. The `session.state === "running"` guard on the
-// iframe itself is a second, redundant line of defense against ever
-// rendering the iframe on a stale/non-running snapshot.
+// its RFB viewport unmounts, severing the live WebSocket client-side.
+// The `session.state === "running"` guard on the viewport itself is a
+// second, redundant line of defense against ever rendering it on a
+// stale/non-running snapshot (the Go proxy independently 403s).
 export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
   const [exam, setExam] = useState<ExamInfo | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
@@ -28,6 +36,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [ending, setEnding] = useState(false);
   const [endError, setEndError] = useState<string | null>(null);
+  const [tourOpen, setTourOpen] = useState(() => !tourSeen());
 
   useEffect(() => {
     let cancelled = false;
@@ -64,13 +73,40 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
     }
   };
 
+  // Desktop connection health surfaces as toasts: sticky warning while
+  // reconnecting, brief confirmation when it comes back.
+  const desktopDownRef = useRef(false);
+  const handleDesktopState = useCallback((state: string) => {
+    if (state === "disconnected") {
+      desktopDownRef.current = true;
+      toastStore.push({
+        kind: "warning",
+        message: strings.toast.desktopReconnecting,
+        dedupeKey: "desktop",
+      });
+    } else if (state === "connected" && desktopDownRef.current) {
+      desktopDownRef.current = false;
+      toastStore.push({
+        kind: "info",
+        message: strings.toast.desktopRestored,
+        dedupeKey: "desktop",
+      });
+    }
+  }, []);
+
+  const restartTour = () => {
+    resetTourSeen();
+    setTourOpen(true);
+  };
+
   return (
     <div className="exam-layout">
       <TimerBar
         session={session}
         fetchedAt={fetchedAt}
-        title={exam?.title ?? "Exam"}
+        title={exam?.title ?? strings.exam.fallbackTitle}
         onEndClick={() => setConfirmOpen(true)}
+        extras={<InfoButton onRestartTour={restartTour} />}
       />
       <div className="exam-body">
         <QuestionPanel
@@ -80,36 +116,36 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
           open={panelOpen}
           onToggle={() => setPanelOpen((v) => !v)}
         />
-        <div className="desktop-pane">
+        <div className="desktop-pane" aria-label={strings.exam.desktopTitle}>
           {session.state === "running" && (
-            <iframe className="desktop-frame" title="Exam desktop" src={DESKTOP_SRC} />
+            <DesktopViewport onStateChange={handleDesktopState} />
           )}
         </div>
       </div>
 
       {confirmOpen && (
-        <div className="confirm-overlay">
-          <div className="confirm-dialog">
-            <h2>End the exam?</h2>
-            <p>
-              This cannot be undone. The desktop will lock immediately and grading
-              will begin.
-            </p>
-            {endError && <p className="error-text">{endError}</p>}
-            <div className="confirm-actions">
-              <button
-                className="btn"
-                onClick={() => setConfirmOpen(false)}
-                disabled={ending}
-              >
-                Cancel
-              </button>
-              <button className="btn btn-danger" onClick={handleConfirmEnd} disabled={ending}>
-                {ending ? "Ending…" : "End Exam"}
-              </button>
-            </div>
+        <Dialog title={strings.exam.confirmTitle} onClose={() => setConfirmOpen(false)}>
+          <p>{strings.exam.confirmBody}</p>
+          {endError && <p className="error-text">{endError}</p>}
+          <div className="confirm-actions">
+            <button className="btn" onClick={() => setConfirmOpen(false)} disabled={ending}>
+              {strings.exam.cancel}
+            </button>
+            <button className="btn btn-danger" onClick={handleConfirmEnd} disabled={ending}>
+              {ending ? strings.exam.ending : strings.exam.endExam}
+            </button>
           </div>
-        </div>
+        </Dialog>
+      )}
+
+      {tourOpen && (
+        <Tour
+          steps={TOUR_STEPS}
+          onDone={() => {
+            markTourSeen();
+            setTourOpen(false);
+          }}
+        />
       )}
     </div>
   );

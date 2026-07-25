@@ -17,9 +17,9 @@ services:
       retries: 90
       start_period: 60s
     networks: [default, examnet]
-  ckad-1:
+  instance-1:
     build: images/instance
-    hostname: ckad-1
+    hostname: instance-1
     environment:
       BANK: ${BANK:-ckad-mock-01}
     depends_on:
@@ -30,9 +30,9 @@ services:
       - ./tests:/tests:ro
       - course-1:/opt/course
     networks: [default, examnet]
-  ckad-2:
+  instance-2:
     build: images/instance
-    hostname: ckad-2
+    hostname: instance-2
     environment:
       BANK: ${BANK:-ckad-mock-01}
     depends_on:
@@ -50,6 +50,7 @@ services:
       BANK: ${BANK:-ckad-mock-01}
     volumes:
       - ./banks:/banks:ro
+      - shared:/shared:ro
     networks: [default, examnet]
     restart: unless-stopped
   desktop:
@@ -68,6 +69,25 @@ services:
       retries: 30
       start_period: 15s
     restart: unless-stopped
+  conductor:
+    build: conductor
+    hostname: conductor
+    # The ONLY container with the Docker socket. It lives alone with the
+    # facilitator on the internal control network: no host port, no exam
+    # network, unreachable from the desktop. Everything it does is
+    # driven through the facilitator's /api/control/* reverse proxy.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./banks:/banks:ro
+      - shared:/shared
+    networks: [controlnet]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9000/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    restart: unless-stopped
   facilitator:
     build:
       context: .
@@ -82,12 +102,12 @@ services:
       - ./banks:/banks:ro
       - shared:/shared:ro
       - session:/session
-    networks: [examnet]
+    networks: [examnet, controlnet]
     depends_on:
       k8s-env: {condition: service_healthy}
       desktop: {condition: service_healthy}
-      ckad-1: {condition: service_started}
-      ckad-2: {condition: service_started}
+      instance-1: {condition: service_started}
+      instance-2: {condition: service_started}
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
       interval: 10s
@@ -108,3 +128,5 @@ networks:
     driver_opts:
       com.docker.network.bridge.enable_ip_masquerade: "false"
       com.docker.network.bridge.enable_ip6_masquerade: "false"
+  controlnet:
+    internal: true

@@ -9,16 +9,22 @@ import {
   type SolutionDetail,
 } from "../api";
 import { CheckList } from "../components/CheckList";
+import { strings } from "../strings";
 
 const GRADING_POLL_MS = 3000;
+
+interface ScoreProps {
+  onNewAttempt: () => void;
+  endReason: string;
+}
 
 // Score screen: while /api/results is 202 ("grading"), poll every 3s;
 // on 500 (gradeError persisted), show the error with a Retry button
 // that re-POSTs /api/session/end (the API re-grades an ended session
-// without results — see §3); once 200, render the scoreboard. No reset
-// control here by design — resetting wipes cluster state and stays a
-// CLI-only decision (`./sim reset`).
-export function Score() {
+// without results — see §3); once 200, render the scoreboard with a
+// "New attempt" action that drives the conductor's reset (same code
+// path as ./sim reset).
+export function Score({ onNewAttempt, endReason }: ScoreProps) {
   const [response, setResponse] = useState<ResultsResponse>({ status: "grading" });
   const intervalRef = useRef<number | null>(null);
 
@@ -41,8 +47,8 @@ export function Score() {
     load();
     intervalRef.current = window.setInterval(load, GRADING_POLL_MS);
     return clearPoll;
-    // `load` is stable in effect (module-level poll interval owns its
-    // own lifecycle here); intentionally mount-only.
+    // Poll lifecycle is intentionally mount-only; `load` reads no props.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleRetry = async () => {
@@ -57,8 +63,8 @@ export function Score() {
   if (response.status === "grading" || response.status === "not-ended") {
     return (
       <div className="score-screen score-loading">
-        <h1>Grading…</h1>
-        <p>Evaluating your exam over SSH. This can take a minute.</p>
+        <h1>{strings.score.gradingTitle}</h1>
+        <p>{strings.score.gradingBody}</p>
       </div>
     );
   }
@@ -66,10 +72,10 @@ export function Score() {
   if (response.status === "error") {
     return (
       <div className="score-screen score-error">
-        <h1>Grading failed</h1>
+        <h1>{strings.score.gradingFailedTitle}</h1>
         <p className="error-text">{response.message}</p>
         <button className="btn btn-primary" onClick={handleRetry}>
-          Retry
+          {strings.score.retry}
         </button>
       </div>
     );
@@ -81,10 +87,13 @@ export function Score() {
     <div className="score-screen">
       <div className={`score-banner ${results.passed ? "pass" : "fail"}`}>
         <div className="score-percent">{results.percent}%</div>
-        <div className="score-verdict">{results.passed ? "PASS" : "FAIL"}</div>
+        <div className="score-verdict">{results.passed ? strings.score.pass : strings.score.fail}</div>
         <div className="score-detail">
-          {results.earned}/{results.total} points — passing score {results.passingScore}%
+          {strings.score.pointsDetail(results.earned, results.total, results.passingScore)}
         </div>
+        {endReason && (
+          <div className="score-end-reason">{strings.score.endReason(endReason)}</div>
+        )}
       </div>
 
       <div className="score-questions">
@@ -93,10 +102,12 @@ export function Score() {
         ))}
       </div>
 
-      <p className="reset-hint">
-        To start a new attempt, run <code>./sim reset</code> from the CLI — it wipes
-        cluster state and returns you to the start screen.
-      </p>
+      <div className="score-actions">
+        <button className="btn btn-primary" onClick={onNewAttempt}>
+          {strings.control.newAttempt}
+        </button>
+        <p className="score-actions-hint">{strings.control.newAttemptHint}</p>
+      </div>
     </div>
   );
 }
@@ -134,8 +145,8 @@ function QuestionResultDetails({ question }: { question: QuestionResult }) {
       </summary>
       <CheckList checks={question.checks} />
       <details className="solution-details" onToggle={handleToggle}>
-        <summary>Show solution</summary>
-        {loadingSolution && <p>Loading solution…</p>}
+        <summary>{strings.score.showSolution}</summary>
+        {loadingSolution && <p>{strings.score.loadingSolution}</p>}
         {solutionError && <p className="error-text">{solutionError}</p>}
         {solution && <ReactMarkdown>{solution.markdown}</ReactMarkdown>}
       </details>

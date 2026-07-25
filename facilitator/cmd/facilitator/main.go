@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"sync/atomic"
 	"time"
@@ -113,8 +115,13 @@ func runServer() error {
 	// calls whatever *gradeFn currently points to, and is only ever
 	// invoked after New returns (never synchronously from within it —
 	// see session.New's doc comment on the load-time-expiry case).
+	// The active bank id comes from the entrypoint (ACTIVE_BANK, derived
+	// from /shared/bank); ex.Name matches it by bank convention and is
+	// the natural fallback for direct/dev runs.
+	activeBank := envOr("ACTIVE_BANK", ex.Name)
+
 	var onExpire atomic.Pointer[func()]
-	mgr, err := session.New(sessionFile, dur, time.Now, func() {
+	mgr, err := session.New(sessionFile, activeBank, dur, time.Now, func() {
 		if fn := onExpire.Load(); fn != nil {
 			(*fn)()
 		}
@@ -142,7 +149,16 @@ func runServer() error {
 		return mgr.Snapshot().State == "running"
 	})
 
-	handler := api.New(ex, cfg.bankDir, mgr, g.Grade, desktopHandler, web.FS())
+	// Reverse proxy for the conductor's control API: the browser only
+	// ever talks to :8080, and the conductor is only reachable from this
+	// container (they share the internal control network).
+	conductorURL, err := url.Parse("http://" + envOr("CONDUCTOR_ADDR", "conductor:9000"))
+	if err != nil {
+		return fmt.Errorf("parse CONDUCTOR_ADDR: %w", err)
+	}
+	controlProxy := httputil.NewSingleHostReverseProxy(conductorURL)
+
+	handler := api.New(ex, cfg.bankDir, mgr, g.Grade, desktopHandler, controlProxy, web.FS())
 
 	srv := &http.Server{
 		Addr:              listen,

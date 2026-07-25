@@ -1,6 +1,6 @@
 # Question 3 | NetworkPolicy lockdown
 
-*Solve this question on instance: `ssh ckad-2`*
+*Solve this question on instance: `ssh instance-2`*
 
 Namespace `orbit` runs Deployments `frontend` (`role=frontend`), `api`
 (`role=api`) and `metrics` (`role=metrics`).

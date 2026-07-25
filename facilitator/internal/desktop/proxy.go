@@ -109,20 +109,57 @@ func writeLocked(w http.ResponseWriter, strippedPath string) {
 // lockedText is the plain-text body for non-navigational locked requests.
 const lockedText = "desktop locked: no exam session is running\n"
 
-// lockedHTML is the small dark, self-contained locked page shown for
+// lockedHTML is the small self-contained locked page shown for
 // navigational locked requests (the desktop root or any *.html asset).
+// It mirrors the SPA's design tokens (ui/src/styles/tokens.css) and
+// reads the SAME localStorage theme key the React app writes — same
+// origin, so a candidate's theme choice carries over seamlessly.
 const lockedHTML = `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
 <title>Desktop locked</title>
+<script>
+  try {
+    var t = localStorage.getItem("sim.theme");
+    if (t === "light" || t === "dark") {
+      document.documentElement.setAttribute("data-theme", t);
+    }
+  } catch (e) {}
+</script>
 <style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f6f9;
+    --surface: #ffffff;
+    --border: #d4dae3;
+    --text: #1a212b;
+    --text-muted: #57626f;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0b0e14;
+    --surface: #11151d;
+    --border: #262c38;
+    --text: #d9dee5;
+    --text-muted: #97a0af;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]):not([data-theme="dark"]) {
+      color-scheme: dark;
+      --bg: #0b0e14;
+      --surface: #11151d;
+      --border: #262c38;
+      --text: #d9dee5;
+      --text-muted: #97a0af;
+    }
+  }
   html, body {
     height: 100%;
     margin: 0;
-    background: #111;
-    color: #ddd;
-    font-family: system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
   }
   body {
     display: flex;
@@ -131,17 +168,20 @@ const lockedHTML = `<!doctype html>
   }
   .card {
     text-align: center;
-    padding: 2rem;
+    padding: 2rem 2.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    max-width: 26rem;
   }
   h1 {
     margin: 0 0 0.5rem;
     font-size: 1.25rem;
     font-weight: 600;
-    color: #fff;
   }
   p {
     margin: 0;
-    color: #888;
+    color: var(--text-muted);
   }
 </style>
 </head>

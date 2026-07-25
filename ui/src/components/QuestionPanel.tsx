@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { getQuestion, type ExamQuestionInfo } from "../api";
+import { strings } from "../strings";
 
 interface QuestionPanelProps {
   questions: ExamQuestionInfo[];
@@ -25,11 +26,10 @@ export function QuestionPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const selected = questions.find((q) => q.id === selectedId);
+
   useEffect(() => {
-    if (!selectedId) {
-      setMarkdown("");
-      return;
-    }
+    if (!selectedId) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -53,7 +53,7 @@ export function QuestionPanel({
       <button
         className="panel-toggle"
         onClick={onToggle}
-        aria-label={open ? "Collapse question panel" : "Expand question panel"}
+        aria-label={open ? strings.questionPanel.collapse : strings.questionPanel.expand}
       >
         {open ? "«" : "»"}
       </button>
@@ -68,15 +68,22 @@ export function QuestionPanel({
                 >
                   <span className="question-id">{q.id}</span>
                   <span className="question-domain">{q.domain}</span>
-                  <span className="question-points">{q.totalPoints} pts</span>
+                  <span className="question-points">{strings.questionPanel.points(q.totalPoints)}</span>
                 </button>
               </li>
             ))}
           </ul>
+          {selected && (
+            <span className="instance-chip">
+              {strings.questionPanel.sshHint(selected.instance)}
+            </span>
+          )}
           <div className="question-markdown">
-            {loading && <p>Loading…</p>}
+            {loading && <p>{strings.questionPanel.loading}</p>}
             {error && <p className="error-text">{error}</p>}
-            {!loading && !error && <ReactMarkdown>{markdown}</ReactMarkdown>}
+            {!loading && !error && (
+              <ReactMarkdown>{selectedId ? markdown : ""}</ReactMarkdown>
+            )}
           </div>
         </>
       )}

@@ -46,7 +46,7 @@ type server struct {
 // given) — the exam package itself does not retain it, but the
 // question/solution endpoints need it to read question.md/solution.md
 // from disk per request.
-func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desktop http.Handler, ui fs.FS) http.Handler {
+func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desktop, control http.Handler, ui fs.FS) http.Handler {
 	s := &server{ex: ex, bankDir: bankDir, mgr: mgr, grade: grade, desktop: desktop, ui: ui}
 
 	mux := http.NewServeMux()
@@ -59,6 +59,13 @@ func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desk
 	mux.HandleFunc("POST /api/session/end", s.handleSessionEnd)
 	mux.HandleFunc("GET /api/results", s.handleResults)
 	mux.HandleFunc("DELETE /api/session", s.handleSessionDelete)
+
+	// Control-plane passthrough to the conductor (reset, bank switch,
+	// catalog). The subtree pattern is more specific than "/", so the
+	// SPA fallback's /api/* 404 guard is unaffected; the conductor sees
+	// the full, unstripped /api/control/... path — its own mux registers
+	// the same paths.
+	mux.Handle("/api/control/", control)
 
 	// Registered as both the exact path and the subtree so every
 	// "/desktop" and "/desktop/*" request reaches desktop with its
@@ -216,6 +223,7 @@ func (s *server) handleSolution(w http.ResponseWriter, r *http.Request) {
 // and POST /api/session/end.
 type sessionResponse struct {
 	State            string `json:"state"`
+	Bank             string `json:"bank"`
 	StartedAt        string `json:"startedAt"`
 	DurationSeconds  int    `json:"durationSeconds"`
 	RemainingSeconds int    `json:"remainingSeconds"`
@@ -225,6 +233,7 @@ type sessionResponse struct {
 func toSessionResponse(snap session.Snapshot) sessionResponse {
 	resp := sessionResponse{
 		State:            snap.State,
+		Bank:             snap.Bank,
 		DurationSeconds:  snap.DurationSeconds,
 		RemainingSeconds: snap.RemainingSeconds,
 		EndReason:        snap.EndReason,
