@@ -45,7 +45,7 @@ Convert to GitHub issues once the repo has a remote.
 ## Milestone D (conductor/catalog/design system) — new
 - conductor: image runs as root and holds the docker socket by design; consider a socket proxy (e.g. filtered API) if the tool is ever multi-user.
 - conductor: catalog is read once at boot; adding a bank requires a conductor restart. Fine locally; revisit if bank authoring becomes iterative.
-- ui: visual regression pass in a real browser (Chrome extension was unavailable during development; WS upgrade + xfconf state verified instead). Do a manual light/dark + tour + toast walkthrough.
+- ~~ui: visual regression pass in a real browser (Chrome extension was unavailable during development; WS upgrade + xfconf state verified instead). Do a manual light/dark + tour + toast walkthrough.~~ (done in Milestone F: real-browser pass at three widths, light and dark. It found three of the four defects that milestone fixed — the skip-link leak, the dead "New attempt" button, and unstyled solution markdown — none of which axe or vitest's jsdom could see.)
 - desktop: xfdesktop may show a one-time "untrusted launcher" prompt on the Desktop icons (panel launchers are the primary path); investigate gio trust metadata if it annoys.
 - ui: bundle is ~470KB min (noVNC + React); consider code-splitting the RFB client if cold loads matter.
 
@@ -72,7 +72,43 @@ Convert to GitHub issues once the repo has a remote.
   usage terms prohibit using their marks as part of a product name. The
   palette is fine (colours are not the exposed part); the *name* is. Worth
   resolving with trademarks@linuxfoundation.org before the repo is public.
-- verification: the live CKAD->CKA switch round-trip was not re-run at the end
+- ~~verification: the live CKAD->CKA switch round-trip was not re-run at the end
   of this milestone because a timed session was in progress and ending it
   would have destroyed an attempt. Everything else was verified; run
-  `tests/smoke.sh` from an idle stack before merging.
+  `tests/smoke.sh` from an idle stack before merging.~~ (ran and passed on
+  main, 2026-07-25.)
+
+## Milestone F (UI polish) — new
+
+- design: `--accent` on `--surface-raised` measures 4.12:1 in the light
+  theme, below WCAG AA's 4.5:1 for normal text. Code-block highlighting
+  sidesteps it by using `--accent-strong` instead (5.57:1 light, 8.52:1
+  dark), so nothing new regresses, but the weaker pairing is still sitting
+  in the palette available for other uses. Worth an audit of where else
+  `--accent` on `--surface-raised` might already be in play.
+- test: `Markdown.test.tsx` reads `theme.css` off disk via a non-literal
+  `import("node:" + "fs")` to dodge a `tsc` error with no `@types/node` in
+  the project. It works and the limitation it's checking for was verified
+  by hand, but it's the weakest test in the suite — a regex over CSS text
+  standing in for a real style assertion. Replace with a typed `node:fs`
+  import if `@types/node` ever enters the project.
+- bug: `highlight.ts` caches a rejected promise forever. One transient
+  failure to load a grammar (yaml/bash/json) disables highlighting for the
+  rest of the session, with no retry on the next code block rendered.
+- bug (theoretical): `Async` treats `data === undefined` as loaded — it
+  only checks `!== null`. A `useAsync<void>` would therefore render its
+  children instead of the loading slot. Nothing in `api.ts` returns `void`
+  today, so this hasn't fired, but the type hole is real.
+- bug: a synchronously-throwing `fn` passed to `useAsync` escapes the
+  effect after `progressStore.start()` runs but before its matching
+  `done()`, leaking the top progress bar visible permanently.
+- docs: `docs/bank-spec.md` still carries its own pre-existing 4-space
+  indented `exam.yaml` example. It renders as an unlabelled block for the
+  same reason the bank content used to — noted during phase 10's bank
+  conversion but left alone as out of scope for that task.
+- ui: the main bundle is now ~485KB. Code-splitting the noVNC RFB client
+  remains the obvious next win if cold loads matter (carried over from
+  Milestone D, still true at the larger number).
+- test: no test covers the success-after-retry path on the lobby's catalog
+  error card — click Retry, confirm the catalog renders. The wiring was
+  traced by hand and is correct, but it's unexercised.
