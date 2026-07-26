@@ -41,6 +41,9 @@ func main() {
 		Project:        project,
 		FacilitatorURL: facilitatorURL,
 		Instances:      instances,
+		// Set to "" to skip; a bank with no image-building questions never
+		// writes to the registry, but wiping it costs nothing either way.
+		Registry:       envOr("REGISTRY_SERVICE", "registry"),
 		HTTPClient:     &http.Client{Timeout: 15 * time.Second},
 		VerifyBudget:   90 * time.Second,
 		VerifyInterval: 2 * time.Second,

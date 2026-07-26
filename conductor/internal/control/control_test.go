@@ -17,6 +17,15 @@ import (
 	"kubestronaut-sim/conductor/internal/job"
 )
 
+// The wipe commands as the fakeEngine renders them (argv joined by
+// spaces). Derived from the real values rather than retyped, so a change
+// to what a reset clears cannot pass this test by accident — the point of
+// the assertion is the *order and set* of calls, not their spelling.
+var (
+	wipeShell     = strings.Join(wipeCmd, " ")
+	registryShell = strings.Join(registryWipeCmd, " ")
+)
+
 // fakeEngine records every docker-side action and lets tests fail
 // specific steps.
 type fakeEngine struct {
@@ -74,6 +83,7 @@ func newTestController(t *testing.T, eng Engine, facilitator string) *Controller
 		Project:        "kubestronaut-sim",
 		FacilitatorURL: facilitator,
 		Instances:      []string{"instance-1", "instance-2"},
+		Registry:       "registry",
 		HTTPClient:     &http.Client{Timeout: 2 * time.Second},
 		VerifyBudget:   500 * time.Millisecond,
 		VerifyInterval: 10 * time.Millisecond,
@@ -141,9 +151,11 @@ func TestResetRunsFullSequenceInOrder(t *testing.T) {
 	got := eng.recorded()
 	want := []string{
 		"find:kubestronaut-sim/instance-1",
-		"exec:instance-1:find /opt/course -mindepth 1 -delete",
+		"exec:instance-1:" + wipeShell,
 		"find:kubestronaut-sim/instance-2",
-		"exec:instance-2:find /opt/course -mindepth 1 -delete",
+		"exec:instance-2:" + wipeShell,
+		"find:kubestronaut-sim/registry",
+		"exec:registry:" + registryShell,
 		"find:kubestronaut-sim/k8s-env",
 		"exec:k8s-env:bash -c kind delete cluster --name sim || true; /opt/sim/bootstrap.sh",
 		"find:kubestronaut-sim/instance-1",
