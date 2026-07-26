@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 1
 # desc: Dockerfile sets RELEASE_CHANNEL to stable
 set -uo pipefail
 # Both ENV forms are valid Dockerfile syntax and both are correct answers.

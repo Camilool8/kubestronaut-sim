@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 1
 # desc: Pod checkout runs app (busybox) and ambassador (nginx), and is Running
 set -uo pipefail
 names=$(kubectl -n dorado get pod checkout \

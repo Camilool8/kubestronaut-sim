@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 5
 # desc: the node port really answers, from a node address inside the cluster
 set -uo pipefail
 node=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null)

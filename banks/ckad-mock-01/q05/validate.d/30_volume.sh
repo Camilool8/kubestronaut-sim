@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 1
 # desc: emptyDir feed-logs mounted at /var/log/feed in both writer and shipper
 set -uo pipefail
 kind=$(kubectl -n lyra get deploy feed-writer \

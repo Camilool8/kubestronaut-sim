@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 3
 # desc: /opt/course/1/aurora-namespaces lists team=aurora namespaces, sorted, names only
 set -uo pipefail
 f=/opt/course/1/aurora-namespaces

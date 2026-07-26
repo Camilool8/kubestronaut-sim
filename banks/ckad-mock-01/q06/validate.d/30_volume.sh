@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 3
 # desc: app-limits mounted read-only at /etc/app, and the file is really there
 set -uo pipefail
 src=$(kubectl -n atlas get pod tuned \

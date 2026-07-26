@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 1
 # desc: Pod telemetry runs containers app and adapter on busybox:1.37
 set -uo pipefail
 names=$(kubectl -n pictor get pod telemetry \

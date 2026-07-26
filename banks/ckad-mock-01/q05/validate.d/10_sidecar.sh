@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 2
 # desc: shipper is a native sidecar (initContainers entry with restartPolicy Always)
 set -uo pipefail
 # The whole point of the question: a sidecar declared the modern way

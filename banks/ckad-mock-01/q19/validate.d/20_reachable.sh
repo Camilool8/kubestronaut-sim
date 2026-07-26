@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 4
+# points: 5
 # desc: the Service has both endpoints and really answers from inside the cluster
 set -uo pipefail
 count=$(kubectl -n serpens get endpointslice -l kubernetes.io/service-name=inventory -o json 2>/dev/null \

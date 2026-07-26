@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 4
 # desc: both replicas pass readiness and appear as ready Service endpoints
 set -uo pipefail
 # Checks are independent, so this one cannot assume 10_probes.sh passed —

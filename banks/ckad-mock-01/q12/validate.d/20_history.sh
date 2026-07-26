@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 4
 # desc: the upgrade really happened, was annotated, and was undone via rollout
 set -uo pipefail
 # Reaching the right end state by editing the image back would leave two

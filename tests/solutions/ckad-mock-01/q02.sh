@@ -16,4 +16,16 @@ kubectl -n nova patch deploy nova-api --type=strategic -p '{
     }]}}
   }
 }'
-kubectl -n nova rollout status deploy nova-api --timeout=180s
+# Not `rollout status`. The seeded Deployment has been failing to pull
+# its image since the cluster came up, so it already carries a
+# ProgressDeadlineExceeded condition — and `rollout status` reports that
+# existing condition and exits non-zero immediately, even though the
+# rollout just triggered is progressing perfectly. Wait on the thing the
+# checks actually assert.
+ready=0
+for _ in $(seq 1 60); do
+  ready=$(kubectl -n nova get deploy nova-api -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo 0)
+  [ "${ready:-0}" = "3" ] && break
+  sleep 3
+done
+[ "${ready:-0}" = "3" ] || { echo "nova-api did not reach 3 ready replicas" >&2; exit 1; }

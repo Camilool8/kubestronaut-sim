@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 4
 # desc: ResourceQuota staging-quota limits pods=5 and requests.cpu=1
 set -uo pipefail
 out=$(kubectl -n aurora-staging get quota staging-quota \

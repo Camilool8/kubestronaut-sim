@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 3
 # desc: requests 100m/64Mi and limits 500m/128Mi
 set -uo pipefail
 sel='{.spec.containers[?(@.name=="agent")].resources'

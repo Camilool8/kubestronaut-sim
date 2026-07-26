@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 3
 # desc: report-api-v1 and the failed release are gone, report-web untouched
 set -uo pipefail
 export HELM_NAMESPACE=carina

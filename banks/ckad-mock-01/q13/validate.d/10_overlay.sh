@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 4
+# points: 5
 # desc: the overlay itself renders the prefix, label, image and replica count
 set -uo pipefail
 # Rendering the overlay, rather than only inspecting the cluster, is what

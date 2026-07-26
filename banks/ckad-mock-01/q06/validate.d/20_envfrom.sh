@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 3
 # desc: Pod tuned takes every app-tuning entry via envFrom, not one by one
 set -uo pipefail
 ref=$(kubectl -n atlas get pod tuned \

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 5
 # desc: the controller really routes / to storefront and /checkout to checkout
 set -uo pipefail
 # Behavioural, not structural: an Ingress whose rules look right but which

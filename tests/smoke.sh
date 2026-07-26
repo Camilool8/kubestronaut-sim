@@ -22,6 +22,11 @@ print(data.get(os.environ["FIELD"], ""))
 '
 }
 
+# Offline and instant, so it runs before anything is torn down: a
+# mis-weighted bank should fail in two seconds, not forty minutes in
+# after a full cold boot.
+bash tests/bank-weights.sh || fail "bank weights are out of balance"
+
 ./sim purge   # cold start: the fresh-grade-0 assertion needs pristine cluster state
 ./sim up
 docker compose exec instance-1 su - candidate -c 'kubectl get nodes --no-headers' | tee /tmp/nodes.txt
