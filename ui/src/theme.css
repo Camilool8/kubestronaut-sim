@@ -268,6 +268,31 @@
   margin-top: var(--space-5);
 }
 
+.catalog-error {
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.catalog-error-title {
+  font-weight: 600;
+  margin: 0;
+}
+
+.catalog-error-body {
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.catalog-loading {
+  color: var(--text-muted);
+}
+
 /* ---- exam layout ---- */
 
 .exam-layout {
@@ -441,13 +466,20 @@
   align-self: flex-start;
 }
 
-.question-markdown {
+/* Pane layout only — how the question panel's scroll region sizes and
+   insets itself. Deliberately separate from `.md` below: `.md` is
+   Markdown's own wrapper and is also dropped straight into
+   `.solution-details` on the Score screen, which has no flex ancestor
+   and no matching padding to pair with this. Bundling the two onto one
+   selector previously nested `.md` inside a `.question-pane`-flavored
+   `.md`, doubling the inset. */
+.question-pane {
   flex: 1;
   overflow-y: auto;
   padding: var(--space-4);
 }
 
-.question-markdown pre {
+.md pre {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-s);
@@ -455,7 +487,7 @@
   overflow-x: auto;
 }
 
-.question-markdown code {
+.md code {
   background: var(--bg);
   padding: 0.1em 0.3em;
   border-radius: 3px;
@@ -499,7 +531,7 @@
   opacity: 1;
 }
 
-.question-markdown pre code {
+.md pre code {
   background: none;
   padding: 0;
 }
@@ -1119,23 +1151,43 @@
   text-align: center;
 }
 
-/* ---- skip link (keyboard exit past the VNC canvas) ---- */
+/* ---- skip link (keyboard exit past the VNC canvas) ----
+   Hidden with the same clip idiom as .sr-only (base.css), NOT with a
+   transform: a translate is proportional to the element's own height, so
+   whether it clears the viewport depends on how far down the page its
+   container starts and whether the label wrapped. That is how it ended up
+   21px visible under the topbar. Clipping is height- and container-
+   independent, and :focus restores it as position: fixed so the visible
+   state is anchored to the viewport rather than to the desktop pane. */
 
 .skip-link {
   position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link:focus {
+  position: fixed;
   top: var(--space-2);
   left: var(--space-2);
   z-index: var(--z-panel);
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  overflow: visible;
+  clip-path: none;
+  white-space: normal;
   background: var(--surface);
   border: 1px solid var(--accent);
   border-radius: var(--radius-s);
   color: var(--accent);
-  padding: var(--space-2) var(--space-3);
-  transform: translateY(-200%);
-}
-
-.skip-link:focus {
-  transform: none;
 }
 
 /* ---- desktop-required gate ---- */
@@ -1217,6 +1269,29 @@
     max-height: 100dvh;
     border-radius: 0;
   }
+
+  .score-screen {
+    padding: var(--space-4) var(--space-3);
+  }
+
+  .score-banner {
+    padding: var(--space-4);
+  }
+
+  /* Four flex columns in one row squeeze the domain to nothing on a
+     phone; let it take its own line under the id and points. */
+  .question-result summary {
+    flex-wrap: wrap;
+  }
+
+  .qr-domain {
+    flex-basis: 100%;
+    order: 3;
+  }
+
+  .score-actions .btn {
+    width: 100%;
+  }
 }
 
 /* Wide content scrolls inside itself instead of pushing the page
@@ -1236,6 +1311,48 @@
   }
 }
 
+/* ---- global progress bar ---- */
+
+.top-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-toast);
+  pointer-events: none;
+}
+
+.top-progress-track {
+  height: 3px;
+  overflow: hidden;
+  background: transparent;
+}
+
+.top-progress-bar {
+  height: 100%;
+  width: 100%;
+  background: var(--accent);
+  /* Calm default: a static full-width accent rule. The travelling
+     animation is layered on only for users who accept motion. */
+  transform-origin: 0 50%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .top-progress-bar {
+    width: 40%;
+    animation: top-progress-slide 1.1s var(--ease-out) infinite;
+  }
+
+  @keyframes top-progress-slide {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(350%);
+    }
+  }
+}
+
 /* ---- motion ----
    Written motion-additive: the calm state is the default and animation
    is layered on only when the user has expressed no preference against
@@ -1249,7 +1366,23 @@
    compositor-only, which matters for the overlay that stays on screen
    for minutes. */
 
+/* Outside the media query so layout is identical for reduced-motion
+   users: the wrapper's box model must not depend on motion being on. */
+.screen {
+  height: 100%;
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  /* Additive only: `.screen`'s resting style (outside this block, and
+     whenever this animation hasn't started or has already finished) is
+     the plain, fully-visible element. This keyframe only ever plays
+     forward from opacity: 0 to the element's real style, so a screen
+     that never gets to run it — or runs it in a hidden tab whose timeline
+     is paused — still ends up visible rather than stuck invisible. */
+  .screen {
+    animation: screen-in var(--dur-base) var(--ease-out) both;
+  }
+
   .confirm-overlay,
   .control-overlay,
   .drawer-overlay {
@@ -1280,6 +1413,13 @@
   .control-phases li:nth-child(5) { animation-delay: 160ms; }
   .control-phases li:nth-child(6) { animation-delay: 200ms; }
   .control-phases li:nth-child(n + 7) { animation-delay: 240ms; }
+}
+
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 
 @keyframes scrim-in {
@@ -1314,4 +1454,89 @@
     opacity: 0;
     transform: translateY(4px);
   }
+}
+
+/* ---- fenced code blocks ---- */
+
+.code-block {
+  margin: var(--space-3) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+
+.code-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.code-block-lang {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.code-block-copy {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  color: var(--accent);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.code-block-copy:hover {
+  border-color: var(--accent);
+}
+
+/* A code block reads as ONE object: the figure above owns the border,
+   the radius and the body background. `.md pre` (a prose rule that
+   predates this chrome, and still styles fenced code that renders
+   without it) sets its own background/border/border-radius; since this
+   selector has the same specificity and comes later in the cascade, it
+   has to null those three out explicitly or they leak through and
+   occlude the figure's background with a second, redundant border drawn
+   just inside the first. overflow-x stays — a long line scrolls inside
+   the block instead of moving the page. */
+.code-block pre {
+  margin: 0;
+  padding: var(--space-3);
+  overflow-x: auto;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+
+/* highlight.js class names, mapped onto theme tokens so both themes work.
+   Contrast ratios against --surface-raised are recorded in tokens.css.
+   Plain --accent only reaches 4.1:1 on --surface-raised in the light
+   theme — under the 4.5:1 floor — so the keyword group below uses
+   --accent-strong instead, the same substitution tokens.css already
+   documents for --accent on --accent-soft. */
+.md .hljs-attr,
+.md .hljs-attribute,
+.md .hljs-keyword,
+.md .hljs-built_in {
+  color: var(--accent-strong);
+}
+
+.md .hljs-string,
+.md .hljs-number,
+.md .hljs-literal {
+  color: var(--text);
+}
+
+.md .hljs-comment,
+.md .hljs-meta {
+  color: var(--text-muted);
+  font-style: italic;
 }

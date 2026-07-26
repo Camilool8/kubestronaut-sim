@@ -5,8 +5,10 @@ certifications. Deliberately harder than the real exams. CKAD and CKA
 banks today; KCNA/KCSA (multiple choice) and CKS are on the roadmap and
 appear in the catalog as coming soon.
 
-**Status: Milestone E — product polish (live control plane, clipboard,
-Kubernetes-blue design system, responsive + mobile gate).**
+**Status: Milestone F — UI polish (one markdown renderer for questions and
+solutions, a required-error-branch async primitive behind the exam
+catalog, a non-strobing progress bar, and a real-browser pass that caught
+bugs the automated gates could not).**
 
 Code: Apache-2.0. Question banks: CC BY-SA 4.0 (see `banks/LICENSE`).
 Not affiliated with CNCF, The Linux Foundation, PSI, or killer.sh.
@@ -32,7 +34,9 @@ each step's duration and the cluster's own output as it goes.
 **Click any value in a question to copy it**, then paste in the exam
 terminal with Ctrl+Shift+V. Resource names, labels, image tags and
 `/opt/course` paths all have to be exact, and retyping them is how
-avoidable zeros happen.
+avoidable zeros happen. Code listings in both questions and solutions
+carry a language label and a copy-whole-block button, and highlighting
+loads only for the language actually shown.
 
 `down` + `up` resumes your exam state (including an in-progress
 session). Light and dark themes follow your system, with a toggle in the

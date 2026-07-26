@@ -6,6 +6,7 @@ export const strings = {
   app: {
     loading: "Loading…",
     cannotReach: (err: string) => `Cannot reach facilitator: ${err}`,
+    working: "Loading…",
   },
 
   errorBoundary: {
@@ -27,12 +28,20 @@ export const strings = {
     ],
     startExam: "Start Exam",
     starting: "Starting…",
+    catalogErrorTitle: "Couldn't load the exam catalog",
+    catalogErrorBody: (detail: string) =>
+      `The control plane did not answer (${detail}). Your current exam below still works — the list of other exams needs the conductor container.`,
+    catalogRetry: "Retry",
   },
 
   exam: {
     fallbackTitle: "Exam",
     endExam: "End Exam",
     ending: "Ending…",
+    // Submitting is the one control that must never fail silently: the
+    // server-side clock keeps running whatever the button looks like.
+    endFailed: (detail: string) =>
+      `Couldn't submit the exam (${detail}). The session is still running — try again, or submit from a desktop.`,
     confirmTitle: "End the exam?",
     confirmBody:
       "This cannot be undone. The desktop will lock immediately and grading will begin.",
@@ -50,6 +59,15 @@ export const strings = {
     copiedToDesktop: (value: string) => `Copied ${value} — paste with Ctrl+Shift+V`,
     copied: (value: string) => `Copied ${value}`,
     copyFailed: "Could not copy that value.",
+  },
+
+  markdown: {
+    plainLanguage: "text",
+    copyBlock: "Copy",
+    copyBlockLabel: (language: string) => `Copy ${language} code block`,
+    copiedBlockToDesktop: "Copied to the exam desktop — paste with Ctrl+Shift+V.",
+    copiedBlock: "Copied to the clipboard.",
+    copyFailed: "Couldn't copy that.",
   },
 
   toast: {
@@ -159,6 +177,10 @@ export const strings = {
     background: "Run in background",
     retry: "Retry",
     dismiss: "Dismiss",
+    // "HTTP 502" is true and useless. Name the likely cause and the
+    // check that confirms it; keep the raw status as trailing detail.
+    actionFailed: (detail: string) =>
+      `Couldn't reach the control plane (${detail}). The conductor container may be down — check it with \`docker compose ps conductor\`.`,
     newAttempt: "New attempt",
     newAttemptHint:
       "Wipes all cluster and instance state and returns you to the lobby, where you can retry this exam or pick a different one.",
@@ -186,6 +208,15 @@ export const strings = {
     gradingBody: "Evaluating your exam over SSH. This can take a minute.",
     gradingFailedTitle: "Grading failed",
     retry: "Retry",
+    // The poll could not reach the facilitator. Not terminal — the poll is
+    // still running — so the copy says what is happening and that it will
+    // keep trying, rather than reading like a dead end.
+    pollFailed: (detail: string) =>
+      `Still trying to reach the facilitator (${detail}). Retrying every few seconds — leave this tab open.`,
+    // The re-grade request itself failed. The Retry button is showing
+    // again underneath this, so the copy names the likely check.
+    retryFailed: (detail: string) =>
+      `Couldn't ask the facilitator to grade again (${detail}). Check the stack is up with \`docker compose ps\`, then retry.`,
     pass: "PASS",
     fail: "FAIL",
     pointsDetail: (earned: number, total: number, passingScore: number) =>

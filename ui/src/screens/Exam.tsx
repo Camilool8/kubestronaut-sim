@@ -24,6 +24,7 @@ interface ExamProps {
 export function ExamGateControls({ session, fetchedAt, onSessionChange }: ExamProps) {
   const [now, setNow] = useState(() => Date.now());
   const [ending, setEnding] = useState(false);
+  const [endError, setEndError] = useState<string | null>(null);
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000);
@@ -35,11 +36,22 @@ export function ExamGateControls({ session, fetchedAt, onSessionChange }: ExamPr
     session.remainingSeconds - Math.floor((now - fetchedAt) / 1000),
   );
 
+  // This is the only submit control a phone has. A discarded {ok:false}
+  // (409) or a rejected fetch used to leave the button flicking back to
+  // "End Exam" with nothing said, which reads exactly like a button that
+  // does nothing — while the server-side clock keeps running.
   const end = async () => {
     setEnding(true);
+    setEndError(null);
     try {
       const result = await endSession();
-      if (result.ok) onSessionChange(result.session);
+      if (result.ok) {
+        onSessionChange(result.session);
+      } else {
+        setEndError(strings.exam.endFailed(result.error));
+      }
+    } catch (err) {
+      setEndError(strings.exam.endFailed(String(err)));
     } finally {
       setEnding(false);
     }
@@ -51,6 +63,11 @@ export function ExamGateControls({ session, fetchedAt, onSessionChange }: ExamPr
         <span className="timer">{formatClock(remaining)}</span>
       </p>
       <p>{strings.mobile.sessionRunning}</p>
+      {endError && (
+        <p className="error-text" role="alert">
+          {endError}
+        </p>
+      )}
       <button className="btn btn-danger" onClick={end} disabled={ending}>
         {ending ? strings.exam.ending : strings.exam.endExam}
       </button>

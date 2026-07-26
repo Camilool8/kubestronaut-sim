@@ -11,14 +11,21 @@ import {
   type ExamInfo,
   type SessionSnapshot,
 } from "../api";
+import { Async } from "../components/Async";
 import { Dialog } from "../components/Dialog";
 import { useDesktopGate } from "../components/DesktopRequired";
 import { formatDuration } from "../lib/format";
+import { useAsync } from "../lib/useAsync";
 import { strings } from "../strings";
 
 interface StartProps {
   onSessionChange: (session: SessionSnapshot) => void;
-  onControlStart: (result: ControlActionResponse) => void;
+  // Takes the *starter*, not its result, so the switch runs inside App's
+  // runControlAction: that wrapper is what turns both a refused job
+  // ({ok:false}) and a rejected fetch into a toast. Handing it a result
+  // could only ever cover the first, and a bank switch fails the second
+  // way whenever the conductor's host is unreachable.
+  onControlStart: (start: () => Promise<ControlActionResponse>) => void;
   // Bumped by App whenever a control job finishes: a completed bank
   // switch changes the active exam while Start stays mounted, so the
   // exam summary and catalog must be refetched, not kept from mount.
@@ -43,7 +50,6 @@ export function Start({
 }: StartProps) {
   const [exam, setExam] = useState<ExamInfo | null>(null);
   const [examError, setExamError] = useState<string | null>(null);
-  const [banks, setBanks] = useState<BanksResponse | null>(null);
   const [confirmBank, setConfirmBank] = useState<BankEntry | null>(null);
   const [switching, setSwitching] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -60,20 +66,16 @@ export function Start({
       .catch((err) => {
         if (!cancelled) setExamError(String(err));
       });
-    getBanks()
-      .then((b) => {
-        if (cancelled) return;
-        setBanks(b);
-        onBanksLoaded(b);
-      })
-      .catch(() => {
-        // Catalog unavailable is non-fatal: the active exam still works;
-        // the lobby just can't offer switching.
-      });
     return () => {
       cancelled = true;
     };
-  }, [catalogVersion, onBanksLoaded]);
+  }, [catalogVersion]);
+
+  const banksState = useAsync(getBanks, [catalogVersion]);
+
+  useEffect(() => {
+    if (banksState.data) onBanksLoaded(banksState.data);
+  }, [banksState.data, onBanksLoaded]);
 
   const handleStart = async () => {
     setStarting(true);
@@ -95,20 +97,26 @@ export function Start({
     }
   };
 
-  const handleConfirmSwitch = async () => {
+  // The dialog's own concerns (close on acceptance, release the disabled
+  // state either way) live inside the starter; whether the user hears
+  // about a failure is App's, through the wrapper it already owns.
+  const handleConfirmSwitch = () => {
     if (!confirmBank) return;
+    const bank = confirmBank;
     setSwitching(true);
-    try {
-      const result = await startControlSwitch(confirmBank.id);
-      onControlStart(result);
-      if (result.ok) setConfirmBank(null);
-    } finally {
-      setSwitching(false);
-    }
+    onControlStart(async () => {
+      try {
+        const result = await startControlSwitch(bank.id);
+        if (result.ok) setConfirmBank(null);
+        return result;
+      } finally {
+        setSwitching(false);
+      }
+    });
   };
 
-  const bankBadge = (b: BankEntry): string | null => {
-    if (banks && b.id === banks.active) return strings.lobby.active;
+  const bankBadge = (b: BankEntry, banks: BanksResponse): string | null => {
+    if (b.id === banks.active) return strings.lobby.active;
     if (b.comingSoon) return strings.lobby.comingSoon;
     if (!b.available) return strings.lobby.unavailable;
     return null;
@@ -120,44 +128,60 @@ export function Start({
         <h1>{exam?.title ?? strings.start.fallbackTitle}</h1>
         {examError && <p className="error-text">{examError}</p>}
 
-        {banks && banks.banks.length > 0 && (
-          <div className="bank-catalog">
-            <h2>{strings.lobby.chooseExam}</h2>
-            <ul className="bank-list">
-              {banks.banks.map((b) => {
-                const isActive = b.id === banks.active;
-                const badge = bankBadge(b);
-                return (
-                  <li key={b.id}>
-                    <button
-                      className={`bank-card${isActive ? " bank-active" : ""}`}
-                      disabled={!b.available || isActive}
-                      onClick={() => setConfirmBank(b)}
-                      title={b.note ?? b.description ?? ""}
-                    >
-                      <span className="bank-title">
-                        {b.title}
-                        {badge && <span className="bank-badge">{badge}</span>}
-                      </span>
-                      <span className="bank-meta">
-                        {b.certification}
-                        {b.questionCount
-                          ? ` · ${strings.lobby.questions(b.questionCount)}`
-                          : ""}
-                        {b.durationSeconds
-                          ? ` · ${formatDuration(b.durationSeconds)}`
-                          : ""}
-                      </span>
-                      {b.note && !b.available && (
-                        <span className="bank-note">{b.note}</span>
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
+        <Async
+          state={banksState}
+          loading={<p className="catalog-loading">{strings.app.working}</p>}
+          error={(message, reload) => (
+            <div className="catalog-error" role="alert">
+              <p className="catalog-error-title">{strings.start.catalogErrorTitle}</p>
+              <p className="catalog-error-body">{strings.start.catalogErrorBody(message)}</p>
+              <button type="button" className="btn" onClick={reload}>
+                {strings.start.catalogRetry}
+              </button>
+            </div>
+          )}
+        >
+          {(banks) =>
+            banks.banks.length > 0 && (
+              <div className="bank-catalog">
+                <h2>{strings.lobby.chooseExam}</h2>
+                <ul className="bank-list">
+                  {banks.banks.map((b) => {
+                    const isActive = b.id === banks.active;
+                    const badge = bankBadge(b, banks);
+                    return (
+                      <li key={b.id}>
+                        <button
+                          className={`bank-card${isActive ? " bank-active" : ""}`}
+                          disabled={!b.available || isActive}
+                          onClick={() => setConfirmBank(b)}
+                          title={b.note ?? b.description ?? ""}
+                        >
+                          <span className="bank-title">
+                            {b.title}
+                            {badge && <span className="bank-badge">{badge}</span>}
+                          </span>
+                          <span className="bank-meta">
+                            {b.certification}
+                            {b.questionCount
+                              ? ` · ${strings.lobby.questions(b.questionCount)}`
+                              : ""}
+                            {b.durationSeconds
+                              ? ` · ${formatDuration(b.durationSeconds)}`
+                              : ""}
+                          </span>
+                          {b.note && !b.available && (
+                            <span className="bank-note">{b.note}</span>
+                          )}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )
+          }
+        </Async>
 
         {exam && (
           <div className="start-stats">

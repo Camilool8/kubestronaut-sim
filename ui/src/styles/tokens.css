@@ -30,16 +30,20 @@
   --border: #cbd4e1;
   --overlay: rgba(11, 18, 32, 0.55);
 
-  /* text — 15.4:1 and 5.9:1 on --bg */
+  /* text — 15.4:1 and 5.9:1 on --bg; 14.0:1 and 5.4:1 on --surface-raised
+     (the fenced code-block background — see .hljs-* rules in theme.css) */
   --text: #1a212b;
   --text-muted: #57626f;
 
   /* brand + state
-     --accent 4.8:1 on --surface, 4.5:1 on --bg
+     --accent 4.8:1 on --surface, 4.5:1 on --bg, but only 4.1:1 on
+     --surface-raised — under the 4.5:1 floor, so the .hljs-attr/
+     -attribute/-keyword/-built_in token colors in theme.css use
+     --accent-strong instead
      --accent-contrast 4.8:1 on --accent (the primary button)
-     --accent-strong 6.4:1 on --surface, 5.4:1 on --accent-soft — it is
-     the accent used for TEXT sitting on --accent-soft, because --accent
-     itself only reaches 4.0:1 there */
+     --accent-strong 6.4:1 on --surface, 5.4:1 on --accent-soft, 5.6:1 on
+     --surface-raised — it is the accent for text sitting on --accent-soft
+     or --surface-raised, because --accent itself falls short on both */
   --accent: #326ce5;
   --accent-strong: #2557c7;
   --accent-soft: #e4ecfd;
@@ -121,14 +125,17 @@
   --border: #28324a;
   --overlay: rgba(2, 6, 16, 0.66);
 
-  /* 13.9:1 and 7.1:1 on --bg */
+  /* 13.9:1 and 7.1:1 on --bg; 11.5:1 and 5.9:1 on --surface-raised (the
+     fenced code-block background — see .hljs-* rules in theme.css) */
   --text: #d9dee5;
   --text-muted: #97a0af;
 
-  /* --accent 7.4:1 on --bg, 6.9:1 on --surface; --accent-contrast
-     7.4:1 on --accent; --accent-strong 9.5:1 on --surface. A tint of
-     the same Kubernetes blue: #326CE5 itself only reaches ~4.1:1 on
-     this background and would fail as body text. */
+  /* --accent 7.4:1 on --bg, 6.9:1 on --surface, 6.2:1 on --surface-raised;
+     --accent-contrast 7.4:1 on --accent; --accent-strong 9.5:1 on
+     --surface, 8.5:1 on --surface-raised (used by the .hljs-* keyword
+     colors, since the light-theme --accent falls short there — see
+     above). A tint of the same Kubernetes blue: #326CE5 itself only
+     reaches ~4.1:1 on this background and would fail as body text. */
   --accent: #7aa2f7;
   --accent-strong: #a4c0fb;
   --accent-soft: #16294a;

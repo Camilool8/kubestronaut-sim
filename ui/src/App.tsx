@@ -18,6 +18,9 @@ import { ControlProgress } from "./components/ControlProgress";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { InfoButton } from "./components/InfoButton";
 import { ToastLayer } from "./components/Toast";
+import { TopProgress } from "./components/TopProgress";
+import { ScreenTransition } from "./components/ScreenTransition";
+import { toastStore } from "./components/toastStore";
 import { strings } from "./strings";
 
 // Control-status poll cadence: fast while a job is running (the overlay
@@ -53,6 +56,12 @@ export default function App() {
   // finally fires. Restarting the effect polls again immediately.
   const [jobNonce, setJobNonce] = useState(0);
   const wasBusy = useRef(false);
+  // Whether a session has ever arrived, and the id of the toast standing
+  // in for `pollError` once one has. Refs, not state: the poll callbacks
+  // are created once (they are the effect's deps) and must not re-arm the
+  // poller every time either value changes.
+  const seenSession = useRef(false);
+  const pollToastId = useRef<number | null>(null);
 
   const gateVerdict = useDesktopGate();
   // A desktop user who merely shrank their window can wave the gate
@@ -62,14 +71,36 @@ export default function App() {
     gateVerdict === "blocked" || (gateVerdict === "narrow" && !gateOverridden());
 
   const applySession = useCallback((next: SessionSnapshot) => {
+    seenSession.current = true;
     setSession(next);
     setFetchedAt(Date.now());
     setPollError(null);
+    // The facilitator answered again: take the warning back rather than
+    // leaving a stale "cannot reach" toast on a working app.
+    if (pollToastId.current !== null) {
+      toastStore.dismiss(pollToastId.current);
+      pollToastId.current = null;
+    }
+  }, []);
+
+  // `pollError` is rendered by the pre-first-session loading screen below.
+  // Every later failure — i.e. all of them, in normal use — used to be
+  // written to that state and never read again, so the app's most central
+  // fetch failed in silence. After the first success the toast is the
+  // signal, and applySession above withdraws it when the poll recovers.
+  const handlePollError = useCallback((err: unknown) => {
+    setPollError(String(err));
+    if (!seenSession.current) return;
+    pollToastId.current = toastStore.push({
+      kind: "warning",
+      message: strings.app.cannotReach(String(err)),
+      dedupeKey: "session-poll",
+    });
   }, []);
 
   useEffect(() => {
-    return pollSession(applySession, (err) => setPollError(String(err)));
-  }, [applySession]);
+    return pollSession(applySession, handlePollError);
+  }, [applySession, handlePollError]);
 
   useEffect(() => {
     let stopped = false;
@@ -117,7 +148,13 @@ export default function App() {
       // we just optimistically rendered has no phase running yet.
       setJobNonce((n) => n + 1);
     } else {
-      // Most likely 409 busy — surface whatever the conductor reports.
+      // Most likely 409 busy or 502 (conductor down). Either way the user
+      // pressed a button and must be told why nothing is happening.
+      toastStore.push({
+        kind: "warning",
+        message: strings.control.actionFailed(result.error),
+        dedupeKey: "control-action",
+      });
       const current = await getControlStatus().catch(() => null);
       if (current) setControl(current);
     }
@@ -127,19 +164,33 @@ export default function App() {
     setBankTitles(Object.fromEntries(banks.banks.map((b) => [b.id, b.title])));
   }, []);
 
-  const handleNewAttempt = useCallback(async () => {
-    applyControlResult(await startControlReset());
-  }, [applyControlResult]);
-
-  const handleRetry = useCallback(
-    async (op: string, bank: string) => {
-      if (op === "switch" && bank) {
-        applyControlResult(await startControlSwitch(bank));
-      } else {
-        applyControlResult(await startControlReset());
+  const runControlAction = useCallback(
+    async (start: () => Promise<ControlActionResponse>) => {
+      try {
+        applyControlResult(await start());
+      } catch (err) {
+        // fetch itself rejected (facilitator unreachable, network down).
+        toastStore.push({
+          kind: "warning",
+          message: strings.control.actionFailed(String(err)),
+          dedupeKey: "control-action",
+        });
       }
     },
     [applyControlResult],
+  );
+
+  const handleNewAttempt = useCallback(
+    () => runControlAction(startControlReset),
+    [runControlAction],
+  );
+
+  const handleRetry = useCallback(
+    (op: string, bank: string) =>
+      runControlAction(() =>
+        op === "switch" && bank ? startControlSwitch(bank) : startControlReset(),
+      ),
+    [runControlAction],
   );
 
   const overlayJob =
@@ -169,7 +220,7 @@ export default function App() {
       screen = (
         <Start
           onSessionChange={applySession}
-          onControlStart={applyControlResult}
+          onControlStart={runControlAction}
           catalogVersion={catalogVersion}
           onBanksLoaded={handleBanksLoaded}
         />
@@ -201,7 +252,10 @@ export default function App() {
 
   return (
     <>
-      <main>{screen}</main>
+      <TopProgress />
+      <main>
+        <ScreenTransition screenKey={session.state}>{screen}</ScreenTransition>
+      </main>
       <ToastLayer />
       {session.state !== "running" && (
         <div className="floating-controls">

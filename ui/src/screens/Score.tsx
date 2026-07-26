@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type SyntheticEvent } from "react";
-import ReactMarkdown from "react-markdown";
 import {
   endSession,
   getResults,
@@ -9,6 +8,7 @@ import {
   type SolutionDetail,
 } from "../api";
 import { CheckList } from "../components/CheckList";
+import { Markdown } from "../components/Markdown";
 import { strings } from "../strings";
 
 const GRADING_POLL_MS = 3000;
@@ -26,6 +26,11 @@ interface ScoreProps {
 // path as ./sim reset).
 export function Score({ onNewAttempt, endReason }: ScoreProps) {
   const [response, setResponse] = useState<ResultsResponse>({ status: "grading" });
+  // A poll that failed to reach the facilitator at all — distinct from a
+  // grading error the facilitator reported. It is not terminal (the next
+  // tick usually clears it), so it annotates the waiting screen instead
+  // of replacing it.
+  const [pollError, setPollError] = useState<string | null>(null);
   const intervalRef = useRef<number | null>(null);
 
   const clearPoll = () => {
@@ -36,10 +41,21 @@ export function Score({ onNewAttempt, endReason }: ScoreProps) {
   };
 
   const load = async () => {
-    const r = await getResults();
-    setResponse(r);
-    if (r.status === "ready" || r.status === "error") {
-      clearPoll();
+    try {
+      const r = await getResults();
+      setPollError(null);
+      setResponse(r);
+      if (r.status === "ready" || r.status === "error") {
+        clearPoll();
+      }
+    } catch (err) {
+      // getResults() throws for any unexpected status, and the fetch
+      // itself rejects while the facilitator restarts — which App treats
+      // as a normal occurrence. Neither may render as "still grading" and
+      // nothing else: the wait would be indistinguishable from progress.
+      // The poll keeps running, so this clears itself when the server is
+      // back; that is why it does not tear the poll down.
+      setPollError(String(err));
     }
   };
 
@@ -51,10 +67,25 @@ export function Score({ onNewAttempt, endReason }: ScoreProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Retry re-POSTs /api/session/end to ask for a re-grade. clearPoll()
+  // already ran when the status became "error", so this is the only path
+  // back: if the request fails, the error and this button must both come
+  // back. Skipping them left the screen on "Grading…" with no poll armed
+  // and no way out but a page reload — immediately after a timed exam.
   const handleRetry = async () => {
     setResponse({ status: "grading" });
-    await endSession();
-    await load();
+    setPollError(null);
+    try {
+      const result = await endSession();
+      if (!result.ok) {
+        setResponse({ status: "error", message: strings.score.retryFailed(result.error) });
+        return;
+      }
+      await load();
+    } catch (err) {
+      setResponse({ status: "error", message: strings.score.retryFailed(String(err)) });
+      return;
+    }
     if (intervalRef.current === null) {
       intervalRef.current = window.setInterval(load, GRADING_POLL_MS);
     }
@@ -65,6 +96,11 @@ export function Score({ onNewAttempt, endReason }: ScoreProps) {
       <div className="score-screen score-loading">
         <h1>{strings.score.gradingTitle}</h1>
         <p>{strings.score.gradingBody}</p>
+        {pollError && (
+          <p className="error-text" role="status">
+            {strings.score.pollFailed(pollError)}
+          </p>
+        )}
       </div>
     );
   }
@@ -148,7 +184,7 @@ function QuestionResultDetails({ question }: { question: QuestionResult }) {
         <summary>{strings.score.showSolution}</summary>
         {loadingSolution && <p>{strings.score.loadingSolution}</p>}
         {solutionError && <p className="error-text">{solutionError}</p>}
-        {solution && <ReactMarkdown>{solution.markdown}</ReactMarkdown>}
+        {solution && <Markdown>{solution.markdown}</Markdown>}
       </details>
     </details>
   );
