@@ -1,10 +1,15 @@
-FROM debian:12-slim
+# Trixie, not bookworm, for podman: bookworm ships 4.3.1 (2022), trixie
+# ships 5.x. The jump matters because 5.x replaced CNI with netavark,
+# and CNI failing to rebuild its bridge after a restart was one of the
+# reasons these containers ended up privileged. kind's own nodes already
+# run trixie in this stack, so the distro is not new here.
+FROM debian:13-slim
 ARG KUBECTL_VERSION=v1.35.0
 ARG HELM_VERSION=v3.18.0
 ARG YQ_VERSION=v4.45.1
 RUN apt-get update && apt-get install -y --no-install-recommends \
       openssh-server curl ca-certificates vim nano jq less bash-completion procps \
-      sudo podman fuse-overlayfs uidmap \
+      sudo podman fuse-overlayfs uidmap nftables \
     && rm -rf /var/lib/apt/lists/*
 RUN ARCH=$(dpkg --print-architecture) \
     && curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" \
@@ -24,6 +29,7 @@ COPY registries.conf /etc/containers/registries.conf
 # acceptable because the only images built here are deliberately tiny, and
 # bulletproof, which matters more than fast when a candidate is timed.
 COPY storage.conf /etc/containers/storage.conf
+COPY containers.conf /etc/containers/containers.conf
 
 # Candidates get sudo. Image work has to run as root (podman's rootful
 # path is the one that works with the capability set these containers

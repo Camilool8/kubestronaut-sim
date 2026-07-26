@@ -35,22 +35,25 @@ services:
   # The two exam instances are identical but for their /opt/course and
   # container-storage volumes.
   #
-  # privileged, because the image-building questions run podman inside a
-  # container and podman needs to write cgroups and mount /proc for each
-  # build step. A narrower set was tried and does not work here: caps
-  # (SYS_ADMIN, SYS_CHROOT, MKNOD, SETFCAP, NET_ADMIN) plus
-  # cgroupns=host, a read-write /sys/fs/cgroup bind and seccomp
-  # unconfined clears the cgroup errors only to stop on a read-only
-  # /proc/sys/net/ipv4/ping_group_range, which no container-level knob
-  # reopens. Rootless podman as `candidate` is the right long-term
-  # answer and gets further still — it fails mounting proc inside its own
-  # user namespace — but not far enough. See docs/follow-ups.md.
+  # NOT privileged. They were, until podman moved from 4.3.1 (Debian 12)
+  # to 5.4.2 (Debian 13): every setting below was tried against 4.3.1 and
+  # ignored, so `privileged: true` was the only thing that worked. Under
+  # 5.4.2 the same settings are honoured, and the five capabilities here
+  # are what an image build actually needs — measured one failure at a
+  # time, each removed and re-tested:
   #
-  # What this costs: a shell on an instance is a shell on the host. That
-  # matters because SIM_BIND defaults to 0.0.0.0, so read the security
-  # note in the README before running this on a network you do not
-  # control. It is not the only thing that note covers — nothing in this
-  # stack authenticates anyone.
+  #   SYS_ADMIN    mount namespaces for the build's overlay/vfs layers
+  #   SYS_CHROOT   pivot into the build root
+  #   MKNOD        device nodes while unpacking a base image
+  #   SETFCAP      file capabilities carried by base image binaries
+  #   SYS_RESOURCE buildah raises RLIMIT_NPROC to 1048576 per build step
+  #
+  # NET_ADMIN was needed and no longer is: containers.conf sets
+  # netns=host, so nothing creates a network namespace. cgroup: host and
+  # the read-write /sys/fs/cgroup bind ARE still needed — crun enables
+  # cgroup controllers for each build step, and both were removed and
+  # re-tested to confirm it. See images/instance/containers.conf for the
+  # rest and SECURITY.md for what this leaves exposed.
   instance-1:
     build: images/instance
     hostname: instance-1
@@ -64,7 +67,11 @@ services:
       - ./tests:/tests:ro
       - course-1:/opt/course
       - containers-1:/var/lib/containers
-    privileged: true
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cap_add: [SYS_ADMIN, SYS_CHROOT, MKNOD, SETFCAP, SYS_RESOURCE]
+    security_opt: ["seccomp=unconfined", "apparmor=unconfined"]
+    devices: ["/dev/fuse"]
+    cgroup: host
     networks: [default, examnet]
   instance-2:
     build: images/instance
@@ -79,7 +86,11 @@ services:
       - ./tests:/tests:ro
       - course-2:/opt/course
       - containers-2:/var/lib/containers
-    privileged: true
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cap_add: [SYS_ADMIN, SYS_CHROOT, MKNOD, SETFCAP, SYS_RESOURCE]
+    security_opt: ["seccomp=unconfined", "apparmor=unconfined"]
+    devices: ["/dev/fuse"]
+    cgroup: host
     networks: [default, examnet]
   registry:
     # Push target for the image-building questions. Plain HTTP, no auth,
