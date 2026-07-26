@@ -1,16 +1,18 @@
 # kubestronaut-sim
 
 Open-source, killer.sh-style exam simulator for the Kubestronaut
-certifications. Deliberately harder than the real exams. CKAD and CKA
-banks today; KCNA/KCSA (multiple choice) and CKS are on the roadmap and
-appear in the catalog as coming soon.
+certifications. Deliberately harder than the real exams. A full
+**22-question CKAD bank** covering all five curriculum domains, plus a
+short CKA bank; KCNA/KCSA (multiple choice) and CKS are on the roadmap
+and appear in the catalog as coming soon.
 
-**Status: Milestone G — an environment the exam can be tested against.
-Calico replaces kindnet so NetworkPolicies are actually enforced;
+**Status: Milestone G — an environment the exam can be tested against.**
+Calico replaces kindnet so NetworkPolicies are genuinely enforced;
 ingress-nginx, a local Helm repository and a container registry make the
-rest of the CKAD curriculum answerable. The CKAD bank is complete at 20
-questions across all five domains, and the exam desktop no longer
-strobes.**
+rest of the CKAD curriculum answerable. Questions are graded on
+behaviour wherever behaviour is the point — a policy that denies, an
+Ingress the controller really routes, an adapter whose output its
+neighbour can read. And the exam desktop no longer strobes.
 
 Code: Apache-2.0. Question banks: CC BY-SA 4.0 (see `banks/LICENSE`).
 Not affiliated with CNCF, The Linux Foundation, PSI, or killer.sh.
