@@ -18,7 +18,13 @@ export function useFocusTrap(
 
     const focusables = () =>
       Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE));
-    (focusables()[0] ?? container).focus();
+    // preventScroll, because focusing the first control also scrolls it
+    // into view — and in a dialog tall enough to scroll internally, the
+    // first control is at the *bottom*. Opening the exam intro card in a
+    // short window jumped straight past its title and diagram to the
+    // "Got it" button. Focus still lands where it should; only the
+    // scroll-into-view is suppressed, so the dialog opens at its top.
+    (focusables()[0] ?? container).focus({ preventScroll: true });
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {

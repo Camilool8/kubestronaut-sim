@@ -20,12 +20,29 @@ mkdir -p /shared/ssh
 # cache, which lives on a named volume and therefore survives resets. The
 # first boot pulls from the internet; every reset after that is offline
 # and skips a few hundred megabytes of re-download inside the nodes.
+#
+# Retried, because `docker pull` does not retry the way containerd does
+# and this is several hundred megabytes from registries that time out
+# under load. A single transient TLS handshake failure used to take down
+# the entire boot — one flaky second, and the candidate gets no cluster.
+pull_retry() {
+  local img=$1 attempt
+  for attempt in 1 2 3 4 5; do
+    docker pull -q "$img" >/dev/null 2>&1 && return 0
+    echo "  pull of ${img} failed (attempt ${attempt}/5), retrying..."
+    sleep $((attempt * 5))
+  done
+  # Last try, unsilenced, so the real registry error reaches the log and
+  # the conductor's progress detail rather than a bare exit code.
+  docker pull "$img"
+}
+
 preload_images() {
   local manifest=$1
   for img in $(yq -r '[.. | select(has("image")) | .image] | .[]' "$manifest" | sort -u); do
     docker image inspect "$img" >/dev/null 2>&1 || {
       echo "pulling ${img}"
-      docker pull -q "$img"
+      pull_retry "$img"
     }
     kind load docker-image --name sim "$img" >/dev/null
   done

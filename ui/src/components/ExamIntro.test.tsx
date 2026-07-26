@@ -42,6 +42,24 @@ describe("ExamIntro", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  test("opening it does not scroll the card past its own diagram", () => {
+    // The card is taller than a short window, so the dialog scrolls
+    // internally. Focusing the first control also scrolls it into view,
+    // and the first control is the button at the bottom — which opened
+    // the card already scrolled past its title and schematic. Focus must
+    // still land on the button; only the scroll may not happen.
+    //
+    // jsdom has no layout and no scrollIntoView, so the option passed to
+    // focus() is the only observable part of this here; the visible
+    // behaviour was confirmed in a real browser at 1100x617.
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+
+    render(<ExamIntro onClose={() => {}} />);
+
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    focus.mockRestore();
+  });
+
   test("Escape closes it — it inherits Dialog's focus trap", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();

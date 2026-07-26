@@ -14,7 +14,7 @@ import {
 import { Async } from "../components/Async";
 import { Dialog } from "../components/Dialog";
 import { useDesktopGate } from "../components/DesktopRequired";
-import { ExamIntro } from "../components/ExamIntro";
+import { ExamIntro, markIntroSeen } from "../components/ExamIntro";
 import { formatDuration } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 import { strings } from "../strings";
@@ -225,7 +225,15 @@ export function Start({
           >
             {starting ? strings.start.starting : strings.start.startExam}
           </button>
-          <button className="btn" onClick={() => setIntroOpen(true)}>
+          {/* Marks the card seen: someone who read it here should not
+              have it thrown at them again the moment the exam opens. */}
+          <button
+            className="btn"
+            onClick={() => {
+              markIntroSeen();
+              setIntroOpen(true);
+            }}
+          >
             {strings.intro.open}
           </button>
           {/* Say why rather than leaving a dead button: the catalog is
