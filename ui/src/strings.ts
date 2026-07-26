@@ -124,7 +124,11 @@ export const strings = {
       ["Working directories", "Pre-created /opt/course/<n> paths", "Same"],
       ["Cluster", "Local kind cluster (one control plane, one worker)", "Managed multi-node environments"],
       ["Proctoring", "None. No webcam, no ID checks, no lockdown browser", "PSI remote proctoring"],
-      ["Question pool", "Small curated mocks", "Larger pool, broader coverage"],
+      [
+        "Question pool",
+        "One fixed set per exam — you will see the same questions again",
+        "Drawn from a much larger pool",
+      ],
       ["Retakes", "Reset and retry as often as you like", "Limited, paid retakes"],
     ] as [string, string, string][],
     compareNote:
