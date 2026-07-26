@@ -5,9 +5,10 @@ metadata:
   title: CKAD Mock Exam 01
   certification: CKAD
   description: >-
-    Developer-track exercises: namespaces and quotas, debugging a broken
-    Deployment, and NetworkPolicy lockdown. Two instances, kind-backed
-    cluster.
+    Developer-track exercises across the full CKAD curriculum: workloads
+    and multi-container design, deployments and configuration, security
+    contexts, observability, and services, ingress and network policy.
+    Two instances, kind-backed cluster.
 spec:
   examType: hands-on
   duration: 120m
@@ -30,6 +31,26 @@ spec:
       domain: Application Deployment
       weight: 7
     - id: q03
+      instance: instance-2
+      domain: Services and Networking
+      weight: 5
+    - id: q04
+      instance: instance-2
+      domain: Application Design and Build
+      weight: 6
+    - id: q05
+      instance: instance-1
+      domain: Application Design and Build
+      weight: 8
+    - id: q06
+      instance: instance-2
+      domain: Application Environment, Configuration and Security
+      weight: 7
+    - id: q07
+      instance: instance-1
+      domain: Application Environment, Configuration and Security
+      weight: 8
+    - id: q08
       instance: instance-2
       domain: Services and Networking
       weight: 5

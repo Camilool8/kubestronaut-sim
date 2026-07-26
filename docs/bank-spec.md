@@ -42,9 +42,20 @@ spec:
 | File            | Purpose |
 |-----------------|---------|
 | `question.md`   | Statement shown to the candidate. Must name the instance and any artifact paths (`/opt/course/<n>/...`). |
-| `setup.sh`      | Seeds pre-state. Runs inside `k8s-env` as root with admin `KUBECONFIG`. MUST be idempotent (safe to re-run). |
+| `setup.sh`      | Seeds cluster pre-state. Runs inside `k8s-env` as root with admin `KUBECONFIG`. MUST be idempotent (safe to re-run). |
+| `files/`        | Optional. Copied into `/opt/course/<n>/` on every instance at start, owned by `candidate`. |
 | `validate.d/NN_name.sh` | One scoring criterion each, run in lexical order. |
 | `solution.md`   | Full walkthrough, shown after the exam. |
+
+`files/` is how a question hands the candidate starting material: a
+Dockerfile to edit, a manifest on a removed apiVersion, a kustomize base.
+It cannot be done from `setup.sh`, which runs on `k8s-env` and has no
+access to the per-instance `/opt/course` volumes. The copy re-runs on
+every instance start, so restarting an instance restores anything the
+candidate destroyed — the same guarantee `setup.sh`'s idempotence gives
+for cluster state. Do not ship anything under `files/` that a check reads
+without the candidate having modified it: it would score whether the copy
+worked, not whether they did anything.
 
 ## Code blocks in `question.md` / `solution.md`
 

@@ -15,11 +15,27 @@ cp /shared/ssh/id_ed25519.pub /home/candidate/.ssh/authorized_keys
 chown -R candidate:candidate /home/candidate/.kube /home/candidate/.ssh
 chmod 600 /root/.ssh/authorized_keys /home/candidate/.ssh/authorized_keys
 # pre-create /opt/course/<n> per question (candidates write into them, never mkdir)
+# and seed any starting material the question ships.
+#
+# The seeding lives here rather than in setup.sh because setup.sh runs on
+# k8s-env, which has no access to these per-instance volumes — so a
+# question that hands the candidate a broken manifest, a Dockerfile to
+# edit or a kustomize base had no way to deliver it. Files are copied for
+# EVERY question, not just this instance's: a bank is free to move a
+# question between instances, and copying a few kilobytes twice is
+# cheaper than a question whose material silently isn't there.
 if [ -n "${BANK:-}" ] && [ -f "/banks/${BANK}/exam.yaml" ]; then
   for qid in $(yq -r '.spec.questions[].id' "/banks/${BANK}/exam.yaml"); do
     digits=$(printf '%s' "$qid" | tr -dc '0-9')
     [ -n "$digits" ] || continue
-    mkdir -p "/opt/course/$((10#$digits))"
+    dir="/opt/course/$((10#$digits))"
+    mkdir -p "$dir"
+    # Re-copied on every start so a restart restores anything the
+    # candidate mangled beyond repair — the same guarantee setup.sh's
+    # idempotence gives for cluster state.
+    if [ -d "/banks/${BANK}/${qid}/files" ]; then
+      cp -R "/banks/${BANK}/${qid}/files/." "$dir/"
+    fi
   done
   chown -R candidate:candidate /opt/course
 fi
