@@ -78,6 +78,39 @@ Convert to GitHub issues once the repo has a remote.
   `tests/smoke.sh` from an idle stack before merging.~~ (ran and passed on
   main, 2026-07-25.)
 
+## Milestone G (environment) — new
+
+- **instances: rootless podman.** The instances run `privileged: true`
+  solely so podman can build images, which means a shell on an instance
+  is a shell on the host — and `SIM_BIND` now defaults to `0.0.0.0`. A
+  narrower capability set was measured and gets close but not there:
+  `SYS_ADMIN, SYS_CHROOT, MKNOD, SETFCAP, NET_ADMIN` + `cgroupns=host` +
+  a read-write `/sys/fs/cgroup` bind + `seccomp=unconfined` clears every
+  cgroup error and then stops on a read-only
+  `/proc/sys/net/ipv4/ping_group_range` (podman 4.3.1 writes it
+  regardless of `default_sysctls = []` in containers.conf). Rootless
+  podman as `candidate` gets further — subuid/subgid and
+  newuidmap/newgidmap are already in the image, and with
+  SETFCAP/SETUID/SETGID it reaches `mount proc to proc: Operation not
+  permitted` inside its own user namespace. A newer podman, or the
+  upstream `quay.io/podman/stable` recipe, is the likely resolution.
+- images: bank workload images (`nginx:1.29-alpine` et al) are still
+  pulled from the internet by the kind nodes on every reset. The CNI and
+  ingress images are pre-pulled into the persistent DinD cache and
+  side-loaded with `kind load`; extending `preload_images` to a list the
+  bank declares would make a reset fully offline.
+- ingress: image digests are stripped from the vendored ingress-nginx
+  manifest at build time, because `kind load` names images by tag and a
+  kubelet asked for `tag@digest` would go to the network anyway. Version
+  pinning survives via the vendored manifest; digest pinning does not.
+- ingress: the ValidatingWebhookConfiguration is left in place. It is
+  what a real cluster has, but if a candidate's Ingress ever gets
+  rejected at `apply` time because the controller is briefly unavailable,
+  deleting it is the usual kind workaround.
+- storage: podman uses the `vfs` driver. `overlay` + `fuse-overlayfs` was
+  verified working under `privileged` and is the faster choice for large
+  base images; at the sizes the questions use, both took four seconds.
+
 ## Milestone F (UI polish) — new
 
 - design: `--accent` on `--surface-raised` measures 4.12:1 in the light

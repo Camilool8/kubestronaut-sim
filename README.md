@@ -24,6 +24,19 @@ desktop included).
     ./sim up                     # boots everything (first run: several minutes)
     open http://localhost:8080   # then never touch the CLI again
 
+Ports bind to **all interfaces** by default, so you can build the
+environment on a desktop and sit the exam from a laptop on the same
+network — just point it at `http://<that machine>:8080`.
+
+> **There is no authentication anywhere in this stack.** Anyone who can
+> reach port 8080 can start and end your exam, and the exam desktop is a
+> real shell on containers that run privileged. On a network you do not
+> control, bind to loopback instead:
+>
+>     SIM_BIND=127.0.0.1 ./sim up
+>
+> `SIM_BIND` applies to every published port, not just the UI.
+
 Everything after `up` happens in the browser: pick an exam from the
 lobby catalog, start the timed session, work on the embedded desktop,
 submit, read your score with per-check results and solutions, then start
@@ -65,6 +78,39 @@ Desktop access and the solutions endpoint are gated by session state
 (403 until running, or ended, respectively) purely for UX fidelity with
 the real exam — this is **not a security boundary**: every bank file,
 including `solution.md`, already sits unencrypted on your own disk.
+
+## The cluster you get
+
+A two-node kind cluster (one control plane, one worker), with:
+
+- **Calico**, not kind's default kindnet, so **NetworkPolicies are
+  actually enforced**. A policy question can be graded on behaviour —
+  this connection succeeds, that one times out — and, more importantly,
+  you can test your own answer the way you would on the real exam.
+- **ingress-nginx**, pinned to the control-plane node, so Ingress
+  questions have a controller to satisfy them.
+- A **local Helm repository** (`sim`), pre-added on every instance and
+  served from the cluster host with no internet involved.
+- A **plain-HTTP registry** at `registry:5000`, reachable from the
+  instances, for the image-building questions.
+
+Test in-cluster first — that is what the real exam expects, and it is
+what the graders use:
+
+    kubectl -n <ns> run tmp --rm -it --restart=Never --image=nginx:alpine -- curl -m 5 <svc>
+
+Ports are also mapped out to the host, which the real exam does not do,
+because being able to open your own Ingress in a browser is a fast way to
+learn why it isn't matching:
+
+| From your machine | Reaches |
+|---|---|
+| `http://localhost:8081` | ingress-nginx (HTTP) — send a `Host:` header, or use an `/etc/hosts` entry |
+| `https://localhost:8443` | ingress-nginx (HTTPS) |
+| `localhost:30080-30082` | NodePort Services on those three ports |
+
+No `validate.d` check may depend on that host path — it is for you, not
+for grading.
 
 ## Architecture note: the conductor
 

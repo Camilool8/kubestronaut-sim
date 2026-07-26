@@ -23,5 +23,16 @@ if [ -n "${BANK:-}" ] && [ -f "/banks/${BANK}/exam.yaml" ]; then
   done
   chown -R candidate:candidate /opt/course
 fi
+
+# Pre-add the local chart repository so a Helm question starts where the
+# real one does — with a repo already configured — instead of spending the
+# candidate's time on `helm repo add`. Non-fatal: k8s-env serves this, and
+# a bank with no charts has an empty (but valid) index.
+if curl -fsS --max-time 10 -o /dev/null "http://k8s-env:${HELM_REPO_PORT:-8879}/index.yaml" 2>/dev/null; then
+  su - candidate -c "helm repo add sim http://k8s-env:${HELM_REPO_PORT:-8879} --force-update >/dev/null && helm repo update >/dev/null" \
+    && echo "helm repo 'sim' configured" \
+    || echo "warning: could not configure the 'sim' helm repo" >&2
+fi
+
 echo "instance ready: $(hostname)"
 exec /usr/sbin/sshd -D -e

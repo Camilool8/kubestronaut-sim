@@ -1,0 +1,6 @@
+apiVersion: v2
+name: sim-web
+description: A minimal web workload for practising the Helm release lifecycle.
+type: application
+version: 1.0.0
+appVersion: "1.27-alpine"
