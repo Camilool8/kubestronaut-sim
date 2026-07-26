@@ -30,6 +30,13 @@ cat /opt/course/17/crash.log
 
 Short forms: `-p` for `--previous`, and `--tail=20` when a log is long.
 
+If it answers `unable to retrieve container logs for containerd://…`
+instead, the container it wants has already been garbage-collected as the
+crash loop churns. That message goes to **stdout with a zero exit**, so a
+redirect captures it as though it were the log — check what you saved.
+Try again in a few seconds, or drop `--previous`: for a Pod sitting in
+backoff, the current logs are the last dead container's anyway.
+
 **3. The image pull.** `logs` is useless here — no container ever
 started, so there is nothing to log. `describe` carries the reason, in
 the events at the bottom:

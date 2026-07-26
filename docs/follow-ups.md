@@ -78,6 +78,22 @@ Convert to GitHub issues once the repo has a remote.
   `tests/smoke.sh` from an idle stack before merging.~~ (ran and passed on
   main, 2026-07-25.)
 
+## Milestone H (CKAD bank) — new
+
+- **domain weighting is skewed toward Application Design and Build**:
+  28.1% of the points against a 20% target, because adapter (q21) and
+  ambassador (q22) were added on top of an already-complete 20-question
+  bank rather than in place of anything. The other four domains sit at
+  21.6/17.5/17.5/15.2 against 25/20/20/15. Rebalancing means either
+  trimming points from the six Design and Build questions or adding a
+  question each to Deployment and Services and Networking — a product
+  call, not a bug. All five domains are covered; only their proportions
+  drift.
+- the bank is 22 questions where the real CKAD is 15–20. That is
+  deliberate (this simulator is meant to be harder), but a 2-hour
+  duration against 22 questions is tighter than the real exam's ratio;
+  worth revisiting if attempts routinely run out of time.
+
 ## Milestone G (environment) — new
 
 - **instances: rootless podman.** The instances run `privileged: true`
