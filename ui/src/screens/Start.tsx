@@ -14,6 +14,7 @@ import {
 import { Async } from "../components/Async";
 import { Dialog } from "../components/Dialog";
 import { useDesktopGate } from "../components/DesktopRequired";
+import { ExamIntro } from "../components/ExamIntro";
 import { formatDuration } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 import { strings } from "../strings";
@@ -54,6 +55,10 @@ export function Start({
   const [switching, setSwitching] = useState(false);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  // Reading how the exam works should not cost exam time, so the same
+  // card the exam screen shows on first run is reachable here, before
+  // the clock exists.
+  const [introOpen, setIntroOpen] = useState(false);
   // A phone can browse the catalog; it cannot run the exam.
   const examBlocked = useDesktopGate() === "blocked";
 
@@ -220,6 +225,9 @@ export function Start({
           >
             {starting ? strings.start.starting : strings.start.startExam}
           </button>
+          <button className="btn" onClick={() => setIntroOpen(true)}>
+            {strings.intro.open}
+          </button>
           {/* Say why rather than leaving a dead button: the catalog is
               worth browsing on a phone, starting an exam is not. */}
           {examBlocked && <p className="start-blocked">{strings.mobile.startDisabled}</p>}
@@ -232,6 +240,8 @@ export function Start({
           of its behaviour — no role, no aria-modal, no focus trap, no
           Escape. The axe suite missed it because the lobby scan never
           opened it. */}
+      {introOpen && <ExamIntro onClose={() => setIntroOpen(false)} />}
+
       {confirmBank && (
         <Dialog
           title={strings.lobby.switchConfirmTitle(confirmBank.title)}

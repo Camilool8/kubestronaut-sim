@@ -9,7 +9,13 @@ interface DesktopViewportProps {
   onStateChange?: (state: ViewportState) => void;
 }
 
-const RECONNECT_DELAY_MS = 3_000;
+// Reconnect backoff. A desktop container restarting mid-reset is down for
+// tens of seconds and the proxy 403s for the whole of it, so a flat delay
+// just meant hundreds of refused WebSocket upgrades. Backs off to a ceiling
+// that still feels instant to someone watching, and resets on every
+// successful connect.
+const RECONNECT_BASE_MS = 1_000;
+const RECONNECT_MAX_MS = 8_000;
 
 // First-party VNC viewport: connects @novnc/novnc's RFB core straight to
 // the facilitator's same-origin /desktop/websockify proxy — replacing the
@@ -28,6 +34,7 @@ export function DesktopViewport({ onStateChange }: DesktopViewportProps) {
     let disposed = false;
     let rfb: RFB | null = null;
     let retryTimer = 0;
+    let attempt = 0;
 
     const report = (next: ViewportState) => {
       setState(next);
@@ -40,8 +47,17 @@ export function DesktopViewport({ onStateChange }: DesktopViewportProps) {
 
       const scheme = window.location.protocol === "https:" ? "wss" : "ws";
       rfb = new RFB(mount, `${scheme}://${window.location.host}/desktop/websockify`);
-      rfb.resizeSession = true; // TigerVNC honors SetDesktopSize — fill the pane
-      rfb.scaleViewport = true; // and scale while the resize settles
+      // Server-side resize is the primary path: TigerVNC honors
+      // SetDesktopSize, so the desktop is rendered at the pane's real
+      // pixel size and text stays crisp. scaleViewport is the fallback
+      // for the window between asking and being served (and for a server
+      // that refuses outright) — it scales what we already have rather
+      // than showing a cropped desktop. clipViewport off: never offer
+      // scrollbars over the remote screen, which is the other way a
+      // container can end up sized by its own content.
+      rfb.resizeSession = true;
+      rfb.scaleViewport = true;
+      rfb.clipViewport = false;
       rfb.background = "transparent";
 
       // Selections made inside the desktop follow the candidate out to
@@ -56,6 +72,7 @@ export function DesktopViewport({ onStateChange }: DesktopViewportProps) {
 
       rfb.addEventListener("connect", () => {
         if (disposed) return;
+        attempt = 0;
         report("connected");
         // Only now can clipboardPasteFrom do anything — it is a no-op
         // until the connection is established.
@@ -69,7 +86,9 @@ export function DesktopViewport({ onStateChange }: DesktopViewportProps) {
         // proxy 403s outside running sessions; keep trying quietly —
         // the parent unmounts us the moment the session leaves
         // "running", which is the real teardown path.
-        retryTimer = window.setTimeout(connect, RECONNECT_DELAY_MS);
+        const delay = Math.min(RECONNECT_BASE_MS * 2 ** attempt, RECONNECT_MAX_MS);
+        attempt += 1;
+        retryTimer = window.setTimeout(connect, delay);
       });
     };
 

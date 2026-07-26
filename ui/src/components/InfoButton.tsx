@@ -3,14 +3,14 @@ import { InfoDrawer } from "./InfoDrawer";
 import { strings } from "../strings";
 
 // Self-contained "About" affordance: the button and the drawer it opens.
-// Rendered in the exam topbar (with tour restart) and floating on the
-// lobby/score screens.
+// Rendered in the exam topbar and floating on the lobby/score screens.
+// `onShowIntro` is passed by screens that can render the intro card.
 export function InfoButton({
   floating = false,
-  onRestartTour,
+  onShowIntro,
 }: {
   floating?: boolean;
-  onRestartTour?: () => void;
+  onShowIntro?: () => void;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -24,7 +24,7 @@ export function InfoButton({
         ?
       </button>
       {open && (
-        <InfoDrawer onClose={() => setOpen(false)} onRestartTour={onRestartTour} />
+        <InfoDrawer onClose={() => setOpen(false)} onShowIntro={onShowIntro} />
       )}
     </>
   );

@@ -3,34 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Markdown } from "./Markdown";
 import { desktopClipboard } from "../lib/desktopClipboard";
-
-// This project has no @types/node, and adding one is out of scope for a
-// Task 6 fix — it would touch package.json and the lockfile. Node itself
-// still provides fs/path/url at runtime regardless of whether their types
-// are installed (this file runs under vitest, i.e. Node, not a browser);
-// the only obstacle is `tsc`, which resolves a dynamic `import()` against
-// installed types solely when its argument is a string *literal*. Building
-// the specifier from a concatenation keeps its static type as `string`
-// (not a literal), so tsc skips resolution and types the result `any`
-// instead of erroring — no new .d.ts file, no new dependency.
-async function readThemeCss(): Promise<string> {
-  const fsMod = (await import("node:" + "fs")) as {
-    readFileSync: (path: string, encoding: string) => string;
-  };
-  const urlMod = (await import("node:" + "url")) as {
-    fileURLToPath: (url: string) => string;
-  };
-  const pathMod = (await import("node:" + "path")) as {
-    default: { join: (...segments: string[]) => string; dirname: (p: string) => string };
-  };
-  const nodePath = pathMod.default;
-  const cssPath = nodePath.join(
-    nodePath.dirname(urlMod.fileURLToPath(import.meta.url)),
-    "..",
-    "theme.css",
-  );
-  return fsMod.readFileSync(cssPath, "utf8");
-}
+import { readThemeCss } from "../test/readCss";
 
 afterEach(() => {
   vi.restoreAllMocks();

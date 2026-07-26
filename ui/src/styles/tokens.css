@@ -110,7 +110,6 @@
   --z-dialog: 20;
   --z-overlay: 30;
   --z-toast: 40;
-  --z-tour: 50;
 }
 
 /* Dark theme values — explicit user choice. The "system" choice sets no

@@ -5,7 +5,7 @@ import { QuestionPanel } from "../components/QuestionPanel";
 import { DesktopViewport } from "../components/DesktopViewport";
 import { Dialog } from "../components/Dialog";
 import { InfoButton } from "../components/InfoButton";
-import { Tour, markTourSeen, resetTourSeen, tourSeen, type TourStep } from "../components/Tour";
+import { ExamIntro, introSeen, markIntroSeen } from "../components/ExamIntro";
 import { toastStore } from "../components/toastStore";
 import { formatClock } from "../lib/format";
 import { strings } from "../strings";
@@ -75,13 +75,6 @@ export function ExamGateControls({ session, fetchedAt, onSessionChange }: ExamPr
   );
 }
 
-const TOUR_STEPS: TourStep[] = [
-  { target: ".question-panel", ...strings.tour.steps.questions },
-  { target: ".timer", ...strings.tour.steps.timer },
-  { target: ".desktop-pane", ...strings.tour.steps.desktop },
-  { target: ".btn-danger", ...strings.tour.steps.end },
-];
-
 // Exam is only ever rendered by App while session.state === "running"
 // (screen = f(state), no router) — so the moment End succeeds and
 // App's session state flips to "ended", this whole component including
@@ -96,7 +89,14 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [ending, setEnding] = useState(false);
   const [endError, setEndError] = useState<string | null>(null);
-  const [tourOpen, setTourOpen] = useState(() => !tourSeen());
+  // First run shows the intro once; after that it is on demand from the
+  // About drawer. Marked seen when it opens, not when it closes, so a
+  // reload mid-read doesn't make it reappear over a running exam.
+  const [introOpen, setIntroOpen] = useState(() => {
+    if (introSeen()) return false;
+    markIntroSeen();
+    return true;
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -154,11 +154,6 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
     }
   }, []);
 
-  const restartTour = () => {
-    resetTourSeen();
-    setTourOpen(true);
-  };
-
   return (
     <div className="exam-layout">
       <TimerBar
@@ -166,7 +161,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
         fetchedAt={fetchedAt}
         title={exam?.title ?? strings.exam.fallbackTitle}
         onEndClick={() => setConfirmOpen(true)}
-        extras={<InfoButton onRestartTour={restartTour} />}
+        extras={<InfoButton onShowIntro={() => setIntroOpen(true)} />}
       />
       <div className="exam-body">
         <QuestionPanel
@@ -198,15 +193,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
         </Dialog>
       )}
 
-      {tourOpen && (
-        <Tour
-          steps={TOUR_STEPS}
-          onDone={() => {
-            markTourSeen();
-            setTourOpen(false);
-          }}
-        />
-      )}
+      {introOpen && <ExamIntro onClose={() => setIntroOpen(false)} />}
     </div>
   );
 }

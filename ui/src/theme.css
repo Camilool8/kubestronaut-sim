@@ -549,12 +549,18 @@
   position: relative;
   flex: 1;
   min-width: 0;
-  display: flex;
 }
 
+/* Absolutely positioned on purpose, and it must stay that way. noVNC
+   observes this element with a ResizeObserver and asks the server for a
+   framebuffer of exactly its size, then draws a canvas of that size back
+   into it. If the box can take any part of its size from its own content,
+   that is a loop: resize -> canvas grows -> observer fires -> resize. Out
+   of flow, its size comes only from `.desktop-viewport`, so the loop is
+   structurally impossible regardless of what any ancestor does. */
 .desktop-canvas {
-  flex: 1;
-  min-width: 0;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
 }
 
@@ -590,6 +596,10 @@
   border-radius: var(--radius-m);
   box-shadow: var(--shadow-3);
   padding: var(--space-5);
+}
+
+.confirm-dialog-wide {
+  width: min(560px, 92%);
 }
 
 .confirm-dialog h2 {
@@ -985,56 +995,137 @@
   color: var(--text);
 }
 
-/* ---- tour ---- */
+/* ---- exam intro card ----
 
-.tour-layer {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-tour);
-  pointer-events: none;
-}
+   A drawing of the exam screen, not an overlay on top of it. Every box
+   below is sized in relative units off the dialog's own width, so it
+   holds its proportions at any viewport and never has to be measured
+   against the live layout — which is exactly what the spotlight tour
+   this replaced got wrong. */
 
-.tour-spotlight {
-  position: fixed;
-  border-radius: var(--radius-s);
-  box-shadow: 0 0 0 200vmax var(--overlay);
-  border: 2px solid var(--accent);
-  transition: all 0.25s ease;
-}
-
-.tour-card {
-  position: fixed;
-  pointer-events: auto;
-  background: var(--surface);
+.intro-schematic {
   border: 1px solid var(--border);
-  border-radius: var(--radius-m);
-  box-shadow: var(--shadow-3);
-  padding: var(--space-4) var(--space-5);
-  width: 340px;
-  max-width: calc(100vw - 2rem);
+  border-radius: var(--radius-s);
+  overflow: hidden;
+  background: var(--bg);
+  margin-bottom: var(--space-4);
 }
 
-.tour-card h3 {
-  margin: 0 0 var(--space-2);
-}
-
-.tour-card p {
-  margin: 0 0 var(--space-3);
-  color: var(--text-muted);
-}
-
-.tour-actions {
+.intro-topbar {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
   justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
-.tour-progress {
-  margin-right: auto;
+.intro-body {
+  display: flex;
+  height: 7.5rem;
+}
+
+.intro-panel,
+.intro-desktop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
   color: var(--text-muted);
+  font-size: var(--text-s);
+}
+
+.intro-panel {
+  width: 30%;
+  min-width: 5.5rem;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+
+.intro-desktop {
+  flex: 1;
+  /* Stands in for the remote desktop without pretending to be a
+     screenshot: a faint grid reads as "something else lives here". */
+  background-image: linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 1.25rem 1.25rem;
+}
+
+.intro-region-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-contrast);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.intro-region-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.intro-chip {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  padding: 0.1em 0.5em;
+  font-size: var(--text-xs);
+  background: var(--surface-raised);
+}
+
+.intro-chip-timer {
+  font-family: var(--font-mono);
+  color: var(--accent-strong);
+}
+
+.intro-chip-end {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.intro-legend {
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.intro-legend li {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  color: var(--text-muted);
+}
+
+.intro-legend-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  border-radius: 50%;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.intro-legend strong {
+  color: var(--text);
 }
 
 /* ---- info button + drawer ---- */

@@ -5,7 +5,8 @@ const FOCUSABLE =
 
 // Shared modal focus behavior: move focus inside on mount, keep Tab
 // cycling within the container, close on Escape, and restore focus to
-// the opener on unmount. Used by Dialog, InfoDrawer, and the Tour card.
+// the opener on unmount. Used by Dialog (and so by every dialog built on
+// it, including the exam intro) and by InfoDrawer.
 export function useFocusTrap(
   ref: RefObject<HTMLElement | null>,
   onClose: () => void,

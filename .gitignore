@@ -6,3 +6,10 @@ shared/
 ui/node_modules/
 ui/dist/
 /node_modules/
+
+# Third-party exam dumps used as a topic map while authoring banks. These
+# are someone else's copyrighted material; the banks in this repo are
+# CC BY-SA 4.0 and must be ours to license, so no dump may ever be
+# committed here — not even "temporarily".
+killer-sh-*.txt
+*-dump.txt
