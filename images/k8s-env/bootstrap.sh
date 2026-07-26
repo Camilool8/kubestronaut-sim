@@ -90,19 +90,9 @@ kubectl apply -f /opt/sim/ingress-nginx.yaml
 kubectl -n ingress-nginx wait --for=condition=Available \
   deployment/ingress-nginx-controller --timeout=300s
 
-# Local Helm repository, served by start.sh. Charts are plain YAML in the
-# repo and packaged here so nothing has to be committed as a tarball and
-# nothing has to be fetched from the internet.
-if [ -d /banks/_charts ]; then
-  echo "packaging local Helm charts..."
-  rm -rf /shared/helm-repo
-  mkdir -p /shared/helm-repo
-  for chart in /banks/_charts/*/; do
-    [ -f "${chart}Chart.yaml" ] || continue
-    helm package "$chart" -d /shared/helm-repo >/dev/null
-  done
-  helm repo index /shared/helm-repo --url "http://k8s-env:${HELM_REPO_PORT:-8879}"
-fi
+# The local Helm repository is packaged and served by start.sh, before
+# this script runs — a Helm question's setup.sh installs releases from
+# it, so it has to exist by the time seeding starts.
 
 # seed only a freshly created cluster — re-seeding a resumed one would
 # overwrite candidate work (setup.sh scripts re-apply initial state)

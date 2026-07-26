@@ -54,3 +54,23 @@ spec:
       instance: instance-2
       domain: Services and Networking
       weight: 5
+    - id: q09
+      instance: instance-1
+      domain: Application Design and Build
+      weight: 9
+    - id: q10
+      instance: instance-2
+      domain: Application Design and Build
+      weight: 10
+    - id: q11
+      instance: instance-1
+      domain: Application Deployment
+      weight: 8
+    - id: q12
+      instance: instance-2
+      domain: Application Deployment
+      weight: 8
+    - id: q13
+      instance: instance-1
+      domain: Application Deployment
+      weight: 7

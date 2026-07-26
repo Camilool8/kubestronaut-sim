@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cargo-api
+spec:
+  selector:
+    app: cargo-api
+  ports:
+    - port: 80
+      targetPort: 80
