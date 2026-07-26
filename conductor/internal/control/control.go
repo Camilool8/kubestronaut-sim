@@ -53,16 +53,57 @@ type Controller struct {
 	Catalog      *catalog.Catalog
 	BankFile     string   // /shared/bank — the runtime bank source of truth
 	RestartExtra []string // services restarted after the instances on a switch, in order (facilitator last)
+
+	// Registry is the compose service holding the exam image registry, or
+	// "" to skip. Wiped alongside the instances: see registryWipeCmd.
+	Registry string
 }
 
-// The two commands both control operations run inside containers.
+// The commands both control operations run inside containers.
 // bootstrapCmd is the long pole of either job: it tears the kind cluster
 // down and rebuilds it, printing its own progress, which execChecked
 // republishes as the running phase's detail.
 var (
-	wipeCmd      = []string{"find", "/opt/course", "-mindepth", "1", "-delete"}
+	// Candidate state on an instance is not only files. The image-building
+	// questions leave containers and images in podman's store, which lives
+	// on its own volume and therefore survives both the cluster rebuild and
+	// the instance restart — so without this, a second attempt began with
+	// the previous attempt's image already built and its checks already
+	// passing. `|| true` throughout: an instance whose podman was never
+	// used has nothing to remove, and that is not a failed reset.
+	wipeCmd = []string{"sh", "-c",
+		"find /opt/course -mindepth 1 -delete; " +
+			"podman rm -af >/dev/null 2>&1 || true; " +
+			"podman rmi -af >/dev/null 2>&1 || true"}
+
+	// The registry is the other half of that state: an image pushed during
+	// one attempt is still there for the next one to be credited with.
+	// Deleting the repositories directory is the bluntest correct answer —
+	// the registry's own delete API needs a manifest digest per tag, and
+	// this runs on a store nobody is meant to keep.
+	registryWipeCmd = []string{"sh", "-c",
+		"rm -rf /var/lib/registry/docker/registry/v2/repositories/* 2>/dev/null || true"}
+
 	bootstrapCmd = []string{"bash", "-c", "kind delete cluster --name sim || true; /opt/sim/bootstrap.sh"}
 )
+
+// wipeCandidateState clears everything an attempt can leave behind
+// outside the cluster: the per-instance work directories, podman's image
+// and container store on each instance, and the exam registry. Shared by
+// reset and switch so neither can quietly forget one of them — the
+// registry in particular is easy to miss, because it is the only piece of
+// candidate-writable state that does not live on an instance.
+func (c *Controller) wipeCandidateState(ctx context.Context, jobID string) error {
+	for _, inst := range c.Instances {
+		if err := c.execChecked(ctx, jobID, "wipe-instances", inst, wipeCmd); err != nil {
+			return err
+		}
+	}
+	if c.Registry == "" {
+		return nil
+	}
+	return c.execChecked(ctx, jobID, "wipe-instances", c.Registry, registryWipeCmd)
+}
 
 // resetPhases is the checklist a reset job walks through, in order.
 func resetPhases() []job.PhaseSpec {
@@ -99,11 +140,9 @@ func (c *Controller) runReset(jobID string) {
 	}
 
 	c.Store.StartPhase(jobID, "wipe-instances")
-	for _, inst := range c.Instances {
-		if err := c.execChecked(ctx, jobID, "wipe-instances", inst, wipeCmd); err != nil {
-			c.Store.Fail(jobID, err.Error())
-			return
-		}
+	if err := c.wipeCandidateState(ctx, jobID); err != nil {
+		c.Store.Fail(jobID, err.Error())
+		return
 	}
 
 	c.Store.StartPhase(jobID, "recreate-cluster")
@@ -187,11 +226,9 @@ func (c *Controller) runSwitch(jobID, bank string) {
 	}
 
 	c.Store.StartPhase(jobID, "wipe-instances")
-	for _, inst := range c.Instances {
-		if err := c.execChecked(ctx, jobID, "wipe-instances", inst, wipeCmd); err != nil {
-			c.Store.Fail(jobID, err.Error())
-			return
-		}
+	if err := c.wipeCandidateState(ctx, jobID); err != nil {
+		c.Store.Fail(jobID, err.Error())
+		return
 	}
 
 	c.Store.StartPhase(jobID, "write-bank")

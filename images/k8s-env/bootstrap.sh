@@ -16,9 +16,44 @@ rm -f /shared/ready
 mkdir -p /shared/ssh
 [ -f /shared/ssh/id_ed25519 ] || ssh-keygen -t ed25519 -N '' -f /shared/ssh/id_ed25519 -q
 
+# Side-loads a manifest's images into the kind nodes from the DinD image
+# cache, which lives on a named volume and therefore survives resets. The
+# first boot pulls from the internet; every reset after that is offline
+# and skips a few hundred megabytes of re-download inside the nodes.
+#
+# Retried, because `docker pull` does not retry the way containerd does
+# and this is several hundred megabytes from registries that time out
+# under load. A single transient TLS handshake failure used to take down
+# the entire boot — one flaky second, and the candidate gets no cluster.
+pull_retry() {
+  local img=$1 attempt
+  for attempt in 1 2 3 4 5; do
+    docker pull -q "$img" >/dev/null 2>&1 && return 0
+    echo "  pull of ${img} failed (attempt ${attempt}/5), retrying..."
+    sleep $((attempt * 5))
+  done
+  # Last try, unsilenced, so the real registry error reaches the log and
+  # the conductor's progress detail rather than a bare exit code.
+  docker pull "$img"
+}
+
+preload_images() {
+  local manifest=$1
+  for img in $(yq -r '[.. | select(has("image")) | .image] | .[]' "$manifest" | sort -u); do
+    docker image inspect "$img" >/dev/null 2>&1 || {
+      echo "pulling ${img}"
+      pull_retry "$img"
+    }
+    kind load docker-image --name sim "$img" >/dev/null
+  done
+}
+
 created=0
 if ! kind get clusters 2>/dev/null | grep -qx sim; then
-  kind create cluster --config /opt/sim/kind-config.yaml --image "${NODE_IMAGE}" --wait 180s
+  # No --wait: with disableDefaultCNI the nodes cannot reach Ready until
+  # Calico is installed below, so waiting on readiness here would always
+  # time out. The readiness gate moved to after the CNI install.
+  kind create cluster --config /opt/sim/kind-config.yaml --image "${NODE_IMAGE}"
   created=1
 fi
 kind get kubeconfig --name sim | sed 's#https://0\.0\.0\.0:6443#https://k8s-env:6443#' > /shared/kubeconfig
@@ -32,7 +67,32 @@ for i in $(seq 1 60); do
   [ "$i" -eq 60 ] && { echo "API server not ready after 180s"; exit 1; }
   sleep 3
 done
+
+# Cluster networking. Applied on every bootstrap, not just a fresh
+# cluster: both manifests are declarative and re-applying them on a warm
+# restart is a no-op, which is cheaper than remembering whether a past
+# boot got this far.
+echo "installing Calico (NetworkPolicy enforcement)..."
+preload_images /opt/sim/calico.yaml
+kubectl apply -f /opt/sim/calico.yaml
+kubectl -n kube-system rollout status daemonset/calico-node --timeout=300s
+
+# Only now can nodes be Ready — kubelet reports NotReady until a CNI
+# plugin is installed, which is exactly what the step above did.
 kubectl wait --for=condition=Ready nodes --all --timeout=180s
+
+# The ingress controller uses hostPort 80/443, and only the control-plane
+# node carries the matching extraPortMappings, so it has to run there.
+echo "installing ingress-nginx..."
+kubectl label node sim-control-plane ingress-ready=true --overwrite
+preload_images /opt/sim/ingress-nginx.yaml
+kubectl apply -f /opt/sim/ingress-nginx.yaml
+kubectl -n ingress-nginx wait --for=condition=Available \
+  deployment/ingress-nginx-controller --timeout=300s
+
+# The local Helm repository is packaged and served by start.sh, before
+# this script runs — a Helm question's setup.sh installs releases from
+# it, so it has to exist by the time seeding starts.
 
 # seed only a freshly created cluster — re-seeding a resumed one would
 # overwrite candidate work (setup.sh scripts re-apply initial state)

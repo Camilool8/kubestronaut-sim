@@ -15,7 +15,14 @@ install -m 644 -o candidate -g candidate /etc/sim/ssh_config /home/candidate/.ss
 # MaxCutText is raised from the 256KiB default so pasting a whole
 # manifest is not silently truncated.
 clipboard_args='-AcceptCutText=1 -SendCutText=1 -SetPrimary=1 -SendPrimary=1 -MaxCutText 2097152'
-su - candidate -c "Xvnc :1 -geometry 1440x900 -depth 24 -SecurityTypes None -localhost yes ${clipboard_args}" &
+# The geometry is only the *initial* framebuffer: the browser client sets
+# resizeSession, and TigerVNC honors SetDesktopSize with an arbitrary size,
+# so the desktop ends up at the exam pane's real pixel dimensions within a
+# second of connecting. Starting at 1080p rather than 1440x900 means the
+# first negotiated resize is a small correction on a typical laptop instead
+# of a visible jump, and a maximised window on a large display never has to
+# scale up from a smaller frame while it waits.
+su - candidate -c "Xvnc :1 -geometry 1920x1080 -depth 24 -SecurityTypes None -localhost yes ${clipboard_args}" &
 xvnc_pid=$!
 until su - candidate -c 'DISPLAY=:1 xset q' >/dev/null 2>&1; do
   kill -0 "$xvnc_pid" 2>/dev/null || { echo "Xvnc failed to start" >&2; exit 1; }

@@ -1,14 +1,18 @@
 # kubestronaut-sim
 
 Open-source, killer.sh-style exam simulator for the Kubestronaut
-certifications. Deliberately harder than the real exams. CKAD and CKA
-banks today; KCNA/KCSA (multiple choice) and CKS are on the roadmap and
-appear in the catalog as coming soon.
+certifications. Deliberately harder than the real exams. A full
+**22-question CKAD bank** covering all five curriculum domains, plus a
+short CKA bank; KCNA/KCSA (multiple choice) and CKS are on the roadmap
+and appear in the catalog as coming soon.
 
-**Status: Milestone F — UI polish (one markdown renderer for questions and
-solutions, a required-error-branch async primitive behind the exam
-catalog, a non-strobing progress bar, and a real-browser pass that caught
-bugs the automated gates could not).**
+**Status: Milestone G — an environment the exam can be tested against.**
+Calico replaces kindnet so NetworkPolicies are genuinely enforced;
+ingress-nginx, a local Helm repository and a container registry make the
+rest of the CKAD curriculum answerable. Questions are graded on
+behaviour wherever behaviour is the point — a policy that denies, an
+Ingress the controller really routes, an adapter whose output its
+neighbour can read. And the exam desktop no longer strobes.
 
 Code: Apache-2.0. Question banks: CC BY-SA 4.0 (see `banks/LICENSE`).
 Not affiliated with CNCF, The Linux Foundation, PSI, or killer.sh.
@@ -23,6 +27,19 @@ desktop included).
 
     ./sim up                     # boots everything (first run: several minutes)
     open http://localhost:8080   # then never touch the CLI again
+
+Ports bind to **all interfaces** by default, so you can build the
+environment on a desktop and sit the exam from a laptop on the same
+network — just point it at `http://<that machine>:8080`.
+
+> **There is no authentication anywhere in this stack.** Anyone who can
+> reach port 8080 can start and end your exam, and the exam desktop is a
+> real shell on containers that run privileged. On a network you do not
+> control, bind to loopback instead:
+>
+>     SIM_BIND=127.0.0.1 ./sim up
+>
+> `SIM_BIND` applies to every published port, not just the UI.
 
 Everything after `up` happens in the browser: pick an exam from the
 lobby catalog, start the timed session, work on the embedded desktop,
@@ -55,7 +72,8 @@ there.
    desktop rendered by a built-in VNC client. The desktop comes ready:
    the terminal is already open showing the exam banner, and the panel
    has Terminal + Firefox (docs-allowlist only) launchers. A first-run
-   tour points out the moving parts.
+   card explains the four regions of the screen; "How this exam works"
+   in the lobby and the About panel bring it back at any time.
 3. **End** — submit early or let the timer expire; the desktop locks
    immediately and grading runs in the background.
 4. **Score** — percent, pass/fail, how the session ended, expandable
@@ -65,6 +83,39 @@ Desktop access and the solutions endpoint are gated by session state
 (403 until running, or ended, respectively) purely for UX fidelity with
 the real exam — this is **not a security boundary**: every bank file,
 including `solution.md`, already sits unencrypted on your own disk.
+
+## The cluster you get
+
+A two-node kind cluster (one control plane, one worker), with:
+
+- **Calico**, not kind's default kindnet, so **NetworkPolicies are
+  actually enforced**. A policy question can be graded on behaviour —
+  this connection succeeds, that one times out — and, more importantly,
+  you can test your own answer the way you would on the real exam.
+- **ingress-nginx**, pinned to the control-plane node, so Ingress
+  questions have a controller to satisfy them.
+- A **local Helm repository** (`sim`), pre-added on every instance and
+  served from the cluster host with no internet involved.
+- A **plain-HTTP registry** at `registry:5000`, reachable from the
+  instances, for the image-building questions.
+
+Test in-cluster first — that is what the real exam expects, and it is
+what the graders use:
+
+    kubectl -n <ns> run tmp --rm -it --restart=Never --image=nginx:alpine -- curl -m 5 <svc>
+
+Ports are also mapped out to the host, which the real exam does not do,
+because being able to open your own Ingress in a browser is a fast way to
+learn why it isn't matching:
+
+| From your machine | Reaches |
+|---|---|
+| `http://localhost:8081` | ingress-nginx (HTTP) — send a `Host:` header, or use an `/etc/hosts` entry |
+| `https://localhost:8443` | ingress-nginx (HTTPS) |
+| `localhost:30080-30082` | NodePort Services on those three ports |
+
+No `validate.d` check may depend on that host path — it is for you, not
+for grading.
 
 ## Architecture note: the conductor
 
@@ -94,7 +145,16 @@ session has ended, from the score page).
 
 ## Verification
 
-`tests/smoke.sh` is the end-to-end gate (~25 min, destructive: it purges
+`tests/smoke.sh` is the end-to-end gate (~35 min, destructive: it purges
 first). It covers the cold boot, solving both banks, session lifecycle,
 warm restart, UI-path reset, the CKAD→CKA→CKAD switch round-trip,
-conductor network isolation, desktop readiness, and session auto-expiry.
+conductor network isolation, desktop readiness, session auto-expiry, and
+the cluster add-ons — including a *behavioural* NetworkPolicy check,
+since "calico-node exists" would pass against a CNI that was installed
+but programming no rules.
+
+Two gates hold every question bank honest, and both run inside the smoke
+test: a **fresh environment must score 0**, and running every
+`tests/solutions/<bank>/qNN.sh` must score **100%**. The first is the one
+that earns its keep — it is what catches a check that passes by accident,
+or state left behind by a previous attempt.

@@ -5,9 +5,10 @@ metadata:
   title: CKAD Mock Exam 01
   certification: CKAD
   description: >-
-    Developer-track exercises: namespaces and quotas, debugging a broken
-    Deployment, and NetworkPolicy lockdown. Two instances, kind-backed
-    cluster.
+    Developer-track exercises across the full CKAD curriculum: workloads
+    and multi-container design, deployments and configuration, security
+    contexts, observability, and services, ingress and network policy.
+    Two instances, kind-backed cluster.
 spec:
   examType: hands-on
   duration: 120m
@@ -32,4 +33,80 @@ spec:
     - id: q03
       instance: instance-2
       domain: Services and Networking
+      weight: 10
+    - id: q04
+      instance: instance-2
+      domain: Application Design and Build
+      weight: 6
+    - id: q05
+      instance: instance-1
+      domain: Application Design and Build
+      weight: 8
+    - id: q06
+      instance: instance-2
+      domain: Application Environment, Configuration and Security
+      weight: 7
+    - id: q07
+      instance: instance-1
+      domain: Application Environment, Configuration and Security
+      weight: 8
+    - id: q08
+      instance: instance-2
+      domain: Services and Networking
       weight: 5
+    - id: q09
+      instance: instance-1
+      domain: Application Design and Build
+      weight: 9
+    - id: q10
+      instance: instance-2
+      domain: Application Design and Build
+      weight: 10
+    - id: q11
+      instance: instance-1
+      domain: Application Deployment
+      weight: 8
+    - id: q12
+      instance: instance-2
+      domain: Application Deployment
+      weight: 8
+    - id: q13
+      instance: instance-1
+      domain: Application Deployment
+      weight: 7
+    - id: q14
+      instance: instance-2
+      domain: Application Environment, Configuration and Security
+      weight: 8
+    - id: q15
+      instance: instance-1
+      domain: Application Environment, Configuration and Security
+      weight: 9
+    - id: q16
+      instance: instance-2
+      domain: Application Observability and Maintenance
+      weight: 8
+    - id: q17
+      instance: instance-1
+      domain: Application Observability and Maintenance
+      weight: 9
+    - id: q18
+      instance: instance-2
+      domain: Application Observability and Maintenance
+      weight: 9
+    - id: q19
+      instance: instance-1
+      domain: Services and Networking
+      weight: 8
+    - id: q20
+      instance: instance-2
+      domain: Services and Networking
+      weight: 7
+    - id: q21
+      instance: instance-1
+      domain: Application Design and Build
+      weight: 7
+    - id: q22
+      instance: instance-2
+      domain: Application Design and Build
+      weight: 8

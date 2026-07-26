@@ -1,4 +1,10 @@
 name: kubestronaut-sim
+# SIM_BIND is the host interface every published port binds to. It
+# defaults to 0.0.0.0 so the simulator can be built on a desktop and used
+# from a laptop on the same network — which is the point of publishing at
+# all. There is NO authentication anywhere in this stack and the exam
+# desktop is a shell, so on a network you do not control, set
+# SIM_BIND=127.0.0.1. See the README.
 services:
   k8s-env:
     build: images/k8s-env
@@ -6,6 +12,15 @@ services:
     privileged: true
     environment:
       BANK: ${BANK:-ckad-mock-01}
+    ports:
+      # The host end of the host -> cluster chain (see kind-config.yaml).
+      # 80/443 inside this container are the kind control-plane node's
+      # published ports, which ingress-nginx binds via hostPort; the
+      # 30080-30082 band is for NodePort Services. Offset on the host so
+      # they never contend with whatever else is listening there.
+      - "${SIM_BIND:-0.0.0.0}:8081:80"
+      - "${SIM_BIND:-0.0.0.0}:8443:443"
+      - "${SIM_BIND:-0.0.0.0}:30080-30082:30080-30082"
     volumes:
       - shared:/shared
       - dind:/var/lib/docker
@@ -17,6 +32,25 @@ services:
       retries: 90
       start_period: 60s
     networks: [default, examnet]
+  # The two exam instances are identical but for their /opt/course and
+  # container-storage volumes.
+  #
+  # privileged, because the image-building questions run podman inside a
+  # container and podman needs to write cgroups and mount /proc for each
+  # build step. A narrower set was tried and does not work here: caps
+  # (SYS_ADMIN, SYS_CHROOT, MKNOD, SETFCAP, NET_ADMIN) plus
+  # cgroupns=host, a read-write /sys/fs/cgroup bind and seccomp
+  # unconfined clears the cgroup errors only to stop on a read-only
+  # /proc/sys/net/ipv4/ping_group_range, which no container-level knob
+  # reopens. Rootless podman as `candidate` is the right long-term
+  # answer and gets further still — it fails mounting proc inside its own
+  # user namespace — but not far enough. See docs/follow-ups.md.
+  #
+  # What this costs: a shell on an instance is a shell on the host. That
+  # matters because SIM_BIND defaults to 0.0.0.0, so read the security
+  # note in the README before running this on a network you do not
+  # control. It is not the only thing that note covers — nothing in this
+  # stack authenticates anyone.
   instance-1:
     build: images/instance
     hostname: instance-1
@@ -29,6 +63,8 @@ services:
       - ./banks:/banks:ro
       - ./tests:/tests:ro
       - course-1:/opt/course
+      - containers-1:/var/lib/containers
+    privileged: true
     networks: [default, examnet]
   instance-2:
     build: images/instance
@@ -42,7 +78,23 @@ services:
       - ./banks:/banks:ro
       - ./tests:/tests:ro
       - course-2:/opt/course
+      - containers-2:/var/lib/containers
+    privileged: true
     networks: [default, examnet]
+  registry:
+    # Push target for the image-building questions. Plain HTTP, no auth,
+    # no host port: it exists only so `podman push` from an instance has
+    # somewhere to go, the way the real exam gives you a registry. On
+    # examnet alone, so it has no internet and nothing outside the exam
+    # can reach it.
+    image: registry:2
+    hostname: registry
+    environment:
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    volumes:
+      - registry:/var/lib/registry
+    networks: [examnet]
+    restart: unless-stopped
   docs-proxy:
     build: proxy
     hostname: docs-proxy
@@ -94,7 +146,7 @@ services:
       dockerfile: facilitator/Dockerfile
     hostname: facilitator
     ports:
-      - "127.0.0.1:8080:8080"
+      - "${SIM_BIND:-0.0.0.0}:8080:8080"
     environment:
       BANK: ${BANK:-ckad-mock-01}
       SESSION_DURATION_OVERRIDE: ${SESSION_DURATION_OVERRIDE:-}
@@ -121,6 +173,9 @@ volumes:
   course-1: {}
   course-2: {}
   session: {}
+  registry: {}
+  containers-1: {}
+  containers-2: {}
 networks:
   default: {}
   examnet:

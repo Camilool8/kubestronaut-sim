@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cargo-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cargo-api
+  template:
+    metadata:
+      labels:
+        app: cargo-api
+    spec:
+      containers:
+        - name: api
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80

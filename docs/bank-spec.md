@@ -7,42 +7,60 @@ coming-soon entries whose exam engine doesn't exist yet.
 
 ## exam.yaml
 
-    apiVersion: sim.kubestronaut.dev/v1alpha2
-    kind: Exam
-    metadata:
-      name: ckad-mock-01            # must equal directory name
-      title: CKAD Mock Exam 01
-      certification: CKAD           # catalog badge (CKAD/CKA/CKS/...)
-      description: >-               # one-liner shown on the catalog card
-        Developer-track exercises.
-    spec:
-      examType: hands-on            # only "hands-on" runs today; anything else
-                                    # is listed in the catalog but disabled
-      duration: 120m                # enforced: the facilitator auto-ends the session at 0:00
-      passingScore: 66              # percent; enforced: facilitator's Results.Passed
-      kubernetesVersion: "1.35"     # informational
-      environment:
-        provider: kind
-        nodes: 2                    # informational; 1 control-plane + N-1 workers
-      instances:                    # ssh targets; 1 or 2 entries, names MUST be
-        - name: instance-1          # instance-1 / instance-2 — the compose topology
-        - name: instance-2          # is generic so every bank runs unmodified.
-                                    # (Per-bank ssh aliases, e.g. cka-1 -> instance-1,
-                                    # are a possible future enhancement.)
-      questions:
-        - id: q01                   # directory name
-          instance: instance-1          # where the candidate solves it
-          domain: Application Design and Build
-          weight: 5                 # informational; scoring = sum of check points
+```yaml
+apiVersion: sim.kubestronaut.dev/v1alpha2
+kind: Exam
+metadata:
+  name: ckad-mock-01            # must equal directory name
+  title: CKAD Mock Exam 01
+  certification: CKAD           # catalog badge (CKAD/CKA/CKS/...)
+  description: >-               # one-liner shown on the catalog card
+    Developer-track exercises.
+spec:
+  examType: hands-on            # only "hands-on" runs today; anything else
+                                # is listed in the catalog but disabled
+  duration: 120m                # enforced: the facilitator auto-ends the session at 0:00
+  passingScore: 66              # percent; enforced: facilitator's Results.Passed
+  kubernetesVersion: "1.35"     # informational
+  environment:
+    provider: kind
+    nodes: 2                    # informational; 1 control-plane + N-1 workers
+  instances:                    # ssh targets; 1 or 2 entries, names MUST be
+    - name: instance-1          # instance-1 / instance-2 — the compose topology
+    - name: instance-2          # is generic so every bank runs unmodified.
+                                # (Per-bank ssh aliases, e.g. cka-1 -> instance-1,
+                                # are a possible future enhancement.)
+  questions:
+    - id: q01                   # directory name
+      instance: instance-1      # where the candidate solves it
+      domain: Application Design and Build
+      weight: 5                 # informational; scoring = sum of check points
+```
 
 ## Question directory: `banks/<bank-id>/<qid>/`
 
 | File            | Purpose |
 |-----------------|---------|
 | `question.md`   | Statement shown to the candidate. Must name the instance and any artifact paths (`/opt/course/<n>/...`). |
-| `setup.sh`      | Seeds pre-state. Runs inside `k8s-env` as root with admin `KUBECONFIG`. MUST be idempotent (safe to re-run). |
+| `setup.sh`      | Seeds cluster pre-state. Runs inside `k8s-env` as root with admin `KUBECONFIG`. MUST be idempotent (safe to re-run). |
+| `files/`        | Optional. Copied into `/opt/course/<n>/` on every instance at start, owned by `candidate`. |
 | `validate.d/NN_name.sh` | One scoring criterion each, run in lexical order. |
 | `solution.md`   | Full walkthrough, shown after the exam. |
+
+`files/` is how a question hands the candidate starting material: a
+Dockerfile to edit, a manifest on a removed apiVersion, a kustomize base.
+It cannot be done from `setup.sh`, which runs on `k8s-env` and has no
+access to the per-instance `/opt/course` volumes.
+
+The copy **never overwrites**. It runs on every instance start, but only
+creates files that are not already there, because for these questions the
+seeded file *is* the answer sheet — `./sim down && ./sim up` resumes an
+attempt, and re-copying would throw the candidate's edits away. A reset
+clears `/opt/course` first, so it seeds fresh copies; a restart does not.
+
+Do not ship anything under `files/` that a check reads without the
+candidate having modified it: it would score whether the copy worked, not
+whether they did anything.
 
 ## Code blocks in `question.md` / `solution.md`
 
@@ -82,12 +100,68 @@ color this section warns about.
   (message: "check timed out"), regardless of what it would eventually have
   returned.
 
+## What the cluster provides
+
+Guarantees a question may rely on. Each one is installed by
+`images/k8s-env/bootstrap.sh` before any `setup.sh` runs.
+
+**NetworkPolicy is enforced.** The CNI is Calico, not kind's default
+kindnet. This is the difference between a policy question that can only
+check the shape of a candidate's YAML and one that can check what the
+policy *does* — and, more importantly, between a candidate who has to
+guess and one who can test. Prefer behavioural checks:
+
+```bash
+# in a validate.d script: the allowed path must work...
+kubectl -n "$NS" run probe-ok --rm -i --restart=Never --image=busybox:1.37 \
+  --labels=role=frontend --command -- wget -q -T 4 -O- http://api:80
+# ...and the denied one must time out, not merely be absent
+kubectl -n "$NS" run probe-deny --rm -i --restart=Never --image=busybox:1.37 \
+  --labels=role=other --command -- wget -q -T 4 -O- http://api:80 && exit 1
+```
+
+Budget for it: a probe Pod plus its timeout has to fit inside the check
+contract's 30 seconds, so keep `-T` low and run at most two probes per
+script.
+
+**An Ingress controller exists.** ingress-nginx, pinned to the
+control-plane node, with IngressClass `nginx`. Ingress questions can
+require a real controller to admit and route the rule.
+
+**A Helm repository is pre-added.** Charts under `banks/_charts/` are
+packaged at bootstrap and served from `k8s-env:8879`; every instance has
+it configured as `sim` before the candidate logs in. `helm` is available
+to `setup.sh` (which runs on k8s-env) too, so a question can seed
+releases — including one deliberately left in a bad state.
+
+**A registry is reachable at `registry:5000`.** Plain HTTP, no auth, from
+the instances only. Podman is installed on the instances, so a question
+can ask a candidate to edit a Dockerfile, build, tag, push and run.
+
+### Testing: in-cluster first
+
+Questions must be solvable and verifiable **from inside the cluster** —
+that is what the real exam expects, and the instances are not cluster
+nodes, so a ClusterIP is not reachable from an instance shell. The
+idiom, in both `solution.md` and `validate.d`:
+
+```bash
+kubectl -n <ns> run tmp --rm -it --restart=Never --image=nginx:alpine -- curl -m 5 <svc>
+```
+
+Ports are also mapped out to the host — `:8081` → ingress HTTP, `:8443`
+→ ingress HTTPS, `:30080-30082` → NodePorts — which the real exam does
+not offer. That path exists so a candidate can open their own Ingress in
+a browser while learning. **No `validate.d` check may depend on it**: it
+is outside the cluster, it is off by default when `SIM_BIND` is set to
+loopback on another host, and grading must not vary with either.
+
 ## Runtime environment provided to scripts
 
 - `/shared/kubeconfig` — admin kubeconfig (server `https://k8s-env:6443`).
-- Instances: candidate user `candidate` (password `candidate`), kubeconfig
-  at `~/.kube/config`, writable `/opt/course/`, tools: kubectl, helm, yq,
-  jq, vim, nano.
+- Instances: candidate user `candidate` (password `candidate`, and
+  passwordless `sudo`), kubeconfig at `~/.kube/config`, writable
+  `/opt/course/`, tools: kubectl, helm, yq, jq, vim, nano, podman.
 - `/opt/course/<n>` is pre-created on every instance for each question
   (`<n>` = the digits of the question id, e.g. `q01` → `/opt/course/1`),
   owned by `candidate`. Questions must never require creating these

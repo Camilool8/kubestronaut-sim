@@ -4,7 +4,7 @@ Convert to GitHub issues once the repo has a remote.
 
 ## Grading strictness / bank content
 - q01 `10_list-file.sh`: strip trailing whitespace on populated lines before diffing.
-- q01 `30_quota.sh`: accept equivalent resource quantities (e.g. `1000m` == `1`) instead of canonical-string match. Highest-value fix in this list.
+- q01 `30_quota.sh`: accept equivalent resource quantities (e.g. `1000m` == `1`) instead of canonical-string match. Highest-value fix in this list. Milestone G's `q07/validate.d/30_resources.sh` has the normaliser to copy — it compares CPU in millicores and memory in MiB rather than by spelling, so `0.1` and `100m` both pass.
 - ~~grader: tighten points guard to `(0|[1-9][0-9]*)` (leading-zero `08` currently hits bash octal parse)~~ (fixed in Milestone C: Go loader rejects leading zeros/negatives).
 - ~~grader: wrap remote validate execution in `timeout` (connect-phase timeout exists; hung script still hangs grade). Add "checks must finish within N seconds" to bank-spec~~ (fixed in Milestone C: 30s per-check context timeout in evaluator).
 
@@ -47,7 +47,7 @@ Convert to GitHub issues once the repo has a remote.
 - conductor: catalog is read once at boot; adding a bank requires a conductor restart. Fine locally; revisit if bank authoring becomes iterative.
 - ~~ui: visual regression pass in a real browser (Chrome extension was unavailable during development; WS upgrade + xfconf state verified instead). Do a manual light/dark + tour + toast walkthrough.~~ (done in Milestone F: real-browser pass at three widths, light and dark. It found three of the four defects that milestone fixed — the skip-link leak, the dead "New attempt" button, and unstyled solution markdown — none of which axe or vitest's jsdom could see.)
 - desktop: xfdesktop may show a one-time "untrusted launcher" prompt on the Desktop icons (panel launchers are the primary path); investigate gio trust metadata if it annoys.
-- ui: bundle is ~470KB min (noVNC + React); consider code-splitting the RFB client if cold loads matter.
+- ui: bundle size — superseded by the Milestone F/G entry below (~487KB).
 
 ## Milestone E (UI/UX overhaul) — new
 
@@ -78,6 +78,55 @@ Convert to GitHub issues once the repo has a remote.
   `tests/smoke.sh` from an idle stack before merging.~~ (ran and passed on
   main, 2026-07-25.)
 
+## Milestone H (CKAD bank) — new
+
+- **domain weighting is skewed toward Application Design and Build**:
+  28.1% of the points against a 20% target, because adapter (q21) and
+  ambassador (q22) were added on top of an already-complete 20-question
+  bank rather than in place of anything. The other four domains sit at
+  21.6/17.5/17.5/15.2 against 25/20/20/15. Rebalancing means either
+  trimming points from the six Design and Build questions or adding a
+  question each to Deployment and Services and Networking — a product
+  call, not a bug. All five domains are covered; only their proportions
+  drift.
+- the bank is 22 questions where the real CKAD is 15–20. That is
+  deliberate (this simulator is meant to be harder), but a 2-hour
+  duration against 22 questions is tighter than the real exam's ratio;
+  worth revisiting if attempts routinely run out of time.
+
+## Milestone G (environment) — new
+
+- **instances: rootless podman.** The instances run `privileged: true`
+  solely so podman can build images, which means a shell on an instance
+  is a shell on the host — and `SIM_BIND` now defaults to `0.0.0.0`. A
+  narrower capability set was measured and gets close but not there:
+  `SYS_ADMIN, SYS_CHROOT, MKNOD, SETFCAP, NET_ADMIN` + `cgroupns=host` +
+  a read-write `/sys/fs/cgroup` bind + `seccomp=unconfined` clears every
+  cgroup error and then stops on a read-only
+  `/proc/sys/net/ipv4/ping_group_range` (podman 4.3.1 writes it
+  regardless of `default_sysctls = []` in containers.conf). Rootless
+  podman as `candidate` gets further — subuid/subgid and
+  newuidmap/newgidmap are already in the image, and with
+  SETFCAP/SETUID/SETGID it reaches `mount proc to proc: Operation not
+  permitted` inside its own user namespace. A newer podman, or the
+  upstream `quay.io/podman/stable` recipe, is the likely resolution.
+- images: bank workload images (`nginx:1.29-alpine` et al) are still
+  pulled from the internet by the kind nodes on every reset. The CNI and
+  ingress images are pre-pulled into the persistent DinD cache and
+  side-loaded with `kind load`; extending `preload_images` to a list the
+  bank declares would make a reset fully offline.
+- ingress: image digests are stripped from the vendored ingress-nginx
+  manifest at build time, because `kind load` names images by tag and a
+  kubelet asked for `tag@digest` would go to the network anyway. Version
+  pinning survives via the vendored manifest; digest pinning does not.
+- ingress: the ValidatingWebhookConfiguration is left in place. It is
+  what a real cluster has, but if a candidate's Ingress ever gets
+  rejected at `apply` time because the controller is briefly unavailable,
+  deleting it is the usual kind workaround.
+- storage: podman uses the `vfs` driver. `overlay` + `fuse-overlayfs` was
+  verified working under `privileged` and is the faster choice for large
+  base images; at the sizes the questions use, both took four seconds.
+
 ## Milestone F (UI polish) — new
 
 - design: `--accent` on `--surface-raised` measures 4.12:1 in the light
@@ -86,12 +135,14 @@ Convert to GitHub issues once the repo has a remote.
   dark), so nothing new regresses, but the weaker pairing is still sitting
   in the palette available for other uses. Worth an audit of where else
   `--accent` on `--surface-raised` might already be in play.
-- test: `Markdown.test.tsx` reads `theme.css` off disk via a non-literal
-  `import("node:" + "fs")` to dodge a `tsc` error with no `@types/node` in
-  the project. It works and the limitation it's checking for was verified
-  by hand, but it's the weakest test in the suite — a regex over CSS text
-  standing in for a real style assertion. Replace with a typed `node:fs`
-  import if `@types/node` ever enters the project.
+- test: reading a stylesheet off disk via a non-literal
+  `import("node:" + "fs")`, to dodge a `tsc` error with no `@types/node`
+  in the project, now lives in one place — `ui/src/test/readCss.ts` —
+  with two consumers (`Markdown.test.tsx` and `styles/layout.test.ts`).
+  It works, and what it checks was verified by hand, but a regex over CSS
+  text is still standing in for a real style assertion. Delete the whole
+  helper for a typed `node:fs` import if `@types/node` ever enters the
+  project.
 - bug: `highlight.ts` caches a rejected promise forever. One transient
   failure to load a grammar (yaml/bash/json) disables highlighting for the
   rest of the session, with no retry on the next code block rendered.
@@ -102,13 +153,12 @@ Convert to GitHub issues once the repo has a remote.
 - bug: a synchronously-throwing `fn` passed to `useAsync` escapes the
   effect after `progressStore.start()` runs but before its matching
   `done()`, leaking the top progress bar visible permanently.
-- docs: `docs/bank-spec.md` still carries its own pre-existing 4-space
-  indented `exam.yaml` example. It renders as an unlabelled block for the
-  same reason the bank content used to — noted during phase 10's bank
-  conversion but left alone as out of scope for that task.
-- ui: the main bundle is now ~485KB. Code-splitting the noVNC RFB client
-  remains the obvious next win if cold loads matter (carried over from
-  Milestone D, still true at the larger number).
+- ~~docs: `docs/bank-spec.md` still carries its own pre-existing 4-space
+  indented `exam.yaml` example~~ (fixed in Milestone G: converted to a
+  fenced `yaml` block along with the rest of that document).
+- ui: the main bundle is ~487KB. Code-splitting the noVNC RFB client
+  remains the obvious next win if cold loads matter. (Supersedes the
+  Milestone D entry above — same item, measured again.)
 - test: no test covers the success-after-retry path on the lobby's catalog
   error card — click Retry, confirm the catalog renders. The wiring was
   traced by hand and is correct, but it's unexercised.

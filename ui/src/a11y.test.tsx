@@ -7,6 +7,7 @@ import { Score } from "./screens/Score";
 import { ControlProgress } from "./components/ControlProgress";
 import { DesktopRequired } from "./components/DesktopRequired";
 import { Dialog } from "./components/Dialog";
+import { ExamIntro } from "./components/ExamIntro";
 import { InfoDrawer } from "./components/InfoDrawer";
 import { ToastLayer } from "./components/Toast";
 import { toastStore } from "./components/toastStore";
@@ -269,6 +270,14 @@ describe("axe: no WCAG violations", () => {
 
   test("info drawer", async () => {
     const { container } = render(<InfoDrawer onClose={() => {}} />);
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  test("exam intro card", async () => {
+    // The schematic is a div tree carrying role="img"; the scan is what
+    // holds it to having an accessible name rather than being a pile of
+    // unlabelled boxes a screen reader walks through one at a time.
+    const { container } = render(<ExamIntro onClose={() => {}} />);
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 

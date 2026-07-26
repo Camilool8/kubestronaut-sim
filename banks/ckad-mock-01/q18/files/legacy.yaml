@@ -1,0 +1,32 @@
+# Handed over by a team that last touched it several Kubernetes releases
+# ago. Both apiVersions below were removed and this file no longer
+# applies to any current cluster.
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: nightly-report
+spec:
+  schedule: "0 2 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: report
+              image: busybox:1.37
+              command: ["sh", "-c", "echo generating nightly report"]
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: reports
+spec:
+  rules:
+    - host: reports.sim.local
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: reports
+              servicePort: 80

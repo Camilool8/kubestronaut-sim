@@ -77,29 +77,36 @@ export const strings = {
     desktopRestored: "Desktop connection restored.",
   },
 
-  tour: {
-    progress: (step: number, total: number) => `${step} of ${total}`,
-    skip: "Skip tour",
-    next: "Next",
+  intro: {
+    title: "How this exam works",
+    open: "How this exam works",
     done: "Got it",
-    steps: {
-      questions: {
-        title: "Your questions",
-        body: "Select a question to read it. The chip below the list names the instance to ssh into for that question.",
+    // The schematic is decorative to a sighted reader and load-bearing to
+    // a screen reader, so it carries the same four regions in prose.
+    schematicAlt:
+      "Layout of the exam screen: a question panel on the left, the exam desktop filling the rest, and a bar across the top holding the countdown and the End Exam button.",
+    diagramQuestions: "Questions",
+    diagramDesktop: "Exam desktop",
+    diagramTimer: "1:59:58",
+    diagramEnd: "End Exam",
+    legend: [
+      {
+        title: "Questions",
+        body: "Select one to read it. Click any value in the text — a name, a label, an image tag, a path — to copy it, then paste in the desktop terminal with Ctrl+Shift+V. The chip under the list names the instance to ssh into.",
       },
-      timer: {
+      {
+        title: "Exam desktop",
+        body: "A real Linux desktop. The terminal is already open; ssh to the instance the question names and solve with kubectl. Firefox is there too, limited to the allowlisted documentation sites.",
+      },
+      {
         title: "The countdown",
-        body: "Time is tracked on the server. When it reaches zero the exam ends and grading starts automatically.",
+        body: "Time is tracked on the server, not in this tab, and cannot be paused. At zero the exam ends and grading starts by itself.",
       },
-      desktop: {
-        title: "Your exam desktop",
-        body: "Work here exactly like the real exam: open the terminal, ssh to the named instance, and solve with kubectl. Firefox reaches the allowlisted documentation sites only.",
-      },
-      end: {
+      {
         title: "Finishing",
-        body: "Done early? End the exam here. The desktop locks immediately and your score appears when grading completes.",
+        body: "Done early? End the exam here. The desktop locks immediately and your score appears once grading completes.",
       },
-    },
+    ] as { title: string; body: string }[],
   },
 
   info: {
@@ -117,7 +124,11 @@ export const strings = {
       ["Working directories", "Pre-created /opt/course/<n> paths", "Same"],
       ["Cluster", "Local kind cluster (one control plane, one worker)", "Managed multi-node environments"],
       ["Proctoring", "None. No webcam, no ID checks, no lockdown browser", "PSI remote proctoring"],
-      ["Question pool", "Small curated mocks", "Larger pool, broader coverage"],
+      [
+        "Question pool",
+        "One fixed set per exam — you will see the same questions again",
+        "Drawn from a much larger pool",
+      ],
       ["Retakes", "Reset and retry as often as you like", "Limited, paid retakes"],
     ] as [string, string, string][],
     compareNote:
@@ -132,7 +143,7 @@ export const strings = {
       "Typefaces: IBM Plex Sans and JetBrains Mono (SIL Open Font License)",
       "Desktop client: built on noVNC (MPL 2.0)",
     ],
-    restartTour: "Replay the exam tour",
+    howItWorks: "How this exam works",
     footerLine: "Independent study tool. Not affiliated with CNCF, The Linux Foundation, PSI, or killer.sh.",
   },
 

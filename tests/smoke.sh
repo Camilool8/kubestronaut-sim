@@ -27,7 +27,128 @@ print(data.get(os.environ["FIELD"], ""))
 docker compose exec instance-1 su - candidate -c 'kubectl get nodes --no-headers' | tee /tmp/nodes.txt
 [ "$(grep -c ' Ready ' /tmp/nodes.txt)" -eq 2 ] || fail "expected 2 Ready nodes"
 
-echo "== facilitator: healthz, exam metadata, built UI, single :8080 surface =="
+echo "== cluster add-ons: enforcing CNI, ingress controller, helm repo, registry =="
+# Nodes cannot reach Ready without a CNI, so the assertion above already
+# proves *a* CNI is running. What matters is which one: kindnet routes
+# but does not enforce policy, and every NetworkPolicy question in every
+# bank is only worth marking if this is Calico.
+docker compose exec k8s-env kubectl -n kube-system get daemonset calico-node >/dev/null 2>&1 \
+  || fail "calico-node is missing — NetworkPolicy would not be enforced"
+docker compose exec k8s-env kubectl -n kube-system get daemonset kindnet >/dev/null 2>&1 \
+  && fail "kindnet is still installed; disableDefaultCNI should have removed it" || true
+
+# The behavioural proof, which is the whole point of the CNI swap: a
+# default-deny policy must make traffic time out, not merely exist as an
+# object. Run in a scratch namespace so no bank state is touched.
+docker compose exec -T k8s-env sh <<'PROBE'
+set -e
+kubectl create namespace netpol-smoke --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+kubectl -n netpol-smoke run target --image=nginx:1.29-alpine --labels=app=target \
+  --port=80 >/dev/null 2>&1 || true
+kubectl -n netpol-smoke expose pod target --port=80 >/dev/null 2>&1 || true
+kubectl -n netpol-smoke wait --for=condition=Ready pod/target --timeout=120s >/dev/null
+# Reachable before any policy exists.
+kubectl -n netpol-smoke run probe-before --rm -i --restart=Never --image=busybox:1.37 \
+  --command -- wget -q -T 5 -O- http://target >/dev/null 2>&1 \
+  || { echo "PROBE: target unreachable before any policy"; exit 1; }
+kubectl -n netpol-smoke apply -f - >/dev/null <<'EOF'
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: deny-all, namespace: netpol-smoke}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+EOF
+sleep 5   # let the CNI programme the rules
+if kubectl -n netpol-smoke run probe-after --rm -i --restart=Never --image=busybox:1.37 \
+     --command -- wget -q -T 5 -O- http://target >/dev/null 2>&1; then
+  echo "PROBE: deny-all did NOT block traffic — the CNI is not enforcing policy"
+  exit 1
+fi
+kubectl delete namespace netpol-smoke --wait=false >/dev/null
+PROBE
+[ $? -eq 0 ] || fail "NetworkPolicy is not enforced by the CNI"
+
+docker compose exec k8s-env kubectl -n ingress-nginx get deploy ingress-nginx-controller \
+  -o jsonpath='{.status.readyReplicas}' | grep -q '^[1-9]' \
+  || fail "ingress-nginx controller has no ready replica"
+# It must be on the control-plane node: only that node has the port
+# mappings, so anywhere else means the host path silently 404s.
+docker compose exec k8s-env kubectl -n ingress-nginx get pod \
+  -l app.kubernetes.io/component=controller -o jsonpath='{.items[0].spec.nodeName}' \
+  | grep -q 'sim-control-plane' \
+  || fail "ingress controller is not on the control-plane node (host port chain would be dead)"
+
+docker compose exec instance-1 su - candidate -c 'helm repo list' | grep -q '^sim' \
+  || fail "the 'sim' helm repo is not configured on instance-1"
+docker compose exec instance-1 su - candidate -c 'helm search repo sim/sim-web --versions -o json' \
+  | grep -q '1.1.0' || fail "helm repo index is missing sim-web 1.1.0"
+
+docker compose exec instance-1 curl -fsS --max-time 10 http://registry:5000/v2/ >/dev/null \
+  || fail "the exam registry is not reachable from instance-1"
+
+# The full image-building loop a question asks for: edit, build, tag,
+# push, run, read the logs back. Slow under the vfs storage driver, which
+# is why the image is three lines.
+docker compose exec -T instance-1 bash <<'PODMAN'
+set -e
+work=$(mktemp -d)
+cat > "$work/Dockerfile" <<'EOF'
+FROM alpine:3.21
+ENV SIM_SMOKE=ok
+CMD ["sh", "-c", "echo smoke-$SIM_SMOKE"]
+EOF
+podman build -q -t registry:5000/smoke:v1 "$work" >/dev/null
+podman push --tls-verify=false registry:5000/smoke:v1 >/dev/null
+podman run --rm registry:5000/smoke:v1 | grep -qx 'smoke-ok'
+rm -rf "$work"
+PODMAN
+[ $? -eq 0 ] || fail "podman build/push/run against registry:5000 failed on instance-1"
+
+echo "== host -> cluster: an Ingress answers on the published port =="
+docker compose exec -T k8s-env sh <<'INGRESS'
+set -e
+kubectl create namespace ingress-smoke --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+kubectl -n ingress-smoke create deployment site --image=nginx:1.29-alpine >/dev/null 2>&1 || true
+kubectl -n ingress-smoke expose deployment site --port=80 >/dev/null 2>&1 || true
+kubectl -n ingress-smoke apply -f - >/dev/null <<'EOF'
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata: {name: site, namespace: ingress-smoke}
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: smoke.sim.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: site, port: {number: 80}}}
+EOF
+kubectl -n ingress-smoke rollout status deployment/site --timeout=180s >/dev/null
+INGRESS
+[ $? -eq 0 ] || fail "could not create the smoke Ingress"
+
+# Poll: ingress-nginx takes a moment to pick up a new rule.
+ing_ok=0
+for _ in $(seq 1 20); do
+  if curl -fsS --max-time 5 -H 'Host: smoke.sim.local' http://localhost:8081/ | grep -q 'nginx'; then
+    ing_ok=1; break
+  fi
+  sleep 3
+done
+[ "$ing_ok" = "1" ] || fail "Ingress did not answer on the published host port :8081"
+docker compose exec k8s-env kubectl delete namespace ingress-smoke --wait=false >/dev/null
+
+echo "== published ports bind every interface (SIM_BIND default) =="
+# The bind address is the thing that changed; asserting on it directly
+# beats trying to find a routable LAN address on an arbitrary runner.
+docker compose port facilitator 8080 | grep -q '^0\.0\.0\.0:' \
+  || fail "facilitator should publish on 0.0.0.0 by default (SIM_BIND)"
+docker compose port k8s-env 80 | grep -q '^0\.0\.0\.0:' \
+  || fail "the ingress host port should publish on 0.0.0.0 by default (SIM_BIND)"
+
+echo "== facilitator: healthz, exam metadata, built UI, desktop only via :8080 =="
 status=$(req GET /healthz)
 [ "$status" = "200" ] || fail "healthz expected 200, got $status"
 
@@ -40,8 +161,13 @@ api_title=$(json_field title)
 status=$(req GET /)
 grep -q 'assets/' "$RESP" || fail "exam UI '/' did not serve the built assets"
 
+# The desktop is reachable through the facilitator's session-gated
+# /desktop proxy and nowhere else. (The stack does publish other ports
+# now — the cluster's ingress and NodePort band on k8s-env — but the
+# desktop's own noVNC port is deliberately not among them, because that
+# path would bypass the gate below.)
 curl -fsS --max-time 5 -o /dev/null http://localhost:6080/vnc.html \
-  && fail "port 6080 should not be reachable from the host (single :8080 surface)" || true
+  && fail "port 6080 should not be reachable from the host (it would bypass the session gate)" || true
 
 status=$(req GET /desktop/vnc.html)
 [ "$status" = "403" ] || fail "desktop should be 403 while idle, got $status"
@@ -114,9 +240,37 @@ status=$(req GET /api/questions/q01/solution)
 read -r _ e0 t0 _ < <(grep '^RESULT ' /tmp/grade0.txt)
 [ "$e0" = "0" ] || fail "fresh env should score 0, got ${e0}"
 
-docker compose exec instance-1 su - candidate -c 'bash /tests/solutions/ckad-mock-01/q01.sh'
-docker compose exec instance-1 su - candidate -c 'bash /tests/solutions/ckad-mock-01/q02.sh'
-docker compose exec instance-2 su - candidate -c 'bash /tests/solutions/ckad-mock-01/q03.sh'
+# Blocks until every Deployment in the cluster is Available. Bare Pods are
+# deliberately not covered: one question seeds a crash-looping Pod, so
+# "all Pods Ready" is a condition this cluster is designed never to meet.
+wait_workloads() {
+  docker compose exec -T k8s-env kubectl wait --for=condition=Available \
+    deployments --all --all-namespaces --timeout=300s >/dev/null 2>&1 \
+    || fail "cluster workloads did not become Available within 300s"
+}
+
+# Solve every question, each on the instance its exam.yaml entry names.
+# Driven from the bank rather than a hand-kept list: a question added
+# without a solution script, or pointed at the wrong instance, fails here
+# instead of quietly costing points in the 100% assertion below.
+solve_bank() {
+  local bank=$1 qid inst
+  while read -r qid inst; do
+    [ -n "$qid" ] || continue
+    [ -f "tests/solutions/${bank}/${qid}.sh" ] \
+      || { fail "no solution script for ${bank}/${qid}"; continue; }
+    # </dev/null is load-bearing: `compose exec -T` reads stdin, and
+    # without it the first question swallows the rest of the loop's input
+    # and only one solution ever runs.
+    docker compose exec -T "$inst" su - candidate \
+      -c "bash /tests/solutions/${bank}/${qid}.sh" \
+      >"/tmp/smoke-${bank}-${qid}.log" 2>&1 </dev/null \
+      || fail "${bank}/${qid} solution failed (see /tmp/smoke-${bank}-${qid}.log)"
+  done < <(docker compose exec -T k8s-env yq -r \
+    ".spec.questions[] | .id + \" \" + .instance" "/banks/${bank}/exam.yaml" | tr -d '\r')
+}
+
+solve_bank ckad-mock-01
 
 ./sim grade | tee /tmp/grade1.txt
 read -r _ e1 t1 _ < <(grep '^RESULT ' /tmp/grade1.txt)
@@ -161,6 +315,11 @@ state=$(json_field state)
 # warm restart: down + up must resume exam state
 ./sim down
 ./sim up
+# `./sim up --wait` waits for *container* health; the cluster's own
+# workloads come back well after that, and several checks assert on ready
+# replicas or make live requests. Grading straight away measures how fast
+# the machine is, not whether state resumed.
+wait_workloads
 ./sim grade | tee /tmp/grade2.txt
 read -r _ e2 t2 _ < <(grep '^RESULT ' /tmp/grade2.txt)
 [ "$e2" = "$t2" ] || fail "resumed env should keep score ${t2}/${t2}, got ${e2}/${t2}"

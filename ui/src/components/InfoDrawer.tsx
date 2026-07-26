@@ -4,14 +4,16 @@ import { strings } from "../strings";
 
 interface InfoDrawerProps {
   onClose: () => void;
-  onRestartTour?: () => void;
+  onShowIntro?: () => void;
 }
 
 // Slide-over "About" panel: how the sim compares to the real exam,
 // non-affiliation disclaimer, and license attribution. Available from
-// every screen; the tour restart appears only where a tour exists (the
-// exam screen).
-export function InfoDrawer({ onClose, onRestartTour }: InfoDrawerProps) {
+// every screen. The "How this exam works" entry appears wherever the
+// host screen can render the intro card — which, unlike the spotlight
+// tour it replaced, is every screen, because the card describes the exam
+// layout rather than pointing at a live one.
+export function InfoDrawer({ onClose, onShowIntro }: InfoDrawerProps) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
   useFocusTrap(ref, onClose);
@@ -74,16 +76,16 @@ export function InfoDrawer({ onClose, onRestartTour }: InfoDrawerProps) {
           </ul>
         </section>
 
-        {onRestartTour && (
+        {onShowIntro && (
           <section>
             <button
               className="btn"
               onClick={() => {
-                onRestartTour();
+                onShowIntro();
                 onClose();
               }}
             >
-              {s.restartTour}
+              {s.howItWorks}
             </button>
           </section>
         )}

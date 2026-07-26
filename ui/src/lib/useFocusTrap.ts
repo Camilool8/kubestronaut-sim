@@ -5,7 +5,8 @@ const FOCUSABLE =
 
 // Shared modal focus behavior: move focus inside on mount, keep Tab
 // cycling within the container, close on Escape, and restore focus to
-// the opener on unmount. Used by Dialog, InfoDrawer, and the Tour card.
+// the opener on unmount. Used by Dialog (and so by every dialog built on
+// it, including the exam intro) and by InfoDrawer.
 export function useFocusTrap(
   ref: RefObject<HTMLElement | null>,
   onClose: () => void,
@@ -17,7 +18,13 @@ export function useFocusTrap(
 
     const focusables = () =>
       Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE));
-    (focusables()[0] ?? container).focus();
+    // preventScroll, because focusing the first control also scrolls it
+    // into view — and in a dialog tall enough to scroll internally, the
+    // first control is at the *bottom*. Opening the exam intro card in a
+    // short window jumped straight past its title and diagram to the
+    // "Got it" button. Focus still lands where it should; only the
+    // scroll-into-view is suppressed, so the dialog opens at its top.
+    (focusables()[0] ?? container).focus({ preventScroll: true });
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
