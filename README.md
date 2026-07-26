@@ -5,10 +5,12 @@ certifications. Deliberately harder than the real exams. CKAD and CKA
 banks today; KCNA/KCSA (multiple choice) and CKS are on the roadmap and
 appear in the catalog as coming soon.
 
-**Status: Milestone F — UI polish (one markdown renderer for questions and
-solutions, a required-error-branch async primitive behind the exam
-catalog, a non-strobing progress bar, and a real-browser pass that caught
-bugs the automated gates could not).**
+**Status: Milestone G — an environment the exam can be tested against.
+Calico replaces kindnet so NetworkPolicies are actually enforced;
+ingress-nginx, a local Helm repository and a container registry make the
+rest of the CKAD curriculum answerable. The CKAD bank is complete at 20
+questions across all five domains, and the exam desktop no longer
+strobes.**
 
 Code: Apache-2.0. Question banks: CC BY-SA 4.0 (see `banks/LICENSE`).
 Not affiliated with CNCF, The Linux Foundation, PSI, or killer.sh.
@@ -68,7 +70,8 @@ there.
    desktop rendered by a built-in VNC client. The desktop comes ready:
    the terminal is already open showing the exam banner, and the panel
    has Terminal + Firefox (docs-allowlist only) launchers. A first-run
-   tour points out the moving parts.
+   card explains the four regions of the screen; "How this exam works"
+   in the lobby and the About panel bring it back at any time.
 3. **End** — submit early or let the timer expire; the desktop locks
    immediately and grading runs in the background.
 4. **Score** — percent, pass/fail, how the session ended, expandable
@@ -140,7 +143,16 @@ session has ended, from the score page).
 
 ## Verification
 
-`tests/smoke.sh` is the end-to-end gate (~25 min, destructive: it purges
+`tests/smoke.sh` is the end-to-end gate (~35 min, destructive: it purges
 first). It covers the cold boot, solving both banks, session lifecycle,
 warm restart, UI-path reset, the CKAD→CKA→CKAD switch round-trip,
-conductor network isolation, desktop readiness, and session auto-expiry.
+conductor network isolation, desktop readiness, session auto-expiry, and
+the cluster add-ons — including a *behavioural* NetworkPolicy check,
+since "calico-node exists" would pass against a CNI that was installed
+but programming no rules.
+
+Two gates hold every question bank honest, and both run inside the smoke
+test: a **fresh environment must score 0**, and running every
+`tests/solutions/<bank>/qNN.sh` must score **100%**. The first is the one
+that earns its keep — it is what catches a check that passes by accident,
+or state left behind by a previous attempt.

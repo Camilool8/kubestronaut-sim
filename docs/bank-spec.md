@@ -50,12 +50,17 @@ spec:
 `files/` is how a question hands the candidate starting material: a
 Dockerfile to edit, a manifest on a removed apiVersion, a kustomize base.
 It cannot be done from `setup.sh`, which runs on `k8s-env` and has no
-access to the per-instance `/opt/course` volumes. The copy re-runs on
-every instance start, so restarting an instance restores anything the
-candidate destroyed — the same guarantee `setup.sh`'s idempotence gives
-for cluster state. Do not ship anything under `files/` that a check reads
-without the candidate having modified it: it would score whether the copy
-worked, not whether they did anything.
+access to the per-instance `/opt/course` volumes.
+
+The copy **never overwrites**. It runs on every instance start, but only
+creates files that are not already there, because for these questions the
+seeded file *is* the answer sheet — `./sim down && ./sim up` resumes an
+attempt, and re-copying would throw the candidate's edits away. A reset
+clears `/opt/course` first, so it seeds fresh copies; a restart does not.
+
+Do not ship anything under `files/` that a check reads without the
+candidate having modified it: it would score whether the copy worked, not
+whether they did anything.
 
 ## Code blocks in `question.md` / `solution.md`
 

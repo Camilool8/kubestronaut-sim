@@ -240,9 +240,37 @@ status=$(req GET /api/questions/q01/solution)
 read -r _ e0 t0 _ < <(grep '^RESULT ' /tmp/grade0.txt)
 [ "$e0" = "0" ] || fail "fresh env should score 0, got ${e0}"
 
-docker compose exec instance-1 su - candidate -c 'bash /tests/solutions/ckad-mock-01/q01.sh'
-docker compose exec instance-1 su - candidate -c 'bash /tests/solutions/ckad-mock-01/q02.sh'
-docker compose exec instance-2 su - candidate -c 'bash /tests/solutions/ckad-mock-01/q03.sh'
+# Blocks until every Deployment in the cluster is Available. Bare Pods are
+# deliberately not covered: one question seeds a crash-looping Pod, so
+# "all Pods Ready" is a condition this cluster is designed never to meet.
+wait_workloads() {
+  docker compose exec -T k8s-env kubectl wait --for=condition=Available \
+    deployments --all --all-namespaces --timeout=300s >/dev/null 2>&1 \
+    || fail "cluster workloads did not become Available within 300s"
+}
+
+# Solve every question, each on the instance its exam.yaml entry names.
+# Driven from the bank rather than a hand-kept list: a question added
+# without a solution script, or pointed at the wrong instance, fails here
+# instead of quietly costing points in the 100% assertion below.
+solve_bank() {
+  local bank=$1 qid inst
+  while read -r qid inst; do
+    [ -n "$qid" ] || continue
+    [ -f "tests/solutions/${bank}/${qid}.sh" ] \
+      || { fail "no solution script for ${bank}/${qid}"; continue; }
+    # </dev/null is load-bearing: `compose exec -T` reads stdin, and
+    # without it the first question swallows the rest of the loop's input
+    # and only one solution ever runs.
+    docker compose exec -T "$inst" su - candidate \
+      -c "bash /tests/solutions/${bank}/${qid}.sh" \
+      >"/tmp/smoke-${bank}-${qid}.log" 2>&1 </dev/null \
+      || fail "${bank}/${qid} solution failed (see /tmp/smoke-${bank}-${qid}.log)"
+  done < <(docker compose exec -T k8s-env yq -r \
+    ".spec.questions[] | .id + \" \" + .instance" "/banks/${bank}/exam.yaml" | tr -d '\r')
+}
+
+solve_bank ckad-mock-01
 
 ./sim grade | tee /tmp/grade1.txt
 read -r _ e1 t1 _ < <(grep '^RESULT ' /tmp/grade1.txt)
@@ -287,6 +315,11 @@ state=$(json_field state)
 # warm restart: down + up must resume exam state
 ./sim down
 ./sim up
+# `./sim up --wait` waits for *container* health; the cluster's own
+# workloads come back well after that, and several checks assert on ready
+# replicas or make live requests. Grading straight away measures how fast
+# the machine is, not whether state resumed.
+wait_workloads
 ./sim grade | tee /tmp/grade2.txt
 read -r _ e2 t2 _ < <(grep '^RESULT ' /tmp/grade2.txt)
 [ "$e2" = "$t2" ] || fail "resumed env should keep score ${t2}/${t2}, got ${e2}/${t2}"

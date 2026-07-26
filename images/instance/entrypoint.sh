@@ -30,11 +30,14 @@ if [ -n "${BANK:-}" ] && [ -f "/banks/${BANK}/exam.yaml" ]; then
     [ -n "$digits" ] || continue
     dir="/opt/course/$((10#$digits))"
     mkdir -p "$dir"
-    # Re-copied on every start so a restart restores anything the
-    # candidate mangled beyond repair — the same guarantee setup.sh's
-    # idempotence gives for cluster state.
+    # Seeded once, never overwritten: -n keeps whatever the candidate has
+    # already edited. `down` + `up` is documented to resume an attempt, and
+    # these files ARE the attempt for a question that hands over a
+    # Dockerfile or a kustomize overlay — re-copying would silently throw
+    # the work away. A reset is the thing that clears them, by wiping
+    # /opt/course first, after which this seeds fresh copies.
     if [ -d "/banks/${BANK}/${qid}/files" ]; then
-      cp -R "/banks/${BANK}/${qid}/files/." "$dir/"
+      cp -Rn "/banks/${BANK}/${qid}/files/." "$dir/" 2>/dev/null || true
     fi
   done
   chown -R candidate:candidate /opt/course
@@ -48,6 +51,34 @@ if curl -fsS --max-time 10 -o /dev/null "http://k8s-env:${HELM_REPO_PORT:-8879}/
   su - candidate -c "helm repo add sim http://k8s-env:${HELM_REPO_PORT:-8879} --force-update >/dev/null && helm repo update >/dev/null" \
     && echo "helm repo 'sim' configured" \
     || echo "warning: could not configure the 'sim' helm repo" >&2
+fi
+
+# Reconcile podman across a container restart.
+#
+# Podman keeps runtime state under /run (network namespaces, lock files)
+# and CNI keeps its IP allocations under /var/lib/cni. On a real host
+# both are on tmpfs and vanish at boot, which is the assumption podman is
+# built on. Inside a container they survive `docker restart` instead, so
+# podman comes back holding records that point at network namespaces and
+# iptables chains that no longer exist — and then fails *every* command,
+# including `podman ps`, not just the stale one. The candidate's whole
+# container toolchain is dead until someone wipes the volume.
+#
+# Clearing it restores that boot-time assumption, and `start --all` then
+# brings back whatever was running, which is what a restart policy does
+# on a real machine. All best-effort: an instance whose podman has never
+# been used has none of these paths.
+if command -v podman >/dev/null 2>&1; then
+  rm -rf /run/netns /run/containers /run/libpod /run/cni /var/lib/cni 2>/dev/null || true
+  podman system migrate >/dev/null 2>&1 || true
+  # Retried: the first start immediately after clearing the CNI state
+  # loses a race with podman rebuilding its default bridge, and fails
+  # with "could not set bridge's mac". The second attempt succeeds.
+  for attempt in 1 2 3; do
+    podman start --all >/dev/null 2>&1 && break
+    [ "$attempt" = "3" ] && echo "warning: could not restart podman containers" >&2
+    sleep 2
+  done
 fi
 
 echo "instance ready: $(hostname)"
