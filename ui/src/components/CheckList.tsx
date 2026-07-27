@@ -1,4 +1,5 @@
 import type { CheckResult } from "../api";
+import { Icon } from "./Icon";
 import { strings } from "../strings";
 
 interface CheckListProps {
@@ -29,7 +30,7 @@ export function CheckList({ checks }: CheckListProps) {
           {checks.map((c) => (
             <tr key={c.name} className={c.passed ? "check-pass" : "check-fail"}>
               <td className="check-mark">
-                <span aria-hidden="true">{c.passed ? "✓" : "✗"}</span>
+                <Icon name={c.passed ? "check" : "cross"} />
                 <span className="sr-only">
                   {c.passed ? strings.score.checkPassed : strings.score.checkFailed}
                 </span>

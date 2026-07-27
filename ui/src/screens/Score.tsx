@@ -8,7 +8,11 @@ import {
   type SolutionDetail,
 } from "../api";
 import { CheckList } from "../components/CheckList";
+import { Icon } from "../components/Icon";
 import { Markdown } from "../components/Markdown";
+import { PendingBar } from "../components/Pending";
+import { formatElapsed } from "../lib/format";
+import { useTick } from "../lib/useTick";
 import { strings } from "../strings";
 
 const GRADING_POLL_MS = 3000;
@@ -25,6 +29,11 @@ interface ScoreProps {
 // "New attempt" action that drives the conductor's reset (same code
 // path as ./sim reset).
 export function Score({ onNewAttempt, endReason }: ScoreProps) {
+  // Released by this screen unmounting when the reset job flips the session
+  // back to idle; a refused job leaves it set only until the toast App
+  // raises is dismissed and the user tries again, which is the correct
+  // read — the request really is still outstanding.
+  const [starting, setStarting] = useState(false);
   const [response, setResponse] = useState<ResultsResponse>({ status: "grading" });
   // A poll that failed to reach the facilitator at all — distinct from a
   // grading error the facilitator reported. It is not terminal (the next
@@ -32,6 +41,8 @@ export function Score({ onNewAttempt, endReason }: ScoreProps) {
   // of replacing it.
   const [pollError, setPollError] = useState<string | null>(null);
   const intervalRef = useRef<number | null>(null);
+  // Anchored at mount, which is when the session ended and grading began.
+  const [startedAt] = useState(() => Date.now());
 
   const clearPoll = () => {
     if (intervalRef.current !== null) {
@@ -91,18 +102,13 @@ export function Score({ onNewAttempt, endReason }: ScoreProps) {
     }
   };
 
+  const handleNewAttempt = () => {
+    setStarting(true);
+    onNewAttempt();
+  };
+
   if (response.status === "grading" || response.status === "not-ended") {
-    return (
-      <div className="score-screen score-loading">
-        <h1>{strings.score.gradingTitle}</h1>
-        <p>{strings.score.gradingBody}</p>
-        {pollError && (
-          <p className="error-text" role="status">
-            {strings.score.pollFailed(pollError)}
-          </p>
-        )}
-      </div>
-    );
+    return <Grading startedAt={startedAt} pollError={pollError} />;
   }
 
   if (response.status === "error") {
@@ -122,7 +128,10 @@ export function Score({ onNewAttempt, endReason }: ScoreProps) {
   return (
     <div className="score-screen">
       <div className={`score-banner ${results.passed ? "pass" : "fail"}`}>
-        <div className="score-percent">{results.percent}%</div>
+        <h1 className="score-percent">
+          <span className="sr-only">{strings.score.scoreLabel}: </span>
+          {results.percent}%
+        </h1>
         <div className="score-verdict">{results.passed ? strings.score.pass : strings.score.fail}</div>
         <div className="score-detail">
           {strings.score.pointsDetail(results.earned, results.total, results.passingScore)}
@@ -139,11 +148,47 @@ export function Score({ onNewAttempt, endReason }: ScoreProps) {
       </div>
 
       <div className="score-actions">
-        <button className="btn btn-primary" onClick={onNewAttempt}>
-          {strings.control.newAttempt}
+        {/* This used to fire and change nothing until the 202 landed, so a
+            slow conductor left the screen pixel-identical to before the
+            click — and repeated clicks fired repeated POSTs. */}
+        <button className="btn btn-primary" onClick={handleNewAttempt} disabled={starting}>
+          {starting ? strings.control.starting : strings.control.newAttempt}
         </button>
         <p className="score-actions-hint">{strings.control.newAttemptHint}</p>
       </div>
+    </div>
+  );
+}
+
+// This was the longest fully-static wait in the product: a heading, one
+// paragraph, and a 3s poll behind it. Nothing on screen changed for the
+// whole grade, which is exactly how a normal wait starts reading as a hang.
+//
+// Two signals now, and the order matters. The elapsed counter is the one
+// that carries the state WITHOUT motion — it ticks identically whether or
+// not the user accepts animation, which the bar underneath does not. The
+// bar is the enhancement, never the only evidence.
+function Grading({ startedAt, pollError }: { startedAt: number; pollError: string | null }) {
+  const now = useTick(true);
+
+  return (
+    <div className="score-screen score-loading">
+      <h1>{strings.score.gradingTitle}</h1>
+      <p>{strings.score.gradingBody}</p>
+      <div className="score-loading-progress">
+        <PendingBar label={strings.score.gradingTitle} />
+        {/* aria-hidden and mono/tabular, matching the control overlay: a
+            clock that re-announces every second buries the status line
+            that actually changed. */}
+        <p className="score-loading-elapsed" aria-hidden="true">
+          {strings.control.elapsed(formatElapsed(now - startedAt))}
+        </p>
+      </div>
+      {pollError && (
+        <p className="error-text" role="status">
+          {strings.score.pollFailed(pollError)}
+        </p>
+      )}
     </div>
   );
 }
@@ -173,6 +218,7 @@ function QuestionResultDetails({ question }: { question: QuestionResult }) {
   return (
     <details className="question-result">
       <summary>
+        <Icon name="chevron-down" className="disclosure-chevron" />
         <span className="qr-id">{question.id}</span>
         <span className="qr-domain">{question.domain}</span>
         <span className="qr-points">
@@ -181,7 +227,10 @@ function QuestionResultDetails({ question }: { question: QuestionResult }) {
       </summary>
       <CheckList checks={question.checks} />
       <details className="solution-details" onToggle={handleToggle}>
-        <summary>{strings.score.showSolution}</summary>
+        <summary>
+          <Icon name="chevron-down" className="disclosure-chevron" />
+          {strings.score.showSolution}
+        </summary>
         {loadingSolution && <p>{strings.score.loadingSolution}</p>}
         {solutionError && <p className="error-text">{solutionError}</p>}
         {solution && <Markdown>{solution.markdown}</Markdown>}

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { formatClock, formatDuration, formatElapsed } from "./format";
+import { formatClock, formatClockSpoken, formatDuration, formatElapsed } from "./format";
 
 describe("formatDuration", () => {
   test("whole hours render without minutes", () => {
@@ -56,5 +56,45 @@ describe("formatClock", () => {
 
   test("floors fractional seconds", () => {
     expect(formatClock(59.9)).toBe("0:00:59");
+  });
+});
+
+describe("formatClockSpoken", () => {
+  test("reads hours and minutes together", () => {
+    expect(formatClockSpoken(6432)).toBe("1 hour 47 minutes");
+    expect(formatClockSpoken(7500)).toBe("2 hours 5 minutes");
+  });
+
+  test("a zero minutes component is dropped rather than spoken", () => {
+    expect(formatClockSpoken(7200)).toBe("2 hours");
+    expect(formatClockSpoken(3600)).toBe("1 hour");
+  });
+
+  test("a zero hours component is dropped rather than spoken", () => {
+    expect(formatClockSpoken(300)).toBe("5 minutes");
+    expect(formatClockSpoken(60)).toBe("1 minute");
+  });
+
+  test("seconds are dropped at or above a minute — the tick would re-announce", () => {
+    // 1:00:59 and 1:00:00 are the same reading out loud.
+    expect(formatClockSpoken(3659)).toBe("1 hour");
+    expect(formatClockSpoken(119)).toBe("1 minute");
+  });
+
+  test("under a minute the seconds are the reading", () => {
+    expect(formatClockSpoken(45)).toBe("45 seconds");
+    expect(formatClockSpoken(1)).toBe("1 second");
+    expect(formatClockSpoken(0)).toBe("0 seconds");
+  });
+
+  test("singulars are singular at every unit", () => {
+    expect(formatClockSpoken(3660)).toBe("1 hour 1 minute");
+    expect(formatClockSpoken(7260)).toBe("2 hours 1 minute");
+  });
+
+  test("clamps and floors exactly as formatClock does", () => {
+    // Both read the same remaining-seconds value; they must not disagree.
+    expect(formatClockSpoken(-5)).toBe("0 seconds");
+    expect(formatClockSpoken(59.9)).toBe("59 seconds");
   });
 });

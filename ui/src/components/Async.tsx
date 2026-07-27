@@ -11,7 +11,12 @@ interface AsyncProps<T> {
    */
   error: (message: string, reload: () => void) => ReactNode;
   loading?: ReactNode;
-  children: (data: T) => ReactNode;
+  /**
+   * `refreshing` is true when a call is in flight over data already on
+   * screen. Without it a refetch is invisible: the screen keeps rendering
+   * the previous, possibly stale, values with nothing saying so.
+   */
+  children: (data: T, meta: { refreshing: boolean }) => ReactNode;
 }
 
 export function Async<T>({ state, error, loading = null, children }: AsyncProps<T>) {
@@ -19,8 +24,10 @@ export function Async<T>({ state, error, loading = null, children }: AsyncProps<
     return <>{error(state.error ?? "", state.reload)}</>;
   }
   // Data survives a reload, so refreshing never blanks a working screen.
-  if (state.data !== null) {
-    return <>{children(state.data)}</>;
+  // Gated on hasData rather than `data !== null` so a call that resolves
+  // with nothing still counts as loaded.
+  if (state.hasData) {
+    return <>{children(state.data as T, { refreshing: state.status === "loading" })}</>;
   }
   return <>{loading}</>;
 }

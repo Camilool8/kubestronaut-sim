@@ -86,24 +86,63 @@ async function readError(res: Response): Promise<string> {
   }
 }
 
-export async function getSession(): Promise<SessionSnapshot> {
-  const res = await fetch("/api/session");
+// A facilitator that is reachable but wedged never answers, and fetch has
+// no default timeout. Every pending flag in the UI (`starting`, `ending`,
+// `switching`, the top progress bar) clears in a `finally`, so before this
+// existed a wedged server left buttons disabled and the bar up for the rest
+// of the session with no way back short of a reload.
+const FETCH_TIMEOUT_MS = 10_000;
+
+export interface RequestOptions {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  /** Aborts this call when the caller goes away (useAsync passes its own). */
+  signal?: AbortSignal;
+  timeoutMs?: number;
+}
+
+function withTimeout(ms: number, external?: AbortSignal): AbortSignal {
+  // AbortSignal.timeout deliberately, not a hand-rolled setTimeout:
+  // ControlProgress's tests run under vi.useFakeTimers(), and a manual
+  // timer here would be the one thing in that file able to fire spuriously.
+  const timeout = AbortSignal.timeout(ms);
+  return external ? AbortSignal.any([external, timeout]) : timeout;
+}
+
+async function request(path: string, opts: RequestOptions = {}): Promise<Response> {
+  const { signal, timeoutMs = FETCH_TIMEOUT_MS, ...init } = opts;
+  try {
+    return await fetch(path, { ...init, signal: withTimeout(timeoutMs, signal) });
+  } catch (err) {
+    // "signal is aborted without reason" tells a candidate nothing. Name
+    // the two cases apart: their own navigation, versus a server that went
+    // quiet, which is the one they can act on.
+    if (err instanceof DOMException && err.name === "TimeoutError") {
+      throw new Error(`no answer in ${Math.round(timeoutMs / 1000)}s`, { cause: err });
+    }
+    throw err;
+  }
+}
+
+export async function getSession(signal?: AbortSignal): Promise<SessionSnapshot> {
+  const res = await request("/api/session", { signal });
   if (!res.ok) {
     throw new Error(await readError(res));
   }
   return (await res.json()) as SessionSnapshot;
 }
 
-export async function getExam(): Promise<ExamInfo> {
-  const res = await fetch("/api/exam");
+export async function getExam(signal?: AbortSignal): Promise<ExamInfo> {
+  const res = await request("/api/exam", { signal });
   if (!res.ok) {
     throw new Error(await readError(res));
   }
   return (await res.json()) as ExamInfo;
 }
 
-export async function getQuestion(id: string): Promise<QuestionDetail> {
-  const res = await fetch(`/api/questions/${encodeURIComponent(id)}`);
+export async function getQuestion(id: string, signal?: AbortSignal): Promise<QuestionDetail> {
+  const res = await request(`/api/questions/${encodeURIComponent(id)}`, { signal });
   if (!res.ok) {
     throw new Error(await readError(res));
   }
@@ -118,8 +157,8 @@ export type SolutionResponse =
 // (killer.sh UX fidelity, not a security boundary) — modeled as a
 // tagged union rather than a thrown error so callers render a normal
 // "not available yet" state instead of an exception.
-export async function getSolution(id: string): Promise<SolutionResponse> {
-  const res = await fetch(`/api/questions/${encodeURIComponent(id)}/solution`);
+export async function getSolution(id: string, signal?: AbortSignal): Promise<SolutionResponse> {
+  const res = await request(`/api/questions/${encodeURIComponent(id)}/solution`, { signal });
   if (res.status === 403) {
     return { ok: false, error: await readError(res) };
   }
@@ -136,8 +175,8 @@ export type SessionActionResponse =
 // POST /api/session/start: 200 with the new session snapshot, or 409
 // (already running/ended) surfaced as {ok:false} for the caller to
 // handle by refetching the authoritative session state.
-export async function startSession(): Promise<SessionActionResponse> {
-  const res = await fetch("/api/session/start", { method: "POST" });
+export async function startSession(signal?: AbortSignal): Promise<SessionActionResponse> {
+  const res = await request("/api/session/start", { method: "POST", signal });
   if (res.status === 409) {
     return { ok: false, error: await readError(res) };
   }
@@ -149,8 +188,8 @@ export async function startSession(): Promise<SessionActionResponse> {
 
 // POST /api/session/end: 202 with the ended session snapshot (submit,
 // or a re-grade request on an already-ended session), or 409 if idle.
-export async function endSession(): Promise<SessionActionResponse> {
-  const res = await fetch("/api/session/end", { method: "POST" });
+export async function endSession(signal?: AbortSignal): Promise<SessionActionResponse> {
+  const res = await request("/api/session/end", { method: "POST", signal });
   if (res.status === 409) {
     return { ok: false, error: await readError(res) };
   }
@@ -168,8 +207,8 @@ export type ResultsResponse =
 
 // GET /api/results: 409 not ended, 202 {"state":"grading"}, 500
 // {"error":...} on a persisted gradeError, 200 the results payload.
-export async function getResults(): Promise<ResultsResponse> {
-  const res = await fetch("/api/results");
+export async function getResults(signal?: AbortSignal): Promise<ResultsResponse> {
+  const res = await request("/api/results", { signal });
   if (res.status === 409) {
     return { status: "not-ended" };
   }
@@ -257,8 +296,8 @@ export interface ControlStatus {
   lastJob?: ControlJob;
 }
 
-export async function getControlStatus(): Promise<ControlStatus> {
-  const res = await fetch("/api/control/status");
+export async function getControlStatus(signal?: AbortSignal): Promise<ControlStatus> {
+  const res = await request("/api/control/status", { signal });
   if (!res.ok) {
     throw new Error(await readError(res));
   }
@@ -269,8 +308,8 @@ export type ControlActionResponse =
   | { ok: true; job: ControlJob }
   | { ok: false; error: string };
 
-export async function startControlReset(): Promise<ControlActionResponse> {
-  const res = await fetch("/api/control/reset", { method: "POST" });
+export async function startControlReset(signal?: AbortSignal): Promise<ControlActionResponse> {
+  const res = await request("/api/control/reset", { method: "POST", signal });
   if (res.status === 202) {
     const body = (await res.json()) as { job: ControlJob };
     return { ok: true, job: body.job };
@@ -298,19 +337,23 @@ export interface BanksResponse {
   banks: BankEntry[];
 }
 
-export async function getBanks(): Promise<BanksResponse> {
-  const res = await fetch("/api/control/banks");
+export async function getBanks(signal?: AbortSignal): Promise<BanksResponse> {
+  const res = await request("/api/control/banks", { signal });
   if (!res.ok) {
     throw new Error(await readError(res));
   }
   return (await res.json()) as BanksResponse;
 }
 
-export async function startControlSwitch(bank: string): Promise<ControlActionResponse> {
-  const res = await fetch("/api/control/switch", {
+export async function startControlSwitch(
+  bank: string,
+  signal?: AbortSignal,
+): Promise<ControlActionResponse> {
+  const res = await request("/api/control/switch", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ bank }),
+    signal,
   });
   if (res.status === 202) {
     const body = (await res.json()) as { job: ControlJob };

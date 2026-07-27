@@ -1,9 +1,11 @@
 import type { ReactElement, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { desktopClipboard } from "../lib/desktopClipboard";
 import { highlightTo } from "../lib/highlight";
 import { strings } from "../strings";
+import { Icon } from "./Icon";
 import { toastStore } from "./toastStore";
 
 // The single markdown renderer for the app. Questions and solutions come
@@ -41,7 +43,7 @@ function CopyableCode({ children }: { children: ReactNode }) {
     >
       <code>{children}</code>
       <span className="copy-value-icon" aria-hidden="true">
-        ⧉
+        <Icon name="copy" />
       </span>
     </button>
   );
@@ -115,6 +117,27 @@ interface CodeChildProps {
 }
 
 const COMPONENTS = {
+  // Bank content is authored as a standalone document: every question.md
+  // opens `# Question 8 | ...` and every solution.md opens `# Solution 8`.
+  // Dropped into the app as-is that is a second h1 on the exam screen —
+  // the topbar already owns one — and an h1 nested two <details> deep on
+  // the score screen. Shifting the whole ramp down one level lets the bank
+  // stay a document and the app stay one outline. h6 has nowhere to go and
+  // stays put; nothing in the banks reaches past h3.
+  h1: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
+  h2: ({ children }: { children?: ReactNode }) => <h3>{children}</h3>,
+  h3: ({ children }: { children?: ReactNode }) => <h4>{children}</h4>,
+  h4: ({ children }: { children?: ReactNode }) => <h5>{children}</h5>,
+  h5: ({ children }: { children?: ReactNode }) => <h6>{children}</h6>,
+  h6: ({ children }: { children?: ReactNode }) => <h6>{children}</h6>,
+  // A bare <table> would scroll the page rather than itself. The wrapper
+  // is what carries the Scroll-Inside Rule. (Tables need remark-gfm to
+  // exist at all — see the plugin list below.)
+  table: ({ children }: { children?: ReactNode }) => (
+    <div className="md-table-scroll">
+      <table>{children}</table>
+    </div>
+  ),
   // react-markdown routes fenced blocks through `code` too, and a fenced
   // block with no language has no className — indistinguishable from
   // inline code at that level. Overriding `pre` instead and reading the
@@ -136,10 +159,20 @@ const COMPONENTS = {
     ),
 };
 
+// Eight solution files in the CKAD bank are written with GFM pipe tables
+// ("| Field | Default | Why the question pins it |"). react-markdown parses
+// CommonMark only, so until this plugin landed every one of them rendered
+// as literal rows of pipe characters on the score screen — the surface a
+// candidate reads to find out why they lost points. The plugin is bundled
+// like everything else; the exam must not depend on the network.
+const PLUGINS = [remarkGfm];
+
 export function Markdown({ children }: { children: string }) {
   return (
     <div className="md">
-      <ReactMarkdown components={COMPONENTS}>{children}</ReactMarkdown>
+      <ReactMarkdown components={COMPONENTS} remarkPlugins={PLUGINS}>
+        {children}
+      </ReactMarkdown>
     </div>
   );
 }

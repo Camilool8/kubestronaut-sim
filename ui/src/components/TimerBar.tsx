@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { SessionSnapshot } from "../api";
-import { formatClock } from "../lib/format";
+import { formatClock, formatClockSpoken } from "../lib/format";
 import { strings } from "../strings";
 import { ThemeToggle } from "./ThemeToggle";
 import { toastStore } from "./toastStore";
@@ -63,10 +63,13 @@ export function TimerBar({ session, fetchedAt, title, onEndClick, extras }: Time
 
   return (
     <header className="topbar">
-      <div className="topbar-title">{title}</div>
+      <h1 className="topbar-title">{title}</h1>
       {extras}
       <ThemeToggle />
-      <div className={`timer${isLow ? " timer-low" : ""}`}>{formatClock(remaining)}</div>
+      <div className={`timer${isLow ? " timer-low" : ""}`} role="timer">
+        <span aria-hidden="true">{formatClock(remaining)}</span>
+        <span className="sr-only">{strings.exam.timeRemaining(formatClockSpoken(remaining))}</span>
+      </div>
       <button id="end-exam-button" className="btn btn-danger" onClick={onEndClick}>
         {strings.exam.endExam}
       </button>

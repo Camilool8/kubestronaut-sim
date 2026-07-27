@@ -46,7 +46,18 @@ Convert to GitHub issues once the repo has a remote.
 - conductor: image runs as root and holds the docker socket by design; consider a socket proxy (e.g. filtered API) if the tool is ever multi-user.
 - conductor: catalog is read once at boot; adding a bank requires a conductor restart. Fine locally; revisit if bank authoring becomes iterative.
 - ~~ui: visual regression pass in a real browser (Chrome extension was unavailable during development; WS upgrade + xfconf state verified instead). Do a manual light/dark + tour + toast walkthrough.~~ (done in Milestone F: real-browser pass at three widths, light and dark. It found three of the four defects that milestone fixed — the skip-link leak, the dead "New attempt" button, and unstyled solution markdown — none of which axe or vitest's jsdom could see.)
-- desktop: xfdesktop may show a one-time "untrusted launcher" prompt on the Desktop icons (panel launchers are the primary path); investigate gio trust metadata if it annoys.
+- ~~desktop: xfdesktop may show a one-time "untrusted launcher" prompt on
+  the Desktop icons (panel launchers are the primary path); investigate gio
+  trust metadata if it annoys.~~ (the real defect was worse than a prompt,
+  and fixed in milestone J: both Desktop icons failed outright with "This
+  feature requires a file manager service to be present (such as the one
+  supplied by Thunar)". xfdesktop does not exec a .desktop file itself, it
+  hands it to the org.xfce.FileManager D-Bus service, and no provider was
+  installed. `thunar` is now in the desktop image — D-Bus activated, so it
+  costs nothing until an icon is used. Verified by invoking
+  org.xfce.FileManager.Launch on both icons: firefox-esr 0 -> 1 processes,
+  xfce4-terminal 0 -> 1. No trust prompt appeared; the icons are executable
+  and owned by candidate, which satisfies the check.)
 - ui: bundle size — superseded by the Milestone F/G entry below (~487KB).
 
 ## Milestone E (UI/UX overhaul) — new
@@ -138,16 +149,17 @@ Convert to GitHub issues once the repo has a remote.
   text is still standing in for a real style assertion. Delete the whole
   helper for a typed `node:fs` import if `@types/node` ever enters the
   project.
-- bug: `highlight.ts` caches a rejected promise forever. One transient
-  failure to load a grammar (yaml/bash/json) disables highlighting for the
-  rest of the session, with no retry on the next code block rendered.
-- bug (theoretical): `Async` treats `data === undefined` as loaded — it
-  only checks `!== null`. A `useAsync<void>` would therefore render its
-  children instead of the loading slot. Nothing in `api.ts` returns `void`
-  today, so this hasn't fired, but the type hole is real.
-- bug: a synchronously-throwing `fn` passed to `useAsync` escapes the
+- ~~bug: `highlight.ts` caches a rejected promise forever.~~ (stale entry —
+  verified fixed: `engine()` clears `enginePromise` in its `.catch` and
+  documents why. Struck during milestone J.)
+- ~~bug (theoretical): `Async` treats `data === undefined` as loaded — it
+  only checks `!== null`.~~ (fixed in milestone J: `AsyncState` carries
+  `hasData`, set by the reducer on success, and `Async` gates on that.)
+- ~~bug: a synchronously-throwing `fn` passed to `useAsync` escapes the
   effect after `progressStore.start()` runs but before its matching
-  `done()`, leaking the top progress bar visible permanently.
+  `done()`, leaking the top progress bar visible permanently.~~ (fixed in
+  milestone J: the call is wrapped in `Promise.resolve().then(...)`, with a
+  test pinning that the bar clears.)
 - ~~docs: `docs/bank-spec.md` still carries its own pre-existing 4-space
   indented `exam.yaml` example~~ (fixed in Milestone G: converted to a
   fenced `yaml` block along with the rest of that document).
@@ -177,3 +189,41 @@ Convert to GitHub issues once the repo has a remote.
   touches every screen, so it wants its own pass with the tests to match —
   the pollers especially (`background: true`, and a failed poll must not
   tear the poll down; see `Score.tsx`'s `pollError`).
+
+## Milestone J (UI/UX refinement) — new
+
+- **`exam.yaml` questions have no `title` field.** The only human-readable
+  question title is the `# Question N | ...` h1 inside `question.md`, which
+  the jump grid cannot show without fetching all 22 questions up front. The
+  grid therefore groups by domain and labels tiles `qNN` + points. An
+  optional `title` in the bank spec would let the grid say what a question
+  is about; that is a `docs/bank-spec.md` change plus a facilitator field,
+  so it stayed out of a UI-only pass.
+- **`remark-gfm` was added** (~39KB raw, ~11KB gzip) because eight CKAD
+  solution files are written with GFM pipe tables and react-markdown parses
+  CommonMark only — every one rendered as literal rows of pipe characters
+  on the score screen. Bundle is now ~349KB main plus the 183KB lazy noVNC
+  chunk. Tables are the only GFM feature the banks use, so
+  `micromark-extension-gfm-table` + `mdast-util-gfm-table` directly would
+  be smaller if that ever matters.
+- **The control-progress bar is still indeterminate by time.** The
+  backgrounded-job chip added here is determinate by *step*
+  (`done / phases.length`), which needs no history. A time-weighted bar
+  still wants persisted per-phase medians — the per-phase timings are the
+  input, as the milestone E entry above says.
+- **The reduced-motion pending rule is written down** in `DESIGN.md`: every
+  pending state carries at least one channel that changes without motion
+  (an elapsed counter, a step label, an attempt number), motion layered on
+  additively. Anything new that waits has to satisfy it.
+- `useAsync` now hands its `fn` an `AbortSignal` and every `api.ts` call
+  takes one, behind a 10s timeout. The still-unconverted call sites are the
+  imperative POST handlers (`startSession`, `endSession`,
+  `startControlSwitch`/`Reset`) and the two pollers (`pollSession`, and
+  `Score`'s results poll). Each has an error branch and a `finally`, so
+  they are correct as written — they simply do not feed `TopProgress`.
+- **Not verified in a real browser yet.** Every gate in this repo is blind
+  to CSS layout and motion, and this milestone moved layout in the one
+  place that has a ResizeObserver watching it. The jump grid is
+  `position: absolute` inside `.question-panel` specifically so opening it
+  changes no flex geometry; that needs eyes on it at 1440/1100/900/600px,
+  light and dark, with reduced motion emulated.

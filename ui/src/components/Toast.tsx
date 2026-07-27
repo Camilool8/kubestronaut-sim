@@ -30,6 +30,15 @@ export function ToastLayer() {
 function ToastCard({ id, kind, message }: { id: number; kind: string; message: string }) {
   return (
     <div className={`toast toast-${kind}`}>
+      {/* Info and warning differed only in the hue of a 3px left border —
+          a WCAG 1.4.1 failure hiding in plain sight. The role split above
+          serves screen readers; a colour-blind sighted reader had nothing.
+          A mono glyph is the second channel. */}
+      {kind === "warning" && (
+        <span className="toast-mark" aria-hidden="true">
+          !
+        </span>
+      )}
       <span className="toast-message">{message}</span>
       <button
         className="toast-dismiss"

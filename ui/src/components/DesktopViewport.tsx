@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import RFB from "@novnc/novnc";
 import { desktopClipboard } from "../lib/desktopClipboard";
+import { desktopResize } from "../lib/desktopResize";
 import { strings } from "../strings";
+import { PendingBar } from "./Pending";
 
 type ViewportState = "connecting" | "connected" | "disconnected";
 
@@ -26,6 +28,11 @@ const RECONNECT_MAX_MS = 8_000;
 export function DesktopViewport({ onStateChange }: DesktopViewportProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<ViewportState>("connecting");
+  // Lifted out of the effect closure so the overlay can name the attempt.
+  // The backoff runs to an 8s ceiling and never gives up, so without a
+  // number the overlay is identical on second 1 and minute 3 — the two
+  // cases a candidate most needs to tell apart.
+  const [attemptShown, setAttemptShown] = useState(0);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -73,13 +80,23 @@ export function DesktopViewport({ onStateChange }: DesktopViewportProps) {
       rfb.addEventListener("connect", () => {
         if (disposed) return;
         attempt = 0;
+        setAttemptShown(0);
         report("connected");
         // Only now can clipboardPasteFrom do anything — it is a no-op
         // until the connection is established.
-        if (rfb) desktopClipboard.connect(rfb);
+        if (rfb) {
+          desktopClipboard.connect(rfb);
+          // The panel resizer holds resizeSession false during a drag so a
+          // gesture costs one server-side framebuffer change, not one per
+          // frame. See lib/desktopResize.ts.
+          desktopResize.attach(rfb);
+        }
       });
       rfb.addEventListener("disconnect", () => {
-        if (rfb) desktopClipboard.disconnect(rfb);
+        if (rfb) {
+          desktopClipboard.disconnect(rfb);
+          desktopResize.detach(rfb);
+        }
         if (disposed) return;
         report("disconnected");
         // The desktop container restarts during resets/switches and the
@@ -88,6 +105,7 @@ export function DesktopViewport({ onStateChange }: DesktopViewportProps) {
         // "running", which is the real teardown path.
         const delay = Math.min(RECONNECT_BASE_MS * 2 ** attempt, RECONNECT_MAX_MS);
         attempt += 1;
+        setAttemptShown(attempt);
         retryTimer = window.setTimeout(connect, delay);
       });
     };
@@ -97,7 +115,10 @@ export function DesktopViewport({ onStateChange }: DesktopViewportProps) {
     return () => {
       disposed = true;
       window.clearTimeout(retryTimer);
-      if (rfb) desktopClipboard.disconnect(rfb);
+      if (rfb) {
+        desktopClipboard.disconnect(rfb);
+        desktopResize.detach(rfb);
+      }
       try {
         rfb?.disconnect();
       } catch {
@@ -120,8 +141,13 @@ export function DesktopViewport({ onStateChange }: DesktopViewportProps) {
           <p>
             {state === "connecting"
               ? strings.desktop.connecting
-              : strings.desktop.reconnecting}
+              : strings.desktop.reconnecting(attemptShown)}
           </p>
+          {/* The attempt number in the line above is what carries this
+              state without motion; the bar is the enhancement. */}
+          <div className="desktop-status-bar">
+            <PendingBar />
+          </div>
         </div>
       )}
     </div>

@@ -9,9 +9,15 @@ import { DesktopRequired } from "./components/DesktopRequired";
 import { Dialog } from "./components/Dialog";
 import { ExamIntro } from "./components/ExamIntro";
 import { InfoDrawer } from "./components/InfoDrawer";
+import { BackgroundJobChip } from "./components/BackgroundJobChip";
+import { PanelResizer } from "./components/PanelResizer";
+import { QuestionPanel } from "./components/QuestionPanel";
 import { ToastLayer } from "./components/Toast";
+import { SPLIT_QUERY } from "./lib/useMediaQuery";
+import { matchMediaMock } from "./test/setup";
+import { marksStore } from "./components/marksStore";
 import { toastStore } from "./components/toastStore";
-import type { ControlJob } from "./api";
+import type { ControlJob, ExamQuestionInfo } from "./api";
 
 // Component-level scans run outside App's <main>, so the page-level
 // region rule is not meaningful here. Everything else runs at axe's
@@ -97,6 +103,27 @@ const solutionJSON = {
   markdown: "Apply it with `kubectl apply -f pod.yaml`:\n\n```yaml\nkind: Pod\n```\n",
 };
 
+// Shaped like real bank content: an h1 title, an italic instance line and
+// numbered steps with inline values. The heading level matters — every
+// question.md in the bank opens with one.
+const questionJSON = {
+  id: "q01",
+  instance: "instance-1",
+  domain: "Config",
+  markdown: [
+    "# Question 1 | Namespaces & ResourceQuota",
+    "",
+    "1. Create a Namespace `aurora-staging`.",
+    "2. Add a ResourceQuota named `aurora-quota`.",
+  ].join("\n"),
+};
+
+// Two domains, so the jump grid's grouping headings are exercised.
+const examQuestions: ExamQuestionInfo[] = [
+  { id: "q01", instance: "instance-1", domain: "Config", weight: 5, totalPoints: 5 },
+  { id: "q02", instance: "instance-2", domain: "Networking", weight: 7, totalPoints: 7 },
+];
+
 function stubFetch() {
   vi.stubGlobal(
     "fetch",
@@ -110,7 +137,9 @@ function stubFetch() {
             ? resultsJSON
             : url.includes("/solution")
               ? solutionJSON
-              : {};
+              : url.includes("/api/questions/")
+                ? questionJSON
+                : {};
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -137,6 +166,67 @@ describe("axe: no WCAG violations", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     toastStore.clear();
+    marksStore.reset();
+  });
+
+  // The exam screen was the one surface this suite never scanned, which is
+  // how a second h1 (the topbar's, plus every question.md's own) and a
+  // selection state with no aria-current both survived. QuestionPanel is
+  // scanned directly rather than through Exam, which lazy-imports noVNC.
+  test("exam question panel", async () => {
+    const { container } = render(
+      <QuestionPanel
+        questions={examQuestions}
+        selectedId="q01"
+        onSelect={() => {}}
+        open
+        onToggle={() => {}}
+      />,
+    );
+    await screen.findByRole("button", { name: /aurora-staging/ });
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  test("exam question panel with the jump grid open", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <QuestionPanel
+        questions={examQuestions}
+        selectedId="q02"
+        onSelect={() => {}}
+        open
+        onToggle={() => {}}
+      />,
+    );
+    await user.click(await screen.findByRole("button", { name: /show all questions/i }));
+    expect(container.querySelector("#question-jump")).not.toBeNull();
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  // The chip carries a progressbar, which axe requires to have an
+  // accessible name — the exact thing an unnamed role="progressbar" gets
+  // flagged for.
+  test("backgrounded job chip", async () => {
+    const { container } = render(
+      <BackgroundJobChip job={runningJob} bankTitle="CKA Mock Exam 01" onReopen={() => {}} />,
+    );
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  // axe's aria-required-attr demands aria-valuenow on a focusable
+  // separator, which is exactly the attribute this pattern invites you to
+  // leave off. The default matchMedia stub answers false to everything, so
+  // the resizer has to be opted in.
+  test("panel resizer", async () => {
+    matchMediaMock([SPLIT_QUERY]);
+    const { container } = render(
+      <div className="exam-body">
+        <section id="question-panel" />
+        <PanelResizer panelId="question-panel" collapsed={false} onToggleCollapse={() => {}} />
+      </div>,
+    );
+    expect(container.querySelector('[role="separator"]')).not.toBeNull();
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("lobby (Start)", async () => {

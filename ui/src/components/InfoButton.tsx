@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { InfoDrawer } from "./InfoDrawer";
+import { Icon } from "./Icon";
 import { strings } from "../strings";
 
 // Self-contained "About" affordance: the button and the drawer it opens.
@@ -21,7 +22,7 @@ export function InfoButton({
         onClick={() => setOpen(true)}
         aria-label={strings.info.open}
       >
-        ?
+        <Icon name="help" />
       </button>
       {open && (
         <InfoDrawer onClose={() => setOpen(false)} onShowIntro={onShowIntro} />

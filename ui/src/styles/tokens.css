@@ -18,7 +18,9 @@
    Three mirrors of these values live outside this file and must move
    with it: the Go locked page (facilitator/internal/desktop/proxy.go),
    the favicon (ui/public/favicon.svg), and the exam terminal's palette
-   (images/desktop/assets/terminalrc + its xfconf twin). */
+   (images/desktop/assets/terminalrc + its xfconf twin). Not every token
+   is in every mirror — grep the hex before assuming. --border is only in
+   proxy.go; --border-strong and the hover fills are in none of them. */
 
 :root {
   color-scheme: light;
@@ -27,19 +29,74 @@
   --bg: #f7f9fc;
   --surface: #ffffff;
   --surface-raised: #eaeff7;
-  --border: #cbd4e1;
   --overlay: rgba(11, 18, 32, 0.55);
 
-  /* text — 15.4:1 and 5.9:1 on --bg; 14.0:1 and 5.4:1 on --surface-raised
-     (the fenced code-block background — see .hljs-* rules in theme.css) */
+  /* borders, in two tiers. One token cannot do both jobs: the old single
+     --border (#cbd4e1) measured 1.5:1 on --surface, 1.4:1 on --bg and
+     1.3:1 on --surface-raised — half of WCAG 1.4.11's 3:1 floor for a
+     boundary that identifies a control, across all 40-odd uses. Raising
+     that one value to 3:1 would put a hard grey line under every table
+     row, blockquote and dialog edge and read as a wireframe.
+
+     --border        structural. Container edges, table rules, hr,
+                     blockquotes, panel and topbar dividers, status pills.
+                     Not state-bearing, so 1.4.11 does not reach it — but
+                     2.3:1 on --surface, 2.2:1 on --bg, 2.0:1 on
+                     --surface-raised, which is 53% more than before and
+                     the difference between an edge you see and one you
+                     infer.
+     --border-strong control edges and any border that carries a state.
+                     3.98:1 on --surface, 3.77:1 on --bg, 3.45:1 on
+                     --surface-raised, 3.36:1 on --accent-soft, 3.20:1 on
+                     --surface-hover, 3.08:1 on --raised-hover — clears
+                     3:1 on every fill a control can rest on.
+     The two are 1.73:1 apart, which is what makes them read as two
+     tiers rather than as one value someone got wrong. */
+  --border: #a0acbe;
+  --border-strong: #708197;
+
+  /* hover fills. Hover is a step of TONE, never the accent — see the
+     Rare Accent Rule in DESIGN.md. --surface-hover is for controls
+     resting on --surface, --bg or nothing (1.24:1 from --surface);
+     --raised-hover for controls resting on --surface-raised (1.12:1).
+     Text on them: --text 13.0:1 / 12.5:1, --text-muted 5.0:1 / 4.8:1,
+     --accent-strong 5.2:1 / 5.0:1. Plain --accent is 3.8:1 and 3.7:1
+     here, under the floor, so accent-coloured text on a hover fill takes
+     --accent-strong — the same substitution this palette already makes
+     on --surface-raised and --accent-soft. */
+  --surface-hover: #e1e7f1;
+  --raised-hover: #dbe3f0;
+
+  /* text — 15.4:1 and 5.9:1 on --bg; 16.2:1 and 6.2:1 on --surface (the
+     card/panel/dialog/toast fill, and the most-used pairing in the
+     product); 14.0:1 and 5.4:1 on --surface-raised (the fenced
+     code-block background — see .hljs-* rules in theme.css) */
   --text: #1a212b;
   --text-muted: #57626f;
 
+  /* A genuinely inoperable control's own label. Replaces three different
+     opacity multipliers (0.5, 0.5, 0.72) that composited to 2.1:1-3.2:1
+     and were never measured. 3.3:1 on --surface, 3.1:1 on --bg, 2.8:1 on
+     --surface-raised — deliberately under 4.5:1 and permitted there:
+     WCAG 1.4.3 and 1.4.11 both except inactive components. It is NOT for
+     an unavailable exam card, whose reason line is the point of rendering
+     it at all and stays --text-muted. */
+  --text-disabled: #858f9e;
+
   /* brand + state
      --accent 4.8:1 on --surface, 4.5:1 on --bg, but only 4.1:1 on
-     --surface-raised — under the 4.5:1 floor, so the .hljs-attr/
-     -attribute/-keyword/-built_in token colors in theme.css use
-     --accent-strong instead
+     --surface-raised and 4.0:1 on --accent-soft — both under the 4.5:1
+     floor, so accent-coloured TEXT on either of those two fills uses
+     --accent-strong instead. In theme.css that is the countdown
+     (.timer), .btn on hover, the instance chip, the active bank badge,
+     a hovered click-to-copy value, the intro card's timer chip, and the
+     .hljs-attr/-attribute/-keyword/-built_in code tokens — plus the
+     points pill in a selected question row, which keeps its own --bg
+     fill but reads against a --surface-raised row and matches its
+     neighbours. The --accent BORDERS on those same rules stay --accent
+     on purpose: a border is not text, so it answers to the 3:1 floor of
+     WCAG 1.4.11, which 4.0:1 clears — and moving them would change the
+     visual weight of the design.
      --accent-contrast 4.8:1 on --accent (the primary button)
      --accent-strong 6.4:1 on --surface, 5.4:1 on --accent-soft, 5.6:1 on
      --surface-raised — it is the accent for text sitting on --accent-soft
@@ -48,10 +105,16 @@
   --accent-strong: #2557c7;
   --accent-soft: #e4ecfd;
   --accent-contrast: #ffffff;
+  /* --danger  5.7:1 on --surface, 5.4:1 on --bg, 4.9:1 on --surface-raised
+     --warn     5.5:1 on --surface, 5.3:1 on --bg, 4.8:1 on --surface-raised
+     --success  5.8:1 on --surface, 5.5:1 on --bg, 5.0:1 on --surface-raised.
+                Was #1a7f37, which measured 4.40:1 on --surface-raised and
+                would have failed AA the first time a pass mark landed on a
+                raised fill. Same hue, one step darker. This value is in no
+                mirror — the terminal palette carries only the dark #57d183. */
   --danger: #bb3730;
-  --danger-soft: #f7dedd;
   --warn: #8a6100;
-  --success: #1a7f37;
+  --success: #16752f;
 
   --focus-ring: #326ce5;
 
@@ -79,8 +142,6 @@
   --space-4: 1rem;
   --space-5: 1.5rem;
   --space-6: 2rem;
-  --space-7: 3rem;
-  --space-8: 4rem;
 
   /* radius — one soft system everywhere; pill for badges only */
   --radius-s: 6px;
@@ -90,16 +151,17 @@
   /* motion — durations short enough to feel immediate, and an easing
      curve that decelerates without overshoot. This product is an
      instrument panel for people about to sit a proctored exam; a spring
-     or a bounce reads as unserious. Exits are shorter than entrances.
+     or a bounce reads as unserious.
+     There is no exit duration and no ease-in curve: nothing in this
+     product animates out. Dialogs, toasts and screens disappear on
+     unmount, which needs orchestration the design does not ask for, so
+     the tokens for it were deleted rather than left declared and unused.
      Every use is gated on prefers-reduced-motion (see base.css). */
-  --dur-instant: 100ms;
   --dur-quick: 160ms;
   --dur-base: 220ms;
   --dur-modal-in: 280ms;
-  --dur-modal-out: 200ms;
   --dur-progress: 400ms;
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
-  --ease-in: cubic-bezier(0.4, 0, 1, 1);
 
   /* layering — the control overlay sits ABOVE dialogs and drawers: it
      blocks a destructive operation and must survive every screen
@@ -121,26 +183,42 @@
   --bg: #0b1220;
   --surface: #121a2b;
   --surface-raised: #1a2437;
-  --border: #28324a;
   --overlay: rgba(2, 6, 16, 0.66);
+
+  /* --border        2.3:1 on --surface, 2.5:1 on --bg, 2.1:1 on --surface-raised
+     --border-strong 4.0:1 on --surface, 4.3:1 on --bg, 3.6:1 on --surface-raised,
+                     3.4:1 on --accent-soft, 3.3:1 / 3.1:1 on the hover fills
+     --surface-hover 1.2:1 from --surface; --raised-hover 1.2:1 from
+                     --surface-raised. --text reads 10.5:1 / 9.8:1 on them
+                     and --accent 5.7:1, so dark needs no accent-strong
+                     substitution on a hover fill the way light does. */
+  --border: #465476;
+  --border-strong: #6a79a1;
+  --surface-hover: #1f2a44;
+  --raised-hover: #243048;
 
   /* 13.9:1 and 7.1:1 on --bg; 11.5:1 and 5.9:1 on --surface-raised (the
      fenced code-block background — see .hljs-* rules in theme.css) */
   --text: #d9dee5;
   --text-muted: #97a0af;
+  /* 4.1:1 on --surface, 4.4:1 on --bg, 3.7:1 on --surface-raised */
+  --text-disabled: #727c8e;
 
   /* --accent 7.4:1 on --bg, 6.9:1 on --surface, 6.2:1 on --surface-raised;
      --accent-contrast 7.4:1 on --accent; --accent-strong 9.5:1 on
-     --surface, 8.5:1 on --surface-raised (used by the .hljs-* keyword
-     colors, since the light-theme --accent falls short there — see
-     above). A tint of the same Kubernetes blue: #326CE5 itself only
-     reaches ~4.1:1 on this background and would fail as body text. */
+     --surface, 8.5:1 on --surface-raised, 7.9:1 on --accent-soft (used
+     by the accent-on-raised text rules listed above, which switch token
+     in both themes because the LIGHT --accent is what falls short —
+     dark clears the floor on its own). A tint of the same Kubernetes
+     blue: #326CE5 itself only reaches ~4.1:1 on this background and
+     would fail as body text. */
   --accent: #7aa2f7;
   --accent-strong: #a4c0fb;
   --accent-soft: #16294a;
   --accent-contrast: #0b1220;
+  /* --danger 5.1:1 / 5.5:1 / 4.6:1, --warn 8.2:1 / 8.8:1 / 7.3:1,
+     --success 9.0:1 / 9.7:1 / 8.0:1 on --surface / --bg / --surface-raised */
   --danger: #e5605a;
-  --danger-soft: #3d1a18;
   --warn: #e0a850;
   --success: #57d183;
 
@@ -158,18 +236,22 @@
     --bg: #0b1220;
     --surface: #121a2b;
     --surface-raised: #1a2437;
-    --border: #28324a;
     --overlay: rgba(2, 6, 16, 0.66);
+
+    --border: #465476;
+    --border-strong: #6a79a1;
+    --surface-hover: #1f2a44;
+    --raised-hover: #243048;
 
     --text: #d9dee5;
     --text-muted: #97a0af;
+    --text-disabled: #727c8e;
 
     --accent: #7aa2f7;
     --accent-strong: #a4c0fb;
     --accent-soft: #16294a;
     --accent-contrast: #0b1220;
     --danger: #e5605a;
-    --danger-soft: #3d1a18;
     --warn: #e0a850;
     --success: #57d183;
 

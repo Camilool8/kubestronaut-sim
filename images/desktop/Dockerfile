@@ -1,6 +1,14 @@
 FROM debian:12-slim
+# thunar is not here to browse files. xfdesktop does not exec a .desktop
+# file on the desktop itself — it hands it to the org.xfce.FileManager
+# D-Bus service, and with no provider double-clicking either icon failed
+# with "This feature requires a file manager service to be present (such
+# as the one supplied by Thunar)". The panel launchers always worked
+# because xfce4-panel execs them directly, which is why this went unseen.
+# It is D-Bus activated, so nothing runs until an icon is used.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       xfce4-session xfwm4 xfdesktop4 xfce4-panel xfce4-settings xfce4-terminal \
+      thunar \
       dbus-x11 tigervnc-standalone-server novnc websockify x11-xserver-utils \
       firefox-esr openssh-client curl ca-certificates procps \
       fonts-jetbrains-mono \

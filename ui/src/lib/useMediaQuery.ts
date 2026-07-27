@@ -37,3 +37,16 @@ export const NARROW_QUERY = "(max-width: 767px)";
  * test would lock out exactly the people who most need the zoom.
  */
 export const TOUCH_ONLY_QUERY = "(any-pointer: coarse) and (not (any-pointer: fine))";
+
+/**
+ * The two-pane split is live, so the panel edge is a real boundary that
+ * can be dragged.
+ *
+ * Written as the exact complement of theme.css's `@media (max-width:
+ * 900px)` block, where the question panel leaves the flow and becomes an
+ * overlay drawer — a splitter there would be resizing something that is
+ * no longer beside anything. `not (max-width: …)` rather than
+ * `(min-width: 901px)` because the latter leaves a 1px hole at 900.5 on
+ * fractional-DPI displays, where neither rule would apply.
+ */
+export const SPLIT_QUERY = "not (max-width: 900px)";

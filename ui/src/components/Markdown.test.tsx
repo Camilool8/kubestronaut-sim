@@ -51,6 +51,35 @@ describe("Markdown", () => {
     expect(screen.getByRole("button", { name: /copy yaml code block/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy bash code block/i })).toBeInTheDocument();
   });
+
+  // Bank content is authored standalone: every question.md opens
+  // "# Question N | ..." and every solution.md opens "# Solution N". Left
+  // at h1 that is a second h1 on the exam screen (the topbar owns one) and
+  // an h1 nested two <details> deep on the score screen. The whole ramp
+  // shifts down one so the bank stays a document and the app stays one
+  // outline.
+  test("a document's own h1 renders one level down, under the app's", () => {
+    render(<Markdown>{"# Question 8 | Route two Services\n\nDo the thing."}</Markdown>);
+    expect(
+      screen.getByRole("heading", { level: 2, name: /route two services/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+  });
+
+  test("the shift keeps the rest of the ramp in order", () => {
+    render(<Markdown>{"# Title\n\n## Section\n\n### Detail"}</Markdown>);
+    expect(screen.getByRole("heading", { level: 2, name: "Title" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 3, name: "Section" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 4, name: "Detail" })).toBeInTheDocument();
+  });
+
+  test("a wide table scrolls inside itself rather than pushing the page sideways", () => {
+    const { container } = render(
+      <Markdown>{"| Name | Value |\n| --- | --- |\n| a | b |"}</Markdown>,
+    );
+    const table = container.querySelector("table");
+    expect(table?.parentElement).toHaveClass("md-table-scroll");
+  });
 });
 
 describe("Markdown wrapper: pane layout and prose styling do not share a class", () => {

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Score } from "./Score";
+import { strings } from "../strings";
 
 // The BARE Results object. getResults() (api.ts:171-186) wraps a 200 body
 // as {status: "ready", results: <body>} itself, so a fixture that already
@@ -44,6 +45,40 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+
+describe("Score grading wait", () => {
+  // This screen was a heading and a paragraph behind a 3s poll — nothing on
+  // it changed for the whole grade, which is how a normal wait starts
+  // reading as a hang. The elapsed counter is the signal that has to keep
+  // working when the user has asked for no motion, so it is what is pinned
+  // here rather than the bar beside it.
+  test("the wait reports elapsed time, and keeps reporting it", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-27T12:00:00.000Z"));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ state: "grading" }), { status: 202 })),
+    );
+
+    render(<Score onNewAttempt={() => {}} endReason="" />);
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(screen.getByText(/elapsed 0\.0s/i)).toBeInTheDocument();
+
+    await vi.advanceTimersByTimeAsync(12_000);
+    expect(screen.getByText(/elapsed 12s/i)).toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  test("the wait does not overstate how long grading takes", () => {
+    // A measured full CKAD grade is ~16s. "This can take a minute" was a
+    // guess, and an overstated wait is the same defect as an understated one.
+    expect(strings.score.gradingBody).toMatch(/well under a minute/i);
+    expect(strings.score.gradingBody).not.toMatch(/can take a minute/i);
+  });
 });
 
 describe("Score grading failures", () => {
@@ -167,6 +202,29 @@ describe("Score results poll", () => {
     await screen.findByText("q01", {}, { timeout: 6_000 });
     expect(screen.queryByText(/still trying to reach the facilitator/i)).toBeNull();
   }, 10_000);
+});
+
+describe("Score heading", () => {
+  // The scored state was two anonymous divs: the one number the candidate
+  // came for had no heading to navigate to, and announced as a bare
+  // percentage with nothing naming it.
+  test("the percentage is the screen's h1 and says what the number is", async () => {
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+
+    // Named, because the grading state's own h1 is on screen until the
+    // first poll lands and would satisfy a bare level-1 query.
+    const heading = await screen.findByRole("heading", { level: 1, name: /your score/i });
+    expect(heading).toHaveTextContent("0%");
+  });
+
+  // Promoting the verdict too would put two headings on one banner and
+  // announce PASS/FAIL twice; it already follows the heading immediately.
+  test("the verdict stays out of the heading structure", async () => {
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+
+    expect(await screen.findByText("FAIL")).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
 });
 
 describe("Score solutions", () => {

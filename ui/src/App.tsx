@@ -14,6 +14,7 @@ import { Start } from "./screens/Start";
 import { Exam, ExamGateControls } from "./screens/Exam";
 import { Score } from "./screens/Score";
 import { DesktopRequired, gateOverridden, useDesktopGate } from "./components/DesktopRequired";
+import { BackgroundJobChip } from "./components/BackgroundJobChip";
 import { ControlProgress } from "./components/ControlProgress";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { InfoButton } from "./components/InfoButton";
@@ -204,6 +205,11 @@ export default function App() {
   // new job (or a failure) brings it back.
   const showOverlay = overlayJob !== null && overlayJob.id !== backgroundedJobId;
 
+  // Still running, just not on top of the screen. It gets an ambient chip
+  // instead of nothing at all.
+  const backgroundedJob =
+    control?.busy && control.job && control.job.id === backgroundedJobId ? control.job : null;
+
   if (!session) {
     return (
       <main>
@@ -259,6 +265,16 @@ export default function App() {
       <ToastLayer />
       {session.state !== "running" && (
         <div className="floating-controls">
+          {/* A backgrounded rebuild used to run for 2-4 minutes with no
+              indicator anywhere: the lobby behind it looked idle while the
+              cluster it describes was being torn down. */}
+          {backgroundedJob && (
+            <BackgroundJobChip
+              job={backgroundedJob}
+              bankTitle={bankTitles[backgroundedJob.bank]}
+              onReopen={() => setBackgroundedJobId(null)}
+            />
+          )}
           <InfoButton floating />
           <ThemeToggle floating />
         </div>
