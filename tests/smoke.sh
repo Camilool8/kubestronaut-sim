@@ -299,7 +299,25 @@ if [ "$rstatus" = "200" ]; then
   total=$(json_field total)
   passed=$(json_field passed)
   # totals come from the grade run above, not a hardcoded bank size
-  [ "$earned" = "$t1" ] || fail "facilitator results: earned should be ${t1}, got ${earned}"
+  # Name the checks, not just the shortfall. "earned should be 180, got
+  # 170" is true and useless: the same cluster state had just graded
+  # 180/180 through `./sim grade`, so the interesting information is
+  # *which* ten points disagreed, and every one of them is sitting in the
+  # response body already.
+  if [ "$earned" != "$t1" ]; then
+    fail "facilitator results: earned should be ${t1}, got ${earned}"
+    echo "  checks the facilitator scored as failed:"
+    RESP="$RESP" python3 -c '
+import json, os
+with open(os.environ["RESP"]) as f:
+    data = json.load(f)
+for q in data.get("questions", []):
+    for c in q.get("checks", []):
+        if not c.get("passed"):
+            print(f"    {q[\"id\"]:>4}  {c.get(\"points\", 0)}pts  {c.get(\"desc\", \"\")}")
+            print(f"          {c.get(\"message\", \"\")}")
+' || echo "    (could not parse $RESP)"
+  fi
   [ "$total" = "$t1" ] || fail "facilitator results: total should be ${t1}, got ${total}"
   [ "$passed" = "True" ] || fail "facilitator results: passed should be true, got ${passed}"
 fi
