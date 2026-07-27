@@ -170,16 +170,26 @@ guess and one who can test. Prefer behavioural checks:
 
 ```bash
 # in a validate.d script: the allowed path must work...
-kubectl -n "$NS" run probe-ok --rm -i --restart=Never --image=busybox:1.37 \
-  --labels=role=frontend --command -- wget -q -T 4 -O- http://api:80
+kubectl -n "$NS" exec deploy/frontend -- wget -q -T 4 -O /dev/null http://api:80
 # ...and the denied one must time out, not merely be absent
-kubectl -n "$NS" run probe-deny --rm -i --restart=Never --image=busybox:1.37 \
-  --labels=role=other --command -- wget -q -T 4 -O- http://api:80 && exit 1
+kubectl -n "$NS" exec deploy/metrics  -- wget -q -T 4 -O /dev/null http://api:80 && exit 1
 ```
 
-Budget for it: a probe Pod plus its timeout has to fit inside the check
-contract's 30 seconds, so keep `-T` low and run at most two probes per
-script.
+**Make the request from a workload the question already runs.** Do not
+create a probe Pod. `kubectl run --rm` has to schedule a Pod, pull its
+image, run the command and tear it down, and that uses most of the 30
+seconds a check is allowed — so the check passes on an idle cluster and
+times out on a busy one. A timed-out check is scored **failed**, which
+means a correct answer silently loses points because the machine was
+busy. That is not hypothetical: three checks were written that way, each
+worth 5 points, and two of them dropped 10 points from a 180/180 answer
+the first time two grading runs happened back-to-back.
+
+`exec` costs about a second, mutates nothing, and tests the same thing —
+the request still crosses DNS, kube-proxy, the Service's selector and its
+targetPort. If a question genuinely has no running workload to exec into,
+it probably needs one in `setup.sh` anyway, so the candidate has
+something to test against too.
 
 **An Ingress controller exists.** ingress-nginx, pinned to the
 control-plane node, with IngressClass `nginx`. Ingress questions can
