@@ -47,6 +47,11 @@ export const strings = {
       "This cannot be undone. The desktop will lock immediately and grading will begin.",
     cancel: "Cancel",
     desktopTitle: "Exam desktop",
+    // The countdown is mono digits on purpose — "01:47:12" is scannable to
+    // a sighted reader and unreadable to a screen reader, which says it
+    // digit-by-digit with the colons. The glyphs are hidden from assistive
+    // tech and this spoken form carries the same value instead.
+    timeRemaining: (spoken: string) => `Time remaining: ${spoken}`,
   },
 
   questionPanel: {
@@ -228,6 +233,10 @@ export const strings = {
     // again underneath this, so the copy names the likely check.
     retryFailed: (detail: string) =>
       `Couldn't ask the facilitator to grade again (${detail}). Check the stack is up with \`docker compose ps\`, then retry.`,
+    // The percentage is the score screen's heading — the one thing the
+    // candidate came for. It reads as a bare number without this prefix,
+    // which is only ever announced, never drawn.
+    scoreLabel: "Your score",
     pass: "PASS",
     fail: "FAIL",
     pointsDetail: (earned: number, total: number, passingScore: number) =>

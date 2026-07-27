@@ -169,6 +169,29 @@ describe("Score results poll", () => {
   }, 10_000);
 });
 
+describe("Score heading", () => {
+  // The scored state was two anonymous divs: the one number the candidate
+  // came for had no heading to navigate to, and announced as a bare
+  // percentage with nothing naming it.
+  test("the percentage is the screen's h1 and says what the number is", async () => {
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+
+    // Named, because the grading state's own h1 is on screen until the
+    // first poll lands and would satisfy a bare level-1 query.
+    const heading = await screen.findByRole("heading", { level: 1, name: /your score/i });
+    expect(heading).toHaveTextContent("0%");
+  });
+
+  // Promoting the verdict too would put two headings on one banner and
+  // announce PASS/FAIL twice; it already follows the heading immediately.
+  test("the verdict stays out of the heading structure", async () => {
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+
+    expect(await screen.findByText("FAIL")).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+});
+
 describe("Score solutions", () => {
   // Solutions used to render through a bare <ReactMarkdown> with no
   // components override and no styles, so a long yaml line pushed the whole

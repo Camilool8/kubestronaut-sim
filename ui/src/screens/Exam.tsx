@@ -1,14 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { endSession, getExam, type ExamInfo, type SessionSnapshot } from "../api";
 import { TimerBar } from "../components/TimerBar";
 import { QuestionPanel } from "../components/QuestionPanel";
-import { DesktopViewport } from "../components/DesktopViewport";
 import { Dialog } from "../components/Dialog";
 import { InfoButton } from "../components/InfoButton";
 import { ExamIntro, introSeen, markIntroSeen } from "../components/ExamIntro";
 import { toastStore } from "../components/toastStore";
-import { formatClock } from "../lib/format";
+import { formatClock, formatClockSpoken } from "../lib/format";
 import { strings } from "../strings";
+
+// DesktopViewport pulls in @novnc/novnc, which is almost the entire main
+// bundle. Statically imported it rode along on every screen that touches
+// this module — the lobby, the score screen, and the mobile "desktop
+// required" gate — none of which ever render a viewport. Worst case was a
+// phone on the LAN downloading the whole VNC client just to be told it
+// needs a desktop. Loading it lazily keeps it on the one path that uses it.
+const DesktopViewport = lazy(() =>
+  import("../components/DesktopViewport").then((m) => ({ default: m.DesktopViewport })),
+);
 
 interface ExamProps {
   session: SessionSnapshot;
@@ -60,7 +69,12 @@ export function ExamGateControls({ session, fetchedAt, onSessionChange }: ExamPr
   return (
     <div className="gate-session">
       <p className="gate-session-timer">
-        <span className="timer">{formatClock(remaining)}</span>
+        <span className="timer" role="timer">
+          <span aria-hidden="true">{formatClock(remaining)}</span>
+          <span className="sr-only">
+            {strings.exam.timeRemaining(formatClockSpoken(remaining))}
+          </span>
+        </span>
       </p>
       <p>{strings.mobile.sessionRunning}</p>
       {endError && (
@@ -173,7 +187,21 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
         />
         <div className="desktop-pane" aria-label={strings.exam.desktopTitle}>
           {session.state === "running" && (
-            <DesktopViewport onStateChange={handleDesktopState} />
+            // The fallback is the connecting state the viewport itself shows a
+            // moment later, same markup: `.desktop-status` is out of flow, so
+            // it needs `.desktop-viewport`'s positioned box to land in the
+            // right place rather than over the whole page.
+            <Suspense
+              fallback={
+                <div className="desktop-viewport">
+                  <div className="desktop-status" role="status">
+                    <p>{strings.desktop.connecting}</p>
+                  </div>
+                </div>
+              }
+            >
+              <DesktopViewport onStateChange={handleDesktopState} />
+            </Suspense>
           )}
         </div>
       </div>

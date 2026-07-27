@@ -37,9 +37,18 @@
 
   /* brand + state
      --accent 4.8:1 on --surface, 4.5:1 on --bg, but only 4.1:1 on
-     --surface-raised — under the 4.5:1 floor, so the .hljs-attr/
-     -attribute/-keyword/-built_in token colors in theme.css use
-     --accent-strong instead
+     --surface-raised and 4.0:1 on --accent-soft — both under the 4.5:1
+     floor, so accent-coloured TEXT on either of those two fills uses
+     --accent-strong instead. In theme.css that is the countdown
+     (.timer), .btn on hover, the instance chip, the active bank badge,
+     a hovered click-to-copy value, the intro card's timer chip, and the
+     .hljs-attr/-attribute/-keyword/-built_in code tokens — plus the
+     points pill in a selected question row, which keeps its own --bg
+     fill but reads against a --surface-raised row and matches its
+     neighbours. The --accent BORDERS on those same rules stay --accent
+     on purpose: a border is not text, so it answers to the 3:1 floor of
+     WCAG 1.4.11, which 4.0:1 clears — and moving them would change the
+     visual weight of the design.
      --accent-contrast 4.8:1 on --accent (the primary button)
      --accent-strong 6.4:1 on --surface, 5.4:1 on --accent-soft, 5.6:1 on
      --surface-raised — it is the accent for text sitting on --accent-soft
@@ -131,10 +140,12 @@
 
   /* --accent 7.4:1 on --bg, 6.9:1 on --surface, 6.2:1 on --surface-raised;
      --accent-contrast 7.4:1 on --accent; --accent-strong 9.5:1 on
-     --surface, 8.5:1 on --surface-raised (used by the .hljs-* keyword
-     colors, since the light-theme --accent falls short there — see
-     above). A tint of the same Kubernetes blue: #326CE5 itself only
-     reaches ~4.1:1 on this background and would fail as body text. */
+     --surface, 8.5:1 on --surface-raised, 7.9:1 on --accent-soft (used
+     by the accent-on-raised text rules listed above, which switch token
+     in both themes because the LIGHT --accent is what falls short —
+     dark clears the floor on its own). A tint of the same Kubernetes
+     blue: #326CE5 itself only reaches ~4.1:1 on this background and
+     would fail as body text. */
   --accent: #7aa2f7;
   --accent-strong: #a4c0fb;
   --accent-soft: #16294a;

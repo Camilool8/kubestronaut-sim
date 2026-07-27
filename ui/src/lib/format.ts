@@ -1,6 +1,7 @@
 // Shared time formatters. formatDuration is the human-friendly form used
 // on summary surfaces ("2h", "1h 30m"); formatClock is the ticking
-// H:MM:SS countdown used by the timer.
+// H:MM:SS countdown used by the timer, and formatClockSpoken is the same
+// reading in words, for the assistive tech the glyphs are hidden from.
 
 export function formatDuration(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
@@ -33,4 +34,24 @@ export function formatClock(totalSeconds: number): string {
   const m = Math.floor((clamped % 3600) / 60);
   const s = clamped % 60;
   return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+// formatClockSpoken carries formatClock's value in natural language,
+// because "1:47:12" is announced digit by digit with its colons and
+// arrives as noise. Seconds are dropped at or above a minute on purpose:
+// the countdown re-renders every second, and a reading whose tail changes
+// on every tick is re-announced faster than it can be heard out. Below a
+// minute they are the only thing left worth saying.
+export function formatClockSpoken(totalSeconds: number): string {
+  const clamped = Math.max(0, Math.floor(totalSeconds));
+  if (clamped < 60) return plural(clamped, "second");
+  const h = Math.floor(clamped / 3600);
+  const m = Math.floor((clamped % 3600) / 60);
+  if (h === 0) return plural(m, "minute");
+  if (m === 0) return plural(h, "hour");
+  return `${plural(h, "hour")} ${plural(m, "minute")}`;
+}
+
+function plural(count: number, unit: string): string {
+  return `${count} ${unit}${count === 1 ? "" : "s"}`;
 }

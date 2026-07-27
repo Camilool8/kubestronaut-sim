@@ -16,9 +16,13 @@
     transform 0.05s ease;
 }
 
+/* The fill stays --surface-raised on hover, where plain --accent reaches
+   only 4.1:1; the label takes --accent-strong (5.6:1). The border stays
+   --accent — as a non-text boundary it needs 3:1 (WCAG 1.4.11), and
+   moving it would change the button's visual weight. */
 .btn:hover:not(:disabled) {
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-strong);
 }
 
 .btn:active:not(:disabled) {
@@ -315,10 +319,16 @@
   flex-shrink: 0;
 }
 
+/* This is the exam screen's <h1>. font-size and margin are pinned so the
+   heading level carries no visual weight of its own — the topbar title
+   has always read at body size, and the browser's 2em / 0.67em h1
+   defaults would resize the row and break the wrap behaviour above. */
 .topbar-title {
   flex: 1 1 8rem;
   min-width: 0;
+  font-size: inherit;
   font-weight: 600;
+  margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -333,7 +343,10 @@
   border-radius: var(--radius-s);
   background: var(--surface-raised);
   border: 1px solid var(--border);
-  color: var(--accent);
+  /* On its own --surface-raised chip, plain --accent is 4.1:1; the
+     countdown is normal-size text and needs 4.5:1. --accent-strong is
+     5.6:1 here. .timer-low overrides this to --danger and is unaffected. */
+  color: var(--accent-strong);
   letter-spacing: 0.03em;
 }
 
@@ -367,7 +380,13 @@
   width: 360px;
   flex-shrink: 0;
   position: relative;
-  transition: width 0.15s ease;
+  /* The collapse is instant on purpose. This used to ease the panel's
+     own width over 150ms, which is neither compositor-only nor authored
+     inside prefers-reduced-motion — and animating a layout property for
+     150ms relayouts the adjacent .desktop-pane every frame, which is the
+     one element in the product with a ResizeObserver watching it (noVNC).
+     There is no transform-only way to move this edge without changing the
+     collapsed and expanded geometry, so a utility toggle simply snaps. */
 }
 
 .question-panel.collapsed {
@@ -445,19 +464,25 @@
   white-space: nowrap;
 }
 
+/* The selected row is --surface-raised, where plain --accent is 4.1:1;
+   the points value takes --accent-strong. The pill border stays --accent
+   (non-text, 3:1 under WCAG 1.4.11). */
 .question-item.selected .question-points {
-  color: var(--accent);
+  color: var(--accent-strong);
   border-color: var(--accent);
 }
 
-/* which box to ssh into — the single most load-bearing fact per question */
+/* which box to ssh into — the single most load-bearing fact per question.
+   The text sits on --accent-soft, where plain --accent is 4.0:1, so it
+   takes --accent-strong (5.4:1); the border stays --accent, which clears
+   the 3:1 non-text floor and keeps the chip's weight unchanged. */
 .instance-chip {
   display: inline-flex;
   align-items: center;
   gap: 0.4em;
   font-family: var(--font-mono);
   font-size: var(--text-s);
-  color: var(--accent);
+  color: var(--accent-strong);
   background: var(--accent-soft);
   border: 1px solid var(--accent);
   border-radius: var(--radius-pill);
@@ -656,11 +681,15 @@
   border-color: var(--danger);
 }
 
+/* This is the score screen's <h1>. It already declares its own display
+   size, so only the browser's 0.67em h1 margin has to be neutralised —
+   the banner owns the spacing around this number. */
 .score-percent {
   font-family: var(--font-mono);
   font-size: var(--text-hero);
   font-weight: 700;
   line-height: 1.1;
+  margin: 0;
 }
 
 .score-verdict {
@@ -1393,12 +1422,37 @@
   overscroll-behavior-x: contain;
 }
 
-/* Touch targets on the screens a phone can actually reach. */
+/* Touch targets on the screens a phone can actually reach. Keyed to
+   pointer type, not width, and everything stays inside this query — a
+   mouse sees none of it.
+
+   .theme-toggle shares the floating cluster with .info-button and was
+   half its neighbour's height; .toast-dismiss was ~18px and is the only
+   way to clear a warning toast, which never auto-expires. .drawer-close
+   and .code-block-copy are the other two icon-scale controls reachable
+   on a phone. */
 @media (any-pointer: coarse) {
   .panel-toggle,
-  .info-button {
+  .info-button,
+  .theme-toggle,
+  .toast-dismiss,
+  .drawer-close,
+  .code-block-copy {
     min-width: 44px;
     min-height: 44px;
+  }
+
+  /* These three keep their padding-derived box on a mouse, so growing
+     them to 44px would otherwise push their glyph off-centre against
+     asymmetric padding (.toast-dismiss is `0 0.2em` in a flex row).
+     Centring in the enlarged box leaves the mark exactly where the
+     desktop layout already put it, horizontally and vertically. */
+  .toast-dismiss,
+  .drawer-close,
+  .code-block-copy {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 

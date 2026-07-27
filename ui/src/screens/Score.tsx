@@ -122,7 +122,10 @@ export function Score({ onNewAttempt, endReason }: ScoreProps) {
   return (
     <div className="score-screen">
       <div className={`score-banner ${results.passed ? "pass" : "fail"}`}>
-        <div className="score-percent">{results.percent}%</div>
+        <h1 className="score-percent">
+          <span className="sr-only">{strings.score.scoreLabel}: </span>
+          {results.percent}%
+        </h1>
         <div className="score-verdict">{results.passed ? strings.score.pass : strings.score.fail}</div>
         <div className="score-detail">
           {strings.score.pointsDetail(results.earned, results.total, results.passingScore)}
