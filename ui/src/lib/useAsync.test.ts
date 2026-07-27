@@ -100,6 +100,36 @@ describe("useAsync", () => {
     expect(progressStore.isVisible()).toBe(false);
     expect(result.current.status).toBe("loading");
   });
+
+  // The bar is driven from a start/done pair. A synchronously-throwing fn
+  // used to escape between them, so one bad call site left the bar up for
+  // the rest of the session with nothing in flight.
+  test("a synchronously throwing function does not strand the progress bar", async () => {
+    const { result } = renderHook(() =>
+      useAsync<string>(() => {
+        throw new Error("boom");
+      }, []),
+    );
+    await waitFor(() => expect(result.current.status).toBe("error"));
+    expect(result.current.error).toBe("boom");
+    await waitFor(() => expect(progressStore.isVisible()).toBe(false));
+  });
+
+  // The old `cancelled` flag only ignored a late result; the request itself
+  // kept running, and against a wedged server it never settled at all.
+  test("unmounting aborts the signal handed to the call", async () => {
+    let signal: AbortSignal | undefined;
+    const { unmount } = renderHook(() =>
+      useAsync((s) => {
+        signal = s;
+        return new Promise<string>(() => {});
+      }, []),
+    );
+    await waitFor(() => expect(signal).toBeDefined());
+    expect(signal!.aborted).toBe(false);
+    unmount();
+    expect(signal!.aborted).toBe(true);
+  });
 });
 
 describe("callReducer", () => {
@@ -111,21 +141,21 @@ describe("callReducer", () => {
   // three-useState version this reducer replaced (a useState setter with an
   // unchanged value already skips the re-render).
   test("start returns the same reference when already loading with no error", () => {
-    const state = { status: "loading" as const, data: null, error: null };
+    const state = { status: "loading" as const, data: null, hasData: false, error: null };
     expect(callReducer(state, { type: "start" })).toBe(state);
   });
 
   test("start allocates when transitioning out of idle", () => {
-    const state = { status: "idle" as const, data: null, error: null };
+    const state = { status: "idle" as const, data: null, hasData: false, error: null };
     const next = callReducer(state, { type: "start" });
     expect(next).not.toBe(state);
-    expect(next).toEqual({ status: "loading", data: null, error: null });
+    expect(next).toEqual({ status: "loading", data: null, hasData: false, error: null });
   });
 
   test("start allocates to clear a previous error", () => {
-    const state = { status: "error" as const, data: null, error: "HTTP 502" };
+    const state = { status: "error" as const, data: null, hasData: false, error: "HTTP 502" };
     const next = callReducer(state, { type: "start" });
     expect(next).not.toBe(state);
-    expect(next).toEqual({ status: "loading", data: null, error: null });
+    expect(next).toEqual({ status: "loading", data: null, hasData: false, error: null });
   });
 });

@@ -2,13 +2,14 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { ControlJob, ControlPhase } from "../api";
 import { formatElapsed } from "../lib/format";
 import { useFocusTrap } from "../lib/useFocusTrap";
+import { Icon } from "./Icon";
 import { strings } from "../strings";
 
 interface ControlProgressProps {
   job: ControlJob;
   /** Resolved catalog title for job.bank — the slug is never shown. */
   bankTitle?: string;
-  onRetry: () => void;
+  onRetry: () => void | Promise<void>;
   onDismiss: () => void;
   onBackground: () => void;
 }
@@ -54,7 +55,23 @@ export function ControlProgress({
   onBackground,
 }: ControlProgressProps) {
   const failed = Boolean(job.error);
+  const [retrying, setRetrying] = useState(false);
   const titleId = useId();
+
+  // Awaits the outcome rather than latching a local flag. A retry that is
+  // refused leaves this component mounted on the same job id, so a flag
+  // cleared only by a new job would disable the one button that could get
+  // the user out — the same trap the fetch timeout in api.ts exists to
+  // prevent. Dismiss is never disabled for the same reason: it is the
+  // escape hatch.
+  const handleRetry = async () => {
+    setRetrying(true);
+    try {
+      await onRetry();
+    } finally {
+      setRetrying(false);
+    }
+  };
   const dialogRef = useRef<HTMLDivElement>(null);
 
   // The dialog declared aria-modal="true" while trapping nothing, so
@@ -123,7 +140,13 @@ export function ControlProgress({
                   <span className="phase-mark phase-mark-spinner" aria-hidden="true" />
                 ) : (
                   <span className="phase-mark" aria-hidden="true">
-                    {p.state === "done" ? "✓" : p.state === "failed" ? "✗" : "·"}
+                    {p.state === "done" ? (
+                      <Icon name="check" />
+                    ) : p.state === "failed" ? (
+                      <Icon name="cross" />
+                    ) : (
+                      "·"
+                    )}
                   </span>
                 )}
                 <span className="phase-label">{p.label}</span>
@@ -153,8 +176,12 @@ export function ControlProgress({
               <button className="btn" onClick={onDismiss}>
                 {strings.control.dismiss}
               </button>
-              <button className="btn btn-primary" onClick={onRetry}>
-                {strings.control.retry}
+              {/* A failed job freezes its own clock, so without this the
+                  dialog was entirely static from the click until the new
+                  job's first poll — the one moment the user most needs to
+                  know the button did something. */}
+              <button className="btn btn-primary" onClick={handleRetry} disabled={retrying}>
+                {retrying ? strings.control.starting : strings.control.retry}
               </button>
             </div>
           </>

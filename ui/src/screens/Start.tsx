@@ -8,16 +8,25 @@ import {
   type BankEntry,
   type BanksResponse,
   type ControlActionResponse,
-  type ExamInfo,
   type SessionSnapshot,
 } from "../api";
 import { Async } from "../components/Async";
 import { Dialog } from "../components/Dialog";
 import { useDesktopGate } from "../components/DesktopRequired";
 import { ExamIntro, markIntroSeen } from "../components/ExamIntro";
+import { Skeleton } from "../components/Pending";
 import { formatDuration } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 import { strings } from "../strings";
+
+// The stat labels are known before the numbers are, so the placeholder can
+// carry the real headings and reserve the real height.
+const STAT_LABELS = [
+  strings.start.durationLabel,
+  strings.start.passingScoreLabel,
+  strings.start.questionsLabel,
+  strings.start.kubernetesLabel,
+];
 
 interface StartProps {
   onSessionChange: (session: SessionSnapshot) => void;
@@ -49,8 +58,6 @@ export function Start({
   catalogVersion,
   onBanksLoaded,
 }: StartProps) {
-  const [exam, setExam] = useState<ExamInfo | null>(null);
-  const [examError, setExamError] = useState<string | null>(null);
   const [confirmBank, setConfirmBank] = useState<BankEntry | null>(null);
   const [switching, setSwitching] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -62,21 +69,14 @@ export function Start({
   // A phone can browse the catalog; it cannot run the exam.
   const examBlocked = useDesktopGate() === "blocked";
 
-  useEffect(() => {
-    let cancelled = false;
-    getExam()
-      .then((e) => {
-        if (!cancelled) setExam(e);
-      })
-      .catch((err) => {
-        if (!cancelled) setExamError(String(err));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [catalogVersion]);
+  // Through useAsync so it also drives the top progress bar. It used to be
+  // a hand-rolled cancelled flag with no indicator at all: while it was in
+  // flight the card showed the fallback title and no stats, which is
+  // indistinguishable from the endpoint being down.
+  const examState = useAsync((signal) => getExam(signal), [catalogVersion]);
+  const exam = examState.data;
 
-  const banksState = useAsync(getBanks, [catalogVersion]);
+  const banksState = useAsync((signal) => getBanks(signal), [catalogVersion]);
 
   useEffect(() => {
     if (banksState.data) onBanksLoaded(banksState.data);
@@ -131,7 +131,7 @@ export function Start({
     <div className="start-screen">
       <div className="start-card">
         <h1>{exam?.title ?? strings.start.fallbackTitle}</h1>
-        {examError && <p className="error-text">{examError}</p>}
+        {examState.error && <p className="error-text">{strings.start.examFailed(examState.error)}</p>}
 
         <Async
           state={banksState}
@@ -187,6 +187,21 @@ export function Start({
             )
           }
         </Async>
+
+        {/* The stats box reserves its own height whether or not the numbers
+            have landed, so the card does not jump when they do. */}
+        {!exam && !examState.error && (
+          <div className="start-stats" aria-hidden="true">
+            {STAT_LABELS.map((label) => (
+              <div key={label}>
+                <div className="start-stat-label">{label}</div>
+                <div className="start-stat-value">
+                  <Skeleton width="3.5em" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {exam && (
           <div className="start-stats">
@@ -269,7 +284,9 @@ export function Start({
               onClick={handleConfirmSwitch}
               disabled={switching}
             >
-              {strings.lobby.switchConfirm}
+              {/* Both buttons went grey and nothing else changed, which
+                  reads as a stuck dialog rather than a request in flight. */}
+              {switching ? strings.control.starting : strings.lobby.switchConfirm}
             </button>
           </div>
         </Dialog>

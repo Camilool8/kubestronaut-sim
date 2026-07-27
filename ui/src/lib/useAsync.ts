@@ -6,6 +6,12 @@ export type AsyncStatus = "idle" | "loading" | "success" | "error";
 export interface AsyncState<T> {
   status: AsyncStatus;
   data: T | null;
+  /**
+   * Whether a successful call has ever landed. Distinct from `data !== null`,
+   * which cannot tell "resolved with nothing" from "never resolved" — a
+   * `useAsync<void>` would report itself loaded forever under that test.
+   */
+  hasData: boolean;
   error: string | null;
   reload: () => void;
 }
@@ -25,6 +31,7 @@ export interface UseAsyncOptions {
 interface CallState<T> {
   status: AsyncStatus;
   data: T | null;
+  hasData: boolean;
   error: string | null;
 }
 
@@ -46,24 +53,28 @@ export function callReducer<T>(state: CallState<T>, action: CallAction<T>): Call
       // one place the reducer conversion has to match that behavior.
       return state.status === "loading" && state.error === null
         ? state
-        : { status: "loading", data: state.data, error: null };
+        : { status: "loading", data: state.data, hasData: state.hasData, error: null };
     case "success":
-      return { status: "success", data: action.data, error: null };
+      return { status: "success", data: action.data, hasData: true, error: null };
     case "error":
-      return { status: "error", data: state.data, error: action.message };
+      return { status: "error", data: state.data, hasData: state.hasData, error: action.message };
   }
 }
 
 function initCallState<T>(): CallState<T> {
-  return { status: "idle", data: null, error: null };
+  return { status: "idle", data: null, hasData: false, error: null };
 }
 
 /**
- * Runs an async function and reports its state, cancelling on unmount.
+ * Runs an async function and reports its state, aborting on unmount.
  * Replaces the per-call-site `cancelled` flag pattern.
+ *
+ * `fn` receives an AbortSignal. Pass it to fetch: the old `cancelled` flag
+ * only ignored a late result while the request itself kept running, and a
+ * request against an unresponsive facilitator never settles at all.
  */
 export function useAsync<T>(
-  fn: () => Promise<T>,
+  fn: (signal: AbortSignal) => Promise<T>,
   deps: unknown[],
   opts: UseAsyncOptions = {},
 ): AsyncState<T> {
@@ -84,11 +95,16 @@ export function useAsync<T>(
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
+    const controller = new AbortController();
     dispatch({ type: "start" });
     if (!background) progressStore.start();
 
-    fnRef
-      .current()
+    // Promise.resolve().then(...) rather than calling fn directly: a
+    // synchronously-throwing fn would otherwise escape the effect after
+    // progressStore.start() and before its matching done(), leaving the top
+    // bar up for the rest of the session with nothing in flight.
+    Promise.resolve()
+      .then(() => fnRef.current(controller.signal))
       .then((value) => {
         if (cancelled) return;
         dispatch({ type: "success", data: value });
@@ -103,6 +119,7 @@ export function useAsync<T>(
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
     // deps is the caller's dependency list, spread so each entry is compared
     // individually; nonce drives reload().
@@ -111,5 +128,11 @@ export function useAsync<T>(
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
-  return { status: state.status, data: state.data, error: state.error, reload };
+  return {
+    status: state.status,
+    data: state.data,
+    hasData: state.hasData,
+    error: state.error,
+    reload,
+  };
 }

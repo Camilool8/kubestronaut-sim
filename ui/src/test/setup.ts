@@ -38,6 +38,13 @@ Object.defineProperty(window, "localStorage", {
   configurable: true,
 });
 
+// Same story for sessionStorage, which marksStore uses to keep a
+// candidate's viewed/marked flags across a reload mid-exam.
+Object.defineProperty(window, "sessionStorage", {
+  value: new MemoryStorage(),
+  configurable: true,
+});
+
 // jsdom has no CSS engine and therefore no matchMedia. Default every
 // query to "no match", which is the desktop case — components that gate
 // on viewport or pointer then behave as they would on a laptop unless a

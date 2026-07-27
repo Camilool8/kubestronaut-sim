@@ -132,7 +132,7 @@ const lockedHTML = `<!doctype html>
     color-scheme: light;
     --bg: #f7f9fc;
     --surface: #ffffff;
-    --border: #cbd4e1;
+    --border: #a0acbe;
     --text: #1a212b;
     --text-muted: #57626f;
   }
@@ -140,7 +140,7 @@ const lockedHTML = `<!doctype html>
     color-scheme: dark;
     --bg: #0b1220;
     --surface: #121a2b;
-    --border: #28324a;
+    --border: #465476;
     --text: #d9dee5;
     --text-muted: #97a0af;
   }
@@ -149,7 +149,7 @@ const lockedHTML = `<!doctype html>
       color-scheme: dark;
       --bg: #0b1220;
       --surface: #121a2b;
-      --border: #28324a;
+      --border: #465476;
       --text: #d9dee5;
       --text-muted: #97a0af;
     }

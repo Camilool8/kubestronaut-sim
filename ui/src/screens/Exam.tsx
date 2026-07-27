@@ -1,11 +1,15 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
-import { endSession, getExam, type ExamInfo, type SessionSnapshot } from "../api";
+import { endSession, getExam, type SessionSnapshot } from "../api";
+import { useAsync } from "../lib/useAsync";
 import { TimerBar } from "../components/TimerBar";
 import { QuestionPanel } from "../components/QuestionPanel";
 import { Dialog } from "../components/Dialog";
 import { InfoButton } from "../components/InfoButton";
 import { ExamIntro, introSeen, markIntroSeen } from "../components/ExamIntro";
+import { PanelResizer } from "../components/PanelResizer";
+import { PendingBar } from "../components/Pending";
 import { toastStore } from "../components/toastStore";
+import { marksStore } from "../components/marksStore";
 import { formatClock, formatClockSpoken } from "../lib/format";
 import { strings } from "../strings";
 
@@ -97,9 +101,8 @@ export function ExamGateControls({ session, fetchedAt, onSessionChange }: ExamPr
 // second, redundant line of defense against ever rendering it on a
 // stale/non-running snapshot (the Go proxy independently 403s).
 export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
-  const [exam, setExam] = useState<ExamInfo | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [pickedId, setPickedId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [ending, setEnding] = useState(false);
   const [endError, setEndError] = useState<string | null>(null);
@@ -112,22 +115,28 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
     return true;
   });
 
+  // Scope the panel's viewed/marked flags to this attempt. startedAt
+  // changes on every new attempt, so a fresh attempt starts clean without
+  // anyone having to remember to clear — and a reload mid-exam keeps them,
+  // which is the only thing they exist for.
   useEffect(() => {
-    let cancelled = false;
-    getExam()
-      .then((e) => {
-        if (cancelled) return;
-        setExam(e);
-        setSelectedId((current) => current ?? e.questions[0]?.id ?? null);
-      })
-      .catch(() => {
-        // Non-fatal: the question panel just stays empty. The exam
-        // itself (timer, desktop) still works without /api/exam.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    marksStore.setScope(session.startedAt);
+  }, [session.startedAt]);
+
+  // This used to swallow its error entirely, on the reasoning that the
+  // timer and desktop work without /api/exam. They do — but a swallowed
+  // failure renders an empty question panel, which is byte-identical to an
+  // exam with no questions. A candidate five minutes into a 120-minute
+  // clock got no explanation and nothing to retry. The failure is still
+  // non-fatal; it is now visible and recoverable.
+  const examState = useAsync((signal) => getExam(signal), []);
+  const exam = examState.data;
+
+  // Derived, not stored. The selection is "whatever the candidate picked,
+  // or the first question" — holding that in state meant an effect writing
+  // it the moment the exam landed, which is a render cascade for a value
+  // that was always a function of two things already on hand.
+  const selectedId = pickedId ?? exam?.questions[0]?.id ?? null;
 
   const handleConfirmEnd = async () => {
     setEnding(true);
@@ -181,11 +190,33 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
         <QuestionPanel
           questions={exam?.questions ?? []}
           selectedId={selectedId}
-          onSelect={setSelectedId}
+          onSelect={setPickedId}
           open={panelOpen}
           onToggle={() => setPanelOpen((v) => !v)}
+          emptyState={
+            examState.status === "error" ? (
+              <div className="pane-error" role="alert">
+                <p className="error-text">
+                  {strings.exam.questionsFailed(examState.error ?? "")}
+                </p>
+                <button className="btn" onClick={examState.reload}>
+                  {strings.questionPanel.retry}
+                </button>
+              </div>
+            ) : (
+              <p className="question-empty-note">{strings.exam.loadingQuestions}</p>
+            )
+          }
         />
-        <div className="desktop-pane" aria-label={strings.exam.desktopTitle}>
+        <PanelResizer
+          panelId="question-panel"
+          collapsed={!panelOpen}
+          onToggleCollapse={() => setPanelOpen((v) => !v)}
+        />
+        {/* A section rather than a div: an aria-label on a role-less
+            element is ignored by most assistive tech, so the label this
+            already carried was doing nothing. */}
+        <section className="desktop-pane" aria-label={strings.exam.desktopTitle}>
           {session.state === "running" && (
             // The fallback is the connecting state the viewport itself shows a
             // moment later, same markup: `.desktop-status` is out of flow, so
@@ -196,6 +227,9 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
                 <div className="desktop-viewport">
                   <div className="desktop-status" role="status">
                     <p>{strings.desktop.connecting}</p>
+                    <div className="desktop-status-bar">
+                      <PendingBar />
+                    </div>
                   </div>
                 </div>
               }
@@ -203,7 +237,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
               <DesktopViewport onStateChange={handleDesktopState} />
             </Suspense>
           )}
-        </div>
+        </section>
       </div>
 
       {confirmOpen && (

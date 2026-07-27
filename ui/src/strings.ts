@@ -26,6 +26,11 @@ export const strings = {
       "Each question has a working directory pre-created at /opt/course/<n>.",
       "The timer starts the moment you click Start and cannot be paused.",
     ],
+    // The catalog and the exam summary are separate endpoints, so one can
+    // fail while the other renders. Say which one, and that the button
+    // below is the thing that will not work.
+    examFailed: (detail: string) =>
+      `Couldn't load this exam's summary (${detail}). The facilitator may still be starting — check it with \`docker compose ps facilitator\`.`,
     startExam: "Start Exam",
     starting: "Starting…",
     catalogErrorTitle: "Couldn't load the exam catalog",
@@ -36,6 +41,12 @@ export const strings = {
 
   exam: {
     fallbackTitle: "Exam",
+    loadingQuestions: "Loading the questions…",
+    // An empty panel used to be the only symptom of this, which reads
+    // exactly like an exam with no questions. Say which part broke, and
+    // that the parts the clock depends on did not.
+    questionsFailed: (detail: string) =>
+      `Couldn't load the question list (${detail}). The timer and the exam desktop are unaffected — the questions are served by the facilitator, so check it is up with \`docker compose ps facilitator\`.`,
     endExam: "End Exam",
     ending: "Ending…",
     // Submitting is the one control that must never fail silently: the
@@ -47,6 +58,10 @@ export const strings = {
       "This cannot be undone. The desktop will lock immediately and grading will begin.",
     cancel: "Cancel",
     desktopTitle: "Exam desktop",
+    resizePanel: "Resize the question panel",
+    // aria-valuetext, so a screen reader hears "360 pixels" rather than a
+    // bare number whose unit it cannot know.
+    resizePanelValue: (px: number) => `${px} pixels`,
     // The countdown is mono digits on purpose — "01:47:12" is scannable to
     // a sighted reader and unreadable to a screen reader, which says it
     // digit-by-digit with the colons. The glyphs are hidden from assistive
@@ -55,9 +70,27 @@ export const strings = {
   },
 
   questionPanel: {
+    regionLabel: "Questions",
     collapse: "Collapse question panel",
     expand: "Expand question panel",
-    loading: "Loading…",
+    loading: "Loading the question…",
+    // The clock keeps running through this, so the copy has to say the
+    // session is unharmed rather than leave the candidate wondering.
+    loadFailed: (detail: string) =>
+      `Couldn't load this question (${detail}). The exam is still running — the desktop and the timer are unaffected.`,
+    retry: "Retry",
+    prev: "Previous question",
+    next: "Next question",
+    // The navigator's own button opens the full grid, so its accessible
+    // name has to carry both where you are and what activating it does.
+    position: (n: number, total: number) => `Question ${n} of ${total}. Show all questions.`,
+    jumpOpenLabel: "Show all questions",
+    // Never "answered" or "done": the UI knows it rendered the text, not
+    // that the work was done, and the grader is the only thing that knows
+    // the latter.
+    mark: "Mark for review",
+    marked: "marked for review",
+    viewed: "viewed",
     points: (points: number) => `${points} pts`,
     sshHint: (instance: string) => `ssh ${instance}`,
     copyValue: (value: string) => `Copy ${value}`,
@@ -97,7 +130,7 @@ export const strings = {
     legend: [
       {
         title: "Questions",
-        body: "Select one to read it. Click any value in the text — a name, a label, an image tag, a path — to copy it, then paste in the desktop terminal with Ctrl+Shift+V. The chip under the list names the instance to ssh into.",
+        body: "Step through with ‹ and ›, or the [ and ] keys. Click the question number to see all of them at once and jump anywhere. The chip below names the instance to ssh into. Click any value in the text — a name, a label, an image tag, a path — to copy it, then paste in the desktop terminal with Ctrl+Shift+V.",
       },
       {
         title: "Exam desktop",
@@ -154,13 +187,19 @@ export const strings = {
 
   theme: {
     labels: { system: "Auto", light: "Light", dark: "Dark" } as Record<string, string>,
-    icons: { system: "◐", light: "☀", dark: "☾" } as Record<string, string>,
     ariaLabel: (current: string) => `Theme: ${current}. Activate to change.`,
   },
 
   desktop: {
     connecting: "Connecting to the exam desktop…",
-    reconnecting: "Desktop connection lost. Reconnecting…",
+    // Attempt-numbered on purpose. The backoff climbs to 8s and never
+    // gives up, so a fixed string looks the same after one second and
+    // after three minutes — and "it is still trying" versus "it is stuck"
+    // is the only question the candidate actually has.
+    reconnecting: (attempt: number) =>
+      attempt > 1
+        ? `Desktop connection lost. Reconnecting — attempt ${attempt}.`
+        : "Desktop connection lost. Reconnecting…",
     skip: "Skip past the exam desktop (it captures Tab while focused)",
   },
 
@@ -191,7 +230,13 @@ export const strings = {
     elapsed: (span: string) => `Elapsed ${span}`,
     reconnecting: "Restarting the exam services. The page will reconnect on its own.",
     background: "Run in background",
+    progressLabel: "Rebuild progress",
+    reopen: (label: string) => `${label}. Show details.`,
     retry: "Retry",
+    // One label for every control action's in-flight state. The request is
+    // a 202 that starts a job; "Starting…" is what is literally true
+    // between the click and the job appearing.
+    starting: "Starting…",
     dismiss: "Dismiss",
     // "HTTP 502" is true and useless. Name the likely cause and the
     // check that confirms it; keep the raw status as trailing detail.
@@ -221,7 +266,12 @@ export const strings = {
 
   score: {
     gradingTitle: "Grading…",
-    gradingBody: "Evaluating your exam over SSH. This can take a minute.",
+    // "This can take a minute" was a guess, and the measured full 22-question
+    // CKAD grade is ~16s. Overstating a wait is the same mistake as
+    // understating one — the elapsed counter beside this is the honest
+    // answer, so the copy only has to bound it and say not to navigate away.
+    gradingBody:
+      "Evaluating your exam over SSH. A full bank usually finishes in well under a minute — leave this tab open.",
     gradingFailedTitle: "Grading failed",
     retry: "Retry",
     // The poll could not reach the facilitator. Not terminal — the poll is

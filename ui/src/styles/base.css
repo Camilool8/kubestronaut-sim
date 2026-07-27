@@ -65,7 +65,12 @@ h3 {
 :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
-  border-radius: var(--radius-s);
+  /* No border-radius here. It used to set --radius-s, which is not a
+     property of the outline — it changes the ELEMENT's own corners, so
+     every pill-shaped control (the theme toggle, the info button) visibly
+     became a 6px rectangle the moment it took keyboard focus, and inline
+     `code` jumped from 3px. The outline already follows whatever radius
+     the element has. */
 }
 
 /* Motion is an enhancement, never a requirement. */
@@ -77,6 +82,41 @@ h3 {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* Windows High Contrast and friends. forced-colors overrides every colour
+   we set and drops box-shadow entirely, which costs this system BOTH of
+   selection's channels at once — the accent border and the inset bar. What
+   survives is `outline` and the system colour keywords, so currency
+   re-declares itself with one. Without this block a chosen exam, the
+   current question and a marked question are all indistinguishable
+   rectangles. */
+@media (forced-colors: active) {
+  .question-tile[aria-current="true"],
+  .bank-card.bank-active,
+  .question-mark[aria-pressed="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -3px;
+  }
+
+  /* --text-disabled is overridden away; GrayText is the system's own. */
+  .btn:disabled,
+  .bank-card:disabled,
+  .question-nav-step:disabled {
+    color: GrayText;
+  }
+
+  /* The countdown's low-time reading is colour plus a pulse. The pulse
+     survives; the colour does not, so the edge takes a system colour that
+     is not the resting one. */
+  .timer-low {
+    border-color: Mark;
+  }
+
+  .panel-resizer:hover,
+  .panel-resizer[data-dragging="true"] {
+    background: Highlight;
   }
 }
 
