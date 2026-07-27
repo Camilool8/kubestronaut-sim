@@ -86,6 +86,13 @@
   transform: rotate(180deg);
 }
 
+/* An open disclosure's content must not start where its trigger's hover
+   band ends. */
+.question-result[open] > summary,
+.solution-details[open] > summary {
+  margin-bottom: var(--space-2);
+}
+
 /* ---- theme toggle ---- */
 
 .theme-toggle {
@@ -1182,15 +1189,24 @@
    this disclosure had no trigger glyph at all while the solution one
    nested inside it kept the browser's. Both now carry the same chevron,
    and both take a hover fill — they were two of the ten controls in the
-   product that rested with no border and no background whatsoever. */
+   product that rested with no border and no background whatsoever.
+
+   The negative margin is INLINE ONLY, and that is the whole lesson here.
+   Both summaries first shipped with a uniform `margin: -space-2`, so the
+   hover band bled upward as well as sideways — and .solution-details sits
+   only a small gap below the check list, so the nested band landed
+   directly on it with no breathing room at all. Inline padding matches
+   the card's own so the text does not shift and the band reaches the
+   border; vertical spacing is left to the container, which is the only
+   thing that knows what is above. */
 .question-result summary {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   cursor: pointer;
   font-weight: 600;
-  padding: var(--space-2);
-  margin: calc(var(--space-2) * -1);
+  padding: var(--space-1) var(--space-4);
+  margin-inline: calc(var(--space-4) * -1);
   border-radius: var(--radius-s);
   list-style: none;
 }
@@ -1253,21 +1269,25 @@
   color: var(--text-muted);
 }
 
+/* Real separation from the check list above. The summary below carries a
+   hover fill, and a fill that begins where the previous block ends reads
+   as one merged object rather than as a control of its own. */
 .solution-details {
-  margin-top: var(--space-2);
+  margin-top: var(--space-4);
 }
 
 /* --accent-strong, not --accent: this sits inside .question-result, whose
    own fill is --surface, but a hovered summary puts it on --surface-hover
-   where plain --accent measures 3.8:1. */
+   where plain --accent measures 3.8:1.
+   Same inline-only margin as the summary above, and the same reason. */
 .solution-details summary {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   cursor: pointer;
   color: var(--accent-strong);
-  padding: var(--space-2);
-  margin: calc(var(--space-2) * -1);
+  padding: var(--space-1) var(--space-4);
+  margin-inline: calc(var(--space-4) * -1);
   border-radius: var(--radius-s);
   list-style: none;
 }

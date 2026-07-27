@@ -46,7 +46,18 @@ Convert to GitHub issues once the repo has a remote.
 - conductor: image runs as root and holds the docker socket by design; consider a socket proxy (e.g. filtered API) if the tool is ever multi-user.
 - conductor: catalog is read once at boot; adding a bank requires a conductor restart. Fine locally; revisit if bank authoring becomes iterative.
 - ~~ui: visual regression pass in a real browser (Chrome extension was unavailable during development; WS upgrade + xfconf state verified instead). Do a manual light/dark + tour + toast walkthrough.~~ (done in Milestone F: real-browser pass at three widths, light and dark. It found three of the four defects that milestone fixed — the skip-link leak, the dead "New attempt" button, and unstyled solution markdown — none of which axe or vitest's jsdom could see.)
-- desktop: xfdesktop may show a one-time "untrusted launcher" prompt on the Desktop icons (panel launchers are the primary path); investigate gio trust metadata if it annoys.
+- ~~desktop: xfdesktop may show a one-time "untrusted launcher" prompt on
+  the Desktop icons (panel launchers are the primary path); investigate gio
+  trust metadata if it annoys.~~ (the real defect was worse than a prompt,
+  and fixed in milestone J: both Desktop icons failed outright with "This
+  feature requires a file manager service to be present (such as the one
+  supplied by Thunar)". xfdesktop does not exec a .desktop file itself, it
+  hands it to the org.xfce.FileManager D-Bus service, and no provider was
+  installed. `thunar` is now in the desktop image — D-Bus activated, so it
+  costs nothing until an icon is used. Verified by invoking
+  org.xfce.FileManager.Launch on both icons: firefox-esr 0 -> 1 processes,
+  xfce4-terminal 0 -> 1. No trust prompt appeared; the icons are executable
+  and owned by candidate, which satisfies the check.)
 - ui: bundle size — superseded by the Milestone F/G entry below (~487KB).
 
 ## Milestone E (UI/UX overhaul) — new
