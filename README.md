@@ -34,12 +34,13 @@ network — just point it at `http://<that machine>:8080`.
 
 > **There is no authentication anywhere in this stack.** Anyone who can
 > reach port 8080 can start and end your exam, and the exam desktop is a
-> real shell on containers that run privileged. On a network you do not
-> control, bind to loopback instead:
+> real shell with cluster-admin on the practice cluster. On a network you
+> do not control, bind to loopback instead:
 >
 >     SIM_BIND=127.0.0.1 ./sim up
 >
-> `SIM_BIND` applies to every published port, not just the UI.
+> `SIM_BIND` applies to every published port, not just the UI. See
+> [SECURITY.md](SECURITY.md) for the full picture.
 
 Everything after `up` happens in the browser: pick an exam from the
 lobby catalog, start the timed session, work on the embedded desktop,

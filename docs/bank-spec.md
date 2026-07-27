@@ -22,6 +22,12 @@ spec:
   duration: 120m                # enforced: the facilitator auto-ends the session at 0:00
   passingScore: 66              # percent; enforced: facilitator's Results.Passed
   kubernetesVersion: "1.35"     # informational
+  domainWeights:                # optional; see "Points and domain weights"
+    Application Design and Build: 20
+    Application Deployment: 20
+    Application Environment, Configuration and Security: 25
+    Application Observability and Maintenance: 15
+    Services and Networking: 20
   environment:
     provider: kind
     nodes: 2                    # informational; 1 control-plane + N-1 workers
@@ -34,8 +40,59 @@ spec:
     - id: q01                   # directory name
       instance: instance-1      # where the candidate solves it
       domain: Application Design and Build
-      weight: 5                 # informational; scoring = sum of check points
+      weight: 6                 # MUST equal the sum of this question's
+                                # check points; enforced by
+                                # tests/bank-weights.sh
 ```
+
+## Points and domain weights
+
+**A domain's share of a bank's points is its curriculum weight.** Points
+are not a property of a question — they are a property of its domain,
+divided among the questions in it:
+
+```
+question points = domain budget / questions in that domain
+check points    = split the question's total by how much each check matters
+```
+
+`spec.domainWeights` carries the certification's published weights, and
+`tests/bank-weights.sh` fails the build if any domain's actual share
+drifts more than **2 percentage points** from it.
+
+This exists because the obvious alternative does not survive contact
+with a growing bank. Assign points per question and every addition
+shifts the balance a little; milestone H added two multi-container
+questions to a finished 20-question bank and pushed Application Design
+and Build from 20% to 28% without anyone noticing. Deriving the points
+means adding a seventh question to a domain makes all seven worth
+slightly less, automatically, and the balance cannot rot.
+
+Two consequences worth expecting:
+
+- **Questions in different domains are worth different amounts.** A
+  bank with six Design-and-Build questions and three Observability ones
+  will price the first at 6 points and the second at 9. That is what a
+  weighted exam means, and the question list shows the number, so it is
+  honest signalling rather than a hidden thumb on the scale.
+- **Do not flatten a question into equal parts to hit its total.** The
+  behavioural check is usually worth more than the structural ones that
+  set it up, and that ordering is the teaching.
+
+`tests/bank-weights.sh` runs offline in about a second — no cluster, no
+containers — and `tests/smoke.sh` calls it before the destructive purge,
+so a weighting mistake fails immediately instead of forty minutes into a
+cold boot. It asserts three things:
+
+1. each domain's share is within 2 percentage points of its
+   `spec.domainWeights` entry;
+2. every question's `weight:` equals the sum of its `# points:` headers;
+3. the questions in `exam.yaml` and the `q*/` directories on disk are
+   the same set.
+
+A bank with no `spec.domainWeights` is exempt from (1) but still subject
+to (2) and (3), so a bank that has not been mapped to a curriculum yet
+(`cka-mock-01`) stays green.
 
 ## Question directory: `banks/<bank-id>/<qid>/`
 
