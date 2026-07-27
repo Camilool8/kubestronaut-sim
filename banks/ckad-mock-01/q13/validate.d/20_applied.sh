@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 4
 # desc: the overlay was applied to pavo and is running
 set -uo pipefail
 img=$(kubectl -n pavo get deploy staging-cargo-api \

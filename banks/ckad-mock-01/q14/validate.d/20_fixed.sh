@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 4
 # desc: ledger-api reads the key that exists and is ready; ledger-creds untouched
 set -uo pipefail
 # The Secret must still hold what it was seeded with. Editing the Secret

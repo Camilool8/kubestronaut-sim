@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 4
+# points: 3
 # desc: the app reaches the backend through localhost, and only through it
 set -uo pipefail
 # From inside the app container, so this exercises the whole chain:

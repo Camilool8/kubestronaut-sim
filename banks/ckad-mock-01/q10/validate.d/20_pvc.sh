@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 2
 # desc: PVC archive-pvc requests 1Gi RWO on class manual and is Bound to archive-pv
 set -uo pipefail
 out=$(kubectl -n orion get pvc archive-pvc \

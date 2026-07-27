@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 2
 # desc: PV archive-pv: 2Gi, RWO, hostPath /mnt/archive, class manual, Retain
 set -uo pipefail
 out=$(kubectl get pv archive-pv \

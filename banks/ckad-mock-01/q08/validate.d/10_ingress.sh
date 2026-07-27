@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 4
 # desc: Ingress helios-routes uses class nginx, host helios.sim.local, two Prefix paths
 set -uo pipefail
 class=$(kubectl -n helios get ingress helios-routes -o jsonpath='{.spec.ingressClassName}' 2>/dev/null)

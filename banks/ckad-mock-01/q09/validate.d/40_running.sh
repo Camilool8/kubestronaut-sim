@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 1
 # desc: a container named pulsar-agent is running from that image
 set -uo pipefail
 img=$(podman ps --filter name=^pulsar-agent$ --filter status=running \

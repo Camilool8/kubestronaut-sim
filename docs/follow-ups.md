@@ -80,15 +80,12 @@ Convert to GitHub issues once the repo has a remote.
 
 ## Milestone H (CKAD bank) — new
 
-- **domain weighting is skewed toward Application Design and Build**:
-  28.1% of the points against a 20% target, because adapter (q21) and
-  ambassador (q22) were added on top of an already-complete 20-question
-  bank rather than in place of anything. The other four domains sit at
-  21.6/17.5/17.5/15.2 against 25/20/20/15. Rebalancing means either
-  trimming points from the six Design and Build questions or adding a
-  question each to Deployment and Services and Networking — a product
-  call, not a bug. All five domains are covered; only their proportions
-  drift.
+- ~~**domain weighting is skewed toward Application Design and Build**:
+  28.1% of the points against a 20% target~~ (fixed in Milestone I:
+  points are now derived from `spec.domainWeights` rather than assigned
+  per question, so all five domains land exactly on target and cannot
+  drift again — `tests/bank-weights.sh` fails the build if they do. See
+  "Points and domain weights" in `docs/bank-spec.md`.)
 - the bank is 22 questions where the real CKAD is 15–20. That is
   deliberate (this simulator is meant to be harder), but a 2-hour
   duration against 22 questions is tighter than the real exam's ratio;
@@ -96,20 +93,18 @@ Convert to GitHub issues once the repo has a remote.
 
 ## Milestone G (environment) — new
 
-- **instances: rootless podman.** The instances run `privileged: true`
-  solely so podman can build images, which means a shell on an instance
-  is a shell on the host — and `SIM_BIND` now defaults to `0.0.0.0`. A
-  narrower capability set was measured and gets close but not there:
-  `SYS_ADMIN, SYS_CHROOT, MKNOD, SETFCAP, NET_ADMIN` + `cgroupns=host` +
-  a read-write `/sys/fs/cgroup` bind + `seccomp=unconfined` clears every
-  cgroup error and then stops on a read-only
-  `/proc/sys/net/ipv4/ping_group_range` (podman 4.3.1 writes it
-  regardless of `default_sysctls = []` in containers.conf). Rootless
-  podman as `candidate` gets further — subuid/subgid and
-  newuidmap/newgidmap are already in the image, and with
-  SETFCAP/SETUID/SETGID it reaches `mount proc to proc: Operation not
-  permitted` inside its own user namespace. A newer podman, or the
-  upstream `quay.io/podman/stable` recipe, is the likely resolution.
+- ~~**instances: rootless podman.** The instances run `privileged: true`
+  solely so podman can build images~~ (largely fixed in Milestone I: the
+  Debian 13 base brings podman 5.4.2, which honours the `containers.conf`
+  settings 4.3.1 ignored — including `default_sysctls`, the exact wall
+  this entry described. The instances are no longer privileged; they hold
+  five capabilities, listed and justified in `docker-compose.yaml` and
+  `SECURITY.md`.)
+  - still open, smaller: **rootless podman as `candidate`**, which would
+    drop the remaining five. Not retried under 5.4.2 — the rootful path
+    was enough to remove `privileged`, and the question tells candidates
+    to use `sudo` in any case (as the real exam's does). `SYS_ADMIN` is
+    the one worth removing if anyone returns to this.
 - images: bank workload images (`nginx:1.29-alpine` et al) are still
   pulled from the internet by the kind nodes on every reset. The CNI and
   ingress images are pre-pulled into the persistent DinD cache and

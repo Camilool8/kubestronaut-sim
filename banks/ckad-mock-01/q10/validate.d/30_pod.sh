@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 1
 # desc: Pod archiver mounts the claim at /var/archive and an emptyDir at /var/scratch
 set -uo pipefail
 claim=$(kubectl -n orion get pod archiver -o json 2>/dev/null \
