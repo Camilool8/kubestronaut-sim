@@ -18,7 +18,6 @@ colors:
   accent-soft: "#e4ecfd"
   accent-contrast: "#ffffff"
   danger: "#bb3730"
-  danger-soft: "#f7dedd"
   warn: "#8a6100"
   success: "#16752f"
   focus-ring: "#326ce5"
@@ -78,8 +77,8 @@ components:
     rounded: "{rounded.s}"
     padding: "0.5em 1.1em"
   button-hover:
-    backgroundColor: "{colors.surface-raised}"
-    textColor: "{colors.accent}"
+    backgroundColor: "{colors.raised-hover}"
+    textColor: "{colors.accent-strong}"
   button-primary:
     backgroundColor: "{colors.accent}"
     textColor: "{colors.accent-contrast}"
@@ -111,6 +110,17 @@ components:
     textColor: "{colors.text}"
     rounded: "{rounded.s}"
     padding: "0.75rem 1rem"
+  question-tile:
+    textColor: "{colors.text}"
+    rounded: "{rounded.s}"
+    padding: "0.35em 0.5em"
+  question-tile-hover:
+    backgroundColor: "{colors.surface-hover}"
+  question-tile-current:
+    backgroundColor: "{colors.accent-soft}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.s}"
+    padding: "0.35em 0.5em"
   bank-card-active:
     backgroundColor: "{colors.accent-soft}"
     textColor: "{colors.text}"
@@ -123,12 +133,12 @@ components:
     padding: "0.05em 0.6em"
   instance-chip:
     backgroundColor: "{colors.accent-soft}"
-    textColor: "{colors.accent}"
+    textColor: "{colors.accent-strong}"
     rounded: "{rounded.pill}"
     padding: "0.15em 0.75em"
   timer:
     backgroundColor: "{colors.surface-raised}"
-    textColor: "{colors.accent}"
+    textColor: "{colors.accent-strong}"
     typography: "{typography.data}"
     rounded: "{rounded.s}"
     padding: "0.2em 0.6em"

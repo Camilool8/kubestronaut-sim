@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-07-27T01:15:44Z",
+  "generatedAt": "2026-07-27T21:30:13Z",
   "title": "Design System: kubestronaut-sim",
   "extensions": {
     "themeNote": "Every semantic token is authored in both themes. The DESIGN.md frontmatter carries the light (:root) value; each colorMeta entry below carries its dark counterpart in `dark`. Neither theme is derived from the other.",
@@ -123,14 +123,14 @@
         "canonical": "#a0acbe",
         "dark": "#465476",
         "tonalRamp": [
-          "oklch(22% 0.03 255)",
-          "oklch(32% 0.03 255)",
-          "oklch(43% 0.028 255)",
-          "oklch(54% 0.025 255)",
-          "oklch(66% 0.022 255)",
-          "oklch(78% 0.018 255)",
-          "oklch(87% 0.015 255)",
-          "oklch(95% 0.01 255)"
+          "oklch(22% 0.029 258)",
+          "oklch(32% 0.029 258)",
+          "oklch(43% 0.027 258)",
+          "oklch(54% 0.024 258)",
+          "oklch(66% 0.021 258)",
+          "oklch(78% 0.018 258)",
+          "oklch(87% 0.015 258)",
+          "oklch(95% 0.01 258)"
         ]
       },
       "text": {
@@ -210,14 +210,14 @@
         "canonical": "#16752f",
         "dark": "#57d183",
         "tonalRamp": [
-          "oklch(18% 0.06 145)",
-          "oklch(28% 0.09 145)",
-          "oklch(38% 0.11 145)",
-          "oklch(50% 0.13 145)",
-          "oklch(62% 0.14 145)",
-          "oklch(75% 0.12 145)",
-          "oklch(86% 0.08 145)",
-          "oklch(95% 0.04 145)"
+          "oklch(22% 0.135 147)",
+          "oklch(32% 0.135 147)",
+          "oklch(43% 0.126 147)",
+          "oklch(54% 0.112 147)",
+          "oklch(66% 0.099 147)",
+          "oklch(78% 0.081 147)",
+          "oklch(87% 0.068 147)",
+          "oklch(95% 0.045 147)"
         ]
       },
       "focus-ring": {
@@ -231,25 +231,65 @@
         "role": "neutral",
         "displayName": "Hairline Strong",
         "canonical": "#708197",
-        "dark": "#6a79a1"
+        "dark": "#6a79a1",
+        "tonalRamp": [
+          "oklch(22% 0.039 255)",
+          "oklch(32% 0.039 255)",
+          "oklch(43% 0.036 255)",
+          "oklch(54% 0.033 255)",
+          "oklch(66% 0.029 255)",
+          "oklch(78% 0.024 255)",
+          "oklch(87% 0.02 255)",
+          "oklch(95% 0.013 255)"
+        ]
       },
       "surface-hover": {
         "role": "neutral",
         "displayName": "Hover Fill",
         "canonical": "#e1e7f1",
-        "dark": "#1f2a44"
+        "dark": "#1f2a44",
+        "tonalRamp": [
+          "oklch(22% 0.015 261)",
+          "oklch(32% 0.015 261)",
+          "oklch(43% 0.014 261)",
+          "oklch(54% 0.012 261)",
+          "oklch(66% 0.011 261)",
+          "oklch(78% 0.009 261)",
+          "oklch(87% 0.008 261)",
+          "oklch(95% 0.005 261)"
+        ]
       },
       "raised-hover": {
         "role": "neutral",
         "displayName": "Raised Hover Fill",
         "canonical": "#dbe3f0",
-        "dark": "#243048"
+        "dark": "#243048",
+        "tonalRamp": [
+          "oklch(22% 0.02 260)",
+          "oklch(32% 0.02 260)",
+          "oklch(43% 0.018 260)",
+          "oklch(54% 0.016 260)",
+          "oklch(66% 0.014 260)",
+          "oklch(78% 0.012 260)",
+          "oklch(87% 0.01 260)",
+          "oklch(95% 0.007 260)"
+        ]
       },
       "text-disabled": {
         "role": "neutral",
         "displayName": "Disabled Ink",
         "canonical": "#858f9e",
-        "dark": "#727c8e"
+        "dark": "#727c8e",
+        "tonalRamp": [
+          "oklch(22% 0.025 258)",
+          "oklch(32% 0.025 258)",
+          "oklch(43% 0.023 258)",
+          "oklch(54% 0.021 258)",
+          "oklch(66% 0.018 258)",
+          "oklch(78% 0.015 258)",
+          "oklch(87% 0.013 258)",
+          "oklch(95% 0.008 258)"
+        ]
       }
     },
     "typographyMeta": {
@@ -297,11 +337,6 @@
     ],
     "motion": [
       {
-        "name": "dur-instant",
-        "value": "100ms",
-        "purpose": "Micro-feedback."
-      },
-      {
         "name": "dur-quick",
         "value": "160ms",
         "purpose": "Scrim fades."
@@ -317,11 +352,6 @@
         "purpose": "Dialog and drawer entrance."
       },
       {
-        "name": "dur-modal-out",
-        "value": "200ms",
-        "purpose": "Dialog exit. Exits are shorter than entrances."
-      },
-      {
         "name": "dur-progress",
         "value": "400ms",
         "purpose": "Progress transitions."
@@ -330,11 +360,6 @@
         "name": "ease-out",
         "value": "cubic-bezier(0, 0, 0.2, 1)",
         "purpose": "Default easing. Decelerates without overshoot; a spring or bounce reads as unserious on an instrument."
-      },
-      {
-        "name": "ease-in",
-        "value": "cubic-bezier(0.4, 0, 1, 1)",
-        "purpose": "Exits."
       },
       {
         "name": "stagger-row",
@@ -362,6 +387,11 @@
         "name": "reflow-floor",
         "value": "320px",
         "purpose": "The desktop-required gate must stay usable here \u2014 WCAG 1.4.10 counts 320px as a 1280px window at 400% zoom."
+      },
+      {
+        "name": "panel-split",
+        "value": "not (max-width: 900px)",
+        "purpose": "The two-pane split is live and the panel edge is draggable. Exact complement of panel-overlay, so there is no gap at a fractional width."
       }
     ],
     "layering": [
@@ -390,116 +420,115 @@
       "facilitator/internal/desktop/proxy.go \u2014 the Go locked page",
       "ui/public/favicon.svg \u2014 the prompt-chevron mark",
       "images/desktop/assets/terminalrc plus its xfconf twin \u2014 the exam terminal palette"
-    ],
-    "staleNote": "Values updated by hand for the two-tier border and state-fill work. tonalRamp entries for the four new neutrals are absent: the ramps are generated, and inventing stops would put fabricated data in a file the tooling trusts. Regenerate with /impeccable document when convenient \u2014 note that command rewrites DESIGN.md, whose prose is hand-authored."
+    ]
   },
   "components": [
+    {
+      "name": "Default Button",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Every non-committing action. Hover moves the FILL one tone and the label to accent-strong; the border never moves, because the edge is reserved for state.",
+      "html": "<button class=\"ds-btn\">Cancel</button>",
+      "css": ".ds-btn { background: var(--surface-raised); border: 1px solid var(--border-strong); color: var(--text); padding: 0.5em 1.1em; border-radius: var(--radius-s, 6px); cursor: pointer; font-family: var(--font-sans); font-size: var(--text-m, 0.9375rem); font-weight: 600; transition: background 160ms cubic-bezier(0,0,.2,1), border-color 160ms cubic-bezier(0,0,.2,1), color 160ms cubic-bezier(0,0,.2,1), transform 50ms cubic-bezier(0,0,.2,1); } .ds-btn:hover { background: var(--raised-hover); color: var(--accent-strong); } .ds-btn:active { background: var(--raised-hover); transform: translateY(1px); } .ds-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; } .ds-btn:disabled { color: var(--text-disabled); border-color: var(--border); cursor: not-allowed; } "
+    },
     {
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
       "description": "The single committed action on a screen \u2014 Start Exam, New Attempt, Retry, Got It. Exactly one per screen.",
       "html": "<button class=\"ds-btn ds-btn-primary\">Start Exam</button>",
-      "css": ".ds-btn { background: var(--surface-raised); border: 1px solid var(--border); color: var(--text); padding: 0.5em 1.1em; border-radius: var(--radius-s, 6px); cursor: pointer; font-family: var(--font-sans); font-size: var(--text-m, 0.9375rem); font-weight: 600; transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.05s ease; } .ds-btn:active { transform: translateY(1px); } .ds-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; } .ds-btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); } .ds-btn-primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--accent-contrast); }"
-    },
-    {
-      "name": "Default Button",
-      "kind": "button",
-      "refersTo": "button",
-      "description": "The neutral action. Rests as cool mist on a hairline; on hover the border AND text go accent while the fill stays put \u2014 it brightens rather than filling in.",
-      "html": "<button class=\"ds-btn ds-btn-default\">Cancel</button>",
-      "css": ".ds-btn-default { background: var(--surface-raised); border: 1px solid var(--border); color: var(--text); padding: 0.5em 1.1em; border-radius: var(--radius-s, 6px); cursor: pointer; font-family: var(--font-sans); font-size: var(--text-m, 0.9375rem); font-weight: 600; transition: border-color 0.15s ease, color 0.15s ease, transform 0.05s ease; } .ds-btn-default:hover { border-color: var(--accent); color: var(--accent); } .ds-btn-default:active { transform: translateY(1px); } .ds-btn-default:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; } .ds-btn-default:disabled { opacity: 0.5; cursor: not-allowed; }"
+      "css": ".ds-btn { background: var(--surface-raised); border: 1px solid var(--border-strong); color: var(--text); padding: 0.5em 1.1em; border-radius: var(--radius-s, 6px); cursor: pointer; font-family: var(--font-sans); font-size: var(--text-m, 0.9375rem); font-weight: 600; transition: background 160ms cubic-bezier(0,0,.2,1), border-color 160ms cubic-bezier(0,0,.2,1), color 160ms cubic-bezier(0,0,.2,1), transform 50ms cubic-bezier(0,0,.2,1); } .ds-btn:hover { background: var(--raised-hover); color: var(--accent-strong); } .ds-btn:active { background: var(--raised-hover); transform: translateY(1px); } .ds-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; } .ds-btn:disabled { color: var(--text-disabled); border-color: var(--border); cursor: not-allowed; } .ds-btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); } .ds-btn-primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--accent-contrast); }"
     },
     {
       "name": "Danger Button",
       "kind": "button",
       "refersTo": "button-danger",
-      "description": "End Exam. The only control in the system that fills on hover \u2014 deliberate, because the action is irreversible and should feel like it commits.",
+      "description": "End Exam. The one control in the system that fills on hover \u2014 it is irreversible and should feel like it commits.",
       "html": "<button class=\"ds-btn ds-btn-danger\">End Exam</button>",
-      "css": ".ds-btn-danger { background: var(--surface-raised); border: 1px solid var(--danger); color: var(--danger); padding: 0.5em 1.1em; border-radius: var(--radius-s, 6px); cursor: pointer; font-family: var(--font-sans); font-size: var(--text-m, 0.9375rem); font-weight: 600; transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.05s ease; } .ds-btn-danger:hover { background: var(--danger); color: var(--surface); } .ds-btn-danger:active { transform: translateY(1px); } .ds-btn-danger:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }"
+      "css": ".ds-btn { background: var(--surface-raised); border: 1px solid var(--border-strong); color: var(--text); padding: 0.5em 1.1em; border-radius: var(--radius-s, 6px); cursor: pointer; font-family: var(--font-sans); font-size: var(--text-m, 0.9375rem); font-weight: 600; transition: background 160ms cubic-bezier(0,0,.2,1), border-color 160ms cubic-bezier(0,0,.2,1), color 160ms cubic-bezier(0,0,.2,1), transform 50ms cubic-bezier(0,0,.2,1); } .ds-btn:hover { background: var(--raised-hover); color: var(--accent-strong); } .ds-btn:active { background: var(--raised-hover); transform: translateY(1px); } .ds-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; } .ds-btn:disabled { color: var(--text-disabled); border-color: var(--border); cursor: not-allowed; } .ds-btn-danger { border-color: var(--danger); color: var(--danger); } .ds-btn-danger:hover { background: var(--danger); color: var(--surface); }"
+    },
+    {
+      "name": "Question Tile",
+      "kind": "custom",
+      "refersTo": "question-tile",
+      "description": "The jump grid's unit, and the clearest expression of the state model: four states on four channels, no two sharing a value. Unopened takes the structural hairline, opened the strong one, hover moves only the fill, and the current tile adds an accent edge, a wash and a 3px inset bar \u2014 the bar being the channel that survives greyscale.",
+      "html": "<div style=\"display:flex;gap:8px\"><button class=\"ds-tile\">q04<span>6 pts</span></button><button class=\"ds-tile ds-tile-viewed\">q05<span>6 pts</span></button><button class=\"ds-tile ds-tile-current\" aria-current=\"true\">q08<span>7 pts</span></button></div>",
+      "css": ".ds-tile { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 0.1em; min-width: 4.25rem; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-s, 6px); padding: 0.35em 0.5em; cursor: pointer; font-family: var(--font-mono); font-weight: 700; color: var(--text); transition: background 160ms cubic-bezier(0,0,.2,1), border-color 160ms cubic-bezier(0,0,.2,1), transform 50ms cubic-bezier(0,0,.2,1); } .ds-tile span { font-size: var(--text-xs, 0.75rem); font-weight: 400; color: var(--text-muted); } .ds-tile-viewed { border-color: var(--border-strong); } .ds-tile:hover:not(.ds-tile-current) { background: var(--surface-hover); } .ds-tile:active { transform: translateY(1px); } .ds-tile-current { background: var(--accent-soft); border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); } .ds-tile-current span { color: var(--accent-strong); }"
     },
     {
       "name": "Countdown Timer",
       "kind": "custom",
       "refersTo": "timer",
-      "description": "Mono, bold, tabular so digits never jitter across two hours. Goes danger and pulses under five minutes \u2014 the one place intensity is permitted, because there it is information.",
-      "html": "<span class=\"ds-timer\">01:47:12</span> <span class=\"ds-timer ds-timer-low\">00:04:38</span>",
-      "css": ".ds-timer { display: inline-block; font-family: var(--font-mono); font-size: var(--text-l, 1.125rem); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 0.03em; padding: 0.2em 0.6em; border-radius: var(--radius-s, 6px); background: var(--surface-raised); border: 1px solid var(--border); color: var(--accent); } .ds-timer-low { color: var(--danger); border-color: var(--danger); animation: ds-timer-pulse 1.5s ease-in-out infinite; } @keyframes ds-timer-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } } @media (prefers-reduced-motion: reduce) { .ds-timer-low { animation: none; } }"
+      "description": "The product's primary readout. Mono and tabular so a changing digit never makes a stable reading look unstable; goes danger and pulses under five minutes.",
+      "html": "<span class=\"ds-timer\">1:47:22</span>",
+      "css": ".ds-timer { display: inline-block; font-family: var(--font-mono); font-size: var(--text-l, 1.125rem); font-weight: 700; letter-spacing: 0.03em; font-variant-numeric: tabular-nums; color: var(--accent-strong); background: var(--surface-raised); border: 1px solid var(--border-strong); border-radius: var(--radius-s, 6px); padding: 0.2em 0.6em; }"
     },
     {
       "name": "Instance Chip",
       "kind": "chip",
       "refersTo": "instance-chip",
       "description": "Which box to ssh into \u2014 the single most load-bearing fact per question, and the only pill carrying a full accent treatment.",
-      "html": "<span class=\"ds-instance-chip\">ssh instance-1</span>",
-      "css": ".ds-instance-chip { display: inline-flex; align-items: center; gap: 0.4em; font-family: var(--font-mono); font-size: var(--text-s, 0.85rem); color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent); border-radius: var(--radius-pill, 999px); padding: 0.15em 0.75em; }"
+      "html": "<span class=\"ds-chip\">ssh instance-2</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; gap: 0.4em; font-family: var(--font-mono); font-size: var(--text-s, 0.85rem); color: var(--accent-strong); background: var(--accent-soft); border: 1px solid var(--accent); border-radius: var(--radius-pill, 999px); padding: 0.15em 0.75em; }"
     },
     {
       "name": "Bank Card (active)",
       "kind": "card",
       "refersTo": "bank-card-active",
-      "description": "An exam in the lobby catalog. Rests on the page fill with a hairline; hover takes the border to accent; the active exam takes an accent border and blue wash. Its badge switches to accent-strong, because plain accent falls to 4.0:1 on that wash.",
-      "html": "<button class=\"ds-bank-card ds-bank-card-active\"><span class=\"ds-bank-title\">CKAD Mock Exam 01<span class=\"ds-bank-badge\">Active</span></span><span class=\"ds-bank-meta\">22 questions \u00b7 120m \u00b7 66% to pass</span></button>",
-      "css": ".ds-bank-card { display: flex; flex-direction: column; gap: 0.25rem; width: 100%; text-align: left; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-s, 6px); padding: 0.75rem 1rem; cursor: pointer; font-family: var(--font-sans); color: var(--text); transition: border-color 0.15s ease; } .ds-bank-card:hover { border-color: var(--accent); } .ds-bank-card:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; } .ds-bank-card-active { border-color: var(--accent); background: var(--accent-soft); } .ds-bank-title { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-weight: 700; } .ds-bank-badge { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent-strong); border: 1px solid var(--accent-strong); border-radius: var(--radius-pill, 999px); padding: 0.05em 0.6em; } .ds-bank-meta { color: var(--text-muted); font-size: var(--text-s, 0.85rem); }"
+      "description": "The exam currently loaded. Selection is an accent edge plus a wash plus an inset bar; hover on a non-active card is a tone step only.",
+      "html": "<button class=\"ds-bank ds-bank-active\"><span class=\"ds-bank-t\">CKAD Mock Exam 01<span class=\"ds-badge\">Active</span></span><span class=\"ds-bank-m\">CKAD \u00b7 22 questions \u00b7 2h</span></button>",
+      "css": ".ds-bank { display: flex; flex-direction: column; gap: 4px; text-align: left; background: var(--bg); border: 1px solid var(--border-strong); border-radius: var(--radius-s, 6px); padding: 0.75rem 1rem; cursor: pointer; font-family: var(--font-sans); color: var(--text); transition: background 160ms cubic-bezier(0,0,.2,1); } .ds-bank:hover:not(.ds-bank-active) { background: var(--surface-hover); } .ds-bank-active { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); } .ds-bank-t { font-weight: 700; display: flex; align-items: center; gap: 0.5rem; } .ds-bank-m { color: var(--text-muted); font-size: var(--text-s, 0.85rem); } .ds-badge { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent-strong); border: 1px solid var(--accent-strong); border-radius: var(--radius-pill, 999px); padding: 0.05em 0.6em; }"
     },
     {
       "name": "Click-to-Copy Value",
       "kind": "custom",
       "refersTo": "copy-value",
-      "description": "Signature component. Every inline value in a question is a button that reads as part of the sentence \u2014 it borrows the inline-code look and reveals its affordance only on hover or focus. The mono font is the only resting signal, which under the Mono-For-Truth Rule already means 'this is a literal value'.",
-      "html": "<p class=\"ds-copy-host\">Create a Deployment named <button class=\"ds-copy-value\"><code>web-frontend</code><span class=\"ds-copy-icon\">\u29c9</span></button> in namespace <button class=\"ds-copy-value\"><code>ckad-ns</code><span class=\"ds-copy-icon\">\u29c9</span></button>.</p>",
-      "css": ".ds-copy-host { font-family: var(--font-sans); font-size: var(--text-m, 0.9375rem); line-height: 1.55; color: var(--text); margin: 0; } .ds-copy-value { display: inline; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; border-radius: var(--radius-s, 6px); } .ds-copy-value code { font-family: var(--font-mono); font-size: 0.92em; background: var(--bg); padding: 0.1em 0.3em; border-radius: 3px; border: 1px solid transparent; transition: border-color 0.15s ease, background 0.15s ease; } .ds-copy-value:hover code, .ds-copy-value:focus-visible code { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); } .ds-copy-icon { font-size: 0.75em; margin-left: 0.25em; color: var(--text-muted); opacity: 0; } .ds-copy-value:hover .ds-copy-icon, .ds-copy-value:focus-visible .ds-copy-icon { opacity: 1; } .ds-copy-value:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }"
+      "description": "Every inline value in a question is a button. It borrows the inline-code look exactly and reveals its affordance only on hover or focus \u2014 one of the two documented exceptions to the Rare Accent Rule, because an inline word has no resting box to tone.",
+      "html": "<p style=\"font-family:var(--font-sans);color:var(--text)\">Create a Namespace <button class=\"ds-copy\"><code>aurora-staging</code><span class=\"ds-copy-i\"><svg viewBox=\"0 0 24 24\" width=\"0.85em\" height=\"0.85em\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"9\" y=\"9\" width=\"11\" height=\"11\" rx=\"2\"/><path d=\"M5 15.5A1.5 1.5 0 0 1 4 14V5.5A1.5 1.5 0 0 1 5.5 4H14a1.5 1.5 0 0 1 1.5 1.5\"/></svg></span></button>.</p>",
+      "css": ".ds-copy { display: inline; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; } .ds-copy code { font-family: var(--font-mono); font-size: 0.92em; background: var(--bg); padding: 0.1em 0.3em; border: 1px solid transparent; border-radius: 3px; transition: border-color 160ms cubic-bezier(0,0,.2,1), background 160ms cubic-bezier(0,0,.2,1); } .ds-copy-i { opacity: 0; margin-left: 0.25em; } .ds-copy:hover code, .ds-copy:focus-visible code { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); } .ds-copy:hover .ds-copy-i, .ds-copy:focus-visible .ds-copy-i { opacity: 1; }"
     },
     {
       "name": "Toast",
       "kind": "custom",
       "refersTo": "toast",
-      "description": "Time warnings and connection state. A 3px left border carries the severity; warning swaps it to amber. Sits above the control overlay so a confirmation is never rendered invisible.",
-      "html": "<div class=\"ds-toast ds-toast-warning\"><span class=\"ds-toast-message\">5 minutes remaining.</span><button class=\"ds-toast-dismiss\" aria-label=\"Dismiss notification\">\u00d7</button></div>",
-      "css": ".ds-toast { display: flex; align-items: flex-start; gap: 0.5rem; max-width: 380px; background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius-s, 6px); box-shadow: 0 4px 12px rgba(16, 24, 40, 0.1), 0 2px 4px rgba(16, 24, 40, 0.08); padding: 0.75rem 0.75rem 0.75rem 1rem; font-family: var(--font-sans); font-size: var(--text-m, 0.9375rem); color: var(--text); } .ds-toast-warning { border-left-color: var(--warn); } .ds-toast-message { flex: 1; } .ds-toast-dismiss { background: transparent; border: none; color: var(--text-muted); font-size: 1.1rem; line-height: 1; cursor: pointer; padding: 0 0.2em; } .ds-toast-dismiss:hover { color: var(--text); } .ds-toast-dismiss:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }"
+      "description": "Info confirms, warning reports a state. Kind is carried by the border colour AND a mono mark \u2014 it used to be the hue of a 3px stripe alone, which is colour as the only channel.",
+      "html": "<div style=\"display:flex;flex-direction:column;gap:8px\"><div class=\"ds-toast\"><span class=\"ds-toast-m\">Copied aurora-staging</span></div><div class=\"ds-toast ds-toast-warn\"><span class=\"ds-toast-mark\">!</span><span class=\"ds-toast-m\">5 minutes remaining.</span></div></div>",
+      "css": ".ds-toast { display: flex; align-items: flex-start; gap: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-s, 6px); box-shadow: var(--shadow-2); padding: 0.75rem 0.75rem 0.75rem 1rem; font-family: var(--font-sans); color: var(--text); } .ds-toast-warn { border-color: var(--warn); } .ds-toast-mark { font-family: var(--font-mono); font-weight: 700; color: var(--warn); } .ds-toast-m { flex: 1; }"
     },
     {
-      "name": "Code Block",
+      "name": "Panel Resizer",
       "kind": "custom",
-      "refersTo": "code-block",
-      "description": "A fenced block reads as ONE object: the figure owns the border, the radius and the body background, with a language tag and a copy-whole-block control in its head. Keyword highlighting uses accent-strong, because plain accent measures only 4.1:1 on this fill in the light theme.",
-      "html": "<figure class=\"ds-code-block\"><figcaption class=\"ds-code-head\"><span class=\"ds-code-lang\">yaml</span><button class=\"ds-code-copy\">Copy</button></figcaption><pre><code><span class=\"ds-kw\">apiVersion</span>: apps/v1\n<span class=\"ds-kw\">kind</span>: Deployment\n<span class=\"ds-cm\"># scaled by the question</span>\n<span class=\"ds-kw\">replicas</span>: 3</code></pre></figure>",
-      "css": ".ds-code-block { margin: 0.75rem 0; border: 1px solid var(--border); border-radius: var(--radius-s, 6px); background: var(--surface-raised); overflow: hidden; } .ds-code-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.25rem 0.5rem; border-bottom: 1px solid var(--border); background: var(--surface); } .ds-code-lang { font-family: var(--font-mono); font-size: var(--text-xs, 0.75rem); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); } .ds-code-copy { background: none; border: 1px solid var(--border); border-radius: var(--radius-s, 6px); color: var(--accent); cursor: pointer; padding: 0.25rem 0.5rem; font-family: var(--font-sans); font-size: var(--text-xs, 0.75rem); } .ds-code-copy:hover { border-color: var(--accent); } .ds-code-copy:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; } .ds-code-block pre { margin: 0; padding: 0.75rem; overflow-x: auto; background: transparent; border: none; } .ds-code-block code { font-family: var(--font-mono); font-size: 0.92em; color: var(--text); } .ds-kw { color: var(--accent-strong); } .ds-cm { color: var(--text-muted); font-style: italic; }"
-    },
-    {
-      "name": "Rebuild Phase Row",
-      "kind": "custom",
-      "refersTo": "control-phase",
-      "description": "Signature component. A cluster rebuild takes minutes, so the checklist is built to be watched: mark | label | elapsed, with the running phase's live command output spanning underneath, clipped to one line so a long line cannot reflow the dialog on every poll. The running phase gets a rotating arc \u2014 without visible motion a four-minute wait reads as frozen.",
-      "html": "<ul class=\"ds-phases\"><li class=\"ds-phase ds-phase-done\"><span class=\"ds-phase-mark\">\u2713</span><span>Tearing down cluster</span><span class=\"ds-phase-elapsed\">0:12</span></li><li class=\"ds-phase ds-phase-running\"><span class=\"ds-phase-spinner\"></span><span>Bootstrapping kind cluster</span><span class=\"ds-phase-elapsed\">1:48</span><span class=\"ds-phase-detail\">node/kubestronaut-worker condition met</span></li><li class=\"ds-phase\"><span class=\"ds-phase-mark\">\u00b7</span><span>Installing Calico</span><span class=\"ds-phase-elapsed\"></span></li></ul>",
-      "css": ".ds-phases { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; font-family: var(--font-sans); font-size: var(--text-m, 0.9375rem); } .ds-phase { display: grid; grid-template-columns: 1em 1fr auto; gap: 0.25rem 0.75rem; align-items: baseline; color: var(--text-muted); } .ds-phase-done { color: var(--text); } .ds-phase-running { color: var(--accent); } .ds-phase-failed { color: var(--danger); } .ds-phase-mark { font-family: var(--font-mono); width: 1em; text-align: center; } .ds-phase-elapsed { font-family: var(--font-mono); font-size: var(--text-s, 0.85rem); font-variant-numeric: tabular-nums; color: var(--text-muted); } .ds-phase-detail { grid-column: 2 / -1; font-family: var(--font-mono); font-size: var(--text-xs, 0.75rem); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-phase-spinner { width: 0.75em; height: 0.75em; margin: 0 0.125em; align-self: center; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: ds-phase-spin 0.8s linear infinite; } @keyframes ds-phase-spin { to { transform: rotate(360deg); } } @media (prefers-reduced-motion: reduce) { .ds-phase-spinner { animation: none; } }"
+      "refersTo": "panel-resizer",
+      "description": "The draggable boundary between the question panel and the remote desktop. A role=separator operable by pointer and keyboard, and the second documented exception to the Rare Accent Rule \u2014 a 6px strip has no interior to tone.",
+      "html": "<div style=\"display:flex;height:64px;background:var(--surface)\"><div style=\"flex:1\"></div><div class=\"ds-resizer\" role=\"separator\" aria-orientation=\"vertical\"></div><div style=\"flex:1;background:var(--bg)\"></div></div>",
+      "css": ".ds-resizer { position: relative; z-index: 1; flex: 0 0 auto; align-self: stretch; width: 6px; margin-inline: -3px; border: 0; background: transparent; cursor: col-resize; touch-action: none; transition: background 160ms cubic-bezier(0,0,.2,1); } .ds-resizer:hover { background: var(--accent); } .ds-resizer:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }"
     }
   ],
   "narrative": {
     "northStar": "The Instrument Panel",
-    "overview": "This is the interface a person looks at while a clock they cannot pause counts down toward a result that matters to them. Everything in the system follows from that one fact. It is an instrument panel, not a product tour: it reports state accurately, it never competes for attention, and it never performs. The phrasing is the codebase's own \u2014 \"a spring or a bounce reads as unserious\" \u2014 and it generalises past motion into every other decision here.\n\nThe philosophy is restraint as respect. A candidate under time pressure has no attention to spare, so the interface spends none of it. Surfaces are quiet: three cool-slate tones separated by hairline borders, with the accent held back until the user reaches for something. Type does the structural work that colour and ornament would do in a louder system. Motion is short, decelerating, and never overshoots. The result should feel less like an app and more like well-made equipment \u2014 the kind you stop noticing once you are working.\n\nThe one place the system permits intensity is where intensity is information: the countdown turning red and pulsing under five minutes, a failed phase in the rebuild checklist, a pass/fail verdict. Those are readings, not decoration. Everything else recedes.",
+    "overview": "This is the interface a person looks at while a clock they cannot pause counts down toward a result that matters to them. Everything in the system follows from that one fact. It is an instrument panel, not a product tour: it reports state accurately, it never competes for attention, and it never performs. The phrasing is the codebase's own \u2014 *\"a spring or a bounce reads as unserious\"* \u2014 and it generalises past motion into every other decision here.\n\nThe philosophy is **restraint as respect**. A candidate under time pressure has no attention to spare, so the interface spends none of it. Surfaces are quiet: three cool-slate tones separated by hairline borders, with the accent held back until the user reaches for something. Type does the structural work that colour and ornament would do in a louder system. Motion is short, decelerating, and never overshoots. The result should feel less like an app and more like well-made equipment \u2014 the kind you stop noticing once you are working.\n\nThe one place the system permits intensity is where intensity is information: the countdown turning red and pulsing under five minutes, a failed phase in the rebuild checklist, a pass/fail verdict. Those are readings, not decoration. Everything else recedes.",
     "keyCharacteristics": [
-      "Kubernetes blue used referentially on cool slate, in two fully specified themes \u2014 every semantic token has a light and a dark value, and components never hardcode a colour.",
+      "Kubernetes blue used referentially on cool slate, in two fully specified themes \u2014 every semantic token has a light *and* a dark value, and components never hardcode a colour.",
       "Contrast is a ledger, not an intention: every text pairing carries its measured ratio in a comment beside the token.",
       "Monospace is a semantic choice \u2014 it marks anything the candidate must type, match, or trust as a measurement.",
       "Tone and hairline borders carry depth; shadow is reserved for things genuinely floating above the page.",
-      "Motion is written additively inside prefers-reduced-motion: no-preference, so the calm state is the default rather than the fallback.",
+      "Motion is written additively inside `prefers-reduced-motion: no-preference`, so the calm state is the default rather than the fallback.",
       "No text inputs exist anywhere in the product. Real input happens in the terminal."
     ],
     "rules": [
       {
         "name": "The Contrast Ledger Rule",
-        "body": "Every text-on-background pairing carries its measured ratio in a comment beside the token in tokens.css. A pairing that lands under 4.5:1 gets a substitute token, never a waiver \u2014 which is why accent-strong exists at all. axe runs in the test suite but jsdom has no layout engine, so the colour-contrast rule is skipped there: the ledger IS the check, and it is re-verified by hand whenever a value moves.",
+        "body": "Every text-on-background pairing carries its measured ratio in a comment beside the token in `tokens.css`. A pairing that lands under 4.5:1 gets a substitute token, never a waiver \u2014 which is why `accent-strong` exists at all. `axe` runs in the test suite but jsdom has no layout engine, so the colour-contrast rule is skipped there: the ledger *is* the check, and it is re-verified by hand whenever a value moves.",
         "section": "colors"
       },
       {
         "name": "The Rare Accent Rule",
-        "body": "The accent is earned, not applied. At rest, a screen is slate and ink; blue arrives on hover, focus, selection, live progress, and exactly one filled button. If a new screen reads as blue before the user touches it, the accent has been used as decoration.",
+        "body": "The accent is earned, not applied. At rest, a screen is slate and ink. Blue arrives for exactly four things: **focus** (the ring), **currency** (the one object the reader is on \u2014 the selected question, the active bank, the running phase), **live progress**, and the single filled primary button per screen. If a new screen reads as blue before the user touches it, the accent has been used as decoration.",
         "section": "colors"
       },
       {
         "name": "The Three Mirrors Rule",
-        "body": "These values live in three places outside tokens.css \u2014 the Go locked page, the favicon, and the exam terminal's palette plus its xfconf twin. A colour change is never a one-file change. The candidate sees the same palette in the browser chrome and inside the terminal they are working in.",
+        "body": "These values live in three places outside `tokens.css` \u2014 the Go locked page (`facilitator/internal/desktop/proxy.go`), the favicon (`ui/public/favicon.svg`), and the exam terminal's palette (`images/desktop/assets/terminalrc` plus its xfconf twin). A colour change is never a one-file change. The candidate sees the same palette in the browser chrome and inside the terminal they are working in.",
         "section": "colors"
       },
       {
@@ -509,22 +538,22 @@
       },
       {
         "name": "The Mono-For-Truth Rule",
-        "body": "JetBrains Mono marks anything the candidate must type, match, or trust as a measurement: resource names, ids, points, durations, paths, command output, the score. IBM Plex Sans is for prose that explains. The test is mechanical \u2014 if a value could be pasted into a terminal, or compared digit by digit, it is mono. This is why every click-to-copy value in a question is mono: the font is the affordance.",
+        "body": "JetBrains Mono marks anything the candidate must type, match, or trust as a measurement: resource names, ids, points, durations, paths, command output, the score. IBM Plex Sans is for prose that explains. The test is mechanical \u2014 *if a value could be pasted into a terminal, or compared digit by digit, it is mono.* This is why every click-to-copy value in a question is mono: the font is the affordance.",
         "section": "typography"
       },
       {
         "name": "The Tabular Rule",
-        "body": "Anything that ticks uses font-variant-numeric: tabular-nums \u2014 the countdown, the control-job elapsed clock, per-phase timings. A digit that changes width makes a stable reading look unstable, and the countdown is on screen for two hours.",
+        "body": "Anything that ticks uses `font-variant-numeric: tabular-nums` \u2014 the countdown, the control-job elapsed clock, per-phase timings. A digit that changes width makes a stable reading look unstable, and the countdown is on screen for two hours.",
         "section": "typography"
       },
       {
         "name": "The Unbroken Height Rule",
-        "body": "html, body, #root and main all assert height: 100%. A percentage height resolves to auto the moment one ancestor in the chain is content-sized, and every full-height screen depends on that chain being intact. Do not add a wrapper element to the chain without giving it a height.",
+        "body": "`html`, `body`, `#root` and `main` all assert `height: 100%`. A percentage height resolves to `auto` the moment one ancestor in the chain is content-sized, and every full-height screen depends on that chain being intact. Do not add a wrapper element to the chain without giving it a height.",
         "section": "layout"
       },
       {
         "name": "The Scroll-Inside Rule",
-        "body": "Wide or long content scrolls inside its own container, never the page: tables get overflow-x: auto with overscroll-behavior-x: contain, code blocks scroll horizontally within the block, and in the control dialog only the checklist scrolls while the header and actions stay pinned \u2014 the progress a user is waiting on must never scroll out of view.",
+        "body": "Wide or long content scrolls inside its own container, never the page: tables get `overflow-x: auto` with `overscroll-behavior-x: contain`, code blocks scroll horizontally within the block, and in the control dialog only the checklist scrolls while the header and actions stay pinned \u2014 the progress a user is waiting on must never scroll out of view.",
         "section": "layout"
       },
       {
@@ -533,43 +562,50 @@
         "section": "elevation"
       },
       {
-        "name": "The Hairline Rule",
-        "body": "Every surface declares its edge with a 1px border. This system has no borderless floating cards; the border does the work that a heavier shadow would do elsewhere, which is what keeps the flat state readable in both themes.",
+        "name": "The Two-Tier Hairline Rule",
+        "body": "Every surface declares its edge with a 1px `border`, and the border does the work a heavier shadow would do elsewhere \u2014 that is what keeps the flat state readable in both themes. There are **two** border values and the choice between them is mechanical:",
         "section": "elevation"
       },
       {
         "name": "The Two-Radius Rule",
-        "body": "Anchored gets 6px, floating gets 10px, status gets pill, and a new component picks from those three rather than introducing its own. Exactly two exceptions are documented, and a third should not be added: inline code uses 3px, because a box sized to a few characters needs a corner proportional to itself rather than to a button; and below 600px full-bleed dialogs drop to radius 0 \u2014 a sheet that reaches every edge should not pretend to have corners.",
+        "body": "Anchored gets 6px, floating gets 10px, status gets pill, and a new component picks from those three rather than introducing its own. Exactly two exceptions are documented, and a third should not be added: inline `code` uses **3px**, because a box sized to a few characters needs a corner proportional to itself rather than to a button; and below 600px full-bleed dialogs drop to **radius 0** \u2014 a sheet that reaches every edge should not pretend to have corners.",
         "section": "shapes"
       },
       {
         "name": "The Motion-Additive Rule",
-        "body": "Motion is written inside @media (prefers-reduced-motion: no-preference), never as a default that a reduce-guard later neutralises. base.css carries the global guard as well, but authoring additively means a reduced-motion user never depends on an animation being correctly cancelled and never downloads a frame of it. Layout must be identical either way: .screen carries its height: 100% outside the media query for exactly this reason, and every keyframe plays forward to the element's real style, so a screen that never runs its animation still ends up visible.",
+        "body": "Motion is written *inside* `@media (prefers-reduced-motion: no-preference)`, never as a default that a reduce-guard later neutralises. `base.css` carries the global guard as well, but authoring additively means a reduced-motion user never depends on an animation being correctly cancelled and never downloads a frame of it. Layout must be identical either way: `.screen` carries its `height: 100%` outside the media query for exactly this reason, and every keyframe plays forward *to* the element's real style, so a screen that never runs its animation still ends up visible.",
+        "section": "components"
+      },
+      {
+        "name": "The Non-Motion Channel Rule",
+        "body": "Every pending state carries at least one channel that changes *without* motion \u2014 an elapsed counter, a step label, an attempt number \u2014 and motion is layered on top of that, additively. The rule exists because the Motion-Additive Rule alone is not enough for a wait: under `reduce`, `.top-progress-bar` collapses to a static full-width accent line indistinguishable from a decorative border, and the rebuild spinner to a static arc. A bar that has stopped moving cannot be told from a bar that never moved, but a number that ticks reads identically in both modes. Current uses: the grading screen's elapsed clock, the backgrounded job chip's step count and clock, the desktop overlay's attempt number, and the rebuild checklist's per-phase label and timings.",
         "section": "components"
       }
     ],
     "dos": [
-      "Do define both theme values for every new semantic token, in tokens.css, and record the measured contrast ratio beside it. A token that exists in one theme is a bug in the other.",
-      "Do use accent-strong for accent-coloured text on accent-soft or surface-raised. Plain accent measures 4.0:1 and 4.1:1 there \u2014 under the floor.",
-      "Do reach for tone and a 1px hairline border first. Add a shadow only when the element genuinely floats above the page.",
-      "Do set anything the candidate must type, match, or read as a measurement in JetBrains Mono, and add tabular-nums if it changes over time.",
-      "Do pick radii from the three that exist: 6px anchored, 10px floating, pill for status.",
-      "Do write new motion additively inside prefers-reduced-motion: no-preference, animating only transform and opacity.",
-      "Do keep every user-facing string in ui/src/strings.ts.",
-      "Do change all three mirrors when a colour changes \u2014 the Go locked page, the favicon, and the terminal palette with its xfconf twin.",
-      "Do make wide content scroll inside its own container, and keep pinned what the user is waiting on."
+      "**Do** define both theme values for every new semantic token, in `tokens.css`, and record the measured contrast ratio beside it. A token that exists in one theme is a bug in the other.",
+      "**Do** use `accent-strong` for accent-coloured text on `accent-soft` or `surface-raised`. Plain `accent` measures 4.0:1 and 4.1:1 there \u2014 under the floor.",
+      "**Do** reach for tone and a 1px hairline border first. Add a shadow only when the element genuinely floats above the page.",
+      "**Do** set anything the candidate must type, match, or read as a measurement in JetBrains Mono, and add `tabular-nums` if it changes over time.",
+      "**Do** pick radii from the three that exist: 6px anchored, 10px floating, pill for status.",
+      "**Do** write new motion additively inside `prefers-reduced-motion: no-preference`, animating only `transform` and `opacity`.",
+      "**Do** keep every user-facing string in `ui/src/strings.ts`.",
+      "**Do** change all three mirrors when a colour changes \u2014 the Go locked page, the favicon, and the terminal palette with its xfconf twin.",
+      "**Do** make wide content scroll inside its own container, and keep pinned what the user is waiting on."
     ],
     "donts": [
-      "Don't hardcode a colour in a component. Every value comes from a semantic token, without exception.",
-      "Don't use the accent as a resting surface. If a screen reads as blue before the user touches anything, the accent has become decoration.",
-      "Don't add springs, bounces, overshoot, gradient fills, emoji, or a celebratory flourish on a pass. The product reports a result; it does not congratulate. A spring reads as unserious on an instrument.",
-      "Don't build overlay tutorials, spotlight tours, or coach marks measured against live layout. Explain a screen with a self-contained drawing that holds its own proportions.",
-      "Don't let the score page or the lobby drift toward a dashboard \u2014 dense chrome, charts for their own sake, cards competing for attention. The score page is one column, and one number matters.",
-      "Don't hide an element with a transform when it must be keyboard-reachable. Use the .sr-only clip idiom; a translate is proportional to the element's own height and will eventually leak.",
-      "Don't add a wrapper to the html/body/#root/main height chain without giving it a height.",
-      "Don't let .desktop-canvas take its size from its own content. It is absolutely positioned so noVNC's ResizeObserver cannot enter a resize feedback loop; that is structural, not stylistic.",
-      "Don't introduce a text input reflexively. This product has none, and the terminal is where real input belongs.",
-      "Don't load a font, stylesheet, or icon from a CDN. Everything ships bundled \u2014 the exam must not depend on the network."
+      "**Don't** hardcode a colour in a component. Every value comes from a semantic token, without exception.",
+      "**Don't** use the accent as a resting surface. If a screen reads as blue before the user touches anything, the accent has become decoration.",
+      "**Don't** add springs, bounces, overshoot, gradient fills, emoji, or a celebratory flourish on a pass. The product reports a result; it does not congratulate. A spring reads as unserious on an instrument.",
+      "**Don't** build overlay tutorials, spotlight tours, or coach marks measured against live layout. Explain a screen with a self-contained drawing that holds its own proportions.",
+      "**Don't** let the score page or the lobby drift toward a dashboard \u2014 dense chrome, charts for their own sake, cards competing for attention. The score page is one column, and one number matters.",
+      "**Don't** hide an element with a `transform` when it must be keyboard-reachable. Use the `.sr-only` clip idiom; a translate is proportional to the element's own height and will eventually leak.",
+      "**Don't** add a wrapper to the `html`/`body`/`#root`/`main` height chain without giving it a height.",
+      "**Don't** let `.desktop-canvas` take its size from its own content. It is absolutely positioned so noVNC's ResizeObserver cannot enter a resize feedback loop; that is structural, not stylistic.",
+      "**Don't** introduce a text input reflexively. This product has none, and the terminal is where real input belongs.",
+      "**Don't** reach for a dropdown, select or menu. The jump grid is this product's disclosure pattern and already carries more per option than a native select can render \u2014 domain grouping with the full 50-character string, points, and viewed/marked flags. A form control here would be the first one in the product.",
+      "**Don't** convey a control's state with `opacity`. It dims the border and the focus ring along with the label, and it composites to a ratio nobody measured. Use `text-disabled`.",
+      "**Don't** load a font, stylesheet, or icon from a CDN. Everything ships bundled \u2014 the exam must not depend on the network."
     ]
   }
 }
