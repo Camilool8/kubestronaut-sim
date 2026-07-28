@@ -439,7 +439,7 @@ status=$(req GET /api/session)
 state=$(json_field state)
 [ "$state" = "idle" ] || fail "session should be idle after ./sim reset, got $state"
 
-echo "== bank switch: CKAD -> CKA -> CKAD round-trip via the conductor =="
+echo "== bank switch: CKAD -> smoke-01 -> CKAD round-trip via the conductor =="
 # wait_control polls the control status until the conductor goes idle,
 # failing the smoke if the finished job carries an error.
 wait_control() {

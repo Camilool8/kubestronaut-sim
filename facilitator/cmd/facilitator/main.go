@@ -1,6 +1,7 @@
 // Command facilitator serves the exam session HTTP API (and, in its
-// `grade` argv form, a session-free scoring run) described in
-// docs/superpowers/specs/2026-07-24-milestone-c-facilitator-design.md.
+// `grade` argv form, a session-free scoring run). docs/api.md is the
+// current reference; the original design is frozen at
+// docs/history/specs/2026-07-24-milestone-c-facilitator-design.md.
 package main
 
 import (
