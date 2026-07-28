@@ -35,6 +35,7 @@ export type IconName =
   | "flag"
   | "flag-filled"
   | "copy"
+  | "keyboard"
   | "theme-auto"
   | "theme-light"
   | "theme-dark"
@@ -86,6 +87,15 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <rect x="9" y="9" width="11" height="11" rx="2" />
       <path d="M5 15.5A1.5 1.5 0 0 1 4 14V5.5A1.5 1.5 0 0 1 5.5 4H14a1.5 1.5 0 0 1 1.5 1.5" />
+    </>
+  ),
+  // Same 24 grid, same round caps: a key row and a space bar, which reads
+  // as a keyboard at 14px without needing the individual keys drawn.
+  keyboard: (
+    <>
+      <rect x="2.5" y="6" width="19" height="12" rx="2" />
+      <path d="M6.5 10h.01M10 10h.01M13.5 10h.01M17 10h.01" />
+      <path d="M8 14h8" />
     </>
   ),
   // Half-lit disc: the same "auto" idea as the old ◐, drawn rather than

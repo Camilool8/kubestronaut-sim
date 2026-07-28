@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"kubestronaut-sim/facilitator/internal/api"
+	"kubestronaut-sim/facilitator/internal/bootstate"
 	"kubestronaut-sim/facilitator/internal/exam"
 	"kubestronaut-sim/facilitator/internal/session"
 )
@@ -79,7 +80,32 @@ func newTestServer(t *testing.T) *testServer {
 		"assets/app.js": &fstest.MapFile{Data: []byte("console.log('hi');")},
 	}
 
-	h := api.New(ex, bankDir, mgr, grader.Grade, fakeDesktop, fakeControl, ui)
+	// nil boot reader == "assume ready", which is what every test below
+	// other than the boot-gate ones wants.
+	h := api.New(ex, bankDir, mgr, grader.Grade, fakeDesktop, fakeControl, ui, nil, nil)
+	return &testServer{handler: h, mgr: mgr, grader: grader, setNow: setNow}
+}
+
+// newBootingTestServer is newTestServer with a boot reader pointed at
+// paths that do not exist, i.e. an environment that has not finished
+// starting.
+func newBootingTestServer(t *testing.T) *testServer {
+	t.Helper()
+
+	ex, err := exam.Load(examJSON, bankDir)
+	if err != nil {
+		t.Fatalf("exam.Load: %v", err)
+	}
+	clock, setNow := fakeClock(epoch)
+	mgr, err := session.New(t.TempDir()+"/session.json", ex.Name, ex.Duration, clock, func() {})
+	if err != nil {
+		t.Fatalf("session.New: %v", err)
+	}
+	grader := &fakeGrader{}
+	dir := t.TempDir()
+	boot := bootstate.New(dir+"/boot.json", dir+"/ready")
+
+	h := api.New(ex, bankDir, mgr, grader.Grade, fakeDesktop, fakeControl, fstest.MapFS{}, boot, nil)
 	return &testServer{handler: h, mgr: mgr, grader: grader, setNow: setNow}
 }
 
@@ -233,7 +259,7 @@ func TestSolutionGatedWhileIdle(t *testing.T) {
 
 func TestSolutionGatedWhileRunning(t *testing.T) {
 	ts := newTestServer(t)
-	if _, err := ts.mgr.Start(); err != nil {
+	if _, err := ts.mgr.Start(session.ModeExam, time.Hour); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 	rec := ts.do(t, http.MethodGet, "/api/questions/q01/solution")
@@ -258,7 +284,7 @@ func TestSolutionGatingPrecedesUnknownID(t *testing.T) {
 
 func TestSolutionAvailableAfterEnd(t *testing.T) {
 	ts := newTestServer(t)
-	if _, err := ts.mgr.Start(); err != nil {
+	if _, err := ts.mgr.Start(session.ModeExam, time.Hour); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 	if err := ts.mgr.End("submitted"); err != nil {
@@ -336,7 +362,7 @@ func TestSessionEndLifecycle(t *testing.T) {
 		t.Errorf("grader.calls after idle end attempt = %d, want 0", ts.grader.calls)
 	}
 
-	if _, err := ts.mgr.Start(); err != nil {
+	if _, err := ts.mgr.Start(session.ModeExam, time.Hour); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 
@@ -393,7 +419,7 @@ func TestResultsLifecycle(t *testing.T) {
 		t.Fatalf("results while idle status = %d, want 409, body=%s", rec.Code, rec.Body.String())
 	}
 
-	if _, err := ts.mgr.Start(); err != nil {
+	if _, err := ts.mgr.Start(session.ModeExam, time.Hour); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 
@@ -477,12 +503,12 @@ func TestDeleteSessionResetsFromAnyState(t *testing.T) {
 	}{
 		{"idle", func(t *testing.T, ts *testServer) {}},
 		{"running", func(t *testing.T, ts *testServer) {
-			if _, err := ts.mgr.Start(); err != nil {
+			if _, err := ts.mgr.Start(session.ModeExam, time.Hour); err != nil {
 				t.Fatalf("Start: %v", err)
 			}
 		}},
 		{"ended", func(t *testing.T, ts *testServer) {
-			if _, err := ts.mgr.Start(); err != nil {
+			if _, err := ts.mgr.Start(session.ModeExam, time.Hour); err != nil {
 				t.Fatalf("Start: %v", err)
 			}
 			if err := ts.mgr.End("submitted"); err != nil {
@@ -588,5 +614,71 @@ func TestControlProxyMounted(t *testing.T) {
 	rec = ts.do(t, http.MethodGet, "/api/nonexistent")
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("unknown api path = %d, want 404", rec.Code)
+	}
+}
+
+func TestBootEndpointReportsReadyWithoutAReader(t *testing.T) {
+	ts := newTestServer(t)
+
+	rec := ts.do(t, http.MethodGet, "/api/boot")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/boot = %d, want 200", rec.Code)
+	}
+	var got bootstate.State
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !got.Ready() {
+		t.Errorf("state = %q, want ready when no reader is wired", got.State)
+	}
+}
+
+// A booting environment must still answer /api/boot — that endpoint is
+// what the progress screen polls, so returning an error there would
+// leave the candidate with nothing to look at during the exact window
+// the endpoint exists to cover.
+func TestBootEndpointReportsBooting(t *testing.T) {
+	ts := newBootingTestServer(t)
+
+	rec := ts.do(t, http.MethodGet, "/api/boot")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/boot = %d, want 200 even while booting", rec.Code)
+	}
+	var got bootstate.State
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.State != bootstate.StateBooting {
+		t.Errorf("state = %q, want %q", got.State, bootstate.StateBooting)
+	}
+	if got.Label == "" {
+		t.Error("label is empty; the progress screen has nothing to render")
+	}
+}
+
+// Starting an attempt against a half-built cluster burns real exam time
+// on questions whose seed data does not exist yet.
+func TestSessionStartRefusedWhileBooting(t *testing.T) {
+	ts := newBootingTestServer(t)
+
+	rec := ts.do(t, http.MethodPost, "/api/session/start")
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("POST /api/session/start while booting = %d, want 409", rec.Code)
+	}
+	if snap := ts.mgr.Snapshot(); snap.State != "idle" {
+		t.Errorf("session state = %q, want it left idle", snap.State)
+	}
+}
+
+// The compose healthcheck points at /healthz. It must keep reporting the
+// process's own health and must not start depending on cluster
+// readiness, or the facilitator would be marked unhealthy for the whole
+// of a boot it is deliberately meant to serve through.
+func TestHealthzIndependentOfBootState(t *testing.T) {
+	ts := newBootingTestServer(t)
+
+	rec := ts.do(t, http.MethodGet, "/healthz")
+	if rec.Code != http.StatusOK {
+		t.Errorf("GET /healthz while booting = %d, want 200", rec.Code)
 	}
 }

@@ -6,8 +6,10 @@ import {
   type QuestionResult,
   type ResultsResponse,
   type SolutionDetail,
+  type SessionMode,
 } from "../api";
 import { CheckList } from "../components/CheckList";
+import { DomainBreakdown } from "../components/DomainBreakdown";
 import { Icon } from "../components/Icon";
 import { Markdown } from "../components/Markdown";
 import { PendingBar } from "../components/Pending";
@@ -20,6 +22,8 @@ const GRADING_POLL_MS = 3000;
 interface ScoreProps {
   onNewAttempt: () => void;
   endReason: string;
+  /** The attempt's mode, so a practice result never reads as an exam pass. */
+  mode?: SessionMode;
 }
 
 // Score screen: while /api/results is 202 ("grading"), poll every 3s;
@@ -28,7 +32,7 @@ interface ScoreProps {
 // without results — see §3); once 200, render the scoreboard with a
 // "New attempt" action that drives the conductor's reset (same code
 // path as ./sim reset).
-export function Score({ onNewAttempt, endReason }: ScoreProps) {
+export function Score({ onNewAttempt, endReason, mode }: ScoreProps) {
   // Released by this screen unmounting when the reset job flips the session
   // back to idle; a refused job leaves it set only until the toast App
   // raises is dismissed and the user tries again, which is the correct
@@ -139,7 +143,16 @@ export function Score({ onNewAttempt, endReason }: ScoreProps) {
         {endReason && (
           <div className="score-end-reason">{strings.score.endReason(endReason)}</div>
         )}
+        {/* A training attempt is untimed and had hints and solutions on
+            tap; a speed attempt ran on half the clock. Neither is a
+            comparable result, and the banner is the one place a
+            candidate will screenshot. */}
+        {mode && mode !== "exam" && (
+          <div className="score-mode">{strings.score.modeNote(strings.modes[mode].label)}</div>
+        )}
       </div>
+
+      <DomainBreakdown questions={results.questions} />
 
       <div className="score-questions">
         {results.questions.map((q) => (

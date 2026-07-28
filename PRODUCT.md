@@ -8,8 +8,8 @@ web
 
 ## Users
 
-Candidates preparing for the CNCF Kubernetes certifications — today CKAD
-and CKA — in the days or weeks before a real sitting. They are already
+Candidates preparing for the CNCF Kubernetes certifications — today
+CKAD — in the days or weeks before a real sitting. They are already
 comfortable in a terminal, they have Docker on their own machine, and
 they run the simulator themselves, unsupervised. There is no proctor, no
 instructor, and no cohort: one candidate, one machine, one session at a
@@ -82,14 +82,19 @@ weights within 2 percentage points.
 
 **What runs today**
 
-- Two hands-on banks: CKAD Mock 01 (22 questions across all five
-  curriculum domains) and CKA Mock 01 (2 questions). Both are 120
-  minutes, 66% to pass, Kubernetes 1.35, two instances, kind two-node
-  cluster.
+- One hands-on bank: CKAD Mock 01 (22 questions across all five
+  curriculum domains). 120 minutes, 66% to pass, Kubernetes 1.35, two
+  instances, kind two-node cluster.
 - Advertised but not runnable, shown disabled in the catalog with the
-  reason: KCNA and KCSA (the multiple-choice engine is not built) and
-  CKS (needs security add-ons the kind environment does not have).
+  reason: CKA (the administrator-track bank is not written), KCNA and
+  KCSA (the multiple-choice engine is not built) and CKS (needs security
+  add-ons the kind environment does not have).
 - Hands-on is the only exam engine that exists.
+- Three ways to run an attempt: **Exam** (the bank's duration, no help),
+  **Training** (untimed, two-tier hints and solutions on demand, and
+  scoring that does not end the attempt) and **Speed** (half the
+  duration, no help). Training is also how the product satisfies WCAG
+  2.2.1 Timing Adjustable, which an unpausable countdown cannot.
 
 **Durable constraints**
 
@@ -162,8 +167,9 @@ weights within 2 percentage points.
 **Absences future work must not paper over:** there are no users,
 testimonials, adoption numbers, pass-rate claims, benchmarks, pricing, or
 hosted service. There is no attempt history, so nothing may promise
-progress over time. The CKA bank holds 2 questions, not an exam's worth,
-and must never be presented as complete.
+progress over time. A bank that cannot produce a meaningful score must
+not be offered at all: the 2-question CKA bank was removed rather than
+left in the catalog looking like an exam.
 
 ## Product Principles
 

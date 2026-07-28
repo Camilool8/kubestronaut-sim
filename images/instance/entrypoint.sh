@@ -1,7 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Bounded. This loop is the other place in the stack that could print
+# "waiting" forever with nothing anywhere to say why — and unlike k8s-env
+# these containers have no healthcheck, so compose could not see it
+# either. The budget is generous because the thing being waited on is a
+# cold cluster bootstrap, but it is finite: a wait that has gone wrong
+# should end as a message in the log, not as a container that looks alive
+# and does nothing.
 echo "waiting for cluster kubeconfig..."
-until [ -f /shared/kubeconfig ] && [ -f /shared/ssh/id_ed25519.pub ]; do sleep 2; done
+wait_deadline=$((SECONDS + ${INSTANCE_WAIT_BUDGET:-2400}))
+until [ -f /shared/kubeconfig ] && [ -f /shared/ssh/id_ed25519.pub ]; do
+  if [ "$SECONDS" -ge "$wait_deadline" ]; then
+    echo "gave up waiting for /shared/kubeconfig — k8s-env never finished bootstrapping" >&2
+    echo "check it with: docker compose logs k8s-env" >&2
+    exit 1
+  fi
+  sleep 2
+done
 # Runtime bank file wins over the compose-time env default; by this point
 # k8s-env has finished bootstrapping (kubeconfig exists), so /shared/bank
 # is authoritative when present.

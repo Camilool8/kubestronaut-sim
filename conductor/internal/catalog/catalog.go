@@ -39,6 +39,23 @@ type Entry struct {
 	Available         bool   `json:"available"`
 	ComingSoon        bool   `json:"comingSoon,omitempty"`
 	Note              string `json:"note,omitempty"`
+
+	// Hidden keeps a bank out of List — and therefore out of the lobby —
+	// without making it unswitchable. It exists for exactly one caller:
+	// tests/smoke.sh needs a second real bank to switch to so the whole
+	// switch path (write-bank, recreate-cluster, restart-facilitator,
+	// verify) stays covered, and the only alternative was keeping a
+	// 2-question "CKA Mock Exam" in the catalog that PRODUCT.md already
+	// warns must never read as complete.
+	//
+	// Never serialised: the UI has no use for it and no business
+	// discovering the fixture exists.
+	Hidden bool `json:"-"`
+
+	// QuestionIDs backs HasQuestion, which is what stops a client-supplied
+	// question id reaching a shell command. Not serialised — the UI gets
+	// the question list from the facilitator's /api/exam.
+	QuestionIDs []string `json:"-"`
 }
 
 // Catalog is an immutable set of entries loaded once at startup (banks
@@ -54,6 +71,7 @@ type bankDoc struct {
 		Title         string `json:"title"`
 		Certification string `json:"certification"`
 		Description   string `json:"description"`
+		Hidden        bool   `json:"hidden"`
 	} `json:"metadata"`
 	Spec struct {
 		ExamType          string `json:"examType"`
@@ -157,6 +175,10 @@ func buildEntry(id string, raw []byte) (Entry, error) {
 		KubernetesVersion: doc.Spec.KubernetesVersion,
 		QuestionCount:     len(doc.Spec.Questions),
 		Available:         true,
+		Hidden:            doc.Metadata.Hidden,
+	}
+	for _, q := range doc.Spec.Questions {
+		entry.QuestionIDs = append(entry.QuestionIDs, q.ID)
 	}
 	if d, err := time.ParseDuration(doc.Spec.Duration); err == nil {
 		entry.DurationSeconds = int(d.Seconds())
@@ -189,11 +211,18 @@ func buildEntry(id string, raw []byte) (Entry, error) {
 	return entry, nil
 }
 
-// List returns all entries, available first, then by id — a stable
-// order for the UI.
+// List returns all entries the lobby should show, available first, then
+// by id — a stable order for the UI.
+//
+// Hidden entries are filtered here and ONLY here: Get and Switchable
+// deliberately still see them, so a test fixture stays a valid switch
+// target while never appearing as an exam anyone could pick.
 func (c *Catalog) List() []Entry {
 	out := make([]Entry, 0, len(c.entries))
 	for _, e := range c.entries {
+		if e.Hidden {
+			continue
+		}
 		out = append(out, e)
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -229,4 +258,24 @@ func (c *Catalog) Switchable(id string) error {
 		return fmt.Errorf("bank %q cannot be activated: %s", id, reason)
 	}
 	return nil
+}
+
+// HasQuestion reports whether bank declares a question with this id.
+//
+// This is the allowlist that makes a client-supplied question id safe to
+// interpolate into a path: not "does it look like an id" but "is it one
+// of these exact strings". Reseed pairs it with a pattern check, because
+// defence in depth is cheap and a shell command is the wrong place to
+// find out you were wrong.
+func (c *Catalog) HasQuestion(bank, qid string) bool {
+	e, ok := c.entries[bank]
+	if !ok {
+		return false
+	}
+	for _, id := range e.QuestionIDs {
+		if id == qid {
+			return true
+		}
+	}
+	return false
 }

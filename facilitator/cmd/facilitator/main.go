@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"kubestronaut-sim/facilitator/internal/api"
+	"kubestronaut-sim/facilitator/internal/bootstate"
 	"kubestronaut-sim/facilitator/internal/desktop"
 	"kubestronaut-sim/facilitator/internal/evaluate"
 	"kubestronaut-sim/facilitator/internal/exam"
@@ -88,12 +89,18 @@ func runServer() error {
 	desktopAddr := envOr("DESKTOP_ADDR", "desktop:6080")
 	durOverride := os.Getenv("SESSION_DURATION_OVERRIDE")
 
-	// Fail fast at boot with a clear message rather than only
-	// discovering a missing ssh key the first time a grade actually
-	// runs (the `grade` subcommand doesn't need this check: it fails
-	// the same way naturally, immediately, with no session involved).
+	// Warn, do not fail. This used to return, which log.Fatal turned
+	// into a restart loop — fine when the facilitator started only after
+	// k8s-env was healthy, fatal now that it deliberately starts first:
+	// the key is not written until bootstrap.sh generates it, so on a
+	// cold boot this check is guaranteed to fail for minutes. Refusing
+	// to run during that window is exactly the dead-browser problem the
+	// early start exists to fix. The real protection moved to the boot
+	// gate on POST /api/session/start, which refuses to begin an attempt
+	// against an environment that is not ready — and by the time it *is*
+	// ready, the key exists.
 	if err := checkSSHKey(cfg.sshKey); err != nil {
-		return err
+		log.Printf("ssh key not usable yet (%v); grading will fail until the environment finishes starting", err)
 	}
 
 	ex, err := exam.Load(cfg.examJSON, cfg.bankDir)
@@ -106,6 +113,13 @@ func runServer() error {
 		return fmt.Errorf("parse SESSION_DURATION_OVERRIDE: %w", err)
 	}
 	ex.Duration = dur
+	// The override is a test knob ("end this attempt in 20s"), so it has
+	// to reach every timed mode — a speed attempt still running for an
+	// hour under SESSION_DURATION_OVERRIDE=20s would be a trap. Training
+	// is deliberately untouched: it has no clock to override.
+	if durOverride != "" {
+		ex.SpeedDuration = dur
+	}
 
 	// onExpire must be wired into session.New before the grader that
 	// actually implements it can be constructed, since the grader
@@ -158,7 +172,12 @@ func runServer() error {
 	}
 	controlProxy := httputil.NewSingleHostReverseProxy(conductorURL)
 
-	handler := api.New(ex, cfg.bankDir, mgr, g.Grade, desktopHandler, controlProxy, web.FS())
+	boot := bootstate.New(
+		envOr("BOOT_FILE", "/shared/boot.json"),
+		envOr("READY_MARKER", "/shared/ready"),
+	)
+
+	handler := api.New(ex, cfg.bankDir, mgr, g.Grade, desktopHandler, controlProxy, web.FS(), boot, g.PracticeGrade)
 
 	srv := &http.Server{
 		Addr:              listen,

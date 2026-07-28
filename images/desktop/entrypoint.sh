@@ -14,7 +14,17 @@ install -m 644 -o candidate -g candidate /etc/sim/ssh_config /home/candidate/.ss
 # >= 1.10 carries UTF-8 via the extended clipboard encoding.
 # MaxCutText is raised from the 256KiB default so pasting a whole
 # manifest is not silently truncated.
-clipboard_args='-AcceptCutText=1 -SendCutText=1 -SetPrimary=1 -SendPrimary=1 -MaxCutText 2097152'
+#
+# -SendPrimary is deliberately OFF (it defaults on). With it, X's PRIMARY
+# selection is pushed to the client too — and PRIMARY is set by merely
+# dragging across text. So every time a candidate selected a word in the
+# terminal to read it, the browser side was told the clipboard had
+# changed, overwriting whatever they had carefully copied a moment
+# earlier. Only an explicit Ctrl+Shift+C should travel outward.
+#
+# -SetPrimary stays on: that is the other direction, and it means text
+# pushed in from the browser can also be middle-click pasted.
+clipboard_args='-AcceptCutText=1 -SendCutText=1 -SetPrimary=1 -SendPrimary=0 -MaxCutText 2097152'
 # The geometry is only the *initial* framebuffer: the browser client sets
 # resizeSession, and TigerVNC honors SetDesktopSize with an arbitrary size,
 # so the desktop ends up at the exam pane's real pixel dimensions within a

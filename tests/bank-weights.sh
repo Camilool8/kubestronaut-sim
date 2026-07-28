@@ -12,8 +12,9 @@
 #   3. the questions in exam.yaml and the q*/ directories on disk are
 #      the same set.
 #
-# A bank with no spec.domainWeights is skipped for (1) — cka-mock-01 has
-# no curriculum mapping yet — but still checked for (2) and (3).
+# A bank with no spec.domainWeights is skipped for (1) — smoke-01, the
+# hidden switch-test fixture, has no curriculum mapping — but still
+# checked for (2) and (3).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -35,7 +36,12 @@ Q_RE = re.compile(
     r"\s+weight:\s*(?P<weight>\d+)\s*$",
     re.M,
 )
-POINTS_RE = re.compile(r"^#\s*points:\s*(\d+)\s*$", re.M)
+# Exactly the Go loader's contract (facilitator/internal/exam/exam.go
+# parsePoints): one space after the colon, no leading zeros. Looser is
+# worse than none — "# points: 08" was counted as 8 here and skipped as 0
+# by the grader, so the two silently disagreed about what a question was
+# worth. tests/check-lint.sh enforces the same pattern on the headers.
+POINTS_RE = re.compile(r"^# points: (0|[1-9][0-9]*)$", re.M)
 
 failures = []
 

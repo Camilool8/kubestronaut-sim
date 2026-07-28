@@ -6,6 +6,9 @@
 
 export type SessionState = "idle" | "running" | "ended";
 
+/** How an attempt is being run. Chosen at Start, immutable after. */
+export type SessionMode = "exam" | "training" | "speed" | "";
+
 export interface SessionSnapshot {
   state: SessionState;
   bank: string;
@@ -13,6 +16,13 @@ export interface SessionSnapshot {
   durationSeconds: number;
   remainingSeconds: number;
   endReason: string;
+  mode: SessionMode;
+  /**
+   * True for a training attempt. Branch on this, never on
+   * remainingSeconds === 0 — that is also what an expired attempt looks
+   * like, and the two must not render the same.
+   */
+  untimed: boolean;
 }
 
 export interface ExamQuestionInfo {
@@ -21,6 +31,16 @@ export interface ExamQuestionInfo {
   domain: string;
   weight: number;
   totalPoints: number;
+  /** How many hint tiers this question has; 0 when it has none. */
+  hintCount: number;
+}
+
+/** One selectable attempt mode, described by the server. */
+export interface ExamMode {
+  id: Exclude<SessionMode, "">;
+  durationSeconds: number;
+  untimed: boolean;
+  helpAllowed: boolean;
 }
 
 export interface ExamInfo {
@@ -30,6 +50,8 @@ export interface ExamInfo {
   passingScore: number;
   kubernetesVersion: string;
   questions: ExamQuestionInfo[];
+  /** Rendered by the lobby's picker, so the modes are the server's list. */
+  modes?: ExamMode[];
 }
 
 export interface QuestionDetail {
@@ -133,6 +155,39 @@ export async function getSession(signal?: AbortSignal): Promise<SessionSnapshot>
   return (await res.json()) as SessionSnapshot;
 }
 
+/** Lifecycle of the exam environment's own start-up. */
+export type BootState = "booting" | "ready" | "failed";
+
+export interface BootStatus {
+  state: BootState;
+  /** Machine id of the current step, e.g. "seed". */
+  phase: string;
+  /** Human label for the current step. */
+  label: string;
+  /** Sub-step progress within the phase, e.g. "question 7 of 22". */
+  detail: string;
+  /** Populated only when state is "failed". */
+  error: string;
+  step: number;
+  totalSteps: number;
+  /** RFC3339; anchors the elapsed counter. */
+  startedAt: string;
+}
+
+/**
+ * The facilitator now starts before the cluster is ready, so this is the
+ * one endpoint that answers during a cold boot. It never fails on the
+ * server side — "still building" is a normal response — but the fetch
+ * itself can still fail in the seconds before the container is listening.
+ */
+export async function getBoot(signal?: AbortSignal): Promise<BootStatus> {
+  const res = await request("/api/boot", { signal });
+  if (!res.ok) {
+    throw new Error(await readError(res));
+  }
+  return (await res.json()) as BootStatus;
+}
+
 export async function getExam(signal?: AbortSignal): Promise<ExamInfo> {
   const res = await request("/api/exam", { signal });
   if (!res.ok) {
@@ -175,8 +230,16 @@ export type SessionActionResponse =
 // POST /api/session/start: 200 with the new session snapshot, or 409
 // (already running/ended) surfaced as {ok:false} for the caller to
 // handle by refetching the authoritative session state.
-export async function startSession(signal?: AbortSignal): Promise<SessionActionResponse> {
-  const res = await request("/api/session/start", { method: "POST", signal });
+export async function startSession(
+  mode: Exclude<SessionMode, ""> = "exam",
+  signal?: AbortSignal,
+): Promise<SessionActionResponse> {
+  const res = await request("/api/session/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode }),
+    signal,
+  });
   if (res.status === 409) {
     return { ok: false, error: await readError(res) };
   }
@@ -360,4 +423,81 @@ export async function startControlSwitch(
     return { ok: true, job: body.job };
   }
   return { ok: false, error: await readError(res) };
+}
+
+/** One hint tier. Fetched on demand so revealing a tier is deliberate. */
+export interface HintDetail {
+  id: string;
+  tier: number;
+  total: number;
+  markdown: string;
+}
+
+/**
+ * GET /api/questions/{id}/hints/{n}. 403 outside training mode, which is
+ * modelled as ok:false rather than thrown — a candidate in an exam
+ * hitting this is not an error condition, it is the rules.
+ */
+export async function getHint(
+  id: string,
+  tier: number,
+  signal?: AbortSignal,
+): Promise<{ ok: true; hint: HintDetail } | { ok: false; error: string }> {
+  const res = await request(
+    `/api/questions/${encodeURIComponent(id)}/hints/${encodeURIComponent(String(tier))}`,
+    { signal },
+  );
+  if (res.status === 403 || res.status === 404) {
+    return { ok: false, error: await readError(res) };
+  }
+  if (!res.ok) {
+    throw new Error(await readError(res));
+  }
+  return { ok: true, hint: (await res.json()) as HintDetail };
+}
+
+/**
+ * POST /api/session/grade — score the work so far without ending the
+ * attempt. Training only, and deliberately not persisted: it never
+ * appears on /api/results and cannot overwrite a real grade.
+ */
+export async function practiceGrade(
+  signal?: AbortSignal,
+): Promise<{ ok: true; results: Results } | { ok: false; error: string }> {
+  const res = await request("/api/session/grade", {
+    method: "POST",
+    signal,
+    // A full grade shells into every instance over ssh; the default
+    // 10s fetch timeout would abort a run that is working fine.
+    timeoutMs: 120_000,
+  });
+  if (!res.ok) {
+    return { ok: false, error: await readError(res) };
+  }
+  return { ok: true, results: (await res.json()) as Results };
+}
+
+/**
+ * POST /api/control/reseed — re-run one question's setup.sh, restoring
+ * its starting state and discarding the candidate's work on it.
+ *
+ * Synchronous and slow (up to ~4 minutes for the Helm question), unlike
+ * reset/switch which return a job to poll. Training only; the conductor
+ * gates on server-side session mode.
+ */
+export async function reseedQuestion(
+  question: string,
+  signal?: AbortSignal,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await request("/api/control/reseed", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question }),
+    signal,
+    timeoutMs: 300_000,
+  });
+  if (!res.ok) {
+    return { ok: false, error: await readError(res) };
+  }
+  return { ok: true };
 }

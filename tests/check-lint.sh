@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# Lints validate.d checks for the idioms that fail correct answers.
+#
+# The bug class this exists to prevent: a check that grades how a
+# candidate spelled something rather than what they did. A `diff` makes
+# line order part of the answer. A `grep` on a YAML file makes
+# indentation part of the answer. `kubectl get -o yaml` hands a check the
+# serialised form instead of the API's normalised object, which is the
+# only reason key order could ever matter. Each one passes review easily
+# and costs a candidate points they earned.
+#
+# Offline and instant, run from smoke.sh next to bank-weights.sh so a bad
+# check fails in two seconds rather than forty minutes into a cold boot.
+#
+# Escape hatch: `# lint: allow-<rule>` on the offending line.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+python3 - "$@" <<'PY'
+import pathlib
+import re
+import sys
+
+ROOT = pathlib.Path(".")
+scripts = sorted(ROOT.glob("banks/*/q*/validate.d/*.sh"))
+if not scripts:
+    print("check-lint: found no validate.d scripts — glob is wrong, refusing to pass")
+    sys.exit(1)
+
+# (rule, compiled pattern, message). Order is the report order.
+HARD = [
+    ("diff", re.compile(r"(?<![\w-])diff(?![\w-])"),
+     "compare sets with same_set from _lib/checks.sh — diff makes line order and whitespace part of the answer"),
+    ("grep-yaml", re.compile(r"grep\b[^|;&]*\.ya?ml\b"),
+     "parse YAML with yq (or yaml_api_versions), never grep — indentation is not the candidate's answer"),
+    ("get-yaml", re.compile(r"kubectl\b[^|;&]*-o\s+yaml"),
+     "read fields with -o jsonpath or -o json | jq — the live object is already normalised, its serialisation is not"),
+    ("kubectl-run", re.compile(r"kubectl\b[^|;&]*\brun\b")," "
+     "do not create a Pod in a check: scheduling eats most of the 30s deadline, and a timed-out check is scored FAILED "
+     "(this cost 10 points on a real run). kubectl exec into a workload the question already runs."),
+    ("grep-qx", re.compile(r"grep\s+-[a-z]*x")," "
+     "use file_text from _lib/checks.sh — grep -qx fails on a trailing space or a CRLF, which are not wrong answers"),
+]
+
+SOFT = [
+    ("index", re.compile(r"\[0\]"),
+     "fixed [0] index — prefer selecting by name/content; add '# lint: allow-index' if the list is pinned to one element"),
+]
+
+POINTS_OK = re.compile(r"^# points: (0|[1-9][0-9]*)$")
+
+errors, warnings = [], []
+
+for path in scripts:
+    text = path.read_text()
+    lines = text.splitlines()
+
+    # The points header must match the Go loader's contract EXACTLY
+    # (facilitator/internal/exam/exam.go parsePoints). A looser reading
+    # here is worse than none: "#points: 08" would be counted as 8 by the
+    # weights gate and skipped as 0 by the grader, and the two would
+    # silently disagree about what the question is worth.
+    # Requires the colon: prose like "# points — when two runs happened"
+    # is a comment, not a malformed header.
+    header_like = re.compile(r"^#\s*points\s*:", re.IGNORECASE)
+    headers = [ln for ln in lines if header_like.match(ln.lstrip())]
+    if not headers:
+        errors.append((path, 0, "points", "no '# points: N' header — the grader will skip this check entirely"))
+    else:
+        for ln in headers:
+            if not POINTS_OK.match(ln):
+                errors.append((path, lines.index(ln) + 1, "points",
+                               f"header {ln!r} does not match '# points: N' exactly (no leading zeros, one space)"))
+
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            continue  # a comment explaining a rule is not a violation of it
+        for rule, pat, msg in HARD:
+            if pat.search(line) and f"lint: allow-{rule}" not in line:
+                errors.append((path, i, rule, msg))
+        for rule, pat, msg in SOFT:
+            if pat.search(line) and f"lint: allow-{rule}" not in line:
+                warnings.append((path, i, rule, msg))
+
+for path, line, rule, msg in warnings:
+    print(f"warn  {path}:{line} [{rule}] {msg}")
+
+for path, line, rule, msg in errors:
+    print(f"FAIL  {path}:{line} [{rule}] {msg}")
+
+print()
+print(f"check-lint: {len(scripts)} checks, {len(errors)} errors, {len(warnings)} warnings")
+sys.exit(1 if errors else 0)
+PY

@@ -3,6 +3,21 @@
 # here are certifications we advertise but cannot run yet (their exam
 # engine is not built), shown disabled in the UI.
 comingSoon:
+  # There was a cka-mock-01 bank here. It held two questions against an
+  # exam that has seventeen, had no spec.domainWeights and so was exempt
+  # from the balance gate every real bank passes, and its two "domains"
+  # were not CKA curriculum domain names. It was removed rather than
+  # left in the lobby: a bank that cannot produce a meaningful score is
+  # worse than an honest "not yet".
+  #
+  # Note the id is cka-mock, not cka-mock-01 — catalog.go lets a real
+  # bank directory win over a coming-soon entry of the same id, so a
+  # differently-named entry can never be shadowed by a stale directory.
+  - id: cka-mock
+    title: CKA Mock Exam
+    certification: CKA
+    examType: hands-on
+    note: Administrator-track bank not written yet
   - id: kcna-mock
     title: KCNA Mock Exam
     certification: KCNA

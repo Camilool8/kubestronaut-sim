@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  getBoot,
   getControlStatus,
   getSession,
   pollSession,
   startControlReset,
   startControlSwitch,
   type BanksResponse,
+  type BootStatus,
   type ControlActionResponse,
   type ControlStatus,
   type SessionSnapshot,
 } from "./api";
+import { BootProgress } from "./screens/BootProgress";
 import { Start } from "./screens/Start";
 import { Exam, ExamGateControls } from "./screens/Exam";
 import { Score } from "./screens/Score";
@@ -30,6 +33,12 @@ import { strings } from "./strings";
 const CONTROL_POLL_BUSY_MS = 2_000;
 const CONTROL_POLL_IDLE_MS = 15_000;
 
+// Boot-progress poll cadence. Only runs while the environment is still
+// building — once it is ready the effect stops entirely, because the only
+// thing that can un-ready it is a control job, and that has its own
+// poller and its own overlay.
+const BOOT_POLL_MS = 2_000;
+
 // The visible screen is a pure function of session.state — no router.
 // App owns the single session poller (10s interval + window focus) and
 // the poll timestamp that Exam/TimerBar anchor their 1Hz local tick to,
@@ -41,6 +50,10 @@ export default function App() {
   const [fetchedAt, setFetchedAt] = useState<number>(() => Date.now());
   const [pollError, setPollError] = useState<string | null>(null);
   const [control, setControl] = useState<ControlStatus | null>(null);
+  // null until the first /api/boot answers. The facilitator now starts
+  // before the cluster exists, so this is what the UI has to show during
+  // a cold first boot — the window in which it used to show nothing.
+  const [boot, setBoot] = useState<BootStatus | null>(null);
   const [dismissedJobId, setDismissedJobId] = useState<string | null>(null);
   const [backgroundedJobId, setBackgroundedJobId] = useState<string | null>(null);
   // Bank id -> catalog title, so the overlay can name the exam a switch
@@ -102,6 +115,33 @@ export default function App() {
   useEffect(() => {
     return pollSession(applySession, handlePollError);
   }, [applySession, handlePollError]);
+
+  // Boot progress. Stops the moment the environment reports ready — a
+  // ready environment can only go back to building via a control job,
+  // which owns its own polling and its own overlay.
+  useEffect(() => {
+    if (boot?.state === "ready") return;
+    let stopped = false;
+    let timer = 0;
+    const tick = async () => {
+      try {
+        const next = await getBoot();
+        if (stopped) return;
+        setBoot(next);
+        if (next.state === "ready") return; // effect re-runs and returns early
+      } catch {
+        // Expected for the first seconds of a cold start, before the
+        // facilitator is listening at all. Keep asking quietly; the
+        // screen already says it is waiting on the services.
+      }
+      if (!stopped) timer = window.setTimeout(tick, BOOT_POLL_MS);
+    };
+    tick();
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+    };
+  }, [boot?.state]);
 
   useEffect(() => {
     let stopped = false;
@@ -210,36 +250,55 @@ export default function App() {
   const backgroundedJob =
     control?.busy && control.job && control.job.id === backgroundedJobId ? control.job : null;
 
-  if (!session) {
-    return (
-      <main>
-        <div className="loading-screen" role="status">
-          {pollError ? strings.app.cannotReach(pollError) : strings.app.loading}
-        </div>
-      </main>
-    );
-  }
+  // The boot screen is a gate ABOVE the session switch, not a fourth
+  // session state — session.state stays a pure three-way and the switch
+  // below is untouched.
+  //
+  // Two exclusions carry real weight:
+  //
+  //  - a running attempt always wins. `down` + `up` mid-exam resumes into
+  //    the exam; the server-side timer never stopped, so replacing it
+  //    with a progress screen would hide a clock that is still counting.
+  //  - a control job always wins. Every reset runs the same bootstrap and
+  //    removes /shared/ready on the way in, so boot state legitimately
+  //    reverts to "building" for the whole of one — and ControlProgress
+  //    is already reporting it, in more detail. Without this the two
+  //    would fight over the same information.
+  const booting =
+    boot !== null &&
+    boot.state !== "ready" &&
+    session?.state !== "running" &&
+    !showOverlay &&
+    !backgroundedJob;
 
   let screen = null;
-  switch (session.state) {
-    case "idle":
-      screen = (
-        <Start
-          onSessionChange={applySession}
-          onControlStart={runControlAction}
-          catalogVersion={catalogVersion}
-          onBanksLoaded={handleBanksLoaded}
-        />
-      );
-      break;
-    case "running":
-      // The exam is a terminal beside a remote desktop; on a phone there
-      // is no layout that works. The lobby and score screens stay usable,
-      // and a running session still shows its countdown and an End exam
-      // control here — the server-side timer keeps going regardless, so
-      // nobody may be stranded without a way to submit.
-      screen =
-        gateBlocked ? (
+  if (booting) {
+    screen = <BootProgress boot={boot} onRetry={handleNewAttempt} />;
+  } else if (!session) {
+    screen = (
+      <div className="loading-screen" role="status">
+        {pollError ? strings.app.cannotReach(pollError) : strings.app.loading}
+      </div>
+    );
+  } else {
+    switch (session.state) {
+      case "idle":
+        screen = (
+          <Start
+            onSessionChange={applySession}
+            onControlStart={runControlAction}
+            catalogVersion={catalogVersion}
+            onBanksLoaded={handleBanksLoaded}
+          />
+        );
+        break;
+      case "running":
+        // The exam is a terminal beside a remote desktop; on a phone there
+        // is no layout that works. The lobby and score screens stay usable,
+        // and a running session still shows its countdown and an End exam
+        // control here — the server-side timer keeps going regardless, so
+        // nobody may be stranded without a way to submit.
+        screen = gateBlocked ? (
           <DesktopRequired verdict={gateVerdict}>
             <ExamGateControls
               session={session}
@@ -250,20 +309,27 @@ export default function App() {
         ) : (
           <Exam session={session} fetchedAt={fetchedAt} onSessionChange={applySession} />
         );
-      break;
-    case "ended":
-      screen = <Score onNewAttempt={handleNewAttempt} endReason={session.endReason} />;
-      break;
+        break;
+      case "ended":
+        screen = <Score
+            onNewAttempt={handleNewAttempt}
+            endReason={session.endReason}
+            mode={session.mode}
+          />;
+        break;
+    }
   }
 
   return (
     <>
       <TopProgress />
       <main>
-        <ScreenTransition screenKey={session.state}>{screen}</ScreenTransition>
+        <ScreenTransition screenKey={booting ? "booting" : (session?.state ?? "loading")}>
+          {screen}
+        </ScreenTransition>
       </main>
       <ToastLayer />
-      {session.state !== "running" && (
+      {session && !booting && session.state !== "running" && (
         <div className="floating-controls">
           {/* A backgrounded rebuild used to run for 2-4 minutes with no
               indicator anywhere: the lobby behind it looked idle while the

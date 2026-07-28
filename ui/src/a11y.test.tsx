@@ -5,6 +5,12 @@ import { axe } from "vitest-axe";
 import { Start } from "./screens/Start";
 import { Score } from "./screens/Score";
 import { ControlProgress } from "./components/ControlProgress";
+import { BootProgress } from "./screens/BootProgress";
+import { ClipboardPanel } from "./components/ClipboardPanel";
+import { DomainBreakdown } from "./components/DomainBreakdown";
+import { HintTray } from "./components/HintTray";
+import { KeyboardSettings } from "./components/KeyboardSettings";
+import { ShortcutHelp } from "./components/ShortcutHelp";
 import { DesktopRequired } from "./components/DesktopRequired";
 import { Dialog } from "./components/Dialog";
 import { ExamIntro } from "./components/ExamIntro";
@@ -34,7 +40,7 @@ const examJSON = {
   passingScore: 66,
   kubernetesVersion: "1.35",
   questions: [
-    { id: "q01", instance: "instance-1", domain: "Config", weight: 5, totalPoints: 5 },
+    { id: "q01", instance: "instance-1", domain: "Config", weight: 5, totalPoints: 5, hintCount: 0 },
   ],
 };
 
@@ -120,8 +126,8 @@ const questionJSON = {
 
 // Two domains, so the jump grid's grouping headings are exercised.
 const examQuestions: ExamQuestionInfo[] = [
-  { id: "q01", instance: "instance-1", domain: "Config", weight: 5, totalPoints: 5 },
-  { id: "q02", instance: "instance-2", domain: "Networking", weight: 7, totalPoints: 7 },
+  { id: "q01", instance: "instance-1", domain: "Config", weight: 5, totalPoints: 5, hintCount: 0 },
+  { id: "q02", instance: "instance-2", domain: "Networking", weight: 7, totalPoints: 7, hintCount: 0 },
 ];
 
 function stubFetch() {
@@ -339,6 +345,90 @@ describe("axe: no WCAG violations", () => {
         onBackground={() => {}}
       />,
     );
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  // The first screen anyone ever sees on a cold start, and the one a
+  // candidate stares at for several minutes.
+  test("boot progress, building", async () => {
+    const { container } = render(
+      <BootProgress
+        boot={{
+          state: "booting",
+          phase: "seed",
+          label: "Setting up the exam questions",
+          detail: "question 7 of 22",
+          error: "",
+          step: 7,
+          totalSteps: 8,
+          startedAt: "2026-07-27T12:00:00Z",
+        }}
+        onRetry={() => {}}
+      />,
+    );
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  test("boot progress, failed", async () => {
+    const { container } = render(
+      <BootProgress
+        boot={{
+          state: "failed",
+          phase: "cni",
+          label: "Installing the pod network",
+          detail: "",
+          error: "step failed: kubectl apply -f /opt/sim/calico.yaml (exit 1)",
+          step: 5,
+          totalSteps: 8,
+          startedAt: "2026-07-27T12:00:00Z",
+        }}
+        onRetry={() => {}}
+      />,
+    );
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  // The clipboard panel is a form: two labelled controls and a live
+  // region of remote text. Labels are the whole point of it being usable.
+  // A data table with row headers — the one place in the app where
+  // header association actually carries meaning for a screen reader.
+  test("domain breakdown", async () => {
+    const { container } = render(
+      <DomainBreakdown
+        questions={[
+          {
+            id: "q01",
+            instance: "instance-1",
+            domain: "Services and Networking",
+            earned: 4,
+            total: 10,
+            checks: [],
+          },
+        ]}
+      />,
+    );
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  test("hint tray", async () => {
+    const { container } = render(<HintTray questionId="q01" hintCount={2} />);
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  test("clipboard panel", async () => {
+    const { container } = render(<ClipboardPanel onClose={() => {}} />);
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  test("keyboard settings popover", async () => {
+    const { container } = render(
+      <KeyboardSettings onClose={() => {}} onShowHelp={() => {}} />,
+    );
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  test("shortcut help", async () => {
+    const { container } = render(<ShortcutHelp onClose={() => {}} />);
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 

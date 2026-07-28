@@ -83,8 +83,15 @@ func sshArgs(keyPath, instance, cmd string) []string {
 
 // remoteCommand builds the remote command string grade.sh runs for one
 // validate.d script.
+//
+// BANK is exported alongside KUBECONFIG so a check can reach its own
+// bank's pristine files under /banks/$BANK/<qid>/files. That is what
+// makes "the candidate must not have modified this file" checkable by
+// comparing against the original, rather than by grepping for a line
+// that happened to be in it — which made the check whitespace-exact on
+// a YAML file it had no business reading as text.
 func remoteCommand(bank, qid, script string) string {
-	return fmt.Sprintf("KUBECONFIG=/home/candidate/.kube/config bash /banks/%s/%s/validate.d/%s", bank, qid, script)
+	return fmt.Sprintf("KUBECONFIG=/home/candidate/.kube/config BANK=%s bash /banks/%s/%s/validate.d/%s", bank, bank, qid, script)
 }
 
 // Results is a fully graded exam: totals, pass/fail, and the per-question

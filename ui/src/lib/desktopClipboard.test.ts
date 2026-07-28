@@ -83,3 +83,88 @@ describe("desktopClipboard", () => {
     expect(writeText).toHaveBeenCalledWith("nginx:1.29-alpine");
   });
 });
+
+describe("pasteFromHost", () => {
+  // The one-keystroke path: read the host clipboard, push it into the
+  // remote clipboard, then synthesise the terminal's paste chord. The
+  // ORDER matters — both messages go out on the same socket, so the
+  // server must see the cut-text before the key event.
+  test("pushes the host clipboard to the desktop, then sends the chord", async () => {
+    const order: string[] = [];
+    const target = {
+      clipboardPasteFrom: (t: string) => {
+        order.push(`paste:${t}`);
+      },
+    };
+    desktopClipboard.connect(target);
+    vi.stubGlobal("navigator", {
+      clipboard: { readText: async () => "kubectl get pods" },
+    });
+
+    const outcome = await desktopClipboard.pasteFromHost(() => order.push("chord"));
+
+    expect(outcome).toBe("sent");
+    expect(order).toEqual(["paste:kubectl get pods", "chord"]);
+  });
+
+  // Firefox has no readText for web content; Chrome refuses without the
+  // permission. This is an expected path for a lot of users, and the
+  // caller turns it into a pointer at the clipboard panel.
+  test("reports blocked when the browser refuses to read the clipboard", async () => {
+    let chords = 0;
+    desktopClipboard.connect({ clipboardPasteFrom: () => {} });
+    vi.stubGlobal("navigator", {
+      clipboard: {
+        readText: async () => {
+          throw new Error("NotAllowedError");
+        },
+      },
+    });
+
+    expect(await desktopClipboard.pasteFromHost(() => chords++)).toBe("blocked");
+    expect(chords).toBe(0);
+  });
+
+  // Sending the chord anyway would paste whatever was in the remote
+  // clipboard before, which is worse than doing nothing.
+  test("does not send the chord when there is no desktop", async () => {
+    let chords = 0;
+    desktopClipboard.reset();
+    vi.stubGlobal("navigator", { clipboard: { readText: async () => "text" } });
+
+    expect(await desktopClipboard.pasteFromHost(() => chords++)).toBe("no-desktop");
+    expect(chords).toBe(0);
+  });
+
+  test("reports empty rather than pasting nothing", async () => {
+    let chords = 0;
+    desktopClipboard.connect({ clipboardPasteFrom: () => {} });
+    vi.stubGlobal("navigator", { clipboard: { readText: async () => "" } });
+
+    expect(await desktopClipboard.pasteFromHost(() => chords++)).toBe("empty");
+    expect(chords).toBe(0);
+  });
+});
+
+describe("inbound clipboard", () => {
+  // Previously this text was handed straight to navigator.clipboard
+  // .writeText, which needs a user gesture the WebSocket message cannot
+  // provide — so it was usually refused and silently dropped. Holding it
+  // lets the panel offer a button, which is a real gesture.
+  test("keeps what the desktop copied and notifies subscribers", () => {
+    desktopClipboard.reset();
+    let notified = 0;
+    const unsubscribe = desktopClipboard.subscribe(() => notified++);
+
+    desktopClipboard.receive("nginx:1.29-alpine");
+    expect(desktopClipboard.getRemote()).toBe("nginx:1.29-alpine");
+    expect(notified).toBe(1);
+
+    // Identical text is not a change — otherwise every repeated copy
+    // would re-render the panel for nothing.
+    desktopClipboard.receive("nginx:1.29-alpine");
+    expect(notified).toBe(1);
+
+    unsubscribe();
+  });
+});

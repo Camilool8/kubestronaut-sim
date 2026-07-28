@@ -88,3 +88,31 @@ func (g *grader) Grade() {
 		}
 	}()
 }
+
+// PracticeGrade scores the environment as it stands right now and
+// returns the result WITHOUT recording it anywhere.
+//
+// Deliberately non-persisted and synchronous. The alternative — routing
+// it through SetResults — would mean relaxing checkGradeWriteLocked,
+// which is the attempt-token guard the whole stale-write design rests
+// on; a mid-attempt score would then be indistinguishable from the real
+// one on /api/results, and a training run could overwrite a graded exam.
+// So this touches no session state at all: it reads the cluster, returns
+// JSON, and forgets.
+//
+// It shares inFlight with the real grader, so a "score my work" click
+// cannot race a submit-triggered grade, and two impatient clicks cannot
+// launch two ssh storms across every instance.
+func (g *grader) PracticeGrade() (json.RawMessage, error) {
+	if !g.inFlight.CompareAndSwap(false, true) {
+		return nil, fmt.Errorf("a grading run is already in progress")
+	}
+	defer g.inFlight.Store(false)
+
+	res := evaluate.Grade(g.ex, g.bank, g.runner, g.timeout)
+	raw, err := json.Marshal(res)
+	if err != nil {
+		return nil, fmt.Errorf("marshal practice results: %w", err)
+	}
+	return raw, nil
+}

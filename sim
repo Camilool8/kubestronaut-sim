@@ -2,21 +2,111 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 cmd=${1:-help}
+
+UI=http://localhost:8080
+
+# Reads one field out of a JSON object on stdin. python3 rather than jq
+# because the reset path below has always used it and it is the one
+# interpreter this script can count on.
+json_field() { python3 -c "import json,sys; print(json.load(sys.stdin).get('$1',''))" 2>/dev/null || true; }
+
 case "$cmd" in
   up)
-    BANK=${2:-ckad-mock-01} docker compose up -d --build --wait
-    echo "Exam environment ready. Exam UI: http://localhost:8080 — or ./sim ssh instance-1" ;;
+    # NOT `--wait`. That waits on the healthcheck with no timeout
+    # (compose's default --wait-timeout is 0, i.e. forever) and prints one
+    # unmoving word — so a first boot that takes 20 minutes and a first
+    # boot that died after 30 seconds look exactly alike. This is what
+    # "env-1 stuck at Waiting" was: not a hang, an unreported wait.
+    #
+    # The facilitator no longer waits for the cluster, so it answers
+    # within seconds and /api/boot can narrate the rest. The browser shows
+    # the same phases from the same source at the same time.
+    BANK=${2:-ckad-mock-01} docker compose up -d --build
+
+    budget=${SIM_BOOT_BUDGET:-3600}
+    deadline=$((SECONDS + budget))
+    last=""
+    echo "Building the exam environment (first run pulls and seeds; later runs resume)..."
+    while :; do
+      if [ "$SECONDS" -ge "$deadline" ]; then
+        echo
+        echo "Gave up waiting after ${budget}s. The environment may still be working;"
+        echo "check with:  docker compose logs -f k8s-env"
+        echo "Raise the budget with SIM_BOOT_BUDGET=<seconds> ./sim up"
+        exit 1
+      fi
+
+      boot=$(curl -fsS --max-time 5 "${UI}/api/boot" 2>/dev/null) || { sleep 3; continue; }
+      state=$(printf '%s' "$boot" | json_field state)
+      label=$(printf '%s' "$boot" | json_field label)
+      detail=$(printf '%s' "$boot" | json_field detail)
+
+      line="$label"
+      [ -n "$detail" ] && line="$label — $detail"
+      if [ "$line" != "$last" ] && [ -n "$line" ]; then
+        echo "  $line"
+        last="$line"
+      fi
+
+      case "$state" in
+        ready) break ;;
+        failed)
+          echo
+          echo "The environment failed to start:"
+          printf '  %s\n' "$(printf '%s' "$boot" | json_field error)"
+          echo
+          echo "Full output:  docker compose logs k8s-env"
+          exit 1 ;;
+      esac
+      sleep 3
+    done
+    echo "Exam environment ready. Exam UI: ${UI} — or ./sim ssh instance-1" ;;
   down)  docker compose down --remove-orphans ;;
   purge) docker compose down -v --remove-orphans ;;
+  doctor)
+    # The first-run failures that are not this project's fault are almost
+    # all environmental, and all of them are cheaper to find here than
+    # twenty minutes into a boot.
+    echo "kubestronaut-sim preflight"
+    echo
+    printf 'docker            : '; docker version --format '{{.Server.Version}}' 2>/dev/null || echo "NOT REACHABLE"
+    printf 'compose           : '; docker compose version --short 2>/dev/null || echo "MISSING"
+    printf 'python3           : '; python3 --version 2>/dev/null || echo "MISSING (./sim up needs it)"
+
+    mem=$(docker info --format '{{.MemTotal}}' 2>/dev/null || echo 0)
+    memgb=$(( mem / 1024 / 1024 / 1024 ))
+    printf 'RAM to docker     : %sGB' "$memgb"
+    if [ "$memgb" -lt 8 ]; then echo "   << LOW: the desktop plus a 2-node cluster wants ~9GB"; else echo "   ok"; fi
+
+    avail=$(docker run --rm -v /var/lib/docker alpine:3.21 df -Pk /var/lib/docker 2>/dev/null | awk 'NR==2{print int($4/1024/1024)}' || echo "?")
+    printf 'disk for images   : %sGB' "$avail"
+    if [ "$avail" != "?" ] && [ "$avail" -lt 25 ]; then echo "   << LOW: images alone are ~10GB"; else echo "   ok"; fi
+
+    printf 'cgroup version    : '; docker info --format '{{.CgroupVersion}}' 2>/dev/null || echo "unknown"
+
+    printf 'warm volumes      : '
+    warm=$(docker volume ls -q --filter name=kubestronaut-sim 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$warm" = "0" ]; then
+      echo "none — this will be a cold first boot (slowest path)"
+    else
+      echo "${warm} present — boot will resume rather than rebuild"
+    fi
+
+    printf 'exam UI           : '
+    if curl -fsS --max-time 3 "${UI}/api/boot" >/dev/null 2>&1; then
+      echo "up (state: $(curl -fsS --max-time 3 "${UI}/api/boot" | json_field state))"
+    else
+      echo "not running"
+    fi ;;
   reset)
     # Same code path the UI's "New attempt" button uses: the conductor
     # owns the reset sequence; this is just a thin trigger + progress
     # poll against the facilitator's /api/control proxy.
     echo "Resetting exam state via conductor (cluster + instances, cached images kept)..."
-    curl -fsS -X POST http://localhost:8080/api/control/reset >/dev/null
+    curl -fsS -X POST "${UI}/api/control/reset" >/dev/null
     while :; do
       sleep 3
-      status=$(curl -fsS http://localhost:8080/api/control/status 2>/dev/null) || continue
+      status=$(curl -fsS "${UI}/api/control/status" 2>/dev/null) || continue
       busy=$(printf '%s' "$status" | python3 -c 'import json,sys; print(json.load(sys.stdin)["busy"])')
       [ "$busy" = "False" ] && break
     done
@@ -26,6 +116,6 @@ case "$cmd" in
   ssh)   docker compose exec "${2:-instance-1}" su - candidate ;;
   status) docker compose ps ;;
   grade) docker compose exec facilitator /entrypoint.sh grade ;;
-  help)  echo "usage: ./sim {up [bank]|down|reset|purge|ssh [instance]|status|grade}" ;;
-  *) echo "usage: ./sim {up [bank]|down|reset|purge|ssh [instance]|status|grade}"; exit 1 ;;
+  help)  echo "usage: ./sim {up [bank]|down|reset|purge|doctor|ssh [instance]|status|grade}" ;;
+  *) echo "usage: ./sim {up [bank]|down|reset|purge|doctor|ssh [instance]|status|grade}"; exit 1 ;;
 esac

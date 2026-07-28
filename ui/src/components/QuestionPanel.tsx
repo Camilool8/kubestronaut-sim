@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { getQuestion, type ExamQuestionInfo } from "../api";
+import { getQuestion, type ExamQuestionInfo, type SessionMode } from "../api";
 import { useAsync } from "../lib/useAsync";
 import { strings } from "../strings";
 import { Async } from "./Async";
 import { Icon } from "./Icon";
 import { Markdown } from "./Markdown";
+import { HintTray } from "./HintTray";
 import { Skeleton } from "./Pending";
 import { marksStore } from "./marksStore";
 
@@ -22,6 +23,12 @@ interface QuestionPanelProps {
    * panel — which is exactly what they did before this existed.
    */
   emptyState?: ReactNode;
+  /**
+   * The attempt's mode. Only "training" renders the hint tray — and the
+   * hint/solution endpoints 403 in every other mode regardless, so this
+   * is an affordance over a server-side rule, not the rule.
+   */
+  mode?: SessionMode;
 }
 
 // The collapsible left panel. Its whole job is the question text: the
@@ -49,6 +56,7 @@ export function QuestionPanel({
   open,
   onToggle,
   emptyState = null,
+  mode,
 }: QuestionPanelProps) {
   const [jumpOpen, setJumpOpen] = useState(false);
   const paneRef = useRef<HTMLDivElement>(null);
@@ -213,6 +221,14 @@ export function QuestionPanel({
             >
               {(data) => <Markdown>{data.markdown}</Markdown>}
             </Async>
+            {/* Inside the scrolling pane, below the question: a candidate
+                reaching for a hint has just finished reading, and the
+                tray should be where their eye already is. Keyed by id so
+                moving question resets it rather than carrying a revealed
+                hint across. */}
+            {mode === "training" && selected && selected.hintCount > 0 && (
+              <HintTray key={selected.id} questionId={selected.id} hintCount={selected.hintCount} />
+            )}
           </div>
 
           {jumpOpen && (

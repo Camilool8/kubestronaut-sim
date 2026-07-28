@@ -167,6 +167,14 @@ export function PanelResizer({ panelId, collapsed, onToggleCollapse }: PanelResi
       return;
     }
 
+    // Same guard QuestionPanel's global handler uses. Without it, ⌘→ or
+    // Ctrl+Home while this separator has focus resized the panel AND
+    // preventDefault'd the browser's own shortcut — so a Mac candidate
+    // reaching for "end of line" moved the divider instead. Shift is
+    // deliberately still allowed: Shift+Arrow is this control's own
+    // coarse step.
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+
     const delta = event.shiftKey ? COARSE_STEP : STEP;
     let next: number | null = null;
     if (event.key === "ArrowLeft") next = width - delta;

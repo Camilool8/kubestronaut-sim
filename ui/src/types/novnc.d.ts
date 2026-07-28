@@ -24,6 +24,14 @@ declare module "@novnc/novnc" {
      * the connection is established and viewOnly is false.
      */
     clipboardPasteFrom(text: string): void;
+    /**
+     * Sends one key event. `down` omitted sends a press followed by a
+     * release. `code` is a DOM KeyboardEvent.code ("KeyC", "ControlLeft")
+     * and must be correct: rfb.js maps it through XtScancode when the
+     * server negotiates QEMU extended key events, so the keysym alone is
+     * not always what travels.
+     */
+    sendKey(keysym: number, code: string, down?: boolean): void;
 
     /** Typed overload for the "clipboard" event's CustomEvent detail. */
     addEventListener(

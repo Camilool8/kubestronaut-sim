@@ -1,0 +1,30 @@
+apiVersion: sim.kubestronaut.dev/v1alpha2
+kind: Exam
+metadata:
+  name: smoke-01
+  title: Smoke Test Bank
+  certification: NONE
+  # Keeps this out of the lobby while leaving it a valid switch target.
+  # See Entry.Hidden in conductor/internal/catalog/catalog.go.
+  hidden: true
+  description: >-
+    Not an exam. A single trivial question that exists so tests/smoke.sh
+    can exercise the full bank-switch path — write-bank, recreate-cluster,
+    restart-facilitator, verify — against a real second bank. Deliberately
+    cheap to seed so the switch round-trip costs seconds, not minutes.
+spec:
+  examType: hands-on
+  duration: 120m
+  passingScore: 66
+  kubernetesVersion: "1.35"
+  environment:
+    provider: kind
+    nodes: 2
+    allowedDomains: [kubernetes.io]
+  instances:
+    - name: instance-1
+  questions:
+    - id: q01
+      instance: instance-1
+      domain: Smoke
+      weight: 1

@@ -1,6 +1,8 @@
 package exam
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -150,5 +152,54 @@ func TestParsePoints(t *testing.T) {
 					c.raw, c.present, points, skip, c.wantPoints, c.wantSkip)
 			}
 		})
+	}
+}
+
+func TestCountAndSplitHints(t *testing.T) {
+	dir := t.TempDir()
+	qdir := filepath.Join(dir, "q01")
+	if err := os.MkdirAll(qdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Text before the first heading is deliberately ignored, so an
+	// author can leave a note at the top of the file.
+	body := "some authoring note\n\n## Hint 1\n\nlook at the selector\n\n## Hint 2\n\ntry `kubectl get svc`\n"
+	if err := os.WriteFile(filepath.Join(qdir, "hints.md"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := countHints(dir, "q01"); got != 2 {
+		t.Errorf("countHints = %d, want 2", got)
+	}
+
+	raw, _ := os.ReadFile(HintsPath(dir, "q01"))
+	tiers := SplitHints(raw)
+	if len(tiers) != 2 {
+		t.Fatalf("len(SplitHints) = %d, want 2", len(tiers))
+	}
+	if tiers[0] != "look at the selector" {
+		t.Errorf("tier 1 = %q", tiers[0])
+	}
+	if tiers[1] != "try `kubectl get svc`" {
+		t.Errorf("tier 2 = %q", tiers[1])
+	}
+}
+
+// A bank with no hints must load, not error: hints are optional, and
+// smoke-01 has none.
+func TestCountHintsIsZeroWhenAbsent(t *testing.T) {
+	if got := countHints(t.TempDir(), "q01"); got != 0 {
+		t.Errorf("countHints on a bank with no hints.md = %d, want 0", got)
+	}
+}
+
+func TestSpeedDurationDefaultsToHalf(t *testing.T) {
+	ex, err := Load(examJSON, bankDir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if ex.SpeedDuration != ex.Duration/2 {
+		t.Errorf("SpeedDuration = %v, want half of %v", ex.SpeedDuration, ex.Duration)
 	}
 }

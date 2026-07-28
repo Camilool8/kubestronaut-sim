@@ -10,9 +10,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
+	"kubestronaut-sim/facilitator/internal/bootstate"
 	"kubestronaut-sim/facilitator/internal/exam"
 	"kubestronaut-sim/facilitator/internal/session"
 )
@@ -25,6 +27,11 @@ import (
 // multiple goroutines and safe to call more than once in a row.
 type Grader func()
 
+// PracticeGrader scores the environment as it stands and returns the
+// result without recording it. Backs "score my work now" in training
+// mode. Returns an error when a grading run is already in flight.
+type PracticeGrader func() (json.RawMessage, error)
+
 // server holds every dependency the HTTP handlers need. It is
 // unexported; New is the only way to obtain the http.Handler it backs.
 type server struct {
@@ -33,7 +40,9 @@ type server struct {
 	mgr     *session.Manager
 	grade   Grader
 	desktop http.Handler
-	ui      fs.FS
+	ui       fs.FS
+	boot     *bootstate.Reader
+	practice PracticeGrader
 }
 
 // New builds the facilitator's complete HTTP handler: the /api/*
@@ -46,17 +55,25 @@ type server struct {
 // given) — the exam package itself does not retain it, but the
 // question/solution endpoints need it to read question.md/solution.md
 // from disk per request.
-func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desktop, control http.Handler, ui fs.FS) http.Handler {
-	s := &server{ex: ex, bankDir: bankDir, mgr: mgr, grade: grade, desktop: desktop, ui: ui}
+// boot reports the exam environment's start-up progress; the facilitator
+// now starts before k8s-env is healthy, so it must be able to say what
+// is happening rather than simply refusing to answer. A nil Reader means
+// "assume ready", which keeps direct/dev runs and tests that do not care
+// about boot from having to construct one.
+func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desktop, control http.Handler, ui fs.FS, boot *bootstate.Reader, practice PracticeGrader) http.Handler {
+	s := &server{ex: ex, bankDir: bankDir, mgr: mgr, grade: grade, desktop: desktop, ui: ui, boot: boot, practice: practice}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealthz)
+	mux.HandleFunc("GET /api/boot", s.handleBoot)
 	mux.HandleFunc("GET /api/exam", s.handleExam)
 	mux.HandleFunc("GET /api/questions/{id}", s.handleQuestion)
 	mux.HandleFunc("GET /api/questions/{id}/solution", s.handleSolution)
+	mux.HandleFunc("GET /api/questions/{id}/hints/{n}", s.handleHint)
 	mux.HandleFunc("POST /api/session/start", s.handleSessionStart)
 	mux.HandleFunc("GET /api/session", s.handleSessionGet)
 	mux.HandleFunc("POST /api/session/end", s.handleSessionEnd)
+	mux.HandleFunc("POST /api/session/grade", s.handlePracticeGrade)
 	mux.HandleFunc("GET /api/results", s.handleResults)
 	mux.HandleFunc("DELETE /api/session", s.handleSessionDelete)
 
@@ -96,6 +113,17 @@ type examResponse struct {
 	PassingScore      int                `json:"passingScore"`
 	KubernetesVersion string             `json:"kubernetesVersion"`
 	Questions         []examQuestionInfo `json:"questions"`
+	// Modes the lobby renders its picker from, so the three cards are
+	// described by the server rather than hardcoded in the UI.
+	Modes []examMode `json:"modes"`
+}
+
+// examMode is one selectable attempt mode.
+type examMode struct {
+	ID              string `json:"id"`
+	DurationSeconds int    `json:"durationSeconds"`
+	Untimed         bool   `json:"untimed"`
+	HelpAllowed     bool   `json:"helpAllowed"`
 }
 
 // examQuestionInfo is one question's entry in the GET /api/exam
@@ -107,6 +135,7 @@ type examQuestionInfo struct {
 	Domain      string `json:"domain"`
 	Weight      int    `json:"weight"`
 	TotalPoints int    `json:"totalPoints"`
+	HintCount   int    `json:"hintCount"`
 }
 
 func (s *server) handleExam(w http.ResponseWriter, r *http.Request) {
@@ -127,7 +156,13 @@ func (s *server) handleExam(w http.ResponseWriter, r *http.Request) {
 			Domain:      q.Domain,
 			Weight:      q.Weight,
 			TotalPoints: totalPoints(q),
+			HintCount:   q.HintCount,
 		})
+	}
+	resp.Modes = []examMode{
+		{ID: session.ModeExam, DurationSeconds: int(s.ex.Duration.Seconds())},
+		{ID: session.ModeTraining, Untimed: true, HelpAllowed: true},
+		{ID: session.ModeSpeed, DurationSeconds: int(s.ex.SpeedDuration.Seconds())},
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
@@ -198,7 +233,10 @@ func (s *server) handleSolution(w http.ResponseWriter, r *http.Request) {
 	// to probe which question ids exist before the session ends —
 	// documented UX fidelity with killer.sh, not a security boundary
 	// (the bank files sit on the candidate's own disk regardless).
-	if s.mgr.Snapshot().State != "ended" {
+	// Training mode is exactly the mode where reading the solution is
+	// the point. Everything else keeps the exam-fidelity gate.
+	snap := s.mgr.Snapshot()
+	if snap.State != "ended" && snap.Mode != session.ModeTraining {
 		writeJSONError(w, http.StatusForbidden, "solutions are available once the session has ended")
 		return
 	}
@@ -218,6 +256,110 @@ func (s *server) handleSolution(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, solutionResponse{ID: id, Markdown: string(md)})
 }
 
+// durationFor resolves an attempt's clock from its mode.
+//
+// SESSION_DURATION_OVERRIDE is applied by main to s.ex.Duration before
+// this server is built, so it keeps winning for exam and speed — which
+// is what tests/smoke.sh's auto-expiry section relies on. It deliberately
+// does NOT reach training: untimed means untimed.
+func (s *server) durationFor(mode string) time.Duration {
+	switch mode {
+	case session.ModeTraining:
+		return 0
+	case session.ModeSpeed:
+		return s.ex.SpeedDuration
+	default:
+		return s.ex.Duration
+	}
+}
+
+// hintResponse is the GET /api/questions/{id}/hints/{n} JSON shape.
+type hintResponse struct {
+	ID       string `json:"id"`
+	Tier     int    `json:"tier"`
+	Total    int    `json:"total"`
+	Markdown string `json:"markdown"`
+}
+
+// handleHint serves ONE hint tier at a time, so revealing the second is
+// a deliberate act the candidate takes rather than something the client
+// silently already has.
+//
+// The route is registered unconditionally even though it only ever
+// answers in training mode: Go's ServeMux patterns are static, and a
+// conditionally-registered route would leak the attempt's mode through
+// the difference between 404 and 403.
+func (s *server) handleHint(w http.ResponseWriter, r *http.Request) {
+	// Gate first, before the id lookup, for the same reason the solution
+	// gate does it: the endpoint must not double as a way to enumerate
+	// which question ids exist.
+	snap := s.mgr.Snapshot()
+	if snap.Mode != session.ModeTraining {
+		writeJSONError(w, http.StatusForbidden, "hints are available in Training mode only")
+		return
+	}
+	if snap.State == "idle" {
+		writeJSONError(w, http.StatusForbidden, "no attempt is running")
+		return
+	}
+
+	id := r.PathValue("id")
+	q, ok := s.findQuestion(id)
+	if !ok {
+		writeJSONError(w, http.StatusNotFound, "unknown question "+id)
+		return
+	}
+
+	tier, err := strconv.Atoi(r.PathValue("n"))
+	if err != nil || tier < 1 || tier > q.HintCount {
+		writeJSONError(w, http.StatusNotFound, "no such hint")
+		return
+	}
+
+	raw, err := os.ReadFile(exam.HintsPath(s.bankDir, id))
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	tiers := exam.SplitHints(raw)
+	if tier > len(tiers) {
+		writeJSONError(w, http.StatusNotFound, "no such hint")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, hintResponse{
+		ID: id, Tier: tier, Total: len(tiers), Markdown: tiers[tier-1],
+	})
+}
+
+// handlePracticeGrade scores the work so far without ending the attempt
+// and without recording anything. Training only: in an exam, finding out
+// your score mid-attempt is precisely the thing the format withholds.
+func (s *server) handlePracticeGrade(w http.ResponseWriter, r *http.Request) {
+	snap := s.mgr.Snapshot()
+	if snap.Mode != session.ModeTraining {
+		writeJSONError(w, http.StatusForbidden, "scoring mid-attempt is available in Training mode only")
+		return
+	}
+	if snap.State != "running" {
+		writeJSONError(w, http.StatusConflict, "no attempt is running")
+		return
+	}
+	if s.practice == nil {
+		writeJSONError(w, http.StatusNotImplemented, "practice grading is not available")
+		return
+	}
+
+	raw, err := s.practice()
+	if err != nil {
+		writeJSONError(w, http.StatusConflict, err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	w.Write(raw)
+}
+
 // sessionResponse is the shared JSON shape for every endpoint that
 // reports session state: GET /api/session, POST /api/session/start,
 // and POST /api/session/end.
@@ -228,6 +370,8 @@ type sessionResponse struct {
 	DurationSeconds  int    `json:"durationSeconds"`
 	RemainingSeconds int    `json:"remainingSeconds"`
 	EndReason        string `json:"endReason"`
+	Mode             string `json:"mode"`
+	Untimed          bool   `json:"untimed"`
 }
 
 func toSessionResponse(snap session.Snapshot) sessionResponse {
@@ -237,6 +381,8 @@ func toSessionResponse(snap session.Snapshot) sessionResponse {
 		DurationSeconds:  snap.DurationSeconds,
 		RemainingSeconds: snap.RemainingSeconds,
 		EndReason:        snap.EndReason,
+		Mode:             snap.Mode,
+		Untimed:          snap.Untimed,
 	}
 	if !snap.StartedAt.IsZero() {
 		resp.StartedAt = snap.StartedAt.Format(time.RFC3339Nano)
@@ -245,12 +391,52 @@ func toSessionResponse(snap session.Snapshot) sessionResponse {
 }
 
 func (s *server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
-	snap, err := s.mgr.Start()
+	// The facilitator answers long before the cluster is usable now, so
+	// this is the gate that stops a candidate starting a 120-minute
+	// clock against a half-built environment. Without it, "the UI came
+	// up, so I clicked Start" burns real exam time on questions whose
+	// seed data does not exist yet.
+	if !s.bootState().Ready() {
+		writeJSONError(w, http.StatusConflict, "the exam environment is still starting")
+		return
+	}
+	// Body is optional and defaults to an exam attempt: ./sim and
+	// tests/smoke.sh both POST with no body at all, and must keep
+	// working unchanged.
+	mode := session.ModeExam
+	var body struct {
+		Mode string `json:"mode"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err == nil && body.Mode != "" {
+		mode = body.Mode
+	}
+	if !session.ValidMode(mode) {
+		writeJSONError(w, http.StatusBadRequest, "unknown mode "+mode)
+		return
+	}
+
+	snap, err := s.mgr.Start(mode, s.durationFor(mode))
 	if err != nil {
 		writeJSONError(w, http.StatusConflict, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, toSessionResponse(snap))
+}
+
+// bootState reads the environment's start-up state, treating a nil
+// Reader as ready.
+func (s *server) bootState() bootstate.State {
+	if s.boot == nil {
+		return bootstate.State{State: bootstate.StateReady, Phase: "ready"}
+	}
+	return s.boot.Read()
+}
+
+// handleBoot always returns 200 — "the environment is still building" is
+// a normal answer to this question, not an error, and the UI polls it on
+// a loop while rendering a progress screen.
+func (s *server) handleBoot(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, s.bootState())
 }
 
 func (s *server) handleSessionGet(w http.ResponseWriter, r *http.Request) {

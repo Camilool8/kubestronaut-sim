@@ -1305,6 +1305,404 @@
 
 /* ---- control job overlay (reset / bank switch progress) ---- */
 
+/* Pre-submit review. Informational, never blocking — a candidate who is
+   out of time must not have to argue with a dialog. */
+.submit-review {
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  background: var(--surface-raised);
+  border-radius: var(--radius-s);
+  font-size: var(--text-s);
+}
+
+.submit-review p {
+  margin: 0 0 var(--space-1);
+}
+
+.submit-review p:last-child {
+  margin-bottom: 0;
+}
+
+.submit-review-ids {
+  font-family: var(--font-mono);
+}
+
+/* ---- score: per-domain breakdown ---- */
+
+.domain-breakdown {
+  margin: var(--space-6) 0;
+}
+
+.domain-breakdown h2 {
+  margin-bottom: var(--space-1);
+}
+
+.domain-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: var(--space-3);
+}
+
+.domain-table th {
+  text-align: left;
+  font-weight: 600;
+}
+
+.domain-table thead th {
+  font-size: var(--text-s);
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--space-1);
+}
+
+.domain-table tbody th,
+.domain-table td {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.domain-table td {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  justify-content: flex-end;
+}
+
+/* Decorative: the figure beside it carries the value, so this reads the
+   same with CSS off and needs no motion to be legible. */
+.domain-bar {
+  flex: 1;
+  min-width: 4rem;
+  max-width: 16rem;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+
+.domain-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.domain-figure {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-s);
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .domain-table tbody th,
+  .domain-table td {
+    display: block;
+    border-bottom: 0;
+  }
+  .domain-table tbody tr {
+    display: block;
+    border-bottom: 1px solid var(--border);
+    padding: var(--space-2) 0;
+  }
+}
+
+/* ---- attempt modes, hints ---- */
+
+/* On the score banner, under the verdict. A training or speed result is
+   not comparable to an exam one, and the banner is what gets screenshot. */
+.score-mode {
+  margin-top: var(--space-2);
+  font-size: var(--text-s);
+  opacity: 0.9;
+}
+
+.score-headline {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  margin: 0 0 var(--space-2);
+}
+
+.score-question {
+  margin-bottom: var(--space-2);
+}
+
+
+.mode-picker {
+  border: 0;
+  padding: 0;
+  margin: var(--space-4) 0 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.mode-picker legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-s);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* A row per mode with the trade-off spelled out beside the name. The
+   choice is not obvious from three words, and a candidate picking
+   Training without realising it is untimed would misread their result. */
+.mode-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 var(--space-2);
+  align-items: baseline;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+}
+
+.mode-option:hover {
+  background: var(--surface-hover);
+}
+
+.mode-option-on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.mode-name {
+  font-weight: 600;
+}
+
+.mode-blurb {
+  grid-column: 2;
+  color: var(--text-muted);
+  font-size: var(--text-s);
+}
+
+/* Named in the topbar for anything that is not a plain exam, so a
+   training result is never mistaken for a real one at a glance. */
+.mode-chip {
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-s);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.hint-tray {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.hint {
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface-raised);
+  border-radius: var(--radius-s);
+}
+
+.hint h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-s);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.hint > :last-child {
+  margin-bottom: 0;
+}
+
+.hint-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* ---- clipboard panel and keyboard settings ---- */
+
+/* Both are position: fixed so they are out of flow entirely. Anything
+   that changes .desktop-pane's box fires noVNC's ResizeObserver and buys
+   a server-side framebuffer resize — the same reason QuestionJump is
+   absolutely positioned inside .question-panel rather than laid out. */
+.clipboard-panel,
+.keyboard-popover {
+  position: fixed;
+  top: calc(var(--space-6) + var(--space-5));
+  right: var(--space-4);
+  z-index: var(--z-panel);
+  width: min(92vw, 380px);
+  max-height: min(70dvh, 34rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-3);
+  padding: var(--space-4);
+}
+
+.clipboard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.clipboard-panel h2,
+.keyboard-popover h2 {
+  margin: 0;
+  font-size: var(--text-m);
+}
+
+.clipboard-label {
+  display: block;
+  margin-top: var(--space-4);
+  font-size: var(--text-s);
+  font-weight: 600;
+}
+
+.clipboard-hint {
+  margin: var(--space-1) 0 var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-s);
+}
+
+.clipboard-input,
+.clipboard-output {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: var(--text-s);
+  background: var(--surface-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  padding: var(--space-2);
+}
+
+.clipboard-input {
+  resize: vertical;
+}
+
+.clipboard-output {
+  margin: 0;
+  max-height: 8rem;
+  overflow: auto;
+  /* Remote clipboard content is arbitrary and often long — wrap it
+     rather than letting one line push the panel wider than the viewport. */
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.clipboard-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-2);
+}
+
+.keyboard-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.keyboard-row label {
+  font-size: var(--text-s);
+}
+
+.shortcut-group {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-s);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.shortcut-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-s);
+}
+
+.shortcut-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding-bottom: var(--space-1);
+}
+
+.shortcut-table td {
+  padding: var(--space-1) var(--space-2) var(--space-1) 0;
+  vertical-align: top;
+}
+
+.shortcut-table kbd {
+  font-family: var(--font-mono);
+  font-size: var(--text-s);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  padding: 0 var(--space-1);
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .clipboard-panel,
+  .keyboard-popover {
+    top: auto;
+    bottom: 0;
+    right: 0;
+    left: 0;
+    width: 100%;
+    border-radius: var(--radius-m) var(--radius-m) 0 0;
+    max-height: 80dvh;
+  }
+}
+
+/* Boot progress is a SCREEN, not an overlay: there is nothing behind it
+   to dim. It borrows the control dialog's checklist wholesale (same
+   .control-phases / .phase-* rules) because a candidate who sees both
+   should recognise the second from the first — but it is a page, so it
+   gets page padding and no scrim, no focus trap, no dismiss. */
+.boot-screen {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6) var(--space-4);
+}
+
+.boot-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-2);
+  padding: var(--space-5) var(--space-6);
+  width: 560px;
+  max-width: min(94vw, 560px);
+}
+
+.boot-panel h1 {
+  margin-top: 0;
+  font-size: var(--text-xl);
+}
+
+@media (max-width: 600px) {
+  .boot-screen {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .boot-panel {
+    width: 100%;
+    max-width: 100%;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: var(--space-5) var(--space-4);
+  }
+}
+
 .control-overlay {
   position: fixed;
   inset: 0;
@@ -1696,6 +2094,10 @@
 
 /* ---- info button + drawer ---- */
 
+/* The system's small icon button. Named for its first use (About) and
+   now also the topbar's clipboard and keyboard triggers, and the
+   clipboard panel's close — one component, not three near-duplicates.
+   Worth renaming to .icon-button when something else touches this file. */
 .info-button {
   background: transparent;
   border: 1px solid var(--border-strong);

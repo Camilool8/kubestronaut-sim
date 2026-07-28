@@ -26,8 +26,31 @@ export type CopyOutcome =
   | "browser"
   | "failed";
 
+export type PasteOutcome =
+  /** Read the host clipboard and delivered it to the desktop. */
+  | "sent"
+  /** No desktop connected — nothing to paste into. */
+  | "no-desktop"
+  /** The browser refused to let us read the clipboard. */
+  | "blocked"
+  /** The host clipboard was empty. */
+  | "empty";
+
 class DesktopClipboard {
   private target: ClipboardTarget | null = null;
+  private listeners = new Set<() => void>();
+  /**
+   * The desktop's most recent clipboard contents.
+   *
+   * Held rather than pushed straight at navigator.clipboard.writeText,
+   * which is what used to happen: that call needs transient user
+   * activation, this arrives on a WebSocket message with no gesture
+   * behind it, and the failure was swallowed. So a candidate who copied
+   * in the terminal usually got nothing and no indication why. Keeping
+   * it lets the clipboard panel offer a real button, which is a real
+   * gesture, which actually works.
+   */
+  private remote = "";
 
   /** Called by the viewport once its connection is established. */
   connect(target: ClipboardTarget): void {
@@ -77,6 +100,76 @@ class DesktopClipboard {
 
     if (reachedDesktop) return "desktop";
     return reachedBrowser ? "browser" : "failed";
+  }
+
+  /**
+   * Sends arbitrary text to the desktop's clipboard, without touching
+   * the browser's. Backs the clipboard panel's Send button.
+   */
+  sendToDesktop(text: string): boolean {
+    if (!this.target) return false;
+    try {
+      this.target.clipboardPasteFrom(text);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Reads the host clipboard and pastes it into the desktop in one go:
+   * push the text into the remote clipboard, then synthesise the
+   * terminal's paste chord so it actually lands. Both messages go out on
+   * the same socket in order, so the server processes the cut-text
+   * before the key event — which is the whole reason a single keystroke
+   * can work here.
+   *
+   * `sendChord` is injected rather than imported so this module keeps
+   * knowing nothing about the keymap (and so the test does not need one).
+   */
+  async pasteFromHost(sendChord: () => void): Promise<PasteOutcome> {
+    if (!this.target) return "no-desktop";
+
+    let text: string;
+    try {
+      text = await navigator.clipboard.readText();
+    } catch {
+      // Firefox has no readText for web content at all, and Chrome
+      // refuses without the clipboard-read permission. This is the
+      // expected path for a large share of users, not an error — the
+      // caller points them at the panel.
+      return "blocked";
+    }
+    if (!text) return "empty";
+
+    if (!this.sendToDesktop(text)) return "no-desktop";
+    // Only after the text is in the remote clipboard. Sending the chord
+    // on a failed push would paste whatever was there before, which is
+    // worse than doing nothing.
+    sendChord();
+    return "sent";
+  }
+
+  /** Called by the viewport when the desktop's clipboard changes. */
+  receive(text: string): void {
+    if (text === this.remote) return;
+    this.remote = text;
+    for (const l of this.listeners) l();
+  }
+
+  subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  };
+
+  /** The string itself is a stable snapshot — no version counter needed. */
+  getRemote = (): string => this.remote;
+
+  /** Test-only. */
+  reset(): void {
+    this.target = null;
+    this.remote = "";
+    this.listeners.clear();
   }
 }
 
