@@ -270,7 +270,7 @@ func TestGradeComposesRemoteCommand(t *testing.T) {
 	}
 	want := call{
 		instance: "instance-1",
-		cmd:      "KUBECONFIG=/home/candidate/.kube/config bash /banks/ckad-mock-01/q01/validate.d/10_ok.sh",
+		cmd:      "KUBECONFIG=/home/candidate/.kube/config BANK=ckad-mock-01 bash /banks/ckad-mock-01/q01/validate.d/10_ok.sh",
 	}
 	if runner.calls[0] != want {
 		t.Errorf("call = %+v, want %+v", runner.calls[0], want)
@@ -366,7 +366,7 @@ func TestScoreboardGolden(t *testing.T) {
 
 func TestRemoteCommand(t *testing.T) {
 	got := remoteCommand("ckad-mock-01", "q01", "10_ok.sh")
-	want := "KUBECONFIG=/home/candidate/.kube/config bash /banks/ckad-mock-01/q01/validate.d/10_ok.sh"
+	want := "KUBECONFIG=/home/candidate/.kube/config BANK=ckad-mock-01 bash /banks/ckad-mock-01/q01/validate.d/10_ok.sh"
 	if got != want {
 		t.Errorf("remoteCommand() = %q, want %q", got, want)
 	}

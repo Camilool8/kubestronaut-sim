@@ -67,7 +67,7 @@ func newTestManager(t *testing.T) *session.Manager {
 	if err != nil {
 		t.Fatalf("session.New: %v", err)
 	}
-	if _, err := mgr.Start(); err != nil {
+	if _, err := mgr.Start(session.ModeExam, time.Hour); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 	if err := mgr.End("submitted"); err != nil {

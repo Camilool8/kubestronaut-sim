@@ -26,9 +26,36 @@ print(data.get(os.environ["FIELD"], ""))
 # mis-weighted bank should fail in two seconds, not forty minutes in
 # after a full cold boot.
 bash tests/bank-weights.sh || fail "bank weights are out of balance"
+# Same slot, same reason: a check that grades spelling rather than
+# behaviour should fail here, not silently cost a candidate points.
+bash tests/check-lint.sh || fail "validate.d checks have brittle idioms"
+bash tests/check-lib.sh || fail "banks/_lib/checks.sh helpers are broken"
+bash tests/bank-hints.sh || fail "hints are malformed, or are just the solution"
 
 ./sim purge   # cold start: the fresh-grade-0 assertion needs pristine cluster state
-./sim up
+
+# Bounded. `./sim up` used to be able to hang indefinitely (compose's
+# --wait defaults to no timeout), and because this script is `set -e`
+# with no timeout of its own, a hung boot hung the whole suite — the one
+# failure mode that produces no output at all. SIM_BOOT_BUDGET bounds
+# ./sim up internally; this is the belt to that braces.
+SMOKE_BOOT_BUDGET=${SMOKE_BOOT_BUDGET:-3600}
+boot_started=$SECONDS
+if ! SIM_BOOT_BUDGET="$SMOKE_BOOT_BUDGET" ./sim up; then
+  echo "SMOKE FAIL: ./sim up did not reach a ready environment within ${SMOKE_BOOT_BUDGET}s"
+  docker compose logs --tail 80 k8s-env || true
+  exit 1
+fi
+echo "cold boot took $((SECONDS - boot_started))s"
+
+# The boot reporting the UI now depends on. A cold boot that finished but
+# never reported ready would leave every candidate stuck on a progress
+# screen in front of a working cluster.
+echo "== boot state =="
+[ "$(req GET /api/boot)" = "200" ] || fail "GET /api/boot did not answer 200"
+[ "$(json_field state)" = "ready" ] || fail "/api/boot state is '$(json_field state)', want ready"
+[ -n "$(json_field label)" ] || fail "/api/boot reports no label"
+
 docker compose exec instance-1 su - candidate -c 'kubectl get nodes --no-headers' | tee /tmp/nodes.txt
 [ "$(grep -c ' Ready ' /tmp/nodes.txt)" -eq 2 ] || fail "expected 2 Ready nodes"
 
@@ -383,24 +410,50 @@ status=$(req GET /api/control/banks)
 active=$(json_field active)
 [ "$active" = "ckad-mock-01" ] || fail "active bank should be ckad-mock-01, got $active"
 
-curl -fsS -X POST -H 'Content-Type: application/json' -d '{"bank":"cka-mock-01"}' \
-  http://localhost:8080/api/control/switch >/dev/null || fail "switch to cka-mock-01 not accepted"
+# A coming-soon certification must be refused, not attempted. This is
+# end-to-end coverage of catalog.Switchable that did not exist before —
+# and it matters more now that CKA is a coming-soon entry rather than a
+# two-question bank.
+curl -s -o "$RESP" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+  -d '{"bank":"cka-mock"}' http://localhost:8080/api/control/switch > /tmp/smoke-cs.txt
+[ "$(cat /tmp/smoke-cs.txt)" = "400" ] \
+  || fail "switch to a coming-soon bank should be 400, got $(cat /tmp/smoke-cs.txt)"
+
+# And a bank id that is not a slug must never reach a filesystem path.
+curl -s -o "$RESP" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+  -d '{"bank":"../../etc"}' http://localhost:8080/api/control/switch > /tmp/smoke-tr.txt
+[ "$(cat /tmp/smoke-tr.txt)" = "400" ] \
+  || fail "switch to a traversal id should be 400, got $(cat /tmp/smoke-tr.txt)"
+
+# The real round trip, against banks/smoke-01 — a hidden one-question
+# fixture. It exists so this path stays covered now that the CKA bank is
+# gone: everything below (write-bank, recreate-cluster,
+# restart-facilitator, verify, motd rewrite, score reset) is exercised
+# exactly as before, and faster, because there is one question to seed.
+curl -fsS -X POST -H 'Content-Type: application/json' -d '{"bank":"smoke-01"}' \
+  http://localhost:8080/api/control/switch >/dev/null || fail "switch to smoke-01 not accepted"
 wait_control
 
 status=$(req GET /api/exam)
 api_name=$(json_field name)
-[ "$api_name" = "cka-mock-01" ] || fail "active exam should be cka-mock-01, got $api_name"
-docker compose exec desktop cat /shared/exam/motd | grep -q 'CKA Mock Exam 01' \
-  || fail "desktop motd should mention the CKA exam after the switch"
+[ "$api_name" = "smoke-01" ] || fail "active exam should be smoke-01, got $api_name"
+docker compose exec desktop cat /shared/exam/motd | grep -q 'Smoke Test Bank' \
+  || fail "desktop motd should mention the smoke bank after the switch"
 
-./sim grade | tee /tmp/grade-cka0.txt
-read -r _ ce0 ct0 _ < <(grep '^RESULT ' /tmp/grade-cka0.txt)
-[ "$ce0" = "0" ] || fail "fresh cka env should score 0, got ${ce0}"
+# A hidden bank must be switchable but must NOT appear in the lobby.
+status=$(req GET /api/control/banks)
+[ "$status" = "200" ] || fail "/api/control/banks expected 200, got $status"
+grep -q '"smoke-01"' "$RESP" \
+  && fail "smoke-01 is a test fixture and must not appear in the bank list" || true
 
-docker compose exec instance-1 su - candidate -c 'bash /tests/solutions/cka-mock-01/q01.sh'
-./sim grade | tee /tmp/grade-cka1.txt
-read -r _ ce1 _ _ < <(grep '^RESULT ' /tmp/grade-cka1.txt)
-[ "$ce1" -gt 0 ] 2>/dev/null || fail "solved cka q01 should score > 0, got ${ce1}"
+./sim grade | tee /tmp/grade-smoke0.txt
+read -r _ se0 st0 _ < <(grep '^RESULT ' /tmp/grade-smoke0.txt)
+[ "$se0" = "0" ] || fail "fresh smoke env should score 0, got ${se0}"
+
+docker compose exec instance-1 su - candidate -c 'bash /tests/solutions/smoke-01/q01.sh'
+./sim grade | tee /tmp/grade-smoke1.txt
+read -r _ se1 _ _ < <(grep '^RESULT ' /tmp/grade-smoke1.txt)
+[ "$se1" -gt 0 ] 2>/dev/null || fail "solved smoke q01 should score > 0, got ${se1}"
 
 curl -fsS -X POST -H 'Content-Type: application/json' -d '{"bank":"ckad-mock-01"}' \
   http://localhost:8080/api/control/switch >/dev/null || fail "switch back to ckad-mock-01 not accepted"
@@ -412,6 +465,64 @@ api_name=$(json_field name)
 ./sim grade | tee /tmp/grade-back.txt
 read -r _ be0 _ _ < <(grep '^RESULT ' /tmp/grade-back.txt)
 [ "$be0" = "0" ] || fail "ckad after switch-back should score 0, got ${be0}"
+
+echo "== training mode: hints, solutions mid-attempt, scoring without ending =="
+# Every gate below is server-side session state, so this is the only
+# place they get exercised against a real facilitator rather than a stub.
+status=$(req DELETE /api/session)
+[ "$status" = "204" ] || fail "training: could not reset the session, got $status"
+
+curl -s -o "$RESP" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+  -d '{"mode":"training"}' "${BASE}/api/session/start" > /tmp/smoke-tstart.txt
+[ "$(cat /tmp/smoke-tstart.txt)" = "200" ] \
+  || fail "training: start expected 200, got $(cat /tmp/smoke-tstart.txt)"
+[ "$(json_field mode)" = "training" ] || fail "training: mode is '$(json_field mode)'"
+[ "$(json_field untimed)" = "True" ] || fail "training: untimed is '$(json_field untimed)', want True"
+
+# Hints: served one tier at a time, and only in this mode.
+[ "$(req GET /api/questions/q01/hints/1)" = "200" ] || fail "training: hint 1 not served"
+[ -n "$(json_field markdown)" ] || fail "training: hint 1 is empty"
+[ "$(req GET /api/questions/q01/hints/99)" = "404" ] || fail "training: out-of-range hint should 404"
+
+# Solutions, while the attempt is still RUNNING — the one gate training
+# deliberately relaxes.
+[ "$(req GET /api/questions/q01/solution)" = "200" ] \
+  || fail "training: solutions should be readable during a training attempt"
+
+# Scoring without ending. Must not appear on /api/results afterwards.
+[ "$(req POST /api/session/grade)" = "200" ] || fail "training: mid-attempt grade failed"
+[ "$(req GET /api/session)" = "200" ] && [ "$(json_field state)" = "running" ] \
+  || fail "training: scoring must not end the attempt"
+[ "$(req GET /api/results)" = "202" ] \
+  || fail "training: a practice grade must not be recorded as a result"
+
+# Re-seeding one question leaves the rest of the environment alone.
+curl -s -o "$RESP" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+  -d '{"question":"q01"}' "${BASE}/api/control/reseed" > /tmp/smoke-reseed.txt
+[ "$(cat /tmp/smoke-reseed.txt)" = "200" ] \
+  || fail "training: reseed expected 200, got $(cat /tmp/smoke-reseed.txt)"
+# And a question id that is not in the bank never reaches a shell.
+curl -s -o "$RESP" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+  -d '{"question":"../../etc"}' "${BASE}/api/control/reseed" > /tmp/smoke-reseed-bad.txt
+[ "$(cat /tmp/smoke-reseed-bad.txt)" = "400" ] \
+  || fail "training: a traversal question id should be 400, got $(cat /tmp/smoke-reseed-bad.txt)"
+
+status=$(req DELETE /api/session)
+[ "$status" = "204" ] || fail "training: cleanup DELETE expected 204, got $status"
+
+# And the same gates must REFUSE in an exam attempt.
+status=$(req POST /api/session/start)
+[ "$status" = "200" ] || fail "exam-gate: start expected 200, got $status"
+[ "$(json_field mode)" = "exam" ] || fail "exam-gate: mode is '$(json_field mode)', want exam"
+[ "$(req GET /api/questions/q01/hints/1)" = "403" ] || fail "exam-gate: hints must be 403 in an exam"
+[ "$(req GET /api/questions/q01/solution)" = "403" ] || fail "exam-gate: solutions must be 403 mid-exam"
+[ "$(req POST /api/session/grade)" = "403" ] || fail "exam-gate: mid-attempt scoring must be 403 in an exam"
+curl -s -o "$RESP" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+  -d '{"question":"q01"}' "${BASE}/api/control/reseed" > /tmp/smoke-reseed-exam.txt
+[ "$(cat /tmp/smoke-reseed-exam.txt)" = "403" ] \
+  || fail "exam-gate: reseed must be 403 in an exam, got $(cat /tmp/smoke-reseed-exam.txt)"
+status=$(req DELETE /api/session)
+[ "$status" = "204" ] || fail "exam-gate: cleanup DELETE expected 204, got $status"
 
 echo "== auto-end: session expires unattended and re-locks the desktop =="
 SESSION_DURATION_OVERRIDE=20s docker compose up -d --wait facilitator

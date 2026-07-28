@@ -26,12 +26,36 @@ services:
       - dind:/var/lib/docker
       - ./banks:/banks:ro
     healthcheck:
+      # 30 minutes (180 x 10s) after a 2-minute grace, up from a 16-minute
+      # budget that was written against a 3-question bootstrap and never
+      # revisited while that bootstrap grew Calico, ingress-nginx and 22
+      # seeded questions. A cold first boot could legitimately exceed the
+      # old ceiling, at which point compose reported an unhealthy
+      # dependency and the whole stack failed — which is what "env-1 stuck
+      # at Waiting" was. Booting containers by hand in OrbStack worked for
+      # exactly one reason: nothing was enforcing the deadline.
+      #
+      # Deliberately generous rather than tight. This gate is what holds
+      # the instances back, and a timeout here is no longer how a failure
+      # is detected — bootstrap.sh traps its own errors into
+      # /shared/boot.json, which the UI reads and reports directly.
       test: ["CMD", "test", "-f", "/shared/ready"]
       interval: 10s
-      timeout: 3s
-      retries: 90
-      start_period: 60s
-    networks: [default, examnet]
+      timeout: 5s
+      retries: 180
+      start_period: 120s
+      start_interval: 2s
+    # Pinned rather than left to chance. The default gateway is elected
+    # across these two, and today `default` wins only because
+    # kubestronaut-sim_default sorts before _examnet. examnet sets
+    # enable_ip_masquerade=false, so an election that ever flipped would
+    # blackhole every image pull rather than failing fast — indefinite
+    # hangs with no error, the same symptom by another route.
+    networks:
+      default:
+        priority: 100
+      examnet:
+        priority: 10
   # The two exam instances are identical but for their /opt/course and
   # container-storage volumes.
   #
@@ -73,6 +97,18 @@ services:
     devices: ["/dev/fuse"]
     cgroup: host
     networks: [default, examnet]
+    # These containers had no healthcheck at all, so an instance stuck in
+    # its own wait loop was invisible to compose and to `./sim status`.
+    # Checks what actually has to be true for a candidate to work: the
+    # kubeconfig the entrypoint installs, and sshd accepting connections
+    # (the desktop reaches these over ssh, so a listening port is the
+    # thing that matters, not a running process).
+    healthcheck:
+      test: ["CMD", "bash", "-c", "test -f /home/candidate/.kube/config && exec 3<>/dev/tcp/127.0.0.1/22"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
   instance-2:
     build: images/instance
     hostname: instance-2
@@ -92,6 +128,18 @@ services:
     devices: ["/dev/fuse"]
     cgroup: host
     networks: [default, examnet]
+    # These containers had no healthcheck at all, so an instance stuck in
+    # its own wait loop was invisible to compose and to `./sim status`.
+    # Checks what actually has to be true for a candidate to work: the
+    # kubeconfig the entrypoint installs, and sshd accepting connections
+    # (the desktop reaches these over ssh, so a listening port is the
+    # thing that matters, not a running process).
+    healthcheck:
+      test: ["CMD", "bash", "-c", "test -f /home/candidate/.kube/config && exec 3<>/dev/tcp/127.0.0.1/22"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
   registry:
     # Push target for the image-building questions. Plain HTTP, no auth,
     # no host port: it exists only so `podman push` from an instance has
@@ -166,11 +214,18 @@ services:
       - shared:/shared:ro
       - session:/session
     networks: [examnet, controlnet]
-    depends_on:
-      k8s-env: {condition: service_healthy}
-      desktop: {condition: service_healthy}
-      instance-1: {condition: service_started}
-      instance-2: {condition: service_started}
+    # No depends_on, deliberately, and all four entries had to go — not
+    # just the two service_healthy ones. instance-1/2 were only
+    # service_started, but they each depend on k8s-env being healthy, so
+    # leaving them would have re-imposed the entire wait transitively.
+    #
+    # The facilitator used to wait for a healthy k8s-env, which meant port
+    # 8080 served nothing for the whole of a cold first boot: the
+    # candidate's browser was dead for the exact stretch they most needed
+    # to see progress. It now starts immediately and serves a boot screen
+    # driven by /shared/boot.json, and POST /api/session/start refuses
+    # with 409 until the environment is genuinely ready — which is the
+    # protection the dependency was really providing.
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
       interval: 10s

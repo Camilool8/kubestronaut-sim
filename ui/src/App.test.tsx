@@ -12,6 +12,22 @@ const idleSession: SessionSnapshot = {
   durationSeconds: 7200,
   remainingSeconds: 0,
   endReason: "",
+  mode: "exam",
+  untimed: false,
+};
+
+// Every test below is about a *built* environment, so they all report a
+// ready boot. Without it the boot gate covers the screen under test —
+// which is itself the behaviour TestBootGate* below pins down.
+const readyBoot = {
+  state: "ready",
+  phase: "ready",
+  label: "Environment ready",
+  detail: "",
+  error: "",
+  step: 8,
+  totalSteps: 8,
+  startedAt: "",
 };
 
 const exam = {
@@ -89,6 +105,7 @@ function stubFetch() {
         statusPolls++;
         return json(controlStatus);
       }
+      if (url.endsWith("/api/boot")) return json(readyBoot);
       if (url.endsWith("/api/session")) return json(idleSession);
       if (url.endsWith("/api/exam")) return json(exam);
       if (url.endsWith("/api/control/banks")) return json(banks);
@@ -152,6 +169,8 @@ const endedSession: SessionSnapshot = {
   durationSeconds: 7200,
   remainingSeconds: 0,
   endReason: "submitted",
+  mode: "exam",
+  untimed: false,
 };
 
 // GET /api/results returns the flat Results payload on 200 — getControl
@@ -187,6 +206,7 @@ describe("App control failures", () => {
           return new Response("", { status: 502 });
         }
         if (url.endsWith("/api/control/status")) return json({ busy: false });
+        if (url.endsWith("/api/boot")) return json(readyBoot);
         if (url.endsWith("/api/session")) return json(endedSession);
         if (url.endsWith("/api/results")) return json(results);
         if (url.endsWith("/api/exam")) return json(exam);
@@ -223,6 +243,7 @@ describe("App control failures", () => {
           throw new TypeError("Failed to fetch");
         }
         if (url.endsWith("/api/control/status")) return json({ busy: false });
+        if (url.endsWith("/api/boot")) return json(readyBoot);
         if (url.endsWith("/api/session")) return json(endedSession);
         if (url.endsWith("/api/results")) return json(results);
         if (url.endsWith("/api/exam")) return json(exam);
@@ -257,6 +278,7 @@ describe("App control failures", () => {
           throw new TypeError("Failed to fetch");
         }
         if (url.endsWith("/api/control/status")) return json({ busy: false });
+        if (url.endsWith("/api/boot")) return json(readyBoot);
         if (url.endsWith("/api/session")) return json(idleSession);
         if (url.endsWith("/api/exam")) return json(exam);
         if (url.endsWith("/api/control/banks")) return json(banks);
@@ -291,6 +313,7 @@ describe("App session polling", () => {
         const json = (body: unknown, status = 200) =>
           new Response(JSON.stringify(body), { status });
 
+        if (url.endsWith("/api/boot")) return json(readyBoot);
         if (url.endsWith("/api/session")) {
           if (sessionDown) throw new TypeError("Failed to fetch");
           return json(idleSession);
@@ -375,6 +398,7 @@ describe("App control retry", () => {
         if (url.endsWith("/api/control/status")) {
           return json({ busy: false, lastJob: failedJob });
         }
+        if (url.endsWith("/api/boot")) return json(readyBoot);
         if (url.endsWith("/api/session")) return json(idleSession);
         if (url.endsWith("/api/exam")) return json(exam);
         if (url.endsWith("/api/control/banks")) return json(banks);
@@ -388,5 +412,96 @@ describe("App control retry", () => {
 
     const alert = await screen.findByText(/control plane/i);
     expect(alert).toBeInTheDocument();
+  });
+});
+
+// The gate that fixes the dead browser tab: the facilitator now starts
+// before the cluster exists, so during a cold first boot the UI must show
+// what is being built instead of an empty lobby whose Start button leads
+// to a half-seeded environment.
+describe("App boot gate", () => {
+  const bootingBoot = {
+    ...readyBoot,
+    state: "booting",
+    phase: "seed",
+    label: "Setting up the exam questions",
+    detail: "question 7 of 22",
+    step: 7,
+  };
+
+  function stubBoot(boot: unknown, session: SessionSnapshot = idleSession) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        const json = (body: unknown, status = 200) =>
+          new Response(JSON.stringify(body), { status });
+        if (url.endsWith("/api/boot")) return json(boot);
+        if (url.endsWith("/api/session")) return json(session);
+        if (url.endsWith("/api/exam")) return json(exam);
+        if (url.endsWith("/api/control/status")) return json({ busy: false });
+        if (url.endsWith("/api/control/banks")) return json(banks);
+        return json({});
+      }),
+    );
+  }
+
+  test("shows build progress instead of the lobby while the environment is still starting", async () => {
+    stubBoot(bootingBoot);
+    render(<App />);
+
+    await screen.findByText("Building your exam environment");
+    expect(screen.getByText("question 7 of 22")).toBeInTheDocument();
+    // The lobby's Start button must not be reachable: the environment it
+    // would start an attempt against does not exist yet.
+    expect(screen.queryByRole("button", { name: /start/i })).not.toBeInTheDocument();
+  });
+
+  test("shows the lobby once the environment reports ready", async () => {
+    stubBoot(readyBoot);
+    render(<App />);
+
+    await screen.findByText("CKAD Mock Exam 01", { selector: "h1" });
+    expect(screen.queryByText("Building your exam environment")).not.toBeInTheDocument();
+  });
+
+  // `./sim down` + `./sim up` mid-attempt resumes a session whose
+  // server-side timer never stopped. Covering it with a progress screen
+  // would hide a clock that is still counting down.
+  test("a running attempt wins over a not-ready environment", async () => {
+    stubBoot(bootingBoot, {
+      state: "running",
+      bank: "ckad-mock-01",
+      startedAt: "2026-07-25T12:00:00Z",
+      durationSeconds: 7200,
+      remainingSeconds: 3600,
+      endReason: "",
+      mode: "exam",
+      untimed: false,
+    });
+    render(<App />);
+
+    await waitFor(() =>
+      expect(screen.queryByText("Building your exam environment")).not.toBeInTheDocument(),
+    );
+  });
+
+  // A boot that died must say so, and must offer the one action that
+  // actually retries it, rather than looking like a boot still in flight.
+  test("reports a failed boot with its error and a retry", async () => {
+    stubBoot({
+      ...bootingBoot,
+      state: "failed",
+      phase: "cni",
+      label: "Installing the pod network",
+      error: "step failed: kubectl apply -f /opt/sim/calico.yaml (exit 1)",
+    });
+    render(<App />);
+
+    await screen.findByText("The exam environment failed to start");
+    // Scoped to the boot panel's own error line: ToastLayer's region is
+    // also role="alert", so an unqualified byRole is ambiguous.
+    expect(screen.getByText(/calico\.yaml/)).toHaveClass("error-text");
+    expect(screen.getByRole("button", { name: "Try building again" })).toBeInTheDocument();
   });
 });

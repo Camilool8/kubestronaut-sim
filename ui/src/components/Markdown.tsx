@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { desktopClipboard } from "../lib/desktopClipboard";
+import { pasteChordLabel } from "../lib/desktopKeymap";
 import { highlightTo } from "../lib/highlight";
 import { strings } from "../strings";
 import { Icon } from "./Icon";
@@ -26,7 +27,7 @@ function CopyableCode({ children }: { children: ReactNode }) {
       kind: outcome === "failed" ? "warning" : "info",
       message:
         outcome === "desktop"
-          ? strings.questionPanel.copiedToDesktop(value)
+          ? strings.questionPanel.copiedToDesktop(value, pasteChordLabel())
           : outcome === "browser"
             ? strings.questionPanel.copied(value)
             : strings.questionPanel.copyFailed,
@@ -62,7 +63,7 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
       kind: outcome === "failed" ? "warning" : "info",
       message:
         outcome === "desktop"
-          ? strings.markdown.copiedBlockToDesktop
+          ? strings.markdown.copiedBlockToDesktop(pasteChordLabel())
           : outcome === "browser"
             ? strings.markdown.copiedBlock
             : strings.markdown.copyFailed,

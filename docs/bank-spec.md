@@ -34,8 +34,8 @@ spec:
   instances:                    # ssh targets; 1 or 2 entries, names MUST be
     - name: instance-1          # instance-1 / instance-2 — the compose topology
     - name: instance-2          # is generic so every bank runs unmodified.
-                                # (Per-bank ssh aliases, e.g. cka-1 -> instance-1,
-                                # are a possible future enhancement.)
+                                # (Per-bank ssh aliases are a possible
+                                # future enhancement.)
   questions:
     - id: q01                   # directory name
       instance: instance-1      # where the candidate solves it
@@ -91,8 +91,12 @@ cold boot. It asserts three things:
    the same set.
 
 A bank with no `spec.domainWeights` is exempt from (1) but still subject
-to (2) and (3), so a bank that has not been mapped to a curriculum yet
-(`cka-mock-01`) stays green.
+to (2) and (3), so a bank that has not been mapped to a curriculum
+(`smoke-01`, the hidden switch-test fixture) stays green.
+
+`metadata.hidden: true` keeps a bank out of the lobby while leaving it a
+legal `switch` target. It exists for `smoke-01` and should not be used by
+a real bank — a bank worth shipping is worth listing.
 
 ## Question directory: `banks/<bank-id>/<qid>/`
 
@@ -101,6 +105,7 @@ to (2) and (3), so a bank that has not been mapped to a curriculum yet
 | `question.md`   | Statement shown to the candidate. Must name the instance and any artifact paths (`/opt/course/<n>/...`). |
 | `setup.sh`      | Seeds cluster pre-state. Runs inside `k8s-env` as root with admin `KUBECONFIG`. MUST be idempotent (safe to re-run). |
 | `files/`        | Optional. Copied into `/opt/course/<n>/` on every instance at start, owned by `candidate`. |
+| `hints.md` | optional progressive hints, shown in Training mode |
 | `validate.d/NN_name.sh` | One scoring criterion each, run in lexical order. |
 | `solution.md`   | Full walkthrough, shown after the exam. |
 
@@ -147,15 +152,60 @@ color this section warns about.
 ## Validate script contract
 
 - Executed ON the question's instance, as root, with
-  `KUBECONFIG=/home/candidate/.kube/config`.
+  `KUBECONFIG=/home/candidate/.kube/config` and `BANK=<bank-id>` — the
+  latter so a check can read its own bank's pristine `files/` under
+  `/banks/$BANK/<qid>/files` to prove a reference file was left alone.
 - Header comments (parsed by the grader):
-  `# points: <int>` and `# desc: <one line>`.
+  `# points: <int>` and `# desc: <one line>`. The grader's pattern is
+  exact — `# points: N`, one space, no leading zeros — and
+  `tests/check-lint.sh` enforces it, because a header the weights gate
+  reads and the grader skips makes the two disagree silently about what
+  a question is worth.
+- Source `/banks/_lib/checks.sh` and use its helpers.
 - Exit 0 = criterion met. Non-zero = failed. stdout = short message.
 - Must be side-effect free (never mutate cluster or files).
 - Must finish within 30 seconds. The facilitator runs each check under a
   30s deadline; a check still running past it is killed and scored failed
   (message: "check timed out"), regardless of what it would eventually have
   returned.
+
+### Grade behaviour, not spelling
+
+The rule: **a check that fails a correct answer is worse than no check at
+all.** It teaches the candidate something false about Kubernetes and
+costs them points they earned, and it does so invisibly — they see a red
+row, not a linting complaint.
+
+Read the live API object (`-o jsonpath`, or `-o json | jq`), never the
+manifest as text. The API server normalises field order, indentation and
+quoting before a check sees anything, so `limits` before `requests` is
+byte-identical to the reverse. This is why key ordering has never been
+gradeable here, and it must stay that way.
+
+`/banks/_lib/checks.sh` carries the normalisers. Source it first:
+
+```bash
+set -uo pipefail
+. /banks/_lib/checks.sh
+```
+
+| helper | for |
+|---|---|
+| `milli` / `mib` | quantities by value — `0.1` and `100m` are the same CPU request |
+| `mode_decimal` | octal file modes against the decimal the API stores (`0400` → `256`) |
+| `file_text` | answer files a human typed — strips CRLF and surrounding whitespace |
+| `file_lines_sorted` | list answers, non-blank and trimmed |
+| `same_set` | two lists holding the same members, ignoring order |
+| `contains_kv` | `key = value` with any spacing around the `=` |
+| `contains_pair` | `key value` with any run of whitespace between |
+| `yaml_api_versions` | apiVersions via `yq`, never `grep` |
+| `semver_ge` | versions compared as versions |
+
+`tests/check-lint.sh` fails the build on `diff`, `grep` against a YAML
+path, `kubectl get -o yaml`, `kubectl run`, and `grep -qx`; it warns on a
+fixed `[0]` index. Any line may opt out with `# lint: allow-<rule>` where
+the pattern is genuinely correct. `tests/check-lib.sh` unit-tests the
+helpers themselves. Both are offline and run first in `smoke.sh`.
 
 ## What the cluster provides
 
@@ -247,3 +297,44 @@ loopback on another host, and grading must not vary with either.
   real exam's rule that the docs search is allowed but external search
   results are not. Adding a host here widens what a candidate can reach,
   so keep it to things a documentation page genuinely needs.
+
+
+## Hints: `banks/<bank-id>/<qid>/hints.md`
+
+Optional. One file, `## Hint N` headings, tiers numbered from 1:
+
+```markdown
+## Hint 1
+
+Which field decides this? `kubectl explain` knows.
+
+## Hint 2
+
+`spec.selector` on the Service against `--show-labels` on the Pods.
+```
+
+Text before the first heading is ignored, so an author can leave a note.
+Bodies render through the same Markdown component the question does, so
+fenced blocks get their copy buttons for free.
+
+The rules, enforced by `tests/bank-hints.sh`:
+
+- **exactly two tiers**, numbered 1 and 2, neither empty
+- **a hint is not the solution.** A tier sharing 120+ consecutive
+  characters with `solution.md` fails the build. A "hint" a candidate can
+  paste removes the exercise while looking like help, and nothing else in
+  the repo would catch it.
+- tier 1 points at the *concept* ("which field controls this?"); tier 2
+  names the exact resource, field or flag — but still does not write the
+  answer out.
+
+Hints are served one tier at a time by
+`GET /api/questions/{id}/hints/{n}`, gated on the attempt being in
+Training mode. A bank with no `hints.md` files is valid; the tray simply
+does not appear.
+
+## Attempt modes
+
+`spec.duration` is the Exam clock. `spec.speedDuration` is optional and
+defaults to half of it — that is Speed mode. Training has no clock at
+all, which is also the project's answer to WCAG 2.2.1 Timing Adjustable.

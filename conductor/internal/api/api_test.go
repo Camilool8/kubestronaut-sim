@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -19,6 +20,13 @@ type fakeOps struct {
 	switchErr error
 	active    string
 	banks     []string
+	reseedErr error
+	reseeded  []string
+}
+
+func (f *fakeOps) Reseed(_ context.Context, qid string) error {
+	f.reseeded = append(f.reseeded, qid)
+	return f.reseedErr
 }
 
 func (f *fakeOps) StartReset() (job.Job, error) {
@@ -26,6 +34,16 @@ func (f *fakeOps) StartReset() (job.Job, error) {
 		return job.Job{}, f.resetErr
 	}
 	return f.store.Begin("reset", "", []job.PhaseSpec{{ID: "verify", Label: "Verify"}})
+}
+
+// post issues a JSON POST and returns the recorder.
+func post(t *testing.T, h http.Handler, path, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	h.ServeHTTP(rec, req)
+	return rec
 }
 
 func newTestAPI(t *testing.T) (*fakeOps, http.Handler) {
@@ -163,6 +181,57 @@ func TestSwitchEndpointStatusMapping(t *testing.T) {
 			h.ServeHTTP(rec, req)
 			if rec.Code != c.want {
 				t.Fatalf("switch(%s) = %d, want %d, body=%s", c.name, rec.Code, c.want, rec.Body.String())
+			}
+		})
+	}
+}
+
+// Re-seed is synchronous and returns a plain ok — unlike reset/switch,
+// which hand back a job to poll. Returning 202 + a job here would make
+// the UI wait on a job store that will never mention it.
+func TestReseedReturnsOKSynchronously(t *testing.T) {
+	ops, h := newTestAPI(t)
+
+	rec := post(t, h, "/api/control/reseed", `{"question":"q07"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200, body=%s", rec.Code, rec.Body.String())
+	}
+	if len(ops.reseeded) != 1 || ops.reseeded[0] != "q07" {
+		t.Errorf("reseeded = %v, want [q07]", ops.reseeded)
+	}
+}
+
+func TestReseedRequiresAQuestion(t *testing.T) {
+	_, h := newTestAPI(t)
+	for _, body := range []string{`{}`, `{"question":""}`, `not json`} {
+		rec := post(t, h, "/api/control/reseed", body)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("body %q: status = %d, want 400", body, rec.Code)
+		}
+	}
+}
+
+// The three sentinels the browser can actually provoke must each land on
+// a status the UI can tell apart: a bad id is the caller's fault, a
+// running reset is temporary, and the wrong mode is a rule.
+func TestReseedErrorsMapToStatuses(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want int
+	}{
+		{"unknown question", control.ErrUnknownQuestion, http.StatusBadRequest},
+		{"already reseeding", control.ErrReseedBusy, http.StatusConflict},
+		{"a job is running", job.ErrBusy, http.StatusConflict},
+		{"not training", control.ErrNotTraining, http.StatusForbidden},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ops, h := newTestAPI(t)
+			ops.reseedErr = c.err
+			rec := post(t, h, "/api/control/reseed", `{"question":"q07"}`)
+			if rec.Code != c.want {
+				t.Errorf("status = %d, want %d", rec.Code, c.want)
 			}
 		})
 	}

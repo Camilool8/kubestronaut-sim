@@ -35,6 +35,26 @@ const (
 	stateEnded   = "ended"
 )
 
+// Attempt modes. Mode is chosen once at Start and is immutable for the
+// life of an attempt — every gate that depends on it (hints, solutions,
+// mid-attempt grading) reads server-side state, never a request field.
+const (
+	// ModeExam is the real thing: the bank's duration, no help.
+	ModeExam = "exam"
+	// ModeTraining is untimed, with hints and solutions available while
+	// the attempt runs. This is also the answer to WCAG 2.2.1 Timing
+	// Adjustable, which a fixed unpausable countdown cannot satisfy.
+	ModeTraining = "training"
+	// ModeSpeed is half the bank's duration and no help, for candidates
+	// who want the clock to hurt more than the real one does.
+	ModeSpeed = "speed"
+)
+
+// ValidMode reports whether s names a mode this build understands.
+func ValidMode(s string) bool {
+	return s == ModeExam || s == ModeTraining || s == ModeSpeed
+}
+
 // reasonExpired is the EndReason the package itself assigns when a
 // running session is ended by the timer or a lazy expiry check, as
 // opposed to reasons supplied by callers of End (e.g. "submitted").
@@ -57,6 +77,13 @@ type Manager struct {
 	onExpire func()
 	timer    *time.Timer
 
+	// mode and attemptDur belong to the CURRENT attempt, not to the
+	// manager: dur above is only the default Start falls back to. They
+	// are persisted, so a resumed attempt keeps the clock it was started
+	// with even if the process default has since changed.
+	mode       string
+	attemptDur time.Duration
+
 	state      string
 	attempt    string
 	startedAt  time.Time
@@ -72,8 +99,13 @@ type Snapshot struct {
 	Bank             string    // the bank this manager (and any session) belongs to
 	StartedAt        time.Time // zero when never started
 	DurationSeconds  int
-	RemainingSeconds int    // 0 when not running
+	RemainingSeconds int    // 0 when not running, and when untimed
 	EndReason        string // "" | "submitted" | "expired"
+	Mode             string // "exam" | "training" | "speed"
+	// Untimed is true for a training attempt. Callers must branch on this
+	// rather than on RemainingSeconds == 0, which is also what an expired
+	// attempt looks like.
+	Untimed bool
 }
 
 // persistedState is the on-disk JSON shape written and read at path.
@@ -94,14 +126,17 @@ type persistedState struct {
 	DurationSeconds int             `json:"durationSeconds"`
 	EndedAt         *time.Time      `json:"endedAt"`
 	EndReason       string          `json:"endReason"`
+	Mode            string          `json:"mode"`
 	Results         json.RawMessage `json:"results,omitempty"`
 	GradeError      string          `json:"gradeError"`
 }
 
 // persistedVersion is the on-disk format this build reads and writes.
-// Version 1 files predate bank identity and attempt tokens; they are
-// discarded on load (treated as belonging to an unknown bank).
-const persistedVersion = 2
+// Version 1 files predate bank identity and attempt tokens; version 2
+// predates attempt modes. Both are discarded on load by the existing
+// version guard, which is the whole migration: a discarded file starts
+// the session idle, and an idle session has no mode to migrate.
+const persistedVersion = 3
 
 // New loads the session persisted at path, or starts idle if the file is
 // missing or unreadable/corrupt (any non-missing read or parse failure is
@@ -172,6 +207,16 @@ func New(path, bank string, dur time.Duration, clock func() time.Time, onExpire 
 	m.state = doc.State
 	m.attempt = doc.Attempt
 	m.startedAt = doc.StartedAt
+	// The attempt resumes with the clock it was STARTED with, read back
+	// off disk — v2 already wrote DurationSeconds and then ignored it on
+	// load, so a resumed attempt silently inherited whatever the process
+	// default happened to be. That is also what makes an untimed
+	// training attempt survive `./sim down` + `./sim up`.
+	m.attemptDur = time.Duration(doc.DurationSeconds) * time.Second
+	m.mode = doc.Mode
+	if m.mode == "" {
+		m.mode = ModeExam
+	}
 	m.endReason = doc.EndReason
 	m.results = doc.Results
 	m.gradeError = doc.GradeError
@@ -180,7 +225,14 @@ func New(path, bank string, dur time.Duration, clock func() time.Time, onExpire 
 	}
 
 	if m.state == stateRunning {
-		if m.remainingLocked() <= 0 {
+		switch {
+		case m.untimedLocked():
+			// A resumed training attempt has no deadline and needs no
+			// timer. Without this branch it takes the expiry path below
+			// — remainingLocked on a zero duration is always <= 0 — so
+			// every `./sim down` + `./sim up` would silently end an
+			// untimed attempt the moment the process came back.
+		case m.remainingLocked() <= 0:
 			if err := m.transitionToEndedLocked(reasonExpired); err != nil {
 				// Rolled back to running with no time left; there is no
 				// timer to retry this (remaining is already <= 0), so it
@@ -188,7 +240,7 @@ func New(path, bank string, dur time.Duration, clock func() time.Time, onExpire 
 				// lazy-expiry backstop retries the persist.
 				fmt.Fprintf(os.Stderr, "session: persist expiry on load %s: %v\n", path, err)
 			}
-		} else {
+		default:
 			m.armTimerLocked(m.remainingLocked())
 		}
 	}
@@ -202,15 +254,23 @@ func New(path, bank string, dur time.Duration, clock func() time.Time, onExpire 
 // fails, the in-memory state is rolled back to idle (so a caller sees a
 // clean error and can retry) rather than left running with nothing
 // written to disk.
-func (m *Manager) Start() (Snapshot, error) {
+// mode selects the attempt's rules and dur its clock; dur <= 0 means
+// untimed. Passing an unknown mode is a programming error and is
+// rejected rather than silently treated as an exam.
+func (m *Manager) Start(mode string, dur time.Duration) (Snapshot, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if !ValidMode(mode) {
+		return Snapshot{}, fmt.Errorf("session: start: unknown mode %q", mode)
+	}
 	if m.state != stateIdle {
 		return Snapshot{}, fmt.Errorf("session: start: %w", ErrConflict)
 	}
 
 	prev := m.captureLocked()
+	m.mode = mode
+	m.attemptDur = dur
 	m.state = stateRunning
 	m.attempt = newAttemptToken()
 	m.startedAt = m.clock()
@@ -223,7 +283,7 @@ func (m *Manager) Start() (Snapshot, error) {
 		m.restoreLocked(prev)
 		return Snapshot{}, fmt.Errorf("session: start: %w", err)
 	}
-	m.armTimerLocked(m.dur)
+	m.armTimerLocked(m.attemptDur)
 
 	return m.snapshotLocked(), nil
 }
@@ -404,6 +464,12 @@ func (m *Manager) Results() (results json.RawMessage, gradeError string, graded 
 // failed transition leaves no observable trace instead of committing an
 // in-memory change the disk never saw.
 type mutableFields struct {
+	// Included so a Start whose persist fails rolls the attempt's mode
+	// and clock back too, not just its state — otherwise a failed
+	// training Start would leave an idle session claiming to be untimed.
+	mode       string
+	attemptDur time.Duration
+
 	state      string
 	attempt    string
 	startedAt  time.Time
@@ -417,6 +483,8 @@ type mutableFields struct {
 // The caller must hold m.mu.
 func (m *Manager) captureLocked() mutableFields {
 	return mutableFields{
+		mode:       m.mode,
+		attemptDur: m.attemptDur,
 		state:      m.state,
 		attempt:    m.attempt,
 		startedAt:  m.startedAt,
@@ -430,6 +498,8 @@ func (m *Manager) captureLocked() mutableFields {
 // restoreLocked reverts the fields captureLocked snapshotted. The caller
 // must hold m.mu.
 func (m *Manager) restoreLocked(f mutableFields) {
+	m.mode = f.mode
+	m.attemptDur = f.attemptDur
 	m.state = f.state
 	m.attempt = f.attempt
 	m.startedAt = f.startedAt
@@ -439,11 +509,16 @@ func (m *Manager) restoreLocked(f mutableFields) {
 	m.gradeError = f.gradeError
 }
 
-// remainingLocked returns the time left until expiry (dur since
-// startedAt as measured by clock()), clamped to zero. The caller must
-// hold m.mu.
+// untimedLocked reports whether the current attempt has no deadline.
+// Training attempts do not, which is the point of them.
+func (m *Manager) untimedLocked() bool { return m.attemptDur <= 0 }
+
+// remainingLocked returns the time left until expiry (the attempt's own
+// duration since startedAt as measured by clock()), clamped to zero. It
+// is meaningless for an untimed attempt — callers must check
+// untimedLocked first. The caller must hold m.mu.
 func (m *Manager) remainingLocked() time.Duration {
-	remaining := m.dur - m.clock().Sub(m.startedAt)
+	remaining := m.attemptDur - m.clock().Sub(m.startedAt)
 	if remaining < 0 {
 		remaining = 0
 	}
@@ -457,7 +532,11 @@ func (m *Manager) remainingLocked() time.Duration {
 // fails, so a transient disk error never reports an expiry that didn't
 // durably happen. The caller must hold m.mu.
 func (m *Manager) checkExpiryLocked() bool {
-	if m.state != stateRunning || m.remainingLocked() > 0 {
+	// The untimed guard comes first and is load-bearing: remainingLocked
+	// on a zero duration is always 0, so without it every training
+	// attempt would be ended by the lazy expiry check on its very first
+	// Snapshot.
+	if m.state != stateRunning || m.untimedLocked() || m.remainingLocked() > 0 {
 		return false
 	}
 	if err := m.transitionToEndedLocked(reasonExpired); err != nil {
@@ -491,6 +570,14 @@ func (m *Manager) transitionToEndedLocked(reason string) error {
 // m.mu.
 func (m *Manager) armTimerLocked(d time.Duration) {
 	m.stopTimerLocked()
+	// No deadline means no timer. time.AfterFunc(0, ...) fires almost
+	// immediately, so arming a training attempt would end it on the spot
+	// — the exact opposite of untimed. A negative d, by contrast, means
+	// an attempt resumed after its deadline already passed, and SHOULD
+	// fire at once.
+	if m.untimedLocked() {
+		return
+	}
 	if d < 0 {
 		d = 0
 	}
@@ -521,14 +608,26 @@ func (m *Manager) onTimerFire() {
 // snapshotLocked builds a Snapshot from the current in-memory state. The
 // caller must hold m.mu.
 func (m *Manager) snapshotLocked() Snapshot {
+	// Idle reports the manager's default duration, because there is no
+	// attempt yet and the lobby still needs a number to show. Once an
+	// attempt exists, its own clock is the only truthful answer.
+	duration := m.dur
+	mode := m.mode
+	if m.state == stateIdle {
+		mode = ""
+	} else {
+		duration = m.attemptDur
+	}
 	snap := Snapshot{
 		State:           m.state,
 		Bank:            m.bank,
 		StartedAt:       m.startedAt,
-		DurationSeconds: int(m.dur.Seconds()),
+		DurationSeconds: int(duration.Seconds()),
 		EndReason:       m.endReason,
+		Mode:            mode,
+		Untimed:         m.state != stateIdle && m.untimedLocked(),
 	}
-	if m.state == stateRunning {
+	if m.state == stateRunning && !m.untimedLocked() {
 		snap.RemainingSeconds = int(m.remainingLocked().Seconds())
 	}
 	return snap
@@ -544,8 +643,12 @@ func (m *Manager) persistLocked() error {
 		Attempt:         m.attempt,
 		State:           m.state,
 		StartedAt:       m.startedAt,
-		DurationSeconds: int(m.dur.Seconds()),
+		// The ATTEMPT's duration, not the manager default — this is what
+		// a resume reads back, so a training attempt must persist as 0
+		// and stay untimed across a restart.
+		DurationSeconds: int(m.attemptDur.Seconds()),
 		EndReason:       m.endReason,
+		Mode:            m.mode,
 		Results:         m.results,
 		GradeError:      m.gradeError,
 	}

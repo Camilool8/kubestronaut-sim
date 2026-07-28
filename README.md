@@ -2,9 +2,9 @@
 
 Open-source, killer.sh-style exam simulator for the Kubestronaut
 certifications. Deliberately harder than the real exams. A full
-**22-question CKAD bank** covering all five curriculum domains, plus a
-short CKA bank; KCNA/KCSA (multiple choice) and CKS are on the roadmap
-and appear in the catalog as coming soon.
+**22-question CKAD bank** covering all five curriculum domains. CKA,
+KCNA/KCSA (multiple choice) and CKS are on the roadmap and appear in the
+catalog as coming soon.
 
 **Status: Milestone G — an environment the exam can be tested against.**
 Calico replaces kindnet so NetworkPolicies are genuinely enforced;
@@ -25,8 +25,16 @@ the app's About panel.)
 Requires Docker Desktop (or docker + compose v2). ~9GB RAM free (XFCE
 desktop included).
 
+    ./sim doctor                 # optional: RAM, disk, cgroups, warm volumes
     ./sim up                     # boots everything (first run: several minutes)
     open http://localhost:8080   # then never touch the CLI again
+
+`up` prints each build step as it completes, and the UI comes up
+immediately — before the cluster does — so `http://localhost:8080` shows
+the same progress the terminal does, with per-step durations. A build
+that fails says which step failed and why, rather than waiting out a
+timeout. `./sim doctor` catches the environmental problems (not enough
+RAM, no disk) that are cheaper to find before a boot than during one.
 
 Ports bind to **all interfaces** by default, so you can build the
 environment on a desktop and sit the exam from a laptop on the same
@@ -50,7 +58,14 @@ the full environment rebuild with a live progress checklist that shows
 each step's duration and the cluster's own output as it goes.
 
 **Click any value in a question to copy it**, then paste in the exam
-terminal with Ctrl+Shift+V. Resource names, labels, image tags and
+terminal with Ctrl+Shift+V — or just ⌘V on a Mac, which the page
+translates for you along with ⌘C, ⌘K, ⌘←/→ and ⌥←/→ (toggle it, and see
+the full list, from the keyboard button in the exam topbar; `?` opens the
+same reference). Anything else in your clipboard reaches the desktop
+through the **Clipboard** panel beside it — ⌘V/Ctrl+V over the desktop
+does it in one keystroke where your browser allows reading the clipboard,
+and the panel is the fallback where it doesn't (Firefox, or a denied
+permission). Resource names, labels, image tags and
 `/opt/course` paths all have to be exact, and retyping them is how
 avoidable zeros happen. Code listings in both questions and solutions
 carry a language label and a copy-whole-block button, and highlighting
@@ -134,6 +149,7 @@ API; the boundary being defended is privilege, not candidate access.
     ./sim down               # stop (state persists — resume where you left off)
     ./sim purge              # stop and delete all volumes (full clean slate)
     ./sim reset              # same code path as the UI's New attempt button
+    ./sim doctor             # preflight: RAM, disk, cgroups, warm volumes
     ./sim ssh instance-1     # dev shortcut into an instance (user: candidate)
     ./sim grade              # killer.sh-style scoreboard (session-independent)
 

@@ -22,7 +22,7 @@ func TestStartMintsAttemptToken(t *testing.T) {
 	if got := m.AttemptToken(); got != "" {
 		t.Fatalf("idle AttemptToken = %q, want empty", got)
 	}
-	if _, err := m.Start(); err != nil {
+	if _, err := m.Start(ModeExam, testDur); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 	tok1 := m.AttemptToken()
@@ -36,7 +36,7 @@ func TestStartMintsAttemptToken(t *testing.T) {
 	if got := m.AttemptToken(); got != "" {
 		t.Fatalf("AttemptToken after Reset = %q, want empty", got)
 	}
-	if _, err := m.Start(); err != nil {
+	if _, err := m.Start(ModeExam, testDur); err != nil {
 		t.Fatalf("second Start: %v", err)
 	}
 	if tok2 := m.AttemptToken(); tok2 == tok1 {
@@ -51,7 +51,7 @@ func TestSetResultsRequiresMatchingToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	if _, err := m.Start(); err != nil {
+	if _, err := m.Start(ModeExam, testDur); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 	tok := m.AttemptToken()
@@ -82,7 +82,7 @@ func TestSetResultsStaleAcrossFullSecondLifecycle(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	if _, err := m.Start(); err != nil {
+	if _, err := m.Start(ModeExam, testDur); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 	tok1 := m.AttemptToken()
@@ -95,7 +95,7 @@ func TestSetResultsStaleAcrossFullSecondLifecycle(t *testing.T) {
 	if err := m.Reset(); err != nil {
 		t.Fatalf("Reset: %v", err)
 	}
-	if _, err := m.Start(); err != nil {
+	if _, err := m.Start(ModeExam, testDur); err != nil {
 		t.Fatalf("second Start: %v", err)
 	}
 	setClock(start.Add(2 * time.Minute))
@@ -122,7 +122,7 @@ func TestNewDiscardsPersistedSessionFromOtherBank(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	if _, err := m1.Start(); err != nil {
+	if _, err := m1.Start(ModeExam, testDur); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 
@@ -164,7 +164,7 @@ func TestBankResumedAndExposed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	if _, err := m1.Start(); err != nil {
+	if _, err := m1.Start(ModeExam, testDur); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 	tok := m1.AttemptToken()

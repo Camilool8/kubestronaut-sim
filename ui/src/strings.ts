@@ -31,6 +31,7 @@ export const strings = {
     // below is the thing that will not work.
     examFailed: (detail: string) =>
       `Couldn't load this exam's summary (${detail}). The facilitator may still be starting — check it with \`docker compose ps facilitator\`.`,
+    modeLegend: "How do you want to run this?",
     startExam: "Start Exam",
     starting: "Starting…",
     catalogErrorTitle: "Couldn't load the exam catalog",
@@ -54,6 +55,12 @@ export const strings = {
     endFailed: (detail: string) =>
       `Couldn't submit the exam (${detail}). The session is still running — try again, or submit from a desktop.`,
     confirmTitle: "End the exam?",
+    reviewMarked: (n: number) =>
+      n === 1 ? "1 question is marked for review:" : `${n} questions are marked for review:`,
+    // "Never opened" rather than "unanswered": the UI knows it rendered
+    // the text, not whether the work was done.
+    reviewUnseen: (n: number) =>
+      n === 1 ? "1 question was never opened:" : `${n} questions were never opened:`,
     confirmBody:
       "This cannot be undone. The desktop will lock immediately and grading will begin.",
     cancel: "Cancel",
@@ -67,6 +74,9 @@ export const strings = {
     // digit-by-digit with the colons. The glyphs are hidden from assistive
     // tech and this spoken form carries the same value instead.
     timeRemaining: (spoken: string) => `Time remaining: ${spoken}`,
+    // Training counts up: there is no deadline, and a frozen 00:00 would
+    // read as an attempt that had already run out.
+    timeElapsed: (span: string) => `Time elapsed: ${span}`,
   },
 
   questionPanel: {
@@ -94,7 +104,10 @@ export const strings = {
     points: (points: number) => `${points} pts`,
     sshHint: (instance: string) => `ssh ${instance}`,
     copyValue: (value: string) => `Copy ${value}`,
-    copiedToDesktop: (value: string) => `Copied ${value} — paste with Ctrl+Shift+V`,
+    // Takes the chord because it differs by platform: a Mac candidate
+    // with translation on presses ⌘V, everyone else Ctrl+Shift+V. See
+    // lib/desktopKeymap.pasteChordLabel.
+    copiedToDesktop: (value: string, chord: string) => `Copied ${value} — paste with ${chord}`,
     copied: (value: string) => `Copied ${value}`,
     copyFailed: "Could not copy that value.",
   },
@@ -103,7 +116,7 @@ export const strings = {
     plainLanguage: "text",
     copyBlock: "Copy",
     copyBlockLabel: (language: string) => `Copy ${language} code block`,
-    copiedBlockToDesktop: "Copied to the exam desktop — paste with Ctrl+Shift+V.",
+    copiedBlockToDesktop: (chord: string) => `Copied to the exam desktop — paste with ${chord}.`,
     copiedBlock: "Copied to the clipboard.",
     copyFailed: "Couldn't copy that.",
   },
@@ -130,7 +143,7 @@ export const strings = {
     legend: [
       {
         title: "Questions",
-        body: "Step through with ‹ and ›, or the [ and ] keys. Click the question number to see all of them at once and jump anywhere. The chip below names the instance to ssh into. Click any value in the text — a name, a label, an image tag, a path — to copy it, then paste in the desktop terminal with Ctrl+Shift+V.",
+        body: "Step through with ‹ and ›, or the [ and ] keys. Click the question number to see all of them at once and jump anywhere. The chip below names the instance to ssh into. Click any value in the text — a name, a label, an image tag, a path — to copy it, then paste in the desktop terminal.",
       },
       {
         title: "Exam desktop",
@@ -216,6 +229,115 @@ export const strings = {
     cancel: "Cancel",
   },
 
+  modes: {
+    exam: {
+      label: "Exam",
+      blurb: (mins: number) => `${mins} minutes. No hints, no solutions — the real thing.`,
+    },
+    training: {
+      label: "Training",
+      // Named as the accessibility answer as well as the study one:
+      // a countdown that cannot be paused fails WCAG 2.2.1, and this is
+      // the way out of it.
+      blurb: () =>
+        "Untimed. Hints and solutions on demand, and you can score your work without ending the attempt.",
+    },
+    speed: {
+      label: "Speed",
+      blurb: (mins: number) => `${mins} minutes — half the usual. No hints. For pacing practice.`,
+    },
+  },
+
+  hints: {
+    // "Hint 1 of 2" rather than a bare "Hint": knowing how many are left
+    // is what makes taking the first one feel affordable.
+    show: (tier: number, total: number) => `Show hint ${tier} of ${total}`,
+    heading: (tier: number, total: number) => `Hint ${tier} of ${total}`,
+    showSolution: "Show solution",
+    reseed: "Reset this question",
+    reseeding: "Resetting…",
+    reseedTitle: "Reset this question?",
+    // Said plainly: this is the one control in training mode that
+    // destroys work, and "reset" is a word people click without reading.
+    reseedBody:
+      "This re-runs the question's setup, putting it back exactly as it started. Anything you have done for this question is discarded. Other questions are untouched.",
+    reseedConfirm: "Reset it",
+    reseedDone: "Question reset to its starting state.",
+    reseedFailed: (detail: string) => `Couldn't reset that question (${detail}).`,
+    examOnly: "Hints are available in Training mode.",
+    failed: (detail: string) => `Couldn't load that hint (${detail}).`,
+  },
+
+  practice: {
+    scoreNow: "Score my work",
+    scoring: "Scoring…",
+    title: "Your work so far",
+    // Said out loud because a mid-attempt score is the one number a
+    // candidate is most likely to over-read.
+    note: "Not recorded, and not your final score — this is where you stand right now.",
+    close: "Close",
+    failed: (detail: string) => `Couldn't score right now (${detail}).`,
+  },
+
+  clipboard: {
+    title: "Clipboard",
+    open: "Clipboard",
+    // Shown when the browser refuses navigator.clipboard.readText —
+    // always in Firefox, and in Chrome until the permission is granted.
+    // Names the way out rather than the API that said no.
+    blocked: "Your browser won't let this page read the clipboard. Use the Clipboard panel to send text to the desktop.",
+    toDesktopLabel: "Send to the exam desktop",
+    toDesktopHint: "Paste here, then Send. Useful for anything the desktop cannot read from your clipboard directly.",
+    send: "Send",
+    sent: "Sent to the exam desktop.",
+    sendFailed: "No desktop connected.",
+    fromDesktopLabel: "Copied on the exam desktop",
+    // The desktop pushes its clipboard here on every explicit copy;
+    // taking it into the host clipboard needs a click, because browsers
+    // require a real gesture for a clipboard write.
+    fromDesktopEmpty: "Nothing yet. Copy something in the exam terminal and it appears here.",
+    copyToHost: "Copy",
+    copiedToHost: "Copied to your clipboard.",
+  },
+  keyboard: {
+    settingsLabel: "Keyboard",
+    settingsTitle: "Keyboard",
+    macToggle: "Translate Mac shortcuts",
+    macToggleHint:
+      "⌘C and ⌘V become the exam terminal's Ctrl+Shift+C / Ctrl+Shift+V, plus word and line movement. Everything else is passed through untouched.",
+    reservedToggle: "Also map ⌘T and ⌘W",
+    reservedHint:
+      "Off by default: most browsers reserve new tab and close tab, and will act on them before this page can.",
+    helpOpen: "Keyboard shortcuts",
+    helpTitle: "Keyboard shortcuts",
+    helpBrowser: "In the exam page",
+    helpDesktop: "On the exam desktop",
+    helpDesktopNote:
+      "Sent to the desktop instead of what your Mac would normally do. Without this, ⌘ arrives as Super and does nothing.",
+    colPress: "Press",
+    colSends: "Sends",
+    colDoes: "Does",
+    noneMac: "No shortcuts are being translated — this is not a Mac, or translation is switched off.",
+  },
+  boot: {
+    title: "Building your exam environment",
+    // Said plainly because the alternative is a candidate concluding it
+    // has hung and killing it partway — which used to be the rational
+    // read, since nothing on screen changed for the whole of a first run.
+    hint: "First run builds a two-node Kubernetes cluster and sets up every question, which takes several minutes. Later runs resume in seconds. You can leave this tab open.",
+    stepOf: (step: number, total: number, label: string) => `Step ${step} of ${total}: ${label}`,
+    elapsed: (span: string) => `Elapsed ${span}`,
+    progressLabel: "Environment build progress",
+    failedTitle: "The exam environment failed to start",
+    // Names the one command that shows the whole story. A candidate who
+    // hits this needs the log, not reassurance.
+    failedHint:
+      "Nothing was lost — no attempt had started. `docker compose logs k8s-env` has the full output.",
+    retry: "Try building again",
+    // Shown when the browser can reach nothing at all, which during a
+    // cold boot most likely means the container is still coming up.
+    unreachable: "Waiting for the exam services to start…",
+  },
   control: {
     resetTitle: "Rebuilding your exam environment",
     // Takes the exam's catalog title ("CKA Mock Exam 01"), never the
@@ -291,6 +413,14 @@ export const strings = {
     fail: "FAIL",
     pointsDetail: (earned: number, total: number, passingScore: number) =>
       `${earned}/${total} points (passing score ${passingScore}%)`,
+    domainTitle: "By curriculum domain",
+    // The reason this section exists at all: a percentage says whether
+    // you passed, this says what to study.
+    domainHint: "Weakest first. This is where the next hour of study pays most.",
+    domainColumn: "Domain",
+    domainScore: "Score",
+    domainUnknown: "Unclassified",
+    modeNote: (mode: string) => `${mode} attempt — not a comparable exam result.`,
     endReason: (reason: string) =>
       reason === "expired"
         ? "Session ended automatically: time expired."
@@ -302,6 +432,16 @@ export const strings = {
     checkPassed: "Passed:",
     checkFailed: "Failed:",
     showSolution: "Show solution",
+    reseed: "Reset this question",
+    reseeding: "Resetting…",
+    reseedTitle: "Reset this question?",
+    // Said plainly: this is the one control in training mode that
+    // destroys work, and "reset" is a word people click without reading.
+    reseedBody:
+      "This re-runs the question's setup, putting it back exactly as it started. Anything you have done for this question is discarded. Other questions are untouched.",
+    reseedConfirm: "Reset it",
+    reseedDone: "Question reset to its starting state.",
+    reseedFailed: (detail: string) => `Couldn't reset that question (${detail}).`,
     loadingSolution: "Loading solution…",
   },
 } as const;

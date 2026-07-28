@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import RFB from "@novnc/novnc";
 import { desktopClipboard } from "../lib/desktopClipboard";
+import { desktopKeymap } from "../lib/desktopKeymap";
 import { desktopResize } from "../lib/desktopResize";
+import { toastStore } from "./toastStore";
 import { strings } from "../strings";
 import { PendingBar } from "./Pending";
 
@@ -68,13 +70,15 @@ export function DesktopViewport({ onStateChange }: DesktopViewportProps) {
       rfb.background = "transparent";
 
       // Selections made inside the desktop follow the candidate out to
-      // the browser, so copying from the terminal works in both
-      // directions. TigerVNC carries UTF-8 over the extended clipboard
-      // encoding; writeText can still be refused without a gesture, and
-      // that is not worth surfacing.
+      // the browser. This used to call navigator.clipboard.writeText
+      // directly and swallow the failure — but writeText needs transient
+      // user activation and this fires on a WebSocket message, so in
+      // practice it was refused most of the time and the text was simply
+      // dropped. Now it is kept, and the clipboard panel offers a button
+      // to take it, which is a real gesture and therefore actually works.
       rfb.addEventListener("clipboard", (event: CustomEvent<{ text: string }>) => {
         const text = event.detail?.text;
-        if (text) void navigator.clipboard?.writeText(text).catch(() => {});
+        if (text) desktopClipboard.receive(text);
       });
 
       rfb.addEventListener("connect", () => {
@@ -90,12 +94,15 @@ export function DesktopViewport({ onStateChange }: DesktopViewportProps) {
           // gesture costs one server-side framebuffer change, not one per
           // frame. See lib/desktopResize.ts.
           desktopResize.attach(rfb);
+          // ⌘-chord translation for Mac keyboards. See lib/desktopKeymap.ts.
+          desktopKeymap.attach(rfb);
         }
       });
       rfb.addEventListener("disconnect", () => {
         if (rfb) {
           desktopClipboard.disconnect(rfb);
           desktopResize.detach(rfb);
+          desktopKeymap.detach(rfb);
         }
         if (disposed) return;
         report("disconnected");
@@ -118,6 +125,7 @@ export function DesktopViewport({ onStateChange }: DesktopViewportProps) {
       if (rfb) {
         desktopClipboard.disconnect(rfb);
         desktopResize.detach(rfb);
+        desktopKeymap.detach(rfb);
       }
       try {
         rfb?.disconnect();
@@ -126,6 +134,64 @@ export function DesktopViewport({ onStateChange }: DesktopViewportProps) {
       }
     };
   }, [onStateChange]);
+
+  // Keyboard interception, in a separate effect from the RFB lifecycle so
+  // the listeners survive a reconnect.
+  //
+  // Capture phase on the MOUNT div, deliberately. noVNC binds its own
+  // keydown/keyup to the canvas it creates inside this element, and a
+  // capture-phase listener on an ancestor runs before a bubble-phase
+  // listener on the descendant target — so this is the only place that
+  // gets to decide before noVNC has already turned ⌘ into Super. The
+  // stopPropagation on a consumed event also means the window-level
+  // listener in QuestionPanel never sees it.
+  useEffect(() => {
+    const mount = mountRef.current;
+    if (!mount) return;
+
+    const consume = (event: KeyboardEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      // Paste is special: it needs the host clipboard, which is async,
+      // so it cannot go through the synchronous chord path. Ctrl+V is
+      // intercepted too — on a PC it means the same thing to the
+      // candidate, and forwarding it raw would put a literal ^V in the
+      // shell.
+      const isPaste =
+        event.key?.toLowerCase() === "v" &&
+        (event.metaKey || event.ctrlKey) &&
+        !event.shiftKey &&
+        !event.altKey;
+      if (isPaste && desktopClipboard.connected) {
+        consume(event);
+        void desktopClipboard.pasteFromHost(() => desktopKeymap.sendPasteChord()).then((outcome) => {
+          if (outcome === "blocked") {
+            toastStore.push({
+              kind: "warning",
+              message: strings.clipboard.blocked,
+              dedupeKey: "clipboard-blocked",
+            });
+          }
+        });
+        return;
+      }
+      if (desktopKeymap.handleKeyDown(event)) consume(event);
+    };
+
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (desktopKeymap.handleKeyUp(event)) consume(event);
+    };
+
+    mount.addEventListener("keydown", onKeyDown, true);
+    mount.addEventListener("keyup", onKeyUp, true);
+    return () => {
+      mount.removeEventListener("keydown", onKeyDown, true);
+      mount.removeEventListener("keyup", onKeyUp, true);
+    };
+  }, []);
 
   return (
     <div className="desktop-viewport">

@@ -12,7 +12,25 @@ Convert to GitHub issues once the repo has a remote.
 - instance: regenerate ssh host keys in entrypoint (currently baked into the image layer, shared across deployments).
 - instance: explicit `chmod 700` on `~/.ssh` dirs (currently relies on build umask).
 - k8s-env: pin `yq-go` apk package explicitly (alpine `yq` alias ambiguity).
-- k8s-env: trap bootstrap failure to log a clear error before container exit (downstream currently sees only healthcheck timeout).
+- ~~k8s-env: trap bootstrap failure to log a clear error before container exit (downstream currently sees only healthcheck timeout)~~ (fixed in Milestone J: `bootstrap.sh` has an `ERR` trap writing `/shared/boot.json` with the failing command, `start.sh` holds the container open on failure so the UI can render it and a retry can still exec in, and the dockerd wait is bounded and guarded on the daemon still being alive).
+
+## Still open after Milestone J
+- **Attempt history.** One attempt record, overwritten per attempt. Score
+  trend over time needs a store in the `session` volume; `PRODUCT.md`
+  still promises nothing about progress, and must keep not doing so
+  until this exists.
+- **Time per question.** `marksStore` records which questions were
+  viewed, not when. Pacing is the most common CKAD failure mode and the
+  score screen cannot currently say anything about it.
+- **Per-question scratchpad notes.**
+- **Node topology.** One control-plane + one worker means exactly ONE
+  schedulable node (kind sets no `nodeRegistration.taints`, so kubeadm's
+  control-plane `NoSchedule` stands). That is why the 22-question CKAD
+  bank contains no affinity, anti-affinity, topology-spread, nodeSelector
+  or toleration question — they are not gradeable. 1 control-plane + 2
+  workers would unlock that category and is the minimum for CKA's
+  drain/cordon and node-failure work. Costs ~+0.5-1GB RAM and 50% more
+  `kind load` time per boot (mitigable with `kind load --nodes`).
 
 ## UX / docs
 - `./sim grade` on a downed stack: friendly "run ./sim up first" message instead of raw compose error.
@@ -20,6 +38,21 @@ Convert to GitHub issues once the repo has a remote.
 - bank-spec: `kubernetesVersion` and `environment.nodes` remain informational (duration/passingScore enforced by Milestone C evaluator).
 - README: mention `k8s-env` runs privileged (DinD requirement).
 - Cross-arch: amd64 build/run path never physically exercised (all local runs arm64) — cover in Milestone D CI.
+
+## Fidelity gaps (deliberate, worth naming)
+- **One cluster, one context.** The real CKA/CKAD exams present several
+  clusters and open each task with "switch context to X"; forgetting to
+  is a classic way to zero a question you actually solved. We ship a
+  single kind cluster and a single context, so that failure mode cannot
+  be rehearsed here. Per-cluster node count already matches (a real CKAD
+  cluster is 1 control-plane + 1 worker, which is what `kind-config.yaml`
+  builds) — it is the *number* of clusters and the context switching that
+  are missing.
+- ~~**No CI.**~~ (fixed in Milestone J: `.github/workflows/ci.yml` runs
+  the four bank validators, `go test` + `go vet` across all three
+  modules, `tsc`/lint/vitest, every image build with `PRELOAD=none`, and
+  a syntax parse of every shell script. `tests/smoke.sh` is deliberately
+  NOT in it — it purges every volume and takes ~35 minutes.)
 
 ## Milestone B (desktop/proxy) — from final review
 - docs-proxy healthcheck + upgrade desktop `depends_on` to `service_healthy` (alpine image has no `curl`; consider a 3-line `/healthz` bypass in the handler or a wget-spider probe).
@@ -116,11 +149,14 @@ Convert to GitHub issues once the repo has a remote.
     was enough to remove `privileged`, and the question tells candidates
     to use `sudo` in any case (as the real exam's does). `SYS_ADMIN` is
     the one worth removing if anyone returns to this.
-- images: bank workload images (`nginx:1.29-alpine` et al) are still
-  pulled from the internet by the kind nodes on every reset. The CNI and
-  ingress images are pre-pulled into the persistent DinD cache and
-  side-loaded with `kind load`; extending `preload_images` to a list the
-  bank declares would make a reset fully offline.
+- ~~images: bank workload images (`nginx:1.29-alpine` et al) are still
+  pulled from the internet by the kind nodes on every reset~~ (fixed in
+  Milestone J: `images/k8s-env/preload.txt` declares them, a `skopeo`
+  build stage bakes them plus the CNI/ingress images to archives under
+  `/opt/sim/images`, and `preload_images` loads archives with `kind load
+  image-archive` before falling back to a pull. `nginx:1.99` and
+  `nginx:0.0.0-corvus-nonexistent` are deliberately excluded — q02 and
+  q11 are built on those tags NOT resolving.)
 - ingress: image digests are stripped from the vendored ingress-nginx
   manifest at build time, because `kind load` names images by tag and a
   kubelet asked for `tag@digest` would go to the network anyway. Version

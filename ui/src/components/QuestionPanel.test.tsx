@@ -8,7 +8,7 @@ import { marksStore } from "./marksStore";
 import type { ExamQuestionInfo } from "../api";
 
 const questions: ExamQuestionInfo[] = [
-  { id: "q01", instance: "instance-1", domain: "Config", weight: 5, totalPoints: 5 },
+  { id: "q01", instance: "instance-1", domain: "Config", weight: 5, totalPoints: 5, hintCount: 0 },
 ];
 
 // Real bank markdown: the values a candidate must reproduce exactly are
@@ -86,9 +86,9 @@ describe("QuestionPanel copy affordance", () => {
 // Three questions across two domains, which is the smallest fixture that
 // exercises both ends of the navigator and the grid's grouping.
 const bank: ExamQuestionInfo[] = [
-  { id: "q01", instance: "instance-1", domain: "Config", weight: 5, totalPoints: 5 },
-  { id: "q02", instance: "instance-2", domain: "Networking", weight: 7, totalPoints: 7 },
-  { id: "q03", instance: "instance-2", domain: "Networking", weight: 9, totalPoints: 9 },
+  { id: "q01", instance: "instance-1", domain: "Config", weight: 5, totalPoints: 5, hintCount: 0 },
+  { id: "q02", instance: "instance-2", domain: "Networking", weight: 7, totalPoints: 7, hintCount: 0 },
+  { id: "q03", instance: "instance-2", domain: "Networking", weight: 9, totalPoints: 9, hintCount: 0 },
 ];
 
 function renderNav(selectedId: string, onSelect: (id: string) => void = () => {}) {

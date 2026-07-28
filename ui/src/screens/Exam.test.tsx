@@ -11,6 +11,8 @@ const runningSession: SessionSnapshot = {
   durationSeconds: 7200,
   remainingSeconds: 600,
   endReason: "",
+  mode: "exam",
+  untimed: false,
 };
 
 afterEach(() => {

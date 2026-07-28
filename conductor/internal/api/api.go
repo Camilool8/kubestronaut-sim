@@ -5,6 +5,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -19,6 +20,11 @@ type Ops interface {
 	StartSwitch(bank string) (job.Job, error)
 	// Banks returns the catalog response body: {active, banks:[...]}.
 	Banks() any
+	// Reseed re-runs one question's setup.sh. Synchronous, unlike the
+	// two above — it returns when the work is done rather than handing
+	// back a job to poll, because it takes seconds and must not take the
+	// single-job lock a cluster rebuild needs.
+	Reseed(ctx context.Context, qid string) error
 }
 
 // New returns the conductor's HTTP handler.
@@ -40,6 +46,21 @@ func New(ops Ops, store *job.Store) http.Handler {
 			return
 		}
 		writeJSON(w, http.StatusAccepted, map[string]any{"job": j})
+	})
+
+	mux.HandleFunc("POST /api/control/reseed", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Question string `json:"question"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Question == "" {
+			writeError(w, http.StatusBadRequest, "body must be JSON with a non-empty \"question\"")
+			return
+		}
+		if err := ops.Reseed(r.Context(), body.Question); err != nil {
+			writeOpError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	})
 
 	mux.HandleFunc("GET /api/control/banks", func(w http.ResponseWriter, r *http.Request) {
@@ -74,6 +95,12 @@ func writeOpError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "a session is running — end the exam first")
 	case errors.Is(err, control.ErrInvalidBank):
 		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, control.ErrUnknownQuestion):
+		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, control.ErrReseedBusy):
+		writeError(w, http.StatusConflict, "a re-seed is already running")
+	case errors.Is(err, control.ErrNotTraining):
+		writeError(w, http.StatusForbidden, err.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, err.Error())
 	}

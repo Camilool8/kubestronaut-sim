@@ -1,0 +1,132 @@
+# Every gate in this repo that does not need a Kubernetes cluster.
+#
+# Until now there were none running automatically: `go test`, `npm test`,
+# `tsc`, and the four bank validators all ran only when someone
+# remembered, and `tests/smoke.sh` — the only thing that runs them
+# together — is destructive and takes ~35 minutes, so nobody runs it on a
+# whim. docs/follow-ups.md has asked for this since Milestone A.
+#
+# Deliberately NOT here: tests/smoke.sh. It purges every volume and
+# builds a two-node cluster; it belongs on a human's machine before a
+# merge, not on every push.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  banks:
+    name: Question banks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # All four are offline and take seconds in total. They are the
+      # cheapest failures in the project and the easiest to introduce:
+      # a mis-weighted question, a check that grades spelling, a hint
+      # that is really the solution.
+      - name: Weights and domain balance
+        run: bash tests/bank-weights.sh
+      - name: Check idioms
+        run: bash tests/check-lint.sh
+      - name: Check helper library
+        run: bash tests/check-lib.sh
+      - name: Hints
+        run: bash tests/bank-hints.sh
+
+  go:
+    name: Go (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [facilitator, conductor, proxy]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache-dependency-path: ${{ matrix.module }}/go.sum
+      # buildvcs=false matches how these are built locally (in a
+      # container over a bind mount, where the .git directory's ownership
+      # makes the VCS stamp fail).
+      - name: Test
+        working-directory: ${{ matrix.module }}
+        env:
+          GOFLAGS: -buildvcs=false
+        run: go test ./...
+      - name: Vet
+        working-directory: ${{ matrix.module }}
+        env:
+          GOFLAGS: -buildvcs=false
+        run: go vet ./...
+
+  ui:
+    name: UI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Never from the repo root: vitest misses ui/vite.config.ts there
+        # and every DOM test fails with "document is not defined".
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
+      - name: Test
+        run: npm test
+
+  images:
+    name: Images build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # PRELOAD=none skips baking ~2GB of image archives. The point here
+      # is that the Dockerfiles still parse and their build steps still
+      # succeed — the archives themselves are verified by actually
+      # booting, which is smoke.sh's job.
+      - name: k8s-env
+        run: docker build --build-arg PRELOAD=none -t sim-k8s-env images/k8s-env
+      - name: instance
+        run: docker build -t sim-instance images/instance
+      - name: desktop
+        run: docker build -t sim-desktop images/desktop
+      - name: facilitator
+        run: docker build -f facilitator/Dockerfile -t sim-facilitator .
+      - name: conductor
+        run: docker build -t sim-conductor conductor
+      - name: docs-proxy
+        run: docker build -t sim-proxy proxy
+      - name: Compose config is valid
+        run: docker compose config -q
+
+  shell:
+    name: Shell syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # smoke.sh cannot be RUN here, but a syntax error in it should not
+      # wait until someone spends 35 minutes finding out.
+      - name: Parse every script
+        run: |
+          fail=0
+          for f in sim tests/*.sh images/*/*.sh banks/_lib/*.sh \
+                   banks/*/q*/setup.sh banks/*/q*/validate.d/*.sh \
+                   tests/solutions/*/*.sh */entrypoint.sh; do
+            [ -e "$f" ] || continue
+            bash -n "$f" || { echo "syntax error: $f"; fail=1; }
+          done
+          exit $fail

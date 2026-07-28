@@ -1,4 +1,4 @@
-FROM docker:27-dind
+FROM docker:27-dind AS sim
 ARG KIND_VERSION=v0.32.0
 ARG KUBECTL_VERSION=v1.35.6
 ARG HELM_VERSION=v3.18.0
@@ -62,7 +62,66 @@ RUN curl -fsSL -o /opt/sim/ingress-nginx.yaml \
     && sed -i 's|@sha256:[0-9a-f]\{64\}||g' /opt/sim/ingress-nginx.yaml \
     && ! grep -q '@sha256:' /opt/sim/ingress-nginx.yaml
 
-COPY kind-config.yaml bootstrap.sh /opt/sim/
+COPY kind-config.yaml bootstrap.sh phase.sh preload.txt /opt/sim/
 COPY start.sh /start.sh
 RUN chmod +x /start.sh /opt/sim/bootstrap.sh
+
+# Image archives, so a cold first boot is a disk copy instead of a
+# download.
+#
+# The obvious approach — pre-pulling into the Docker cache — cannot work
+# here: /var/lib/docker is a named volume, so anything baked at that path
+# is masked the moment the container starts, and first boot pulls ~1.9GB
+# inside DinD anyway. That is the single slowest and flakiest step of a
+# first run, and it is why bootstrap.sh needs pull_retry at all.
+#
+# skopeo writes the same format `docker save` does and needs no daemon,
+# which matters because a RUN cannot be privileged and so cannot host a
+# nested dockerd. The add-on images are read out of the manifests
+# vendored above rather than listed by hand, so bumping CALICO_VERSION or
+# INGRESS_NGINX_VERSION cannot leave a stale list behind.
+#
+# Cost: roughly 2GB on this image. The byte count of a first run is close
+# to a wash — you fetch it as image layers instead of as registry pulls —
+# but layers are parallel, resumable and cached by the outer Docker,
+# where the in-DinD pulls were serial and fragile. The real prize is that
+# every reset after the first needs no network at all.
+#
+# Cross-arch note: skopeo without --override-arch follows the manifest
+# list and docker-archive holds one platform, so this bakes the build
+# host's. Correct for a local build; see docs/follow-ups.md on amd64.
+FROM sim AS preload
+ARG PRELOAD=full
+RUN apk add --no-cache skopeo
+RUN mkdir -p /out && \
+    if [ "$PRELOAD" = "none" ]; then echo "prebaking disabled"; else \
+      { yq -r '[.. | select(has("image")) | .image] | .[]' /opt/sim/calico.yaml; \
+        yq -r '[.. | select(has("image")) | .image] | .[]' /opt/sim/ingress-nginx.yaml; \
+        grep -v '^[[:space:]]*#' /opt/sim/preload.txt; } \
+      | sed '/^[[:space:]]*$/d' | sort -u > /tmp/all.txt && \
+      while read -r img; do \
+        out=/out/$(printf '%s' "$img" | tr '/:@' '___').tar; \
+        echo "baking $img"; \
+        skopeo copy --retry-times 3 "docker://$img" "docker-archive:${out}:${img}"; \
+      done < /tmp/all.txt; \
+    fi
+# The node image is loaded into the inner daemon rather than into a node
+# (there is no node yet when `kind create cluster` runs), so it gets a
+# fixed name start.sh can find without re-deriving the digest.
+#
+# Source and destination are derived separately because skopeo rejects a
+# `repo:tag@digest` reference outright ("references with both a tag and
+# digest are currently not supported"). So: pull by digest, which is
+# where the supply-chain pinning actually lives, and write the archive
+# under the plain tag, which is what a docker-archive can carry and what
+# `kind create --image` must therefore be given.
+RUN if [ "$PRELOAD" = "full" ]; then \
+      ref="${NODE_IMAGE%%@*}"; \
+      repo="${ref%:*}"; \
+      digest="${NODE_IMAGE##*@}"; \
+      skopeo copy --retry-times 3 "docker://${repo}@${digest}" "docker-archive:/out/_node.tar:${ref}"; \
+    fi
+
+FROM sim
+COPY --from=preload /out /opt/sim/images
 ENTRYPOINT ["/start.sh"]

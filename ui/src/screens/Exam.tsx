@@ -1,10 +1,16 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
-import { endSession, getExam, type SessionSnapshot } from "../api";
+import { endSession, getExam, practiceGrade, type Results, type SessionSnapshot } from "../api";
 import { useAsync } from "../lib/useAsync";
 import { TimerBar } from "../components/TimerBar";
 import { QuestionPanel } from "../components/QuestionPanel";
 import { Dialog } from "../components/Dialog";
 import { InfoButton } from "../components/InfoButton";
+import { KeyboardSettings } from "../components/KeyboardSettings";
+import { ShortcutHelp } from "../components/ShortcutHelp";
+import { ClipboardPanel } from "../components/ClipboardPanel";
+import { CheckList } from "../components/CheckList";
+import { Icon } from "../components/Icon";
+import { desktopKeymap } from "../lib/desktopKeymap";
 import { ExamIntro, introSeen, markIntroSeen } from "../components/ExamIntro";
 import { PanelResizer } from "../components/PanelResizer";
 import { PendingBar } from "../components/Pending";
@@ -106,6 +112,56 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [ending, setEnding] = useState(false);
   const [endError, setEndError] = useState<string | null>(null);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [clipboardOpen, setClipboardOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [scoring, setScoring] = useState(false);
+  const [practice, setPractice] = useState<Results | null>(null);
+
+  // Training only. A mid-attempt score is exactly what an exam withholds,
+  // and the endpoint 403s in the other two modes regardless.
+  const scoreNow = async () => {
+    setScoring(true);
+    try {
+      const res = await practiceGrade();
+      if (res.ok) {
+        setPractice(res.results);
+      } else {
+        toastStore.push({
+          kind: "warning",
+          message: strings.practice.failed(res.error),
+          dedupeKey: "practice-grade",
+        });
+      }
+    } catch (err) {
+      toastStore.push({
+        kind: "warning",
+        message: strings.practice.failed(String(err)),
+        dedupeKey: "practice-grade",
+      });
+    } finally {
+      setScoring(false);
+    }
+  };
+
+  // "?" opens the shortcut reference. Guarded exactly like the [ and ]
+  // handler in QuestionPanel: the RFB canvas owns the keyboard while
+  // focused (the candidate is typing into a terminal), and a dialog that
+  // is already open owns it too.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "?") return;
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".desktop-pane")) return;
+      if (target?.closest("input, textarea, [contenteditable]")) return;
+      if (document.querySelector('[role="dialog"]')) return;
+      event.preventDefault();
+      setHelpOpen(true);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
   // First run shows the intro once; after that it is on demand from the
   // About drawer. Marked seen when it opens, not when it closes, so a
   // reload mid-read doesn't make it reappear over a running exam.
@@ -137,6 +193,14 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
   // it the moment the exam landed, which is a render cascade for a value
   // that was always a function of two things already on hand.
   const selectedId = pickedId ?? exam?.questions[0]?.id ?? null;
+
+  // Computed when the confirm dialog opens, not subscribed: the marks
+  // store is only read here, and re-rendering the whole exam screen on
+  // every mark toggle would be a lot of work for a list nobody is
+  // looking at yet.
+  const questionIds = exam?.questions.map((q) => q.id) ?? [];
+  const reviewMarked = confirmOpen ? questionIds.filter((id) => marksStore.isMarked(id)) : [];
+  const reviewUnseen = confirmOpen ? questionIds.filter((id) => !marksStore.isViewed(id)) : [];
 
   const handleConfirmEnd = async () => {
     setEnding(true);
@@ -184,11 +248,44 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
         fetchedAt={fetchedAt}
         title={exam?.title ?? strings.exam.fallbackTitle}
         onEndClick={() => setConfirmOpen(true)}
-        extras={<InfoButton onShowIntro={() => setIntroOpen(true)} />}
+        extras={
+          <>
+            <button
+              className="info-button"
+              onClick={() => setClipboardOpen((v) => !v)}
+              aria-expanded={clipboardOpen}
+              aria-label={strings.clipboard.open}
+              title={strings.clipboard.open}
+            >
+              <Icon name="copy" />
+            </button>
+            {/* Only where it does something: the translation is a macOS
+                affordance, and a toggle that cannot change anything is
+                worse than no toggle. */}
+            {desktopKeymap.isMac && (
+              <button
+                className="info-button"
+                onClick={() => setKeyboardOpen((v) => !v)}
+                aria-expanded={keyboardOpen}
+                aria-label={strings.keyboard.settingsLabel}
+                title={strings.keyboard.settingsLabel}
+              >
+                <Icon name="keyboard" />
+              </button>
+            )}
+            {session.mode === "training" && (
+              <button className="btn" onClick={() => void scoreNow()} disabled={scoring}>
+                {scoring ? strings.practice.scoring : strings.practice.scoreNow}
+              </button>
+            )}
+            <InfoButton onShowIntro={() => setIntroOpen(true)} />
+          </>
+        }
       />
       <div className="exam-body">
         <QuestionPanel
           questions={exam?.questions ?? []}
+          mode={session.mode}
           selectedId={selectedId}
           onSelect={setPickedId}
           open={panelOpen}
@@ -243,6 +340,28 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
       {confirmOpen && (
         <Dialog title={strings.exam.confirmTitle} onClose={() => setConfirmOpen(false)}>
           <p>{strings.exam.confirmBody}</p>
+          {/* Submitting used to be a bare yes/no. The two things a
+              candidate most wants to know at that moment — did I flag
+              anything for another look, and is there a question I never
+              opened — were both already tracked and never shown. Neither
+              blocks the submit; a candidate who is out of time should not
+              have to argue with a dialog. */}
+          {(reviewMarked.length > 0 || reviewUnseen.length > 0) && (
+            <div className="submit-review">
+              {reviewMarked.length > 0 && (
+                <p>
+                  {strings.exam.reviewMarked(reviewMarked.length)}{" "}
+                  <span className="submit-review-ids">{reviewMarked.join(", ")}</span>
+                </p>
+              )}
+              {reviewUnseen.length > 0 && (
+                <p>
+                  {strings.exam.reviewUnseen(reviewUnseen.length)}{" "}
+                  <span className="submit-review-ids">{reviewUnseen.join(", ")}</span>
+                </p>
+              )}
+            </div>
+          )}
           {endError && <p className="error-text">{endError}</p>}
           <div className="confirm-actions">
             <button className="btn" onClick={() => setConfirmOpen(false)} disabled={ending}>
@@ -255,6 +374,45 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
         </Dialog>
       )}
 
+      {/* position: fixed, so it is out of flow entirely. Anything that
+          changes .desktop-pane's box fires noVNC's ResizeObserver and
+          costs a server-side framebuffer resize — the reason QuestionJump
+          is absolutely positioned too (see QuestionPanel). */}
+      {clipboardOpen && <ClipboardPanel onClose={() => setClipboardOpen(false)} />}
+      {keyboardOpen && (
+        <KeyboardSettings
+          onClose={() => setKeyboardOpen(false)}
+          onShowHelp={() => {
+            setKeyboardOpen(false);
+            setHelpOpen(true);
+          }}
+        />
+      )}
+      {helpOpen && <ShortcutHelp onClose={() => setHelpOpen(false)} />}
+      {practice && (
+        <Dialog title={strings.practice.title} onClose={() => setPractice(null)} wide>
+          <p className="score-headline">
+            {practice.earned} / {practice.total} ({practice.percent}%)
+          </p>
+          {/* Said out loud: a mid-attempt score is the number a candidate
+              is most likely to over-read, and it is neither recorded nor
+              final. */}
+          <p className="control-hint">{strings.practice.note}</p>
+          {practice.questions.map((q) => (
+            <details key={q.id} className="score-question">
+              <summary>
+                {q.id} — {q.earned}/{q.total}
+              </summary>
+              <CheckList checks={q.checks} />
+            </details>
+          ))}
+          <div className="control-actions">
+            <button className="btn" onClick={() => setPractice(null)}>
+              {strings.practice.close}
+            </button>
+          </div>
+        </Dialog>
+      )}
       {introOpen && <ExamIntro onClose={() => setIntroOpen(false)} />}
     </div>
   );

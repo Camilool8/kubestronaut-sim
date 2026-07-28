@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,6 +26,10 @@ type Exam struct {
 	Name              string
 	Title             string
 	Duration          time.Duration // parsed from spec.duration, e.g. "120m"
+	// SpeedDuration is the compressed clock for a speed attempt. A bank
+	// may set spec.speedDuration; otherwise it is half Duration, which is
+	// the point of the mode — same questions, materially less time.
+	SpeedDuration     time.Duration
 	PassingScore      int
 	KubernetesVersion string
 	Questions         []Question // in exam.yaml order
@@ -38,6 +43,11 @@ type Question struct {
 	Domain   string
 	Weight   int
 	Checks   []Check // in lexical order of validate.d/*.sh
+	// HintCount is how many tiers <qid>/hints.md declares. Only the count
+	// is loaded at boot; the text is read per request, exactly as
+	// question.md and solution.md already are — so editing a hint needs
+	// no restart, and a bank with no hints is not an error.
+	HintCount int
 }
 
 // Check is one scoring criterion for a question, backed by a single
@@ -58,6 +68,7 @@ type examDoc struct {
 	} `json:"metadata"`
 	Spec struct {
 		Duration          string `json:"duration"`
+		SpeedDuration     string `json:"speedDuration"`
 		PassingScore      int    `json:"passingScore"`
 		KubernetesVersion string `json:"kubernetesVersion"`
 		Questions         []struct {
@@ -88,10 +99,21 @@ func Load(examJSONPath, bankDir string) (*Exam, error) {
 		return nil, fmt.Errorf("exam: parse spec.duration %q: %w", doc.Spec.Duration, err)
 	}
 
+	// Optional, and a malformed value is a bank bug worth failing on
+	// rather than silently halving.
+	speed := dur / 2
+	if doc.Spec.SpeedDuration != "" {
+		speed, err = time.ParseDuration(doc.Spec.SpeedDuration)
+		if err != nil {
+			return nil, fmt.Errorf("exam: parse spec.speedDuration %q: %w", doc.Spec.SpeedDuration, err)
+		}
+	}
+
 	e := &Exam{
 		Name:              doc.Metadata.Name,
 		Title:             doc.Metadata.Title,
 		Duration:          dur,
+		SpeedDuration:     speed,
 		PassingScore:      doc.Spec.PassingScore,
 		KubernetesVersion: doc.Spec.KubernetesVersion,
 	}
@@ -102,11 +124,12 @@ func Load(examJSONPath, bankDir string) (*Exam, error) {
 			return nil, err
 		}
 		e.Questions = append(e.Questions, Question{
-			ID:       q.ID,
-			Instance: q.Instance,
-			Domain:   q.Domain,
-			Weight:   q.Weight,
-			Checks:   checks,
+			ID:        q.ID,
+			Instance:  q.Instance,
+			Domain:    q.Domain,
+			Weight:    q.Weight,
+			Checks:    checks,
+			HintCount: countHints(bankDir, q.ID),
 		})
 	}
 
@@ -203,4 +226,45 @@ func parsePoints(raw string, present bool) (points int, skip bool) {
 		return 0, true
 	}
 	return n, false
+}
+
+// hintHeading matches a tier heading in a question's hints.md.
+//
+// One file with "## Hint N" headings, not one file per tier: every other
+// per-question artifact is a single file per concern (question.md,
+// solution.md), an author writes both tiers in one sitting, and two files
+// across 22 questions is 44 files to keep in step for a structure that
+// will never grow past a handful of tiers.
+var hintHeading = regexp.MustCompile(`(?m)^##\s+Hint\s+\d+\s*$`)
+
+// HintsPath is where a question's hints live.
+func HintsPath(bankDir, qid string) string {
+	return filepath.Join(bankDir, qid, "hints.md")
+}
+
+// countHints returns how many tiers a question declares, or 0 when it
+// has no hints.md. A missing file is the normal case for a bank that has
+// not been given hints, and must never be an error.
+func countHints(bankDir, qid string) int {
+	raw, err := os.ReadFile(HintsPath(bankDir, qid))
+	if err != nil {
+		return 0
+	}
+	return len(hintHeading.FindAllIndex(raw, -1))
+}
+
+// SplitHints returns the tier bodies of a hints.md, in order. Text before
+// the first heading is ignored, so an author can leave a note at the top.
+func SplitHints(raw []byte) []string {
+	locs := hintHeading.FindAllIndex(raw, -1)
+	out := make([]string, 0, len(locs))
+	for i, loc := range locs {
+		end := len(raw)
+		if i+1 < len(locs) {
+			end = locs[i+1][0]
+		}
+		body := strings.TrimSpace(string(raw[loc[1]:end]))
+		out = append(out, body)
+	}
+	return out
 }

@@ -8,6 +8,8 @@ import {
   type BankEntry,
   type BanksResponse,
   type ControlActionResponse,
+  type ExamMode,
+  type SessionMode,
   type SessionSnapshot,
 } from "../api";
 import { Async } from "../components/Async";
@@ -18,6 +20,14 @@ import { Skeleton } from "../components/Pending";
 import { formatDuration } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 import { strings } from "../strings";
+
+// Fallback for a facilitator that predates the modes field, so the
+// picker still renders rather than collapsing to nothing.
+const DEFAULT_MODES: ExamMode[] = [
+  { id: "exam", durationSeconds: 7200, untimed: false, helpAllowed: false },
+  { id: "training", durationSeconds: 0, untimed: true, helpAllowed: true },
+  { id: "speed", durationSeconds: 3600, untimed: false, helpAllowed: false },
+];
 
 // The stat labels are known before the numbers are, so the placeholder can
 // carry the real headings and reserve the real height.
@@ -62,6 +72,9 @@ export function Start({
   const [switching, setSwitching] = useState(false);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  // Exam is the default on purpose: the simulator's whole point is the
+  // real thing, and training is the deliberate opt-out.
+  const [mode, setMode] = useState<Exclude<SessionMode, "">>("exam");
   // Reading how the exam works should not cost exam time, so the same
   // card the exam screen shows on first run is reachable here, before
   // the clock exists.
@@ -86,7 +99,7 @@ export function Start({
     setStarting(true);
     setStartError(null);
     try {
-      const result = await startSession();
+      const result = await startSession(mode);
       if (result.ok) {
         onSessionChange(result.session);
       } else {
@@ -229,6 +242,27 @@ export function Start({
             <li key={tip}>{tip}</li>
           ))}
         </ul>
+
+        {/* The picker sits directly above the button that acts on it, so
+            the choice and its consequence are one glance apart. */}
+        <fieldset className="mode-picker">
+          <legend>{strings.start.modeLegend}</legend>
+          {(exam?.modes ?? DEFAULT_MODES).map((m) => (
+            <label key={m.id} className={`mode-option${mode === m.id ? " mode-option-on" : ""}`}>
+              <input
+                type="radio"
+                name="attempt-mode"
+                value={m.id}
+                checked={mode === m.id}
+                onChange={() => setMode(m.id)}
+              />
+              <span className="mode-name">{strings.modes[m.id].label}</span>
+              <span className="mode-blurb">
+                {strings.modes[m.id].blurb(Math.round(m.durationSeconds / 60))}
+              </span>
+            </label>
+          ))}
+        </fieldset>
 
         {startError && <p className="error-text">{startError}</p>}
 

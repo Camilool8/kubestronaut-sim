@@ -53,6 +53,7 @@ describe("Icon", () => {
       "flag",
       "flag-filled",
       "copy",
+      "keyboard",
       "theme-auto",
       "theme-light",
       "theme-dark",

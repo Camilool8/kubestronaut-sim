@@ -1,0 +1,24 @@
+# Workload images baked into this image as archives at build time and
+# side-loaded into the kind nodes during bootstrap.
+#
+# Why: without this, every fresh cluster pulls these from the internet
+# inside the nodes' own containerd while seeding 22 questions. That is
+# both the slowest part of a cold boot and the part most likely to fail
+# on a flaky link — and it made a reset require the internet, which the
+# rest of this image goes out of its way to avoid.
+#
+# Cluster add-on images (Calico, ingress-nginx) are NOT listed here. They
+# are derived automatically from the vendored manifests at build time, so
+# a version bump cannot leave this file stale.
+#
+# Deliberately absent, and they must stay absent: nginx:1.99 (q02's
+# broken image) and nginx:0.0.0-corvus-nonexistent (q11's failing Helm
+# install). Both questions are built on those tags NOT resolving. Baking
+# them would silently break two questions.
+#
+# tests/preload-coverage.sh checks this list against what the bank
+# actually references.
+
+busybox:1.37
+nginx:1.27-alpine
+nginx:1.29-alpine
