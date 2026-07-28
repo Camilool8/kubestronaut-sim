@@ -79,3 +79,51 @@ describe("ExamGateControls submit failures", () => {
     expect(await screen.findByText(/no session is running/)).toBeInTheDocument();
   });
 });
+
+// A real-browser pass at 600px found this: the gate rendered 0:00:00 and
+// told a training candidate "the clock keeps going", because it read
+// session.remainingSeconds with no untimed guard. TimerBar has that guard
+// and documents exactly why ("a frozen 00:00 would read as an attempt
+// that had already run out"); this path — the only one a narrowed window
+// or a phone ever sees — was the one that missed it. Both existing tests
+// here cover submit failures, so nothing caught it.
+describe("ExamGateControls in an untimed training attempt", () => {
+  const trainingSession: SessionSnapshot = {
+    ...runningSession,
+    mode: "training",
+    untimed: true,
+    // What the server actually sends for an untimed attempt.
+    durationSeconds: 0,
+    remainingSeconds: 0,
+    startedAt: new Date(Date.now() - 90_000).toISOString(),
+  };
+
+  test("counts up instead of showing an expired-looking countdown", () => {
+    render(
+      <ExamGateControls
+        session={trainingSession}
+        fetchedAt={Date.now()}
+        onSessionChange={() => {}}
+      />,
+    );
+
+    expect(screen.queryByText("0:00:00")).not.toBeInTheDocument();
+    expect(screen.getByRole("timer")).toHaveTextContent(/1m 3\d s?|1m \d\ds/);
+    // And the screen reader is told elapsed, not remaining.
+    expect(screen.getByText(/Time elapsed:/)).toBeInTheDocument();
+    expect(screen.queryByText(/Time remaining:/)).not.toBeInTheDocument();
+  });
+
+  test("does not claim a clock is running out", () => {
+    render(
+      <ExamGateControls
+        session={trainingSession}
+        fetchedAt={Date.now()}
+        onSessionChange={() => {}}
+      />,
+    );
+
+    expect(screen.queryByText(/The clock keeps going/)).not.toBeInTheDocument();
+    expect(screen.getByText(/no time limit/i)).toBeInTheDocument();
+  });
+});

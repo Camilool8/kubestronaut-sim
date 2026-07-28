@@ -121,10 +121,12 @@ weights within 2 percentage points.
 
 **Confirmed but not yet built**
 
-- **Practice mode.** An untimed or 1.25x/1.5x/2x duration option is
-  intended scope. Strict, unpausable timing stays the default; future
-  work should treat session duration as a per-attempt choice rather than
-  a constant.
+- **An extended-time option.** Training mode is untimed and Speed mode
+  halves the clock, so session duration is already a per-attempt choice
+  rather than a constant. What does not exist is the middle ground — a
+  1.25x/1.5x/2x multiplier on a *timed* attempt, for someone who wants
+  the pressure of a countdown at a pace they set. Exam mode's strict,
+  unpausable timing stays the default either way.
 
 **Explicitly out of scope**
 
@@ -154,8 +156,8 @@ weights within 2 percentage points.
 
 ## Evidence on Hand
 
-- Real, runnable question content: 22 CKAD questions and 2 CKA
-  questions, each with per-check validators and a written solution
+- Real, runnable question content: 22 CKAD questions, each with
+  per-check validators, a written solution and two tiers of hints
   (`banks/`).
 - Reference solution scripts that must score 100%
   (`tests/solutions/<bank>/qNN.sh`), the fresh-environment-scores-0 gate,

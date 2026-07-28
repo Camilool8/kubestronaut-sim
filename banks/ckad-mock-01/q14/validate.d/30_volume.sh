@@ -14,9 +14,9 @@ mode=$(kubectl -n tucana get deploy ledger-api \
 [ "$mode" = "256" ] || { echo "defaultMode is '$mode', want 256 (0400)"; exit 1; }
 
 path=$(kubectl -n tucana get deploy ledger-api \
-  -o jsonpath='{.spec.template.spec.containers[0].volumeMounts[?(@.name=="api-keys")].mountPath}' 2>/dev/null)
+  -o jsonpath='{.spec.template.spec.containers[?(@.name=="api")].volumeMounts[?(@.name=="api-keys")].mountPath}' 2>/dev/null)
 ro=$(kubectl -n tucana get deploy ledger-api \
-  -o jsonpath='{.spec.template.spec.containers[0].volumeMounts[?(@.name=="api-keys")].readOnly}' 2>/dev/null)
+  -o jsonpath='{.spec.template.spec.containers[?(@.name=="api")].volumeMounts[?(@.name=="api-keys")].readOnly}' 2>/dev/null)
 [ "$path" = "/etc/api" ] || { echo "mountPath is '$path', want /etc/api"; exit 1; }
 [ "$ro" = "true" ] \
   && echo "secret volume ok" \

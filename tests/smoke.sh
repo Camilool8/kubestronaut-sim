@@ -275,7 +275,54 @@ read -r _ e0 t0 _ < <(grep '^RESULT ' /tmp/grade0.txt)
 # Blocks until every Deployment in the cluster is Available. Bare Pods are
 # deliberately not covered: one question seeds a crash-looping Pod, so
 # "all Pods Ready" is a condition this cluster is designed never to meet.
+#
+# `condition=Available` is NOT enough on its own, which is what the
+# resumed-score assertion discovered: a Deployment reports Available on
+# minimum availability, so it goes true while replicas are still coming
+# back after a restart, and it says nothing about EndpointSlices having
+# repopulated. A grade run in that window scored 134/180 with failures
+# that were all readiness-shaped (`readyReplicas=''`, `0 ready
+# endpoints`) on a cluster that had graded 180/180 minutes earlier.
+#
+# `kubectl wait` also returns 0 when it matches nothing at all, so a
+# too-early call could pass by finding no Deployments yet. Hence the
+# explicit count.
 wait_workloads() {
+  # Gate on live POD phase, never on Deployment status.
+  #
+  # This is the trap that cost two smoke runs. After ./sim down && ./sim
+  # up the node re-registers, and for ~40s its pods sit in `Unknown`
+  # while the Deployment's own .status still carries the values from
+  # before the restart. So `kubectl wait --for=condition=Available` and a
+  # readyReplicas comparison BOTH pass instantly against stale data —
+  # measured directly: every Deployment reported full readyReplicas while
+  # 38 pods were Unknown. The grade then reads live state and collapses
+  # (128/180 and 134/180 on two runs). Waiting properly, the same
+  # environment grades 180/180.
+  #
+  # Unknown/Pending/ContainerCreating mean "not settled yet".
+  # Error/CrashLoopBackOff are settled states this bank creates on
+  # purpose (q17 seeds a crash-looping Pod), so they must NOT be waited
+  # on or this never returns.
+  local budget=300 elapsed=0 unsettled stable=0
+  while [ "$elapsed" -lt "$budget" ]; do
+    unsettled=$(docker compose exec -T k8s-env kubectl get pods --all-namespaces \
+      --no-headers 2>/dev/null \
+      | awk '$4=="Unknown" || $4=="Pending" || $4=="ContainerCreating" || $4=="PodInitializing" {print $1"/"$2}' \
+      | tr '\n' ' ')
+    if [ -z "${unsettled// /}" ]; then
+      # Require it twice running: the window right after the API server
+      # returns can look calm before the kubelet reports anything.
+      stable=$((stable + 1))
+      [ "$stable" -ge 2 ] && break
+    else
+      stable=0
+    fi
+    sleep 5; elapsed=$((elapsed + 5))
+  done
+  [ "$stable" -ge 2 ] || fail "pods still unsettled after ${budget}s: ${unsettled}"
+
+  # Only now is Deployment status fresh enough to be worth asserting on.
   docker compose exec -T k8s-env kubectl wait --for=condition=Available \
     deployments --all --all-namespaces --timeout=300s >/dev/null 2>&1 \
     || fail "cluster workloads did not become Available within 300s"
@@ -334,6 +381,12 @@ if [ "$rstatus" = "200" ]; then
   if [ "$earned" != "$t1" ]; then
     fail "facilitator results: earned should be ${t1}, got ${earned}"
     echo "  checks the facilitator scored as failed:"
+    # %-formatting, not f-strings: this whole program is inside a
+    # single-quoted shell string, so a nested " has to be escaped for the
+    # shell and Python then sees the backslash. It used to read
+    # f"{q[\"id\"]}" and died with "unexpected character after line
+    # continuation character" the first time it ever ran — which was the
+    # first time an assertion here failed, long after it was written.
     RESP="$RESP" python3 -c '
 import json, os
 with open(os.environ["RESP"]) as f:
@@ -341,8 +394,8 @@ with open(os.environ["RESP"]) as f:
 for q in data.get("questions", []):
     for c in q.get("checks", []):
         if not c.get("passed"):
-            print(f"    {q[\"id\"]:>4}  {c.get(\"points\", 0)}pts  {c.get(\"desc\", \"\")}")
-            print(f"          {c.get(\"message\", \"\")}")
+            print("    %4s  %spts  %s" % (q.get("id", ""), c.get("points", 0), c.get("desc", "")))
+            print("          %s" % c.get("message", ""))
 ' || echo "    (could not parse $RESP)"
   fi
   [ "$total" = "$t1" ] || fail "facilitator results: total should be ${t1}, got ${total}"
@@ -443,8 +496,26 @@ docker compose exec desktop cat /shared/exam/motd | grep -q 'Smoke Test Bank' \
 # A hidden bank must be switchable but must NOT appear in the lobby.
 status=$(req GET /api/control/banks)
 [ "$status" = "200" ] || fail "/api/control/banks expected 200, got $status"
-grep -q '"smoke-01"' "$RESP" \
-  && fail "smoke-01 is a test fixture and must not appear in the bank list" || true
+# Inspect the banks array, not the whole body. The response is
+# {"active": ..., "banks": [...]}, and this runs immediately after
+# switching TO smoke-01 — so a grep for the bare id always matched the
+# active field and this assertion could never pass. Catalog.List() does
+# filter hidden entries; only the test was wrong.
+listed=$(RESP="$RESP" python3 -c '
+import json, os
+with open(os.environ["RESP"]) as f:
+    data = json.load(f)
+print(",".join(b.get("id", "") for b in data.get("banks", [])))
+' 2>/dev/null) || fail "could not parse /api/control/banks"
+case ",${listed}," in
+  *,smoke-01,*) fail "smoke-01 is a test fixture and must not appear in the bank list (got: ${listed})" ;;
+esac
+# ...and the bank the lobby *should* offer is still there, so an empty
+# list cannot pass the assertion above by accident.
+case ",${listed}," in
+  *,ckad-mock-01,*) : ;;
+  *) fail "the bank list should still offer ckad-mock-01 (got: ${listed})" ;;
+esac
 
 ./sim grade | tee /tmp/grade-smoke0.txt
 read -r _ se0 st0 _ < <(grep '^RESULT ' /tmp/grade-smoke0.txt)
@@ -493,7 +564,13 @@ curl -s -o "$RESP" -w '%{http_code}' -X POST -H 'Content-Type: application/json'
 [ "$(req POST /api/session/grade)" = "200" ] || fail "training: mid-attempt grade failed"
 [ "$(req GET /api/session)" = "200" ] && [ "$(json_field state)" = "running" ] \
   || fail "training: scoring must not end the attempt"
-[ "$(req GET /api/results)" = "202" ] \
+# 409, not 202. handleResults refuses with "session has not ended"
+# whenever the state is not `ended`; 202 means ended-and-still-grading,
+# which a running training attempt can never be. So 409 IS the proof that
+# the practice grade was not recorded — the assertion wanted the right
+# thing and named the wrong code, and contradicted the Go unit tests that
+# already pin this contract.
+[ "$(req GET /api/results)" = "409" ] \
   || fail "training: a practice grade must not be recorded as a result"
 
 # Re-seeding one question leaves the rest of the environment alone.

@@ -81,8 +81,6 @@ export const strings = {
 
   questionPanel: {
     regionLabel: "Questions",
-    collapse: "Collapse question panel",
-    expand: "Expand question panel",
     loading: "Loading the question…",
     // The clock keeps running through this, so the copy has to say the
     // session is unharmed rather than leave the candidate wondering.
@@ -104,9 +102,9 @@ export const strings = {
     points: (points: number) => `${points} pts`,
     sshHint: (instance: string) => `ssh ${instance}`,
     copyValue: (value: string) => `Copy ${value}`,
-    // Takes the chord because it differs by platform: a Mac candidate
-    // with translation on presses ⌘V, everyone else Ctrl+Shift+V. See
-    // lib/desktopKeymap.pasteChordLabel.
+    // Still takes the chord rather than hardcoding it, so there is one
+    // place to change if the binding ever moves — but it is now the same
+    // chord for every candidate on every platform.
     copiedToDesktop: (value: string, chord: string) => `Copied ${value} — paste with ${chord}`,
     copied: (value: string) => `Copied ${value}`,
     copyFailed: "Could not copy that value.",
@@ -303,8 +301,11 @@ export const strings = {
     settingsLabel: "Keyboard",
     settingsTitle: "Keyboard",
     macToggle: "Translate Mac shortcuts",
+    // Paste is deliberately absent from this list now: Ctrl+V and ⌘V both
+    // paste on every platform whether or not this preference is on, so
+    // naming it here would suggest it can be switched off.
     macToggleHint:
-      "⌘C and ⌘V become the exam terminal's Ctrl+Shift+C / Ctrl+Shift+V, plus word and line movement. Everything else is passed through untouched.",
+      "⌘C becomes the exam terminal's Ctrl+Shift+C, plus word and line movement (⌘←/→, ⌥←/→, ⌘⌫). Everything else is passed through untouched.",
     reservedToggle: "Also map ⌘T and ⌘W",
     reservedHint:
       "Off by default: most browsers reserve new tab and close tab, and will act on them before this page can.",
@@ -384,6 +385,10 @@ export const strings = {
     startDisabled: "Open this on a desktop to start the exam.",
     sessionRunning:
       "An exam is running. The clock keeps going wherever you are — submit here if you cannot get to a desktop in time.",
+    // Training has no deadline, so the urgency above would be a lie. The
+    // counter beside this one counts up for the same reason.
+    sessionRunningUntimed:
+      "A training attempt is open. There is no time limit — pick it up on a desktop whenever you are ready, or submit it here.",
   },
 
   score: {

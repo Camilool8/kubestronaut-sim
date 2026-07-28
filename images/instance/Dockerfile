@@ -31,6 +31,12 @@ COPY registries.conf /etc/containers/registries.conf
 COPY storage.conf /etc/containers/storage.conf
 COPY containers.conf /etc/containers/containers.conf
 
+# Editor defaults. /etc/vim/vimrc.local is Debian's supported hook and is
+# sourced after defaults.vim, so it survives a candidate creating their own
+# ~/.vimrc — which would otherwise silently disable syntax highlighting,
+# because defaults.vim is skipped entirely once one exists.
+COPY vimrc.local /etc/vim/vimrc.local
+
 # Candidates get sudo. Image work has to run as root (podman's rootful
 # path is the one that works with the capability set these containers
 # carry), and the real exam's instances are sudo-capable too.

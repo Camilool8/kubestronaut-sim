@@ -185,8 +185,6 @@ describe("axe: no WCAG violations", () => {
         questions={examQuestions}
         selectedId="q01"
         onSelect={() => {}}
-        open
-        onToggle={() => {}}
       />,
     );
     await screen.findByRole("button", { name: /aurora-staging/ });
@@ -200,8 +198,6 @@ describe("axe: no WCAG violations", () => {
         questions={examQuestions}
         selectedId="q02"
         onSelect={() => {}}
-        open
-        onToggle={() => {}}
       />,
     );
     await user.click(await screen.findByRole("button", { name: /show all questions/i }));
@@ -228,7 +224,7 @@ describe("axe: no WCAG violations", () => {
     const { container } = render(
       <div className="exam-body">
         <section id="question-panel" />
-        <PanelResizer panelId="question-panel" collapsed={false} onToggleCollapse={() => {}} />
+        <PanelResizer panelId="question-panel" />
       </div>,
     );
     expect(container.querySelector('[role="separator"]')).not.toBeNull();

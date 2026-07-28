@@ -43,8 +43,6 @@ function renderPanel() {
       questions={questions}
       selectedId="q01"
       onSelect={() => {}}
-      open
-      onToggle={() => {}}
     />,
   );
 }
@@ -97,8 +95,6 @@ function renderNav(selectedId: string, onSelect: (id: string) => void = () => {}
       questions={bank}
       selectedId={selectedId}
       onSelect={onSelect}
-      open
-      onToggle={() => {}}
     />,
   );
 }
@@ -114,8 +110,6 @@ describe("QuestionPanel navigator", () => {
         questions={bank}
         selectedId="q03"
         onSelect={() => {}}
-        open
-        onToggle={() => {}}
       />,
     );
     // Wrapping q03 back to q01 under a clock that cannot be paused reads
@@ -278,8 +272,6 @@ describe("QuestionPanel failure and pending states", () => {
         questions={bank}
         selectedId="q03"
         onSelect={() => {}}
-        open
-        onToggle={() => {}}
       />,
     );
 

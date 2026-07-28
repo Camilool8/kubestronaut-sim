@@ -9,7 +9,7 @@ set -uo pipefail
 # environment. Requiring the probe first is what makes the endpoint count
 # evidence of anything.
 probe=$(kubectl -n hydra get deploy orders-api \
-  -o jsonpath='{.spec.template.spec.containers[0].readinessProbe.httpGet.port}' 2>/dev/null)
+  -o jsonpath='{.spec.template.spec.containers[?(@.name=="api")].readinessProbe.httpGet.port}' 2>/dev/null)
 [ -n "$probe" ] || { echo "no readinessProbe is configured, so endpoint readiness proves nothing"; exit 1; }
 
 ready=$(kubectl -n hydra get deploy orders-api -o jsonpath='{.status.readyReplicas}' 2>/dev/null)

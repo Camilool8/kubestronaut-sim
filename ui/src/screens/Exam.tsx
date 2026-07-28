@@ -16,7 +16,7 @@ import { PanelResizer } from "../components/PanelResizer";
 import { PendingBar } from "../components/Pending";
 import { toastStore } from "../components/toastStore";
 import { marksStore } from "../components/marksStore";
-import { formatClock, formatClockSpoken } from "../lib/format";
+import { formatClock, formatClockSpoken, formatElapsed } from "../lib/format";
 import { strings } from "../strings";
 
 // DesktopViewport pulls in @novnc/novnc, which is almost the entire main
@@ -55,6 +55,16 @@ export function ExamGateControls({ session, fetchedAt, onSessionChange }: ExamPr
     session.remainingSeconds - Math.floor((now - fetchedAt) / 1000),
   );
 
+  // Untimed attempts count UP here too, for the reason TimerBar already
+  // documents: an untimed session reports remainingSeconds 0, and a
+  // frozen 0:00:00 is indistinguishable from an attempt that has run out.
+  // This gate was the one path that missed that guard — a training user
+  // who narrowed their window was shown an expired-looking clock and told
+  // "the clock keeps going", which is the opposite of what training is.
+  const untimed = session.untimed;
+  const startedMs = session.startedAt ? Date.parse(session.startedAt) : NaN;
+  const elapsed = Number.isNaN(startedMs) ? 0 : Math.max(0, now - startedMs);
+
   // This is the only submit control a phone has. A discarded {ok:false}
   // (409) or a rejected fetch used to leave the button flicking back to
   // "End Exam" with nothing said, which reads exactly like a button that
@@ -80,13 +90,22 @@ export function ExamGateControls({ session, fetchedAt, onSessionChange }: ExamPr
     <div className="gate-session">
       <p className="gate-session-timer">
         <span className="timer" role="timer">
-          <span aria-hidden="true">{formatClock(remaining)}</span>
-          <span className="sr-only">
-            {strings.exam.timeRemaining(formatClockSpoken(remaining))}
-          </span>
+          {untimed ? (
+            <>
+              <span aria-hidden="true">{formatElapsed(elapsed)}</span>
+              <span className="sr-only">{strings.exam.timeElapsed(formatElapsed(elapsed))}</span>
+            </>
+          ) : (
+            <>
+              <span aria-hidden="true">{formatClock(remaining)}</span>
+              <span className="sr-only">
+                {strings.exam.timeRemaining(formatClockSpoken(remaining))}
+              </span>
+            </>
+          )}
         </span>
       </p>
-      <p>{strings.mobile.sessionRunning}</p>
+      <p>{untimed ? strings.mobile.sessionRunningUntimed : strings.mobile.sessionRunning}</p>
       {endError && (
         <p className="error-text" role="alert">
           {endError}
@@ -107,7 +126,6 @@ export function ExamGateControls({ session, fetchedAt, onSessionChange }: ExamPr
 // second, redundant line of defense against ever rendering it on a
 // stale/non-running snapshot (the Go proxy independently 403s).
 export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
-  const [panelOpen, setPanelOpen] = useState(true);
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [ending, setEnding] = useState(false);
@@ -288,8 +306,6 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
           mode={session.mode}
           selectedId={selectedId}
           onSelect={setPickedId}
-          open={panelOpen}
-          onToggle={() => setPanelOpen((v) => !v)}
           emptyState={
             examState.status === "error" ? (
               <div className="pane-error" role="alert">
@@ -305,11 +321,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
             )
           }
         />
-        <PanelResizer
-          panelId="question-panel"
-          collapsed={!panelOpen}
-          onToggleCollapse={() => setPanelOpen((v) => !v)}
-        />
+        <PanelResizer panelId="question-panel" />
         {/* A section rather than a div: an aria-label on a role-less
             element is ignored by most assistive tech, so the label this
             already carried was doing nothing. */}

@@ -2,8 +2,10 @@
 # points: 2
 # desc: PVC archive-pvc requests 1Gi RWO on class manual and is Bound to archive-pv
 set -uo pipefail
+# accessModes[*], not [0] — see the note in 10_pv.sh. One access mode was
+# asked for, so the whole list is the answer.
 out=$(kubectl -n orion get pvc archive-pvc \
-  -o jsonpath='{.spec.resources.requests.storage}|{.spec.accessModes[0]}|{.spec.storageClassName}' 2>/dev/null)
+  -o jsonpath='{.spec.resources.requests.storage}|{.spec.accessModes[*]}|{.spec.storageClassName}' 2>/dev/null)
 want='1Gi|ReadWriteOnce|manual'
 [ "$out" = "$want" ] || { echo "spec is '$out', want '$want'"; exit 1; }
 

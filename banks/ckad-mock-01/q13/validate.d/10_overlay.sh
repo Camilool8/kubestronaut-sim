@@ -17,7 +17,7 @@ svcname=$(printf '%s' "$svc" | yq -r '.metadata.name')
 [ "$name" = "staging-cargo-api" ] || { echo "Deployment renders as '$name', want staging-cargo-api"; exit 1; }
 [ "$svcname" = "staging-cargo-api" ] || { echo "Service renders as '$svcname', want staging-cargo-api"; exit 1; }
 
-img=$(printf '%s' "$dep" | yq -r '.spec.template.spec.containers[0].image')
+img=$(printf '%s' "$dep" | yq -r '.spec.template.spec.containers[] | select(.name == "api") | .image')
 reps=$(printf '%s' "$dep" | yq -r '.spec.replicas')
 label=$(printf '%s' "$dep" | yq -r '.metadata.labels.tier // ""')
 [ "$img" = "nginx:1.29-alpine" ] || { echo "rendered image is '$img', want nginx:1.29-alpine"; exit 1; }

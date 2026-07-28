@@ -49,8 +49,6 @@ function saveWidth(px: number | null): void {
 interface PanelResizerProps {
   /** id of the panel being resized, for aria-controls. */
   panelId: string;
-  collapsed: boolean;
-  onToggleCollapse: () => void;
 }
 
 // The draggable boundary between the question panel and the remote
@@ -64,7 +62,7 @@ interface PanelResizerProps {
 // re-rendering Exam at 60fps would re-render QuestionPanel, and
 // <Markdown> re-parsing the question through react-markdown + remark-gfm
 // sixty times a second is real work for no benefit.
-export function PanelResizer({ panelId, collapsed, onToggleCollapse }: PanelResizerProps) {
+export function PanelResizer({ panelId }: PanelResizerProps) {
   const split = useMediaQuery(SPLIT_QUERY);
   const [width, setWidth] = useState(loadWidth);
   const [dragging, setDragging] = useState(false);
@@ -181,11 +179,9 @@ export function PanelResizer({ panelId, collapsed, onToggleCollapse }: PanelResi
     else if (event.key === "ArrowRight") next = width + delta;
     else if (event.key === "Home") next = MIN_WIDTH;
     else if (event.key === "End") next = MAX_WIDTH;
-    else if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      onToggleCollapse();
-      return;
-    }
+    // No Enter/Space collapse. The splitter pattern allows one, but this
+    // panel has no collapsed state to toggle into: the exam is a split
+    // screen and the questions are never dismissable.
     if (next === null) return;
 
     event.preventDefault();
@@ -211,7 +207,6 @@ export function PanelResizer({ panelId, collapsed, onToggleCollapse }: PanelResi
       aria-valuetext={strings.exam.resizePanelValue(width)}
       aria-label={strings.exam.resizePanel}
       data-dragging={dragging ? "true" : undefined}
-      aria-disabled={collapsed || undefined}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}

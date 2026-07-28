@@ -312,12 +312,36 @@ export const desktopKeymap = new DesktopKeymap();
 /**
  * What to tell the candidate to press to paste into the exam terminal.
  *
- * The desktop's terminal only ever accepts Ctrl+Shift+V; this is about
- * which keys the candidate's hands should make. With translation on, a
- * Mac user presses ⌘V and this module turns it into that chord — so
- * telling them "Ctrl+Shift+V" would be technically true and practically
- * the wrong instruction.
+ * One answer, everywhere. The viewport intercepts Ctrl+V and ⌘V
+ * identically on every platform and turns either into the terminal's real
+ * Ctrl+Shift+V, so there is no longer a per-platform instruction to give.
+ * This used to branch on isMac and return "⌘V" or "Ctrl+Shift+V", which
+ * meant the copy changed depending on who was reading it and on whether a
+ * preference happened to be on — and a Mac user who pressed Ctrl+V
+ * (perfectly reasonable) got the one chord that printed `^V`.
  */
 export function pasteChordLabel(): string {
-  return desktopKeymap.isMac && desktopKeymap.enabled ? "⌘V" : "Ctrl+Shift+V";
+  return "Ctrl+V";
+}
+
+/**
+ * Is this keydown the candidate asking to paste?
+ *
+ * Ctrl+V and ⌘V, on every platform, independent of every preference. It
+ * lives here rather than inline in the viewport so the rule can be
+ * asserted directly: the viewport must consume ALL of these, because the
+ * one thing it must never do is forward a paste to the remote terminal,
+ * where a bare Ctrl+V is readline's verbatim-insert prefix and prints
+ * `^V` instead of pasting.
+ *
+ * Shift and Alt are excluded deliberately: Ctrl+Shift+V is the terminal's
+ * own paste and must pass straight through untouched.
+ */
+export function isPasteChord(event: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "shiftKey" | "altKey">): boolean {
+  return (
+    event.key?.toLowerCase() === "v" &&
+    (event.metaKey || event.ctrlKey) &&
+    !event.shiftKey &&
+    !event.altKey
+  );
 }
