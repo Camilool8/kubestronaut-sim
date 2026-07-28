@@ -56,15 +56,21 @@ export function DomainBreakdown({ questions }: DomainBreakdownProps) {
             <tr key={r.domain}>
               <th scope="row">{r.domain}</th>
               <td>
-                {/* The bar is decorative; the numbers beside it carry the
-                    value, so this reads identically with CSS off and
-                    under reduced motion. */}
-                <span className="domain-bar" aria-hidden="true">
-                  <span className="domain-bar-fill" style={{ width: `${r.percent}%` }} />
-                </span>
-                <span className="domain-figure">
-                  {r.percent}% ({r.earned}/{r.total})
-                </span>
+                {/* The flex row is this wrapper, not the <td>. A flex table
+                    cell leaves the table layout model and stops matching the
+                    row height, which put this cell's border-bottom 2px above
+                    the domain cell's and stepped every divider. */}
+                <div className="domain-score">
+                  {/* The bar is decorative; the numbers beside it carry the
+                      value, so this reads identically with CSS off and
+                      under reduced motion. */}
+                  <span className="domain-bar" aria-hidden="true">
+                    <span className="domain-bar-fill" style={{ width: `${r.percent}%` }} />
+                  </span>
+                  <span className="domain-figure">
+                    {r.percent}% ({r.earned}/{r.total})
+                  </span>
+                </div>
               </td>
             </tr>
           ))}

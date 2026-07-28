@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import RFB from "@novnc/novnc";
 import { desktopClipboard } from "../lib/desktopClipboard";
-import { desktopKeymap } from "../lib/desktopKeymap";
+import { desktopKeymap , isPasteChord } from "../lib/desktopKeymap";
 import { desktopResize } from "../lib/desktopResize";
 import { toastStore } from "./toastStore";
 import { strings } from "../strings";
@@ -155,18 +155,21 @@ export function DesktopViewport({ onStateChange }: DesktopViewportProps) {
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
-      // Paste is special: it needs the host clipboard, which is async,
-      // so it cannot go through the synchronous chord path. Ctrl+V is
-      // intercepted too — on a PC it means the same thing to the
-      // candidate, and forwarding it raw would put a literal ^V in the
-      // shell.
-      const isPaste =
-        event.key?.toLowerCase() === "v" &&
-        (event.metaKey || event.ctrlKey) &&
-        !event.shiftKey &&
-        !event.altKey;
-      if (isPaste && desktopClipboard.connected) {
+      // Paste is special: it needs the host clipboard, which is async, so
+      // it cannot go through the synchronous chord path.
+      //
+      // ⌘V and Ctrl+V are the same instruction here, on every platform,
+      // and BOTH are consumed unconditionally — including when there is no
+      // clipboard link to use. That last part is the bug this guard used
+      // to have: the interception was gated on `desktopClipboard.connected`,
+      // so whenever it was false a Ctrl+V fell through to noVNC, reached
+      // the remote terminal as a literal Ctrl+V, and printed `^V` — the
+      // readline verbatim-insert prefix — instead of pasting. Swallowing a
+      // paste we cannot service is strictly better than sending the one
+      // keystroke guaranteed to do the wrong thing.
+      if (isPasteChord(event)) {
         consume(event);
+        if (!desktopClipboard.connected) return;
         void desktopClipboard.pasteFromHost(() => desktopKeymap.sendPasteChord()).then((outcome) => {
           if (outcome === "blocked") {
             toastStore.push({

@@ -8,15 +8,11 @@ import { matchMediaMock } from "../test/setup";
 
 const STORAGE_KEY = "sim.panelWidth";
 
-function renderResizer(collapsed = false, onToggleCollapse = () => {}) {
+function renderResizer() {
   return render(
     <div className="exam-body">
       <section id="question-panel" />
-      <PanelResizer
-        panelId="question-panel"
-        collapsed={collapsed}
-        onToggleCollapse={onToggleCollapse}
-      />
+      <PanelResizer panelId="question-panel" />
     </div>,
   );
 }
@@ -113,12 +109,17 @@ describe("PanelResizer keyboard", () => {
     expect(sep).toHaveAttribute("aria-valuenow", "280");
   });
 
-  test("Enter toggles the panel collapse, per the window-splitter pattern", async () => {
-    const toggle = vi.fn();
-    renderResizer(false, toggle);
-    screen.getByRole("separator").focus();
+  // The splitter pattern allows Enter to collapse, and this panel
+  // deliberately does not: the exam is a split screen, so there is no
+  // collapsed state to toggle into and a stray Enter must not move the
+  // boundary either.
+  test("Enter does nothing — there is no collapsed state", async () => {
+    renderResizer();
+    const sep = screen.getByRole("separator");
+    sep.focus();
+    const before = sep.getAttribute("aria-valuenow");
     await userEvent.keyboard("{Enter}");
-    expect(toggle).toHaveBeenCalledTimes(1);
+    expect(sep).toHaveAttribute("aria-valuenow", before as string);
   });
 
   // This is the test that protects the remote desktop, and it guards

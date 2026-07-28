@@ -49,6 +49,19 @@ SOFT = [
 
 POINTS_OK = re.compile(r"^# points: (0|[1-9][0-9]*)$")
 
+# Helpers defined by banks/_lib/checks.sh. Calling one without sourcing
+# the library is a bash "command not found" at grade time, which the
+# runner scores as a FAILED check — so a correct answer silently loses
+# the points. This is not hypothetical: q21/30_adapted.sh shipped that
+# way, and a smoke run showed the adapter emitting exactly `cpu 42` and
+# `mem 71` while the check reported 0/3.
+#
+# Nothing offline could catch it before this rule: the script parses, the
+# jsonpath is fine, and the failure only exists at runtime.
+LIB = pathlib.Path("banks/_lib/checks.sh")
+HELPERS = sorted(set(re.findall(r"^([a-z_][a-z0-9_]*)\(\)", LIB.read_text(), re.MULTILINE))) if LIB.is_file() else []
+CALLS = re.compile(r"(?:^|[|&;(]|\$\(|\s)(" + "|".join(HELPERS) + r")\s") if HELPERS else None
+
 errors, warnings = [], []
 
 for path in scripts:
@@ -71,6 +84,24 @@ for path in scripts:
             if not POINTS_OK.match(ln):
                 errors.append((path, lines.index(ln) + 1, "points",
                                f"header {ln!r} does not match '# points: N' exactly (no leading zeros, one space)"))
+
+    # A helper is available if the library is sourced or the function is
+    # defined right here. q07/30_resources.sh predates the library and
+    # carries its own milli/mib, which is correct and must not trip this.
+    if CALLS:
+        sourced = "_lib/checks.sh" in text
+        local = set(re.findall(r"^([a-z_][a-z0-9_]*)\(\)", text, re.MULTILINE))
+        for i, line in enumerate(lines, 1):
+            if line.strip().startswith("#"):
+                continue
+            for m in CALLS.finditer(line):
+                fn = m.group(1)
+                if not sourced and fn not in local:
+                    errors.append((path, i, "unsourced-helper",
+                                   f"calls {fn}() from _lib/checks.sh without sourcing it — "
+                                   f"add '. /banks/_lib/checks.sh'. At grade time this is "
+                                   f"'command not found', scored as a FAILED check, so a "
+                                   f"correct answer loses the points"))
 
     for i, line in enumerate(lines, 1):
         stripped = line.strip()

@@ -383,6 +383,24 @@ tabular-nums` — the countdown, the control-job elapsed clock, per-phase
 timings. A digit that changes width makes a stable reading look unstable,
 and the countdown is on screen for two hours.
 
+**The Three-Colour Syntax Rule.** A fenced block colours exactly three
+things and no more: keys and keywords in `--accent-strong`, strings and
+literals in `--syntax-string`, numbers in `--syntax-number`. Comments take
+`--text-muted` and italics; everything else inherits.
+
+Three, because the language that matters here is YAML, and in YAML almost
+everything to the right of a colon is a string or a number. Colouring only
+the keys — which is what mapping strings and numbers to `--text` amounted
+to — leaves the entire value column the same colour as prose: highlighted
+in the DOM and monochrome to the eye, which is precisely the manifest a
+candidate needs to read most carefully.
+
+The two value hues are the exam terminal's own green and amber
+(`images/desktop/assets/terminalrc`), so a manifest in the question panel
+and the same manifest in the candidate's vim are coloured alike. That
+makes the terminal palette a **fifth mirror** of the design tokens; a
+change to either has to move both.
+
 ## Layout
 
 **The spatial model is two panes and a stack.** The exam screen is a
@@ -453,6 +471,28 @@ the block, and in the control dialog only the checklist scrolls while the
 header and actions stay pinned — the progress a user is waiting on must
 never scroll out of view.
 
+**The Fixed-Geometry Overlay Rule.** Anything that opens over the exam
+screen is taken out of flow — `position: absolute` for the question jump
+grid (inside `.question-panel`), `position: fixed` for the clipboard
+panel (inside `.exam-layout`) — and never added as a flex child. The
+reason is not aesthetic: `.desktop-pane` has noVNC's `ResizeObserver`
+watching it, and any change to the flex geometry of its sibling costs a
+round-trip server-side framebuffer resize — a visible stutter in the
+middle of a timed exam, triggered by opening a panel. Out-of-flow means
+the pane's box never moves, so the observer never fires. Verified in a
+real browser: toggling the jump grid four times and the clipboard panel
+twice left `.desktop-pane` at exactly `912×703` and fired the observer
+**zero** times. This is the one place in the system where a layout choice
+is dictated by something outside CSS.
+
+**The Table-Cell Rule.** Never put `display: flex` on a `<td>` or `<th>`.
+It removes the cell from the table layout model, so it stops stretching to
+the row height and its `border-bottom` lands a couple of pixels off its
+neighbours' — every row divider then visibly steps at the column boundary.
+Put the flex on a wrapper inside the cell. The score screen's domain
+breakdown shipped with this bug (a 38px score cell against a 40px domain
+cell) and it is why `.domain-score` exists.
+
 ## Elevation & Depth
 
 **Tone first; shadow only for what floats.** Depth is carried primarily
@@ -520,6 +560,13 @@ float: the lobby card, dialogs, the desktop-required card. **Pill**
 (`999px`) is reserved for status objects that are read rather than
 pressed — badges, the points counter, the instance chip — plus the two
 circular icon controls (theme toggle, info button).
+
+**3px** (`radius-xs`) has exactly one job: the inline code chip, which is
+also every click-to-copy value in a question. A radius reads relative to
+the box it rounds, and that chip is ~19px tall against the ~40px controls
+6px was picked for — so reusing `radius-s` there is not consistency, it
+is an over-rounded chip inside a sentence. Nothing with real height may
+take it.
 
 Form language is rectilinear and calm: no angles, no clipping, no
 asymmetric corners, no decorative shapes. Two geometric exceptions exist,
@@ -727,6 +774,16 @@ font — which, under the Mono-For-Truth Rule, already means "this is a
 literal value". It is the clearest expression of the whole system:
 invisible until reached for, unambiguous once touched.
 
+**The glyph is out of flow, and that is load-bearing.** It was an inline
+span at `opacity: 0`, which still occupied its own width plus a margin —
+so a paragraph naming six values was typeset with six holes in it, and
+the holes were permanent because the icon was only ever invisible, never
+absent. `position: absolute` at `left: 100%` costs the sentence nothing
+and shifts nothing on hover. The alternative — collapsing the icon to
+`width: 0` and expanding it — is worse than the gap: it reflows the line
+under the reader's eye. If a fourth channel ever has to go here, it must
+also be out of flow.
+
 ### Signature: the rebuild checklist
 
 A cluster rebuild takes minutes, so the control dialog is built to be
@@ -739,6 +796,37 @@ phase gets a rotating arc rather than a static glyph, because without
 visible motion a four-minute wait reads as frozen — and under reduced
 motion the global guard stops the rotation, leaving the arc as a static
 marker.
+
+`BootProgress` reuses this vocabulary wholesale — the same
+`.control-phases` rows, marks, labels and elapsed column — for the
+environment's own start-up, which is a longer wait of exactly the same
+shape. Two differences, both forced by where the truth lives: the phase
+list is held client-side (`PHASES` in `BootProgress.tsx`, mirroring the
+`phase` calls in `images/k8s-env/`) so the checklist can be determinate
+when the server reports only the step it is on, and the *running* row
+always defers to the server's own label, so a drift between the two lists
+mislabels a future step and never the current one. A checklist that says
+the wrong thing about now is worse than no checklist.
+
+### Signature: the progressive hint tray
+
+Training mode's hints are revealed one tier at a time and fetched on
+demand, and the solution sits behind the same gate. Not because the
+content is protected — every `hints.md` is on the candidate's own disk —
+but because a tray that already holds the answer is one accidental scroll
+away from removing the exercise. Taking a hint has to be a decision, so
+each tier costs a deliberate click and the control says which tier it is
+about to spend. The whole tray is keyed by question id at the call site,
+so moving question remounts it and revealed state starts empty; nothing
+resets it in an effect.
+
+### Signature: the worst-first breakdown
+
+The score screen's per-domain table is ordered by percentage ascending,
+never alphabetically. A total tells a candidate whether they passed; the
+ordering is what tells them what to study, and alphabetical order buries
+the one row that should change what they do next. Ties break on domain
+name so the order is stable across attempts.
 
 ### Signature: the intro schematic
 
@@ -787,7 +875,7 @@ modes. Current uses: the grading screen's elapsed clock, the backgrounded
 job chip's step count and clock, the desktop overlay's attempt number, and
 the rebuild checklist's per-phase label and timings.
 
-**The Four Pending Tiers.** A wait belongs to exactly one of these, and
+**The Five Pending Tiers.** A wait belongs to exactly one of these, and
 each has exactly one mechanism, so two of them never appear for the same
 work:
 
@@ -797,10 +885,20 @@ work:
 | Inline | `<Async loading={…}>` in the region's own box | this region is fetching |
 | Blocking | `ControlProgress` | a destructive multi-minute job owns the screen |
 | Background | `BackgroundJobChip` | a backgrounded job is still running |
+| Gating | `BootProgress` | the environment does not exist yet, so no screen below can be truthful |
 
 Skeletons, not spinners, for the inline tier — and shaped like the content
 they stand in for, because a block the wrong size for text reads as an
 empty region rather than as a pending one once the pulse is switched off.
+
+The gating tier is the one that sits *above* the app rather than inside
+it. It renders before the session switch, so nothing else is reachable
+while it is up — which is the point: a lobby offering a "Start exam"
+button against a cluster that is still creating itself is a lie the UI
+used to tell by omission, because the facilitator served nothing at all
+until the cluster was healthy. It satisfies the Non-Motion Channel Rule
+three times over (a step counter, a per-phase label, an elapsed clock)
+because it is the longest wait in the product by an order of magnitude.
 
 ## Do's and Don'ts
 
@@ -817,8 +915,8 @@ empty region rather than as a pending one once the pulse is switched off.
 - **Do** set anything the candidate must type, match, or read as a
   measurement in JetBrains Mono, and add `tabular-nums` if it changes over
   time.
-- **Do** pick radii from the three that exist: 6px anchored, 10px
-  floating, pill for status.
+- **Do** pick radii from the four that exist: 3px inline chips only, 6px
+  anchored, 10px floating, pill for status.
 - **Do** write new motion additively inside `prefers-reduced-motion:
   no-preference`, animating only `transform` and `opacity`.
 - **Do** keep every user-facing string in `ui/src/strings.ts`.
@@ -826,6 +924,15 @@ empty region rather than as a pending one once the pulse is switched off.
   page, the favicon, and the terminal palette with its xfconf twin.
 - **Do** make wide content scroll inside its own container, and keep
   pinned what the user is waiting on.
+- **Do** open panels inside the question panel absolutely, never as a
+  flex child. Changing `.desktop-pane`'s geometry costs a framebuffer
+  resize mid-exam.
+- **Do** show a fallback path before it is needed, not after the failure.
+  The clipboard panel is always available rather than appearing once
+  `readText` has been refused, because a candidate needs to know it exists
+  *before* they hit the wall, in the middle of a timed attempt. The same
+  reasoning makes the browser-reserved chords (⌘T, ⌘W) opt-in and labelled
+  with their caveat rather than silently enabled and silently broken.
 
 ### Don't:
 

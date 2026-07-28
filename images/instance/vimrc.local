@@ -1,0 +1,44 @@
+" Editor defaults for writing Kubernetes YAML under time pressure.
+"
+" Debian sources this file last, after /etc/vim/vimrc and after
+" defaults.vim, so everything here wins. It is shipped rather than left to
+" defaults for two reasons.
+"
+" First, determinism: Debian's syntax highlighting arrives via
+" defaults.vim, which vim silently SKIPS the moment any ~/.vimrc exists. A
+" candidate who writes one line of personal config would lose colour on
+" every manifest and never connect the two. Setting it here does not care
+" whether a ~/.vimrc turns up.
+"
+" Second, tabs. A literal tab is invalid YAML, and the failure is
+" miserable to read: the parser rejects the document with a line number
+" and no explanation a candidate under a clock will enjoy. The filetype
+" plugin already gets this right for *.yaml, but not for a manifest opened
+" as a new unnamed buffer and written later, which is exactly how people
+" work in an exam.
+
+syntax on
+filetype plugin indent on
+
+" Two spaces, never a tab. Applied globally, not just to *.yaml, so a
+" buffer that has not been named yet still cannot produce one.
+set expandtab
+set tabstop=2
+set shiftwidth=2
+set softtabstop=2
+set autoindent
+
+" Nothing that changes what the candidate sees relative to a real exam
+" beyond legibility: no plugins, no colorscheme override, no keymaps.
+set number
+set ruler
+set laststatus=2
+
+" Trailing whitespace and tabs made visible in YAML, where both are
+" invisible causes of a rejected manifest.
+"
+" ASCII on purpose. This file is sourced before 'encoding' is settled, so
+" a multibyte glyph here is read as its raw bytes and vim rejects the
+" option with E1511 ("wrong number of characters for field") — which then
+" prints on every single vim launch.
+autocmd FileType yaml setlocal list listchars=tab:>-,trail:.

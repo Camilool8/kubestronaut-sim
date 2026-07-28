@@ -14,8 +14,6 @@ interface QuestionPanelProps {
   questions: ExamQuestionInfo[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  open: boolean;
-  onToggle: () => void;
   /**
    * Rendered instead of the navigator and pane when there are no questions.
    * The exam list arriving is a separate fetch from any one question, and
@@ -53,8 +51,6 @@ export function QuestionPanel({
   questions,
   selectedId,
   onSelect,
-  open,
-  onToggle,
   emptyState = null,
   mode,
 }: QuestionPanelProps) {
@@ -124,19 +120,16 @@ export function QuestionPanel({
   return (
     <section
       id="question-panel"
-      className={`question-panel${open ? "" : " collapsed"}`}
+      className="question-panel"
       aria-label={strings.questionPanel.regionLabel}
     >
-      <button
-        className="panel-toggle"
-        onClick={onToggle}
-        aria-expanded={open}
-        aria-label={open ? strings.questionPanel.collapse : strings.questionPanel.expand}
-      >
-        <Icon name={open ? "panel-collapse" : "panel-expand"} />
-      </button>
-      {open && questions.length === 0 && <div className="question-empty">{emptyState}</div>}
-      {open && questions.length > 0 && (
+      {/* No collapse control. The exam is a split screen by definition —
+          the questions beside the desktop you answer them on — and a
+          full-screen desktop is not a state this product has. The panel
+          is resizable between 280px and 600px and nothing narrower,
+          because 280px is where the nav row stops fitting. */}
+      {questions.length === 0 && <div className="question-empty">{emptyState}</div>}
+      {questions.length > 0 && (
         <>
           <header className="question-nav">
             <div className="question-nav-row">

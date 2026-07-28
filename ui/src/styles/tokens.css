@@ -116,6 +116,19 @@
   --warn: #8a6100;
   --success: #16752f;
 
+  /* syntax highlighting — the value side of a fenced block.
+     Keys/keywords already use --accent-strong. Strings and numbers used to
+     be plain --text, which in YAML means everything right of the colon is
+     the same colour as prose: structurally highlighted, visually not. These
+     are the two hues the exam terminal already uses for the same job (green
+     for strings, amber for numbers in the xfce palette), one step darker
+     here so they clear the floor on a light fenced block.
+     --syntax-string 5.59:1 on --surface-raised, --syntax-number 5.53:1 —
+     both above 4.5:1, and both clearly separated from --text and from
+     --accent-strong, which is what makes the highlighting readable. */
+  --syntax-string: #146c43;
+  --syntax-number: #8a5200;
+
   --focus-ring: #326ce5;
 
   /* elevation (tinted to the page, never pure black) */
@@ -143,7 +156,13 @@
   --space-5: 1.5rem;
   --space-6: 2rem;
 
-  /* radius — one soft system everywhere; pill for badges only */
+  /* radius — one soft system everywhere; pill for badges only.
+     --radius-xs exists for one shape: the inline code chip, which is
+     ~19px tall against the ~40px controls --radius-s was chosen for.
+     Radius reads relative to the box it rounds, so reusing 6px there
+     does not look consistent, it looks over-rounded. Inline chips only —
+     anything with real height takes --radius-s. */
+  --radius-xs: 3px;
   --radius-s: 6px;
   --radius-m: 10px;
   --radius-pill: 999px;
@@ -222,6 +241,13 @@
   --warn: #e0a850;
   --success: #57d183;
 
+  /* Literally the exam terminal's green and amber (images/desktop/assets/
+     terminalrc), so a YAML block in the question panel and the same YAML
+     in the candidate's vim are the same two colours.
+     --syntax-string 8.03:1, --syntax-number 7.32:1 on --surface-raised. */
+  --syntax-string: #57d183;
+  --syntax-number: #e0a850;
+
   --focus-ring: #7aa2f7;
 
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 6px rgba(0, 0, 0, 0.3);
@@ -254,6 +280,8 @@
     --danger: #e5605a;
     --warn: #e0a850;
     --success: #57d183;
+    --syntax-string: #57d183;
+    --syntax-number: #e0a850;
 
     --focus-ring: #7aa2f7;
 

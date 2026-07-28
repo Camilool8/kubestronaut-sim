@@ -3,7 +3,7 @@
 # desc: the overlay was applied to pavo and is running
 set -uo pipefail
 img=$(kubectl -n pavo get deploy staging-cargo-api \
-  -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)
+  -o jsonpath='{.spec.template.spec.containers[?(@.name=="api")].image}' 2>/dev/null)
 [ "$img" = "nginx:1.29-alpine" ] || { echo "deployed image is '$img', want nginx:1.29-alpine"; exit 1; }
 
 ready=$(kubectl -n pavo get deploy staging-cargo-api -o jsonpath='{.status.readyReplicas}' 2>/dev/null)

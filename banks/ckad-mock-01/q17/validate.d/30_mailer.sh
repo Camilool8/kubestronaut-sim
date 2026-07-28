@@ -7,7 +7,7 @@ got=$(cat /opt/course/17/bad-image 2>/dev/null | tr -d '[:space:]')
   || { echo "/opt/course/17/bad-image contains '$got', want nginx:0.0.0-corvus-nonexistent"; exit 1; }
 
 img=$(kubectl -n corvus get deploy mailer \
-  -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)
+  -o jsonpath='{.spec.template.spec.containers[?(@.name=="mailer")].image}' 2>/dev/null)
 [ "$img" = "nginx:1.29-alpine" ] || { echo "mailer image is '$img', want nginx:1.29-alpine"; exit 1; }
 
 ready=$(kubectl -n corvus get deploy mailer -o jsonpath='{.status.readyReplicas}' 2>/dev/null)

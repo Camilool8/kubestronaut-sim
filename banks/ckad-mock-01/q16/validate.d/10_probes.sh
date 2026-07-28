@@ -3,7 +3,7 @@
 # desc: startup, readiness and liveness probes with the requested settings
 set -uo pipefail
 spec=$(kubectl -n hydra get deploy orders-api -o json 2>/dev/null \
-  | jq -r '.spec.template.spec.containers[0]')
+  | jq -r '.spec.template.spec.containers[] | select(.name == "api")')
 [ -n "$spec" ] && [ "$spec" != "null" ] || { echo "cannot read the orders-api container"; exit 1; }
 
 # Assert only on the fields the question names. Anything else the API

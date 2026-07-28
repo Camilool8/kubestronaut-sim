@@ -2,7 +2,12 @@
 # points: 5
 # desc: the node port really answers, from a node address inside the cluster
 set -uo pipefail
-node=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null)
+# Every node's InternalIP, then take one. Not items[0]: the check does not
+# care *which* node answers — kube-proxy programs the node port on all of
+# them, which is the property being tested — so asking for a specific
+# position in the node list implied a requirement that does not exist.
+node=$(kubectl get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null \
+  | tr ' ' '\n' | grep -v '^$' | head -1)
 [ -n "$node" ] || { echo "could not determine a node address"; exit 1; }
 
 # Deliberately a node IP and not the ClusterIP: a Service left on

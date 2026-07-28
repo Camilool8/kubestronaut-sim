@@ -189,12 +189,12 @@ title=$(yq -r '.metadata.title' "${BANK_DIR}/exam.yaml")
   done
   echo " Working directories are pre-created at /opt/course/<n>."
   echo " Firefox is limited to the allowlisted documentation sites."
-  # Left Linux-correct on purpose. This banner is rendered inside the
-  # desktop and cannot know what keyboard the candidate is holding; the
-  # browser is the only side that can, and it remaps Cmd+V for Macs (see
-  # ui/src/lib/desktopKeymap.ts). Naming both is the honest version.
+  # One instruction, no platform caveat. The browser intercepts Ctrl+V and
+  # Cmd+V identically over the canvas and turns either into the terminal's
+  # Ctrl+Shift+V (ui/src/components/DesktopViewport.tsx), so Ctrl+V is
+  # true for everyone reading this and there is nothing to qualify.
   echo " Click any value in the question panel to copy it, then paste"
-  echo " here with Ctrl+Shift+V (Cmd+V works too, on a Mac)."
+  echo " here with Ctrl+V."
   echo "=============================================================="
 } > /shared/exam/motd
 

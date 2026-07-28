@@ -6,13 +6,17 @@ certifications. Deliberately harder than the real exams. A full
 KCNA/KCSA (multiple choice) and CKS are on the roadmap and appear in the
 catalog as coming soon.
 
-**Status: Milestone G — an environment the exam can be tested against.**
-Calico replaces kindnet so NetworkPolicies are genuinely enforced;
-ingress-nginx, a local Helm repository and a container registry make the
-rest of the CKAD curriculum answerable. Questions are graded on
-behaviour wherever behaviour is the point — a policy that denies, an
-Ingress the controller really routes, an adapter whose output its
-neighbour can read. And the exam desktop no longer strobes.
+**Status: a boot that explains itself, and three ways to sit the exam.**
+The first boot reports what it is doing — a determinate checklist in the
+browser and the same phases from `./sim up` — instead of serving nothing
+until the cluster is ready. Node, CNI, ingress and every workload image
+are baked into the image, so a reset needs no network. Attempts run as
+**Exam** (the bank's duration, no help), **Training** (untimed, two-tier
+hints, solutions on demand, per-question re-seeding) or **Speed** (half
+the clock). macOS keyboards get their own keymap and the whole host
+clipboard reaches the desktop. Questions are graded on behaviour wherever
+behaviour is the point, against a shared helper library and a lint that
+fails the build on the idioms that grade spelling instead.
 
 Code: Apache-2.0. Question banks: CC BY-SA 4.0 (see `banks/LICENSE`).
 Not affiliated with CNCF, The Linux Foundation, PSI, or killer.sh.

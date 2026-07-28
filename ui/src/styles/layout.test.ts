@@ -24,8 +24,23 @@ describe("full-height chain", () => {
     // should be revisited rather than silently kept.
     const css = await readThemeCss();
     expect(ruleBody(css, ".exam-layout")).toContain("height: 100%");
-    expect(ruleBody(css, ".score-screen")).toContain("height: 100%");
+    // .score-screen deliberately does NOT: it is the one screen that grows
+    // past the viewport and lets the PAGE scroll it, so a second scrollbar
+    // never appears over twenty-two expanded results. It still asks for a
+    // percentage — as a floor, not a cap.
+    expect(ruleBody(css, ".score-screen")).toContain("min-height: 100%");
+    expect(ruleBody(css, ".score-screen")).not.toContain("overflow-y: auto");
     expect(ruleBody(css, ".start-screen")).toContain("min-height: 100%");
+  });
+
+  // The wrapper is height: 100% for the exam's benefit; without this
+  // override the score screen's min-height resolves against a fixed box
+  // and the growth has nowhere to go.
+  test("the score screen's wrapper is allowed to grow with it", async () => {
+    const css = await readThemeCss();
+    const body = ruleBody(css, ".screen:has(> .score-screen)");
+    expect(body, "the score screen's wrapper override was renamed or removed").not.toBeNull();
+    expect(body).toContain("height: auto");
   });
 });
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { desktopKeymap, pasteChordLabel, type KeyTarget } from "./desktopKeymap";
+import { desktopKeymap, isPasteChord, pasteChordLabel, type KeyTarget } from "./desktopKeymap";
 
 // Every sendKey call, in order, as [keysym, code, down].
 type Sent = [number, string, boolean | undefined];
@@ -158,18 +158,51 @@ describe("desktopKeymap", () => {
 });
 
 describe("pasteChordLabel", () => {
-  test("names the key the candidate should actually press", () => {
-    setMac(true);
-    desktopKeymap.setEnabled(true);
-    expect(pasteChordLabel()).toBe("⌘V");
+  // One instruction for everyone. The viewport intercepts Ctrl+V and ⌘V
+  // identically regardless of platform or of whether Mac translation is
+  // on, so the label must not vary with either — it used to, which meant
+  // the same screen told two candidates two different things.
+  test("is the same on every platform and either preference", () => {
+    for (const mac of [true, false]) {
+      for (const enabled of [true, false]) {
+        setMac(mac);
+        desktopKeymap.setEnabled(enabled);
+        expect(pasteChordLabel(), `mac=${mac} enabled=${enabled}`).toBe("Ctrl+V");
+      }
+    }
+  });
+});
 
-    // With translation off, ⌘V is not intercepted, so telling them to
-    // press it would be wrong.
-    desktopKeymap.setEnabled(false);
-    expect(pasteChordLabel()).toBe("Ctrl+Shift+V");
+// The regression this exists for: a Ctrl+V that reaches the remote
+// terminal is readline's verbatim-insert prefix and prints `^V` instead
+// of pasting. The viewport must therefore recognise — and swallow —
+// every one of these, whatever the platform or the preferences.
+describe("isPasteChord", () => {
+  const ev = (o: Partial<KeyboardEvent>) =>
+    ({ key: "v", metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, ...o }) as KeyboardEvent;
 
-    setMac(false);
-    desktopKeymap.setEnabled(true);
-    expect(pasteChordLabel()).toBe("Ctrl+Shift+V");
+  test("both Ctrl+V and Cmd+V count, on every platform and preference", () => {
+    for (const mac of [true, false]) {
+      for (const enabled of [true, false]) {
+        setMac(mac);
+        desktopKeymap.setEnabled(enabled);
+        expect(isPasteChord(ev({ ctrlKey: true })), `ctrl mac=${mac} on=${enabled}`).toBe(true);
+        expect(isPasteChord(ev({ metaKey: true })), `meta mac=${mac} on=${enabled}`).toBe(true);
+      }
+    }
+  });
+
+  test("uppercase V counts — caps lock must not turn paste back into ^V", () => {
+    expect(isPasteChord(ev({ key: "V", ctrlKey: true }))).toBe(true);
+  });
+
+  test("the terminal's own Ctrl+Shift+V passes straight through", () => {
+    expect(isPasteChord(ev({ ctrlKey: true, shiftKey: true }))).toBe(false);
+  });
+
+  test("plain v, and other chords on v, are not paste", () => {
+    expect(isPasteChord(ev({}))).toBe(false);
+    expect(isPasteChord(ev({ altKey: true }))).toBe(false);
+    expect(isPasteChord(ev({ key: "c", ctrlKey: true }))).toBe(false);
   });
 });

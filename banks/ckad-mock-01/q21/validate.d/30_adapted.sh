@@ -2,6 +2,7 @@
 # points: 3
 # desc: the adapter really rewrites the app's output into key/value lines
 set -uo pipefail
+. /banks/_lib/checks.sh
 # Read from inside the adapter, not the app: this is what proves the two
 # containers actually share the volume. A Pod whose YAML mounts the same
 # emptyDir at different paths, or whose adapter writes somewhere else,

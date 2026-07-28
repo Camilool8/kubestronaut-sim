@@ -257,7 +257,12 @@
 }
 
 .bank-badge {
-  font-size: 0.68rem;
+  /* Was 0.68rem, below the type scale's smallest step for no reason the
+     scale did not already cover: uppercase at 0.06em tracking already
+     reads larger than its nominal size, so --text-xs carries this badge
+     without crowding, and "COMING SOON" is copy a candidate should be
+     able to read at a glance. */
+  font-size: var(--text-xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -446,16 +451,14 @@
                          the jump grid drops to three columns.
 
      Deliberately a custom property and not an inline `width`: an inline
-     style beats a class rule, so a persisted width would win over
-     .question-panel.collapsed and break the collapse outright. */
+     style beats a class rule, so a persisted width could otherwise win
+     over the clamp and render the panel unusably narrow. */
   width: clamp(280px, var(--panel-width, 360px), min(600px, 50vw));
   flex-shrink: 0;
   position: relative;
-  /* The toggle's own box, declared once. Three things reserve space for
-     it — the toggle itself, the nav header's right padding, and the jump
-     grid's top padding — and under any-pointer: coarse all three have to
-     grow to 44px together or the header runs underneath the button. */
-  --toggle-size: 28px;
+  /* The prev/next step buttons' box, declared once here so the
+     coarse-pointer bump below can raise it in one place. */
+  --control-size: 28px;
   /* The collapse is instant on purpose. This used to ease the panel's
      own width over 150ms, which is neither compositor-only nor authored
      inside prefers-reduced-motion — and animating a layout property for
@@ -463,36 +466,6 @@
      one element in the product with a ResizeObserver watching it (noVNC).
      There is no transform-only way to move this edge without changing the
      collapsed and expanded geometry, so a utility toggle simply snaps. */
-}
-
-.question-panel.collapsed {
-  width: 36px;
-}
-
-.panel-toggle {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
-  background: var(--surface-raised);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-s);
-  width: var(--toggle-size);
-  height: var(--toggle-size);
-  cursor: pointer;
-  /* Above .question-jump, which also takes z-index 1 — the toggle is the
-     one control that must stay reachable while the grid is open. */
-  z-index: 2;
-}
-
-/* It had no hover rule at all, which made it the only control in the
-   product that gave no feedback before you clicked it. */
-.panel-toggle:hover {
-  background: var(--raised-hover);
-}
-
-.panel-toggle:active {
-  background: var(--raised-hover);
-  transform: translateY(1px);
 }
 
 /* ---- question navigator ----
@@ -508,7 +481,6 @@
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-3);
-  padding-right: calc(var(--space-2) * 2 + var(--toggle-size));
   border-bottom: 1px solid var(--border);
 }
 
@@ -520,8 +492,8 @@
 
 .question-nav-step {
   flex-shrink: 0;
-  width: var(--toggle-size);
-  height: var(--toggle-size);
+  width: var(--control-size);
+  height: var(--control-size);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -663,7 +635,6 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: var(--space-3);
-  padding-top: calc(var(--space-3) + var(--toggle-size));
 }
 
 .question-jump-group {
@@ -935,14 +906,19 @@
 .md code {
   background: var(--bg);
   padding: 0.1em 0.3em;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 
 /* Every inline value in a question is a click-to-copy button. It has to
    read as part of the sentence, not as a form control, so it borrows
    the inline-code look and only reveals its affordance on hover/focus. */
 .copy-value {
-  display: inline;
+  /* inline-block, not inline: the icon below is absolutely positioned and
+     needs a positioned box to hang off. Baseline alignment keeps it
+     sitting in the sentence exactly as inline did. */
+  display: inline-block;
+  position: relative;
+  vertical-align: baseline;
   padding: 0;
   border: 0;
   background: none;
@@ -963,11 +939,28 @@
   color: var(--accent-strong);
 }
 
+/* Out of flow, deliberately.
+   This used to be an inline glyph at opacity: 0, which still occupied its
+   own width plus a margin — so every copyable value in a question left a
+   permanent gap in the sentence, and a paragraph with six of them read as
+   though it had been typeset with holes in it. Hiding it with `width: 0`
+   instead would have been worse: the sentence would reflow under the
+   cursor while being read.
+   Absolute keeps the resting text exactly as if the icon did not exist,
+   and hovering shifts nothing. The value's own hover treatment (accent
+   border, accent-soft fill, accent-strong text) is what actually
+   advertises the control; this is a fourth, redundant channel. */
 .copy-value-icon {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 0.15em;
   font-size: 0.85em;
-  margin-left: 0.25em;
-  color: var(--text-muted);
+  line-height: 1;
+  color: var(--accent-strong);
   opacity: 0;
+  pointer-events: none;
 }
 
 .copy-value:hover .copy-value-icon,
@@ -1104,12 +1097,27 @@
 
 /* ---- score screen ---- */
 
+/* The score screen flows in the page and the PAGE scrolls it — one
+   scrollbar, not two.
+   It used to be height: 100% + overflow-y: auto, which made it a viewport-
+   sized box with its own scrollbar. With twenty-two results expanded and a
+   solution open inside each, that box was the thing you scrolled while the
+   page behind it sat still, and the browser's own scroll position, Find,
+   and Home/End all applied to the wrong element. The exam screen still
+   needs the full-height chain (a split layout that must not grow); a
+   results page does not. */
 .score-screen {
-  height: 100%;
-  overflow-y: auto;
+  min-height: 100%;
   padding: var(--space-6) var(--space-4);
   max-width: 820px;
   margin: 0 auto;
+}
+
+/* The wrapper is height: 100% for the exam's sake. The score screen is the
+   one screen that must be allowed to grow past the viewport instead. */
+.screen:has(> .score-screen) {
+  height: auto;
+  min-height: 100%;
 }
 
 .score-loading,
@@ -1362,7 +1370,12 @@
   vertical-align: middle;
 }
 
-.domain-table td {
+/* The flex lives on an inner wrapper, NOT on the cell.
+   `display: flex` on a <td> takes it out of the table layout model, so it
+   stops stretching to the row height: the score cell measured 38px against
+   the domain cell's 40px, putting the two border-bottoms 2px apart and
+   leaving a visible step in every row divider at the column boundary. */
+.domain-score {
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -1854,11 +1867,6 @@
     width: min(85vw, 360px);
     z-index: var(--z-panel);
     box-shadow: var(--shadow-3);
-  }
-
-  .question-panel.collapsed {
-    width: 36px;
-    box-shadow: none;
   }
 
   .exam-body {
@@ -2377,7 +2385,11 @@
    and .code-block-copy are the other two icon-scale controls reachable
    on a phone. */
 @media (any-pointer: coarse) {
-  .panel-toggle,
+  /* Raising the panel's control size here moves the nav steps with it. */
+  .question-panel {
+    --control-size: 44px;
+  }
+
   .info-button,
   .theme-toggle,
   .toast-dismiss,
@@ -2388,13 +2400,6 @@
   .question-tile {
     min-width: 44px;
     min-height: 44px;
-  }
-
-  /* The nav header and the jump grid both reserve a column for the panel
-     toggle. Raising the toggle's own box here moves both reserves with it,
-     which is the whole reason the size is a variable. */
-  .question-panel {
-    --toggle-size: 44px;
   }
 
   /* These three keep their padding-derived box on a mouse, so growing
@@ -2536,7 +2541,7 @@
 .question-empty {
   flex: 1;
   overflow-y: auto;
-  padding: calc(var(--space-3) + var(--toggle-size)) var(--space-4) var(--space-4);
+  padding: var(--space-3) var(--space-4) var(--space-4);
 }
 
 .question-skeleton {
@@ -2610,7 +2615,6 @@
   .bank-card,
   .theme-toggle,
   .info-button,
-  .panel-toggle,
   .question-nav-step,
   .question-nav-current,
   .question-mark,
@@ -2854,10 +2858,18 @@
   color: var(--accent-strong);
 }
 
+/* Strings and numbers carry their own hues, not --text. In YAML almost
+   everything right of the colon is one or the other, so mapping them to
+   the body colour meant a manifest rendered as blue keys against an
+   otherwise monochrome block — highlighted in the DOM, not to the eye. */
 .md .hljs-string,
-.md .hljs-number,
 .md .hljs-literal {
-  color: var(--text);
+  color: var(--syntax-string);
+}
+
+.md .hljs-number,
+.md .hljs-bullet {
+  color: var(--syntax-number);
 }
 
 .md .hljs-comment,

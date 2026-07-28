@@ -3,7 +3,7 @@
 # desc: payments-api is back on nginx:1.27-alpine with 4 ready replicas
 set -uo pipefail
 img=$(kubectl -n draco get deploy payments-api \
-  -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)
+  -o jsonpath='{.spec.template.spec.containers[?(@.name=="api")].image}' 2>/dev/null)
 [ "$img" = "nginx:1.27-alpine" ] || { echo "image is '$img', want nginx:1.27-alpine"; exit 1; }
 
 spec=$(kubectl -n draco get deploy payments-api -o jsonpath='{.spec.replicas}' 2>/dev/null)
