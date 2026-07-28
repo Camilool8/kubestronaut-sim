@@ -45,6 +45,30 @@ Object.defineProperty(window, "sessionStorage", {
   configurable: true,
 });
 
+// jsdom implements no part of the Pointer Capture API, and PanelResizer
+// calls setPointerCapture on pointerdown so a drag that leaves the
+// 6px-wide divider keeps tracking. Without these the drag tests threw
+// asynchronously, inside a jsdom event dispatch where no assertion could
+// catch it: every test still reported green, and vitest still exited 1
+// on the unhandled errors. That combination is why it went unnoticed —
+// the summary said "228 passed" and only the exit code disagreed.
+//
+// Capture is a no-op here rather than a simulation. These tests assert
+// what the resizer does with pointer coordinates, not what the browser
+// does with capture, so recording ids nobody reads would be fiction.
+for (const method of ["setPointerCapture", "releasePointerCapture"] as const) {
+  Object.defineProperty(Element.prototype, method, {
+    value: () => {},
+    configurable: true,
+    writable: true,
+  });
+}
+Object.defineProperty(Element.prototype, "hasPointerCapture", {
+  value: () => false,
+  configurable: true,
+  writable: true,
+});
+
 // jsdom has no CSS engine and therefore no matchMedia. Default every
 // query to "no match", which is the desktop case — components that gate
 // on viewport or pointer then behave as they would on a laptop unless a
