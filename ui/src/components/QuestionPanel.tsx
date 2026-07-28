@@ -88,8 +88,10 @@ export function QuestionPanel({
 
   // [ and ] step between questions. Deliberately not Alt+arrows: those are
   // Back/Forward on Windows and Linux, and in a no-router SPA Back navigates
-  // out of a running exam. Bare bracket keys are safe here for a reason
-  // specific to this product — it has no text inputs anywhere.
+  // out of a running exam. Bare bracket keys are safe because the handler
+  // below bows out over the desktop canvas, over any focused form control,
+  // and while a dialog is open — the product does have form controls (the
+  // mode picker, the clipboard textarea, the keyboard checkboxes).
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "[" && event.key !== "]") return;

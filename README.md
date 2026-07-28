@@ -1,181 +1,110 @@
 # kubestronaut-sim
 
 Open-source, killer.sh-style exam simulator for the Kubestronaut
-certifications. Deliberately harder than the real exams. A full
-**22-question CKAD bank** covering all five curriculum domains. CKA,
-KCNA/KCSA (multiple choice) and CKS are on the roadmap and appear in the
+certifications, run locally on your own machine. Deliberately harder
+than the real exams.
+
+One hands-on bank ships today: **CKAD Mock Exam 01**, 22 questions
+across all five curriculum domains, 120 minutes, 66% to pass, against a
+two-node Kubernetes 1.35 cluster. CKA, KCNA/KCSA and CKS appear in the
 catalog as coming soon.
 
-**Status: a boot that explains itself, and three ways to sit the exam.**
-The first boot reports what it is doing — a determinate checklist in the
-browser and the same phases from `./sim up` — instead of serving nothing
-until the cluster is ready. Node, CNI, ingress and every workload image
-are baked into the image, so a reset needs no network. Attempts run as
-**Exam** (the bank's duration, no help), **Training** (untimed, two-tier
-hints, solutions on demand, per-question re-seeding) or **Speed** (half
-the clock). macOS keyboards get their own keymap and the whole host
-clipboard reaches the desktop. Questions are graded on behaviour wherever
-behaviour is the point, against a shared helper library and a lint that
-fails the build on the idioms that grade spelling instead.
-
-Code: Apache-2.0. Question banks: CC BY-SA 4.0 (see `banks/LICENSE`).
-Not affiliated with CNCF, The Linux Foundation, PSI, or killer.sh.
-Kubernetes and the certification names are trademarks of The Linux
-Foundation. (The same notice, plus a real-exam comparison table, lives in
-the app's About panel.)
+Questions are graded on behaviour wherever behaviour is the point — a
+policy that actually denies, an Ingress the controller really routes —
+not on the shape of your YAML.
 
 ## Quickstart
 
-Requires Docker Desktop (or docker + compose v2). ~9GB RAM free (XFCE
-desktop included).
+Requires Docker Desktop (or docker + compose v2), python3, and about
+9GB of free RAM. The XFCE desktop is included in that figure.
 
-    ./sim doctor                 # optional: RAM, disk, cgroups, warm volumes
-    ./sim up                     # boots everything (first run: several minutes)
-    open http://localhost:8080   # then never touch the CLI again
+```bash
+./sim doctor                 # optional preflight: RAM, disk, cgroups, tools
+./sim up                     # boots everything (first run: several minutes)
+open http://localhost:8080   # then never touch the CLI again
+```
 
-`up` prints each build step as it completes, and the UI comes up
-immediately — before the cluster does — so `http://localhost:8080` shows
-the same progress the terminal does, with per-step durations. A build
-that fails says which step failed and why, rather than waiting out a
-timeout. `./sim doctor` catches the environmental problems (not enough
-RAM, no disk) that are cheaper to find before a boot than during one.
+The UI comes up before the cluster does, so `http://localhost:8080`
+shows the same boot progress the terminal does. `./sim doctor` catches
+the environmental problems that are cheaper to find before a boot than
+during one.
 
-Ports bind to **all interfaces** by default, so you can build the
-environment on a desktop and sit the exam from a laptop on the same
-network — just point it at `http://<that machine>:8080`.
+Everything after `up` happens in the browser. See [docs/cli.md](docs/cli.md)
+for the full command and configuration reference.
 
-> **There is no authentication anywhere in this stack.** Anyone who can
-> reach port 8080 can start and end your exam, and the exam desktop is a
-> real shell with cluster-admin on the practice cluster. On a network you
-> do not control, bind to loopback instead:
+> **There is no authentication anywhere in this stack.** Ports bind to
+> all interfaces by default, so anyone who can reach port 8080 can start
+> and end your exam, and the exam desktop is a real shell with
+> cluster-admin. On a network you do not control:
 >
->     SIM_BIND=127.0.0.1 ./sim up
+> ```bash
+> SIM_BIND=127.0.0.1 ./sim up
+> ```
 >
-> `SIM_BIND` applies to every published port, not just the UI. See
-> [SECURITY.md](SECURITY.md) for the full picture.
-
-Everything after `up` happens in the browser: pick an exam from the
-lobby catalog, start the timed session, work on the embedded desktop,
-submit, read your score with per-check results and solutions, then start
-a **new attempt** or **switch to a different exam** — both buttons drive
-the full environment rebuild with a live progress checklist that shows
-each step's duration and the cluster's own output as it goes.
-
-**Click any value in a question to copy it**, then paste in the exam
-terminal with Ctrl+Shift+V — or just ⌘V on a Mac, which the page
-translates for you along with ⌘C, ⌘K, ⌘←/→ and ⌥←/→ (toggle it, and see
-the full list, from the keyboard button in the exam topbar; `?` opens the
-same reference). Anything else in your clipboard reaches the desktop
-through the **Clipboard** panel beside it — ⌘V/Ctrl+V over the desktop
-does it in one keystroke where your browser allows reading the clipboard,
-and the panel is the fallback where it doesn't (Firefox, or a denied
-permission). Resource names, labels, image tags and
-`/opt/course` paths all have to be exact, and retyping them is how
-avoidable zeros happen. Code listings in both questions and solutions
-carry a language label and a copy-whole-block button, and highlighting
-loads only for the language actually shown.
-
-`down` + `up` resumes your exam state (including an in-progress
-session). Light and dark themes follow your system, with a toggle in the
-corner. The exam itself needs a desktop — a keyboard and room for a
-terminal beside the questions — so phones get a screen saying so rather
-than a broken layout, while the catalog and past scores stay readable
-there.
+> See [SECURITY.md](SECURITY.md) for what is and is not defended.
 
 ## What the exam feels like
 
-1. **Lobby** — the exam catalog (active bank highlighted; unavailable
-   certifications shown with the reason), duration/passing-score stats,
-   and the Start button.
-2. **Exam view** — timer bar with 30/15/5-minute warnings, the question
-   panel (with a chip naming the instance to ssh into), and the exam
-   desktop rendered by a built-in VNC client. The desktop comes ready:
-   the terminal is already open showing the exam banner, and the panel
-   has Terminal + Firefox (docs-allowlist only) launchers. A first-run
-   card explains the four regions of the screen; "How this exam works"
-   in the lobby and the About panel bring it back at any time.
-3. **End** — submit early or let the timer expire; the desktop locks
+1. **Lobby** — the exam catalog, duration and passing-score stats, and
+   the Start button. Pick Exam (the bank's duration, no help), Training
+   (untimed, two-tier hints, solutions on demand) or Speed (half the
+   clock).
+2. **Exam view** — a timer bar with warnings at a quarter, an eighth
+   and a twenty-fourth of the attempt, the question panel, and the exam
+   desktop rendered by a built-in VNC client. The terminal is already
+   open; Firefox is restricted to a documentation allowlist.
+3. **End** — submit early or let the timer expire. The desktop locks
    immediately and grading runs in the background.
-4. **Score** — percent, pass/fail, how the session ended, expandable
-   per-question checks, full solutions, and the New attempt button.
+4. **Score** — percent, pass/fail, expandable per-question checks, full
+   solutions, and a New attempt button.
 
-Desktop access and the solutions endpoint are gated by session state
-(403 until running, or ended, respectively) purely for UX fidelity with
-the real exam — this is **not a security boundary**: every bank file,
-including `solution.md`, already sits unencrypted on your own disk.
+Click any value in a question to copy it, then paste in the exam
+terminal with Ctrl+Shift+V — or ⌘V on a Mac, which the page translates
+along with ⌘C, ⌘K and the line-motion chords. Press `?` for the full
+list. Anything else in your clipboard reaches the desktop through the
+Clipboard panel.
+
+`down` then `up` resumes your exam state, including an in-progress
+session. Light and dark themes follow your system. The exam needs a
+desktop-sized screen; phones get an explanation rather than a broken
+layout.
 
 ## The cluster you get
 
-A two-node kind cluster (one control plane, one worker), with:
+A two-node kind cluster (one control plane, one worker) with **Calico**
+rather than kindnet, so NetworkPolicies are genuinely enforced and a
+policy question can be graded on behaviour. It also carries
+ingress-nginx, a local Helm repository, and a plain-HTTP registry for
+the image-building questions.
 
-- **Calico**, not kind's default kindnet, so **NetworkPolicies are
-  actually enforced**. A policy question can be graded on behaviour —
-  this connection succeeds, that one times out — and, more importantly,
-  you can test your own answer the way you would on the real exam.
-- **ingress-nginx**, pinned to the control-plane node, so Ingress
-  questions have a controller to satisfy them.
-- A **local Helm repository** (`sim`), pre-added on every instance and
-  served from the cluster host with no internet involved.
-- A **plain-HTTP registry** at `registry:5000`, reachable from the
-  instances, for the image-building questions.
+Test in-cluster first — that is what the real exam expects, and what the
+graders use:
 
-Test in-cluster first — that is what the real exam expects, and it is
-what the graders use:
+```bash
+kubectl -n <ns> run tmp --rm -it --restart=Never --image=nginx:alpine -- curl -m 5 <svc>
+```
 
-    kubectl -n <ns> run tmp --rm -it --restart=Never --image=nginx:alpine -- curl -m 5 <svc>
+[docs/architecture.md](docs/architecture.md) covers the containers,
+networks and boot sequence.
 
-Ports are also mapped out to the host, which the real exam does not do,
-because being able to open your own Ingress in a browser is a fast way to
-learn why it isn't matching:
+## Documentation
 
-| From your machine | Reaches |
+| Document | What it covers |
 |---|---|
-| `http://localhost:8081` | ingress-nginx (HTTP) — send a `Host:` header, or use an `/etc/hosts` entry |
-| `https://localhost:8443` | ingress-nginx (HTTPS) |
-| `localhost:30080-30082` | NodePort Services on those three ports |
+| [docs/cli.md](docs/cli.md) | `./sim` subcommands, environment variables, host ports |
+| [docs/architecture.md](docs/architecture.md) | Containers, networks, boot sequence, data flow |
+| [docs/api.md](docs/api.md) | HTTP API for the facilitator and conductor |
+| [docs/bank-spec.md](docs/bank-spec.md) | Question bank format and the validator contract |
+| [docs/testing.md](docs/testing.md) | What CI enforces, and what only the smoke suite does |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Building, testing, and submitting changes |
+| [SECURITY.md](SECURITY.md) | Threat model and the boundaries that exist |
 
-No `validate.d` check may depend on that host path — it is for you, not
-for grading.
+## License
 
-## Architecture note: the conductor
+Code: Apache-2.0. Question banks: CC BY-SA 4.0 (see
+[banks/LICENSE](banks/LICENSE)).
 
-Reset and exam switching rebuild the kind cluster and restart services.
-That power lives in a dedicated `conductor` container — the **only**
-container mounting the Docker socket — kept off the exam network on an
-internal-only network behind the facilitator's `/api/control/*` proxy.
-The exam-facing services never see the socket. On this single-user local
-tool the browser (and therefore the candidate) can reach the control
-API; the boundary being defended is privilege, not candidate access.
-
-## CLI (optional after `up`)
-
-    ./sim up [bank]          # boot; bank argument only sets the first-boot default
-    ./sim down               # stop (state persists — resume where you left off)
-    ./sim purge              # stop and delete all volumes (full clean slate)
-    ./sim reset              # same code path as the UI's New attempt button
-    ./sim doctor             # preflight: RAM, disk, cgroups, warm volumes
-    ./sim ssh instance-1     # dev shortcut into an instance (user: candidate)
-    ./sim grade              # killer.sh-style scoreboard (session-independent)
-
-Bank switching from the CLI is deliberately absent — use the lobby; the
-active bank lives in `/shared/bank` and is owned by the conductor after
-first boot.
-
-Solutions: `banks/<bank>/<q>/solution.md` (also served, once your
-session has ended, from the score page).
-
-## Verification
-
-`tests/smoke.sh` is the end-to-end gate (~35 min, destructive: it purges
-first). It covers the cold boot, solving both banks, session lifecycle,
-warm restart, UI-path reset, the CKAD→CKA→CKAD switch round-trip,
-conductor network isolation, desktop readiness, session auto-expiry, and
-the cluster add-ons — including a *behavioural* NetworkPolicy check,
-since "calico-node exists" would pass against a CNI that was installed
-but programming no rules.
-
-Two gates hold every question bank honest, and both run inside the smoke
-test: a **fresh environment must score 0**, and running every
-`tests/solutions/<bank>/qNN.sh` must score **100%**. The first is the one
-that earns its keep — it is what catches a check that passes by accident,
-or state left behind by a previous attempt.
+Not affiliated with CNCF, The Linux Foundation, PSI, or killer.sh.
+Kubernetes and the certification names are trademarks of The Linux
+Foundation. The same notice, plus a real-exam comparison table, lives in
+the app's About panel.

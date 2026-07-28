@@ -1,6 +1,18 @@
-The question banks in this directory are licensed under the
-Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0).
+Copyright 2026 Camilo Joga
+
+The question banks in this directory — every <bank-id>/ directory and
+its exam.yaml, question.md, hints.md and solution.md files — are
+licensed under the Creative Commons Attribution-ShareAlike 4.0
+International License (CC BY-SA 4.0).
 https://creativecommons.org/licenses/by-sa/4.0/
+
+Attribute as: kubestronaut-sim question banks, Camilo Joga,
+https://github.com/Camilool8/kubestronaut-sim
+
+The code in this directory is NOT covered by that licence. _lib/
+(shared validator shell functions), _charts/ (Helm charts), and every
+validate.d/*.sh and setup.sh are source code, licensed under Apache-2.0
+with the rest of the repository. See ../LICENSE.
 
 All questions are original works. They are inspired in format by public
 Kubernetes certification simulators but share no text with them.

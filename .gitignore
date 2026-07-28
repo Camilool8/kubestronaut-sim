@@ -44,11 +44,14 @@ killer-sh-*.txt
 # of which survives a clone. Anyone else cloning this repo would have seen
 # every one of them as untracked. Listing them here is what makes a fresh
 # clone behave the way this working copy already does.
+# The .impeccable patterns are unanchored on purpose: ui/ has its own
+# .impeccable directory, and root-anchored patterns left its cache file
+# visible on a fresh clone.
 .claude/settings.local.json
-.impeccable/config.local.json
-.impeccable/hook.cache.json
-.impeccable/hook.pending.json
-.impeccable/live/sessions/
+**/.impeccable/config.local.json
+**/.impeccable/hook.cache.json
+**/.impeccable/hook.pending.json
+**/.impeccable/live/sessions/
 .superpowers/
 
 # Deliberately NOT ignored, because they are project artifacts rather than

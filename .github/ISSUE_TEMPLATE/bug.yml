@@ -1,0 +1,80 @@
+name: Bug report
+description: Something in the simulator does not work
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Most reports here come down to the environment rather than the
+        code, so the `./sim doctor` output below is the single most
+        useful thing you can include.
+
+        Security issues are not handled privately. See
+        [SECURITY.md](../blob/main/SECURITY.md) for why, and file them
+        here like anything else.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: ./sim doctor output
+      description: Paste the whole thing. It covers RAM, disk, cgroups, docker, compose and python3.
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: host
+    attributes:
+      label: Host
+      description: OS, architecture, and how much RAM Docker itself is allowed.
+      placeholder: macOS 15.5, arm64, Docker Desktop with 10GB
+    validations:
+      required: true
+
+  - type: input
+    id: bank
+    attributes:
+      label: Bank and question
+      description: Which bank was active, and which question if the problem is specific to one.
+      placeholder: ckad-mock-01, q14
+    validations:
+      required: false
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Attempt mode
+      options:
+        - Exam
+        - Training
+        - Speed
+        - Not in an attempt
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: |
+        `docker compose logs k8s-env` for a boot that never finishes,
+        `docker compose logs facilitator` for grading or API problems.
+      render: text
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: fresh
+    attributes:
+      label: Before filing
+      options:
+        - label: I tried `./sim purge && ./sim up`, and it still happens.
+          required: false

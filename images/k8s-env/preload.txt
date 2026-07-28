@@ -16,8 +16,9 @@
 # install). Both questions are built on those tags NOT resolving. Baking
 # them would silently break two questions.
 #
-# tests/preload-coverage.sh checks this list against what the bank
-# actually references.
+# Nothing checks this list against what the banks actually reference. A
+# missing entry shows up as a question that needs the network to pass,
+# which only a smoke run on a cold cache will catch.
 
 busybox:1.37
 nginx:1.27-alpine
