@@ -25,7 +25,7 @@ jobs:
     name: Question banks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # All four are offline and take seconds in total. They are the
       # cheapest failures in the project and the easiest to introduce:
       # a mis-weighted question, a check that grades spelling, a hint
@@ -47,7 +47,7 @@ jobs:
       matrix:
         module: [facilitator, conductor, proxy]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v5
         with:
           go-version: "1.24"
@@ -78,7 +78,7 @@ jobs:
         # and every DOM test fails with "document is not defined".
         working-directory: ui
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -96,7 +96,7 @@ jobs:
     name: Images build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # PRELOAD=none skips baking ~2GB of image archives. The point here
       # is that the Dockerfiles still parse and their build steps still
       # succeed — the archives themselves are verified by actually
@@ -120,7 +120,7 @@ jobs:
     name: Shell syntax
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # smoke.sh cannot be RUN here, but a syntax error in it should not
       # wait until someone spends 35 minutes finding out.
       - name: Parse every script
