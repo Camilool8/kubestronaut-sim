@@ -108,9 +108,9 @@ sent back to it. Both directions compare before sending and update it
 after. The ⌘V/Ctrl+V path below bypasses the guard entirely: it calls
 `desktopClipboard.pasteFromHost` directly, reading and pushing without
 ever touching `lastSynced`. That is harmless rather than a second loop
-risk — the push lands in the desktop's clipboard buffer only, no
-keystrokes are replayed, so the worst case is one redundant re-push of
-the same value the next time the tab regains focus. This is the single
+risk: the worst case is one redundant re-push on the next focus, and
+unlike pasteFromHost's own chord, that re-push only updates the
+desktop's clipboard buffer — no keystrokes replayed. This is the single
 piece of state in the module and the one most worth testing.
 
 ### The chord fix

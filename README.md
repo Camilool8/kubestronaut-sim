@@ -60,13 +60,14 @@ for the full command and configuration reference.
 
 Anything you copy reaches the exam desktop automatically — highlight text
 in a question and press ⌘C, or copy from any other app and come back to
-the tab. Paste in the exam terminal with Ctrl+V, ⌘V, the terminal's own
-Ctrl+Shift+V, or right-click → Paste. Copying in the terminal works the
-same way in reverse, but only in Chrome: Firefox requires a user gesture
-for clipboard access in both directions, so it can neither read what you
-copied elsewhere nor write what the terminal sent without one — the
-Clipboard panel is a real click and covers both cases. Press `?` for the
-full shortcut list.
+the tab. The in-page copy needs no clipboard permission anywhere,
+Firefox included, since it reads the live selection rather than the
+clipboard API. Paste in the exam terminal with Ctrl+V, ⌘V, the
+terminal's own Ctrl+Shift+V, or right-click → Paste. Copying in the
+terminal works the same way in reverse, but only in Chrome: reading the
+host clipboard automatically and writing the terminal's copy back to it
+both need a gesture Firefox won't grant — the Clipboard panel is a real
+click and covers both. Press `?` for the full shortcut list.
 
 What reaches the desktop is reduced to ASCII, so an em dash arrives as a
 hyphen and curly quotes arrive straight. The clipboard channel drops any
