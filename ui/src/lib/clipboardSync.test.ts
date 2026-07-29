@@ -190,3 +190,50 @@ describe("clipboardSync host read", () => {
     expect(target.pasted).toEqual(["5 Pods"]);
   });
 });
+
+describe("clipboardSync host write", () => {
+  test("what the desktop copied reaches the host clipboard", async () => {
+    const writeText = vi.fn(async () => {});
+    stubClipboard({ writeText });
+    desktopClipboard.receive("candidate@instance-1");
+
+    expect(await clipboardSync.syncToHost()).toBe(true);
+    expect(writeText).toHaveBeenCalledWith("candidate@instance-1");
+  });
+
+  test("a refused write is silent", async () => {
+    stubClipboard({ writeText: vi.fn(async () => Promise.reject(new Error("denied"))) });
+    desktopClipboard.receive("nope");
+
+    expect(await clipboardSync.syncToHost()).toBe(false);
+  });
+
+  test("a value taken from the desktop is never pushed back to it", async () => {
+    // The loop this guards against: write X to the host, the next focus
+    // reads X back, and pushes it to the desktop again, forever.
+    const target = fakeTarget();
+    desktopClipboard.connect(target);
+    const writeText = vi.fn(async () => {});
+    stubClipboard({ writeText, readText: vi.fn(async () => "orbit-frontend") });
+
+    desktopClipboard.receive("orbit-frontend");
+    await clipboardSync.syncToHost();
+    const pushed = await clipboardSync.syncFromHost();
+
+    expect(pushed).toBe(false);
+    expect(target.pasted).toEqual([]);
+  });
+
+  test("a value pushed to the desktop is not written back to the host", async () => {
+    const target = fakeTarget();
+    desktopClipboard.connect(target);
+    const writeText = vi.fn(async () => {});
+    stubClipboard({ writeText, readText: vi.fn(async () => "lyra") });
+
+    await clipboardSync.syncFromHost();
+    desktopClipboard.receive("lyra"); // the server echoes it back
+
+    expect(await clipboardSync.syncToHost()).toBe(false);
+    expect(writeText).not.toHaveBeenCalled();
+  });
+});

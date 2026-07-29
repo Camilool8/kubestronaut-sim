@@ -55,7 +55,9 @@ class ClipboardSync {
     // focus covers switching between windows of the same tab.
     const onFocus = () => {
       if (document.visibilityState === "hidden") return;
-      void this.syncFromHost();
+      void this.syncToHost().then((written) => {
+        if (!written) void this.syncFromHost();
+      });
     };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
@@ -63,6 +65,15 @@ class ClipboardSync {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
     });
+
+    // The desktop pushes its clipboard on every explicit copy there.
+    // Writing needs a focused document, so a change that arrives while the
+    // candidate is looking elsewhere is picked up by the focus handler.
+    const unsubscribe = desktopClipboard.subscribe(() => {
+      if (!document.hasFocus()) return;
+      void this.syncToHost();
+    });
+    this.stopFns.push(unsubscribe);
 
     void this.syncFromHost();
   }
@@ -98,6 +109,26 @@ class ClipboardSync {
       return false;
     }
     return this.pushToDesktop(text);
+  }
+
+  /**
+   * Writes the desktop's clipboard to the host.
+   *
+   * Chrome grants clipboard-write to the focused tab, so no gesture is
+   * needed. Firefox refuses without one — the Clipboard panel's button is
+   * a real gesture and stays for exactly that case.
+   */
+  async syncToHost(): Promise<boolean> {
+    const text = desktopClipboard.getRemote();
+    if (!text || text === this.lastSynced) return false;
+    if (text.length > MAX_SYNC_CHARS) return false;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      return false;
+    }
+    this.lastSynced = text;
+    return true;
   }
 
   /** Sends to the desktop unless it is empty, oversized, or already there. */
