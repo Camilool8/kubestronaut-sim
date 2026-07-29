@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { clipboardSync } from "./clipboardSync";
 import { desktopClipboard, type ClipboardTarget } from "./desktopClipboard";
 
@@ -10,6 +10,13 @@ function fakeTarget(): ClipboardTarget & { pasted: string[] } {
 function stubSelection(text: string) {
   Object.defineProperty(window, "getSelection", {
     value: () => ({ toString: () => text }),
+    configurable: true,
+  });
+}
+
+function stubClipboard(clipboard: Partial<Clipboard>) {
+  Object.defineProperty(navigator, "clipboard", {
+    value: clipboard,
     configurable: true,
   });
 }
@@ -80,5 +87,58 @@ describe("clipboardSync selection push", () => {
     window.dispatchEvent(new Event("copy"));
 
     expect(target.pasted).toEqual([]);
+  });
+});
+
+describe("clipboardSync host read", () => {
+  test("focus pushes what another app put on the host clipboard", async () => {
+    const target = fakeTarget();
+    desktopClipboard.connect(target);
+    stubClipboard({ readText: vi.fn(async () => "kubectl get pods -A") });
+
+    expect(await clipboardSync.syncFromHost()).toBe(true);
+    expect(target.pasted).toEqual(["kubectl get pods -A"]);
+  });
+
+  test("an unchanged host clipboard is not pushed again", async () => {
+    const target = fakeTarget();
+    desktopClipboard.connect(target);
+    stubClipboard({ readText: vi.fn(async () => "aurora-staging") });
+
+    await clipboardSync.syncFromHost();
+    await clipboardSync.syncFromHost();
+
+    expect(target.pasted).toEqual(["aurora-staging"]);
+  });
+
+  test("a refused read is silent", async () => {
+    const target = fakeTarget();
+    desktopClipboard.connect(target);
+    stubClipboard({ readText: vi.fn(async () => Promise.reject(new Error("denied"))) });
+
+    expect(await clipboardSync.syncFromHost()).toBe(false);
+    expect(target.pasted).toEqual([]);
+  });
+
+  test("a browser with no readText at all is silent", async () => {
+    const target = fakeTarget();
+    desktopClipboard.connect(target);
+    stubClipboard({}); // Firefox: no readText for web content
+
+    expect(await clipboardSync.syncFromHost()).toBe(false);
+    expect(target.pasted).toEqual([]);
+  });
+
+  test("start wires focus to a host read", async () => {
+    const target = fakeTarget();
+    desktopClipboard.connect(target);
+    stubClipboard({ readText: vi.fn(async () => "5 Pods") });
+    clipboardSync.start();
+
+    window.dispatchEvent(new Event("focus"));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(target.pasted).toEqual(["5 Pods"]);
   });
 });

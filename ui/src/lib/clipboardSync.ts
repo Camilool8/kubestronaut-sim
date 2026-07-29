@@ -49,6 +49,22 @@ class ClipboardSync {
       window.removeEventListener("copy", onCopy);
       window.removeEventListener("cut", onCopy);
     });
+
+    // Returning to the tab is the moment a candidate has just copied
+    // something elsewhere. visibilitychange covers tab switches;
+    // focus covers switching between windows of the same tab.
+    const onFocus = () => {
+      if (document.visibilityState === "hidden") return;
+      void this.syncFromHost();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    this.stopFns.push(() => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    });
+
+    void this.syncFromHost();
   }
 
   stop(): void {
@@ -63,6 +79,25 @@ class ClipboardSync {
    */
   syncFromSelection(): boolean {
     return this.pushToDesktop(window.getSelection()?.toString() ?? "");
+  }
+
+  /**
+   * Reads the host clipboard and pushes it to the desktop.
+   *
+   * Silent on refusal by design: Firefox has no readText for web content,
+   * and Chrome needs a granted permission. This runs on every tab focus,
+   * so a warning here would fire constantly for a large share of users.
+   * The Clipboard panel is the path that always works, and its copy
+   * already says so.
+   */
+  async syncFromHost(): Promise<boolean> {
+    let text: string;
+    try {
+      text = await navigator.clipboard.readText();
+    } catch {
+      return false;
+    }
+    return this.pushToDesktop(text);
   }
 
   /** Sends to the desktop unless it is empty, oversized, or already there. */
