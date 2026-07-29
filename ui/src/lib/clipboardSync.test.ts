@@ -21,6 +21,18 @@ function stubClipboard(clipboard: Partial<Clipboard>) {
   });
 }
 
+/**
+ * Drains every microtask already queued, however many `.then` hops deep,
+ * without hardcoding a tick count: a macrotask boundary (a real timer)
+ * always runs after all microtasks queued ahead of it have settled. Used
+ * where a fixed number of `await Promise.resolve()` would work today but
+ * silently stop covering the code the moment another `await` is inserted
+ * anywhere in the chain under test.
+ */
+function flushMicrotasks(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 beforeEach(() => {
   clipboardSync.reset();
   stubSelection("");
@@ -139,16 +151,14 @@ describe("clipboardSync host read", () => {
     let hostText = "5 Pods";
     stubClipboard({ readText: vi.fn(async () => hostText) });
     clipboardSync.start();
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(target.pasted).toEqual(["5 Pods"]); // the mount-time read
+    // Condition-based, not tick-counted: onFocus now runs syncToHost()
+    // ahead of syncFromHost(), so the number of microtask hops before this
+    // settles is an implementation detail, not a contract.
+    await vi.waitFor(() => expect(target.pasted).toEqual(["5 Pods"])); // the mount-time read
 
     hostText = "3 Deployments";
     window.dispatchEvent(new Event("focus"));
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(target.pasted).toEqual(["5 Pods", "3 Deployments"]);
+    await vi.waitFor(() => expect(target.pasted).toEqual(["5 Pods", "3 Deployments"]));
   });
 
   test("start wires visibilitychange to a host read", async () => {
@@ -157,16 +167,11 @@ describe("clipboardSync host read", () => {
     let hostText = "5 Pods";
     stubClipboard({ readText: vi.fn(async () => hostText) });
     clipboardSync.start();
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(target.pasted).toEqual(["5 Pods"]); // the mount-time read
+    await vi.waitFor(() => expect(target.pasted).toEqual(["5 Pods"])); // the mount-time read
 
     hostText = "3 Deployments";
     document.dispatchEvent(new Event("visibilitychange"));
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(target.pasted).toEqual(["5 Pods", "3 Deployments"]);
+    await vi.waitFor(() => expect(target.pasted).toEqual(["5 Pods", "3 Deployments"]));
   });
 
   test("stop removes the focus and visibilitychange listeners", async () => {
@@ -175,17 +180,20 @@ describe("clipboardSync host read", () => {
     let hostText = "5 Pods";
     stubClipboard({ readText: vi.fn(async () => hostText) });
     clipboardSync.start();
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(target.pasted).toEqual(["5 Pods"]); // the mount-time read
+    await vi.waitFor(() => expect(target.pasted).toEqual(["5 Pods"])); // the mount-time read
 
     clipboardSync.stop();
     hostText = "3 Deployments"; // a value distinct from lastSynced, so a
     // stray read would not be caught by the dedup guard
     window.dispatchEvent(new Event("focus"));
     document.dispatchEvent(new Event("visibilitychange"));
-    await Promise.resolve();
-    await Promise.resolve();
+    // Proving absence can't use vi.waitFor (it resolves the instant the
+    // assertion is true, which is immediately if nothing is wired — that
+    // would pass just as happily if the listener removal were broken and
+    // the push simply hadn't landed yet). A macrotask flush instead drains
+    // every microtask any surviving handler could have queued before this
+    // assertion runs, whatever the chain length.
+    await flushMicrotasks();
 
     expect(target.pasted).toEqual(["5 Pods"]);
   });
@@ -235,5 +243,69 @@ describe("clipboardSync host write", () => {
 
     expect(await clipboardSync.syncToHost()).toBe(false);
     expect(writeText).not.toHaveBeenCalled();
+  });
+});
+
+describe("clipboardSync desktop-change wiring", () => {
+  test("a desktop change while focused is written to the host", async () => {
+    const hasFocusSpy = vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    try {
+      const writeText = vi.fn(async () => {});
+      stubClipboard({ writeText });
+      clipboardSync.start();
+
+      desktopClipboard.receive("candidate@instance-2");
+
+      await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith("candidate@instance-2"));
+    } finally {
+      hasFocusSpy.mockRestore();
+    }
+  });
+
+  test("a desktop change while unfocused waits for the next focus", async () => {
+    const hasFocusSpy = vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    try {
+      const writeText = vi.fn(async () => {});
+      stubClipboard({ writeText });
+      clipboardSync.start();
+
+      desktopClipboard.receive("candidate@instance-3");
+      // The subscribe callback's hasFocus() guard runs synchronously inside
+      // receive(); if it had passed, the write it triggers would already
+      // be underway. No tick to wait out for this half of the claim.
+      expect(writeText).not.toHaveBeenCalled();
+
+      hasFocusSpy.mockReturnValue(true);
+      window.dispatchEvent(new Event("focus"));
+
+      // ...but nothing is lost: the focus handler tries syncToHost() on
+      // return, independently of the subscription, and picks up the value
+      // that arrived while the tab was elsewhere.
+      await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith("candidate@instance-3"));
+    } finally {
+      hasFocusSpy.mockRestore();
+    }
+  });
+
+  test("stop unsubscribes from desktop clipboard changes", async () => {
+    const hasFocusSpy = vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    try {
+      const writeText = vi.fn(async () => {});
+      stubClipboard({ writeText });
+      clipboardSync.start();
+      clipboardSync.stop();
+
+      desktopClipboard.receive("candidate@instance-4");
+      // Were the subscription still live, hasFocus() would pass and
+      // syncToHost() would call writeText synchronously as part of
+      // handling receive() — so, as above, no tick to wait out. A
+      // trailing flush still guards against a future implementation that
+      // defers the call.
+      await flushMicrotasks();
+
+      expect(writeText).not.toHaveBeenCalled();
+    } finally {
+      hasFocusSpy.mockRestore();
+    }
   });
 });
