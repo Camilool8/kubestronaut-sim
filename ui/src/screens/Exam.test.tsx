@@ -136,9 +136,8 @@ describe("ExamGateControls in an untimed training attempt", () => {
 // suite green while silently turning the clipboard feature off in the app.
 describe("Exam clipboard sync wiring", () => {
   // state: "idle" rather than "running" keeps DesktopViewport (the
-  // Suspense branch that lazy-imports @novnc/novnc) unmounted, the same
-  // route the a11y suite uses to scan QuestionPanel without pulling in
-  // noVNC — see the comment above "exam question panel" in a11y.test.tsx.
+  // Suspense branch that lazy-imports @novnc/novnc) unmounted, so this
+  // test can assert on the mount/unmount effect without noVNC in the mix.
   const idleSession: SessionSnapshot = {
     ...runningSession,
     state: "idle",

@@ -105,10 +105,13 @@ the desktop again.
 One `lastSynced` string, held in `clipboardSync` and consulted by both
 directions, is the guard. A value that arrived from one side is never
 sent back to it. Both directions compare before sending and update it
-after. The ⌘V/Ctrl+V path below is itself a host → desktop push and obeys
-the same rule, so a keystroke paste cannot desynchronise the guard. This
-is the single piece of state in the module and the one most worth
-testing.
+after. The ⌘V/Ctrl+V path below bypasses the guard entirely: it calls
+`desktopClipboard.pasteFromHost` directly, reading and pushing without
+ever touching `lastSynced`. That is harmless rather than a second loop
+risk — the push lands in the desktop's clipboard buffer only, no
+keystrokes are replayed, so the worst case is one redundant re-push of
+the same value the next time the tab regains focus. This is the single
+piece of state in the module and the one most worth testing.
 
 ### The chord fix
 
