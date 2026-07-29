@@ -180,6 +180,11 @@ describe("toAsciiForDesktop", () => {
     expect(toAsciiForDesktop("‘x’")).toBe("'x'");
     expect(toAsciiForDesktop("“x”")).toBe('"x"');
     expect(toAsciiForDesktop("a…")).toBe("a...");
+    // Explicit escape, not a literal nbsp glyph: the two are visually
+    // identical in source, which is exactly how the table bug shipped.
+    expect(toAsciiForDesktop("a\u00a0b")).toBe("a b");
+    // A plain ASCII space stays untouched, kept alongside the nbsp
+    // case above so the two are visibly distinct in the source.
     expect(toAsciiForDesktop("a b")).toBe("a b");
   });
 

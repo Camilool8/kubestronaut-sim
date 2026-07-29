@@ -22,16 +22,22 @@ export interface ClipboardTarget {
 /**
  * Characters the exam's own content actually contains, mapped to the ASCII a
  * terminal can take. Typographic only — nothing here changes a resource name.
+ *
+ * Keys are explicit \uXXXX escapes, not literal characters: U+00A0
+ * (non-breaking space) is visually indistinguishable from a plain U+0020 in
+ * an editor, and a literal nbsp here once shipped as a silent no-op that
+ * mapped a regular space to itself. Escaping every entry keeps the table
+ * honest about what it actually matches.
  */
 const TRANSLITERATIONS: Record<string, string> = {
-  "—": "-", // em dash
-  "–": "-", // en dash
-  "‘": "'", // left single quote
-  "’": "'", // right single quote
-  "“": '"', // left double quote
-  "”": '"', // right double quote
-  "…": "...", // ellipsis
-  " ": " ", // non-breaking space
+  "\u2014": "-", // em dash
+  "\u2013": "-", // en dash
+  "\u2018": "'", // left single quote
+  "\u2019": "'", // right single quote
+  "\u201c": '"', // left double quote
+  "\u201d": '"', // right double quote
+  "\u2026": "...", // ellipsis
+  "\u00a0": " ", // non-breaking space
 };
 
 /**
