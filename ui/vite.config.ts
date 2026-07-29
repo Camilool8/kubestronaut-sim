@@ -14,6 +14,13 @@ export default defineConfig({
     // evergreen browsers only.
     target: "es2022",
   },
+  // The same floor, for dependency pre-bundling. esbuild does not inherit
+  // build.target here, and its default predates top-level await — so
+  // @novnc/novnc failed to optimise and `npm run dev` served a blank page
+  // while `npm run build` was fine. The two targets must move together.
+  optimizeDeps: {
+    esbuildOptions: { target: "es2022" },
+  },
   server: {
     proxy: {
       "/api": "http://localhost:8080",
