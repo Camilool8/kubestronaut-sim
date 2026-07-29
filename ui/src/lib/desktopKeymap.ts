@@ -39,13 +39,17 @@ const XK = {
   Home: 0xff50,
   End: 0xff57,
   b: 0x0062,
-  c: 0x0063,
   f: 0x0066,
   l: 0x006c,
-  t: 0x0074,
   u: 0x0075,
-  v: 0x0076,
-  w: 0x0077,
+  // Shifted forms. A chord that holds Shift must name the shifted keysym:
+  // X11 derives the character from keycode + modifier state, so Shift plus
+  // a lowercase keysym is an inconsistent pair that GTK accelerators
+  // (Ctrl+Shift+V and friends) will not match.
+  C: 0x0043,
+  T: 0x0054,
+  V: 0x0056,
+  W: 0x0057,
 } as const;
 
 /** One key press, with the modifiers to hold around it. */
@@ -71,8 +75,8 @@ const MAC_CHORDS: Record<string, Chord> = {
   // The two that matter. xfce4-terminal's copy/paste are Ctrl+Shift+C/V,
   // and MiscShowUnsafePasteDialog is already off in the image, so a
   // multi-line paste lands without a confirmation dialog.
-  "meta+c": { keysym: XK.c, code: "KeyC", ctrl: true, shift: true, describes: "Copy" },
-  "meta+v": { keysym: XK.v, code: "KeyV", ctrl: true, shift: true, describes: "Paste" },
+  "meta+c": { keysym: XK.C, code: "KeyC", ctrl: true, shift: true, describes: "Copy" },
+  "meta+v": { keysym: XK.V, code: "KeyV", ctrl: true, shift: true, describes: "Paste" },
   // macOS Terminal clears with ⌘K; the Linux equivalent is Ctrl+L.
   "meta+k": { keysym: XK.l, code: "KeyL", ctrl: true, describes: "Clear the screen" },
   // Line movement. On macOS these are ⌘←/→; readline wants Home/End.
@@ -95,8 +99,8 @@ const MAC_CHORDS: Record<string, Chord> = {
  * offered explicitly, with that caveat, rather than enabled quietly.
  */
 export const BROWSER_RESERVED: Record<string, Chord> = {
-  "meta+t": { keysym: XK.t, code: "KeyT", ctrl: true, shift: true, describes: "New terminal tab" },
-  "meta+w": { keysym: XK.w, code: "KeyW", ctrl: true, shift: true, describes: "Close terminal tab" },
+  "meta+t": { keysym: XK.T, code: "KeyT", ctrl: true, shift: true, describes: "New terminal tab" },
+  "meta+w": { keysym: XK.W, code: "KeyW", ctrl: true, shift: true, describes: "Close terminal tab" },
 };
 
 const STORAGE_KEY = "sim.desktopKeymap.enabled";
@@ -272,7 +276,7 @@ class DesktopKeymap {
 
   /** Sends an arbitrary chord — used by the clipboard paste path. */
   sendPasteChord(): void {
-    this.send({ keysym: XK.v, code: "KeyV", ctrl: true, shift: true, describes: "Paste" });
+    this.send({ keysym: XK.V, code: "KeyV", ctrl: true, shift: true, describes: "Paste" });
   }
 
   /** Test-only, mirroring desktopResize.reset. */

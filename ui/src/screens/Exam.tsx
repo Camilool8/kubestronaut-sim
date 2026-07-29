@@ -11,6 +11,7 @@ import { ClipboardPanel } from "../components/ClipboardPanel";
 import { CheckList } from "../components/CheckList";
 import { Icon } from "../components/Icon";
 import { desktopKeymap } from "../lib/desktopKeymap";
+import { clipboardSync } from "../lib/clipboardSync";
 import { ExamIntro, introSeen, markIntroSeen } from "../components/ExamIntro";
 import { PanelResizer } from "../components/PanelResizer";
 import { PendingBar } from "../components/Pending";
@@ -179,6 +180,14 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+  // Clipboard mirroring runs for as long as the exam view is mounted, not
+  // for as long as a viewport is connected: a candidate copies things
+  // before the desktop finishes connecting, and the sync is a no-op until
+  // there is somewhere to send them.
+  useEffect(() => {
+    clipboardSync.start();
+    return () => clipboardSync.stop();
   }, []);
   // First run shows the intro once; after that it is on demand from the
   // About drawer. Marked seen when it opens, not when it closes, so a

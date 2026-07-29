@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ExamGateControls } from "./Exam";
+import { Exam, ExamGateControls } from "./Exam";
 import type { SessionSnapshot } from "../api";
+import { clipboardSync } from "../lib/clipboardSync";
 
 const runningSession: SessionSnapshot = {
   state: "running",
@@ -125,5 +126,58 @@ describe("ExamGateControls in an untimed training attempt", () => {
 
     expect(screen.queryByText(/The clock keeps going/)).not.toBeInTheDocument();
     expect(screen.getByText(/no time limit/i)).toBeInTheDocument();
+  });
+});
+
+// Nothing else proves Exam actually calls clipboardSync.start()/stop() on
+// its own mount/unmount — clipboardSync.test.ts locks in the singleton's
+// idempotence, which says nothing about whether Exam wires it up at all.
+// Deleting the effect in Exam.tsx would leave every other test in the
+// suite green while silently turning the clipboard feature off in the app.
+describe("Exam clipboard sync wiring", () => {
+  // state: "idle" rather than "running" keeps DesktopViewport (the
+  // Suspense branch that lazy-imports @novnc/novnc) unmounted, so this
+  // test can assert on the mount/unmount effect without noVNC in the mix.
+  const idleSession: SessionSnapshot = {
+    ...runningSession,
+    state: "idle",
+  };
+
+  function stubExamFetch() {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ title: "CKAD Mock Exam 01", questions: [] }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+      ),
+    );
+  }
+
+  test("starts clipboard sync on mount and stops it on unmount", async () => {
+    stubExamFetch();
+    const startSpy = vi.spyOn(clipboardSync, "start").mockImplementation(() => {});
+    const stopSpy = vi.spyOn(clipboardSync, "stop").mockImplementation(() => {});
+
+    try {
+      const { unmount } = render(
+        <Exam session={idleSession} fetchedAt={Date.now()} onSessionChange={() => {}} />,
+      );
+
+      // The effect body calls start() synchronously, so render() (which
+      // testing-library wraps in act()) has already flushed it — but
+      // waitFor keeps the assertion honest if that ever stops being true.
+      await vi.waitFor(() => expect(startSpy).toHaveBeenCalledTimes(1));
+      expect(stopSpy).not.toHaveBeenCalled();
+
+      unmount();
+
+      expect(stopSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      startSpy.mockRestore();
+      stopSpy.mockRestore();
+    }
   });
 });

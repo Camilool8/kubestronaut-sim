@@ -59,11 +59,14 @@ describe("desktopKeymap", () => {
 
     expect(desktopKeymap.handleKeyDown(keydown("c", { metaKey: true }))).toBe(true);
 
+    // Shifted keysym, not the lowercase one: Shift plus a lowercase keysym
+    // is the same inconsistent pair that broke paste (see "a shifted
+    // chord sends the uppercase keysym" below).
     expect(sent).toEqual([
       [0xffe3, "ControlLeft", true],
       [0xffe1, "ShiftLeft", true],
-      [0x0063, "KeyC", true],
-      [0x0063, "KeyC", false],
+      [0x0043, "KeyC", true],
+      [0x0043, "KeyC", false],
       [0xffe1, "ShiftLeft", false],
       [0xffe3, "ControlLeft", false],
     ]);
@@ -154,6 +157,36 @@ describe("desktopKeymap", () => {
     const copy = rows.find((r) => r.press === "⌘C");
     expect(copy).toEqual({ press: "⌘C", sends: "Ctrl+Shift+C", describes: "Copy" });
     expect(rows.find((r) => r.press === "⌘←")?.sends).toBe("Home");
+  });
+
+  test("a shifted chord sends the uppercase keysym", () => {
+    // X11 derives the character from keycode + modifier state. Naming the
+    // lowercase keysym while holding Shift is inconsistent, and GTK's
+    // Ctrl+Shift+V accelerator does not match it — the terminal then
+    // forwards a bare Ctrl+V, which is readline's verbatim-insert prefix.
+    const { target, sent } = fakeTarget();
+    desktopKeymap.attach(target);
+
+    desktopKeymap.sendPasteChord();
+
+    expect(sent).toContainEqual([0x0056, "KeyV", true]);
+    expect(sent).not.toContainEqual([0x0076, "KeyV", true]);
+  });
+
+  test("every shifted chord in the map uses an uppercase keysym", () => {
+    const { target, sent } = fakeTarget();
+    desktopKeymap.setReservedEnabled(true);
+    desktopKeymap.attach(target);
+
+    // ⌘C -> Ctrl+Shift+C, ⌘T -> Ctrl+Shift+T, ⌘W -> Ctrl+Shift+W.
+    for (const key of ["c", "t", "w"]) {
+      desktopKeymap.handleKeyDown(keydown(key, { metaKey: true }));
+    }
+
+    // Down-only: send() taps each key down then up, so every keysym
+    // appears twice.
+    const letters = sent.filter(([ks, , down]) => down && ks >= 0x0041 && ks <= 0x007a);
+    expect(letters.map(([ks]) => ks)).toEqual([0x0043, 0x0054, 0x0057]);
   });
 });
 
