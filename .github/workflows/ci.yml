@@ -48,7 +48,7 @@ jobs:
         module: [facilitator, conductor, proxy]
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.24"
           # go.mod, not go.sum: all three modules are stdlib-only, so no
