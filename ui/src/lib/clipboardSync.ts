@@ -36,8 +36,30 @@ class ClipboardSync {
    * ping-pong: the page writes X to the host, the next focus reads X back,
    * and pushes it to the desktop again. A value that arrived from one side
    * is never sent back to it.
+   *
+   * This is a watermark, not a level: pushToDesktop moves it on every
+   * host → desktop send, so after a page copy it no longer describes what
+   * the desktop's clipboard currently holds. desktopClipboard.getRemote()
+   * is the level — the last value the desktop actually sent, moved only
+   * by receive(). syncToHost must not treat "differs from lastSynced" as
+   * "the desktop has something new": a page copy moves the watermark away
+   * from a remote value that never changed, which would make that stale
+   * value look new again on every later focus and overwrite whatever the
+   * user just put on the real host clipboard. lastRemote below is what
+   * keeps that comparison edge-triggered on the level instead.
    */
   private lastSynced = "";
+
+  /**
+   * The last desktop value actually written to the host clipboard.
+   *
+   * Set only after a successful write, so a refused write still retries on
+   * the next focus. Exists purely to edge-trigger syncToHost against
+   * desktopClipboard's level (see lastSynced above) instead of comparing
+   * against the shared watermark.
+   */
+  private lastRemote = "";
+
   private stopFns: Array<() => void> = [];
 
   start(): void {
@@ -81,6 +103,12 @@ class ClipboardSync {
   stop(): void {
     for (const fn of this.stopFns) fn();
     this.stopFns = [];
+    // A fresh desktop container (a new exam attempt) starts with an empty
+    // clipboard. Leaving these set would make start()'s mount-time read see
+    // an unchanged host value and push nothing, so the new desktop would
+    // stay empty until the candidate copied again.
+    this.lastSynced = "";
+    this.lastRemote = "";
   }
 
   /**
@@ -120,13 +148,14 @@ class ClipboardSync {
    */
   async syncToHost(): Promise<boolean> {
     const text = desktopClipboard.getRemote();
-    if (!text || text === this.lastSynced) return false;
+    if (!text || text === this.lastSynced || text === this.lastRemote) return false;
     if (text.length > MAX_SYNC_CHARS) return false;
     try {
       await navigator.clipboard.writeText(text);
     } catch {
       return false;
     }
+    this.lastRemote = text;
     this.lastSynced = text;
     return true;
   }
@@ -144,6 +173,7 @@ class ClipboardSync {
   reset(): void {
     this.stop();
     this.lastSynced = "";
+    this.lastRemote = "";
   }
 }
 

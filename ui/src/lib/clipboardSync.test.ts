@@ -310,6 +310,96 @@ describe("clipboardSync desktop-change wiring", () => {
   });
 });
 
+describe("clipboardSync loop-guard edge cases", () => {
+  test("a page copy between a desktop push and the next focus does not re-send stale desktop text and blocks the real host change", async () => {
+    // Reproduces the MERGE BLOCKER: syncToHost used to compare
+    // desktopClipboard.getRemote() (a level) against lastSynced alone (a
+    // watermark also moved by pushToDesktop). Step 2 below moves the
+    // watermark away from the desktop's still-current value, which made
+    // step 3 treat that stale value as "new" again — overwriting whatever
+    // the user actually just copied outside the tab, and returning true so
+    // syncFromHost (the only path that would have picked up the real host
+    // change) never ran.
+    const target = fakeTarget();
+    desktopClipboard.connect(target);
+    const hasFocusSpy = vi.spyOn(document, "hasFocus").mockReturnValue(true);
+
+    let hostClipboard = "";
+    const writeText = vi.fn(async (text: string) => {
+      hostClipboard = text;
+    });
+    const readText = vi.fn(async () => hostClipboard);
+    stubClipboard({ writeText, readText });
+
+    try {
+      clipboardSync.start();
+
+      // Step 1: terminal copy "pod-A" reaches the desktop, and because the
+      // tab is focused the subscribe wiring writes it straight to the host.
+      desktopClipboard.receive("pod-A");
+      await vi.waitFor(() => expect(hostClipboard).toBe("pod-A"));
+
+      // Step 2: a page copy of "value-C" moves the watermark. The desktop's
+      // remote value is still "pod-A" — nothing told desktopClipboard
+      // otherwise.
+      stubSelection("value-C");
+      window.dispatchEvent(new Event("copy"));
+      expect(target.pasted).toContain("value-C");
+
+      // Step 3: the user copies "manifest-D" in another app (simulated by
+      // the host clipboard changing outside of writeText) and returns to
+      // the tab.
+      hostClipboard = "manifest-D";
+      window.dispatchEvent(new Event("focus"));
+
+      await vi.waitFor(() => expect(target.pasted).toContain("manifest-D"));
+      expect(hostClipboard).toBe("manifest-D");
+    } finally {
+      hasFocusSpy.mockRestore();
+    }
+  });
+});
+
+describe("clipboardSync stop/start lifecycle clears sync state", () => {
+  test("stop then start pushes an unchanged host clipboard again, as a fresh desktop container needs", async () => {
+    const target = fakeTarget();
+    desktopClipboard.connect(target);
+    stubClipboard({ readText: vi.fn(async () => "aurora-staging") });
+
+    clipboardSync.start();
+    await vi.waitFor(() => expect(target.pasted).toEqual(["aurora-staging"]));
+
+    clipboardSync.stop();
+
+    // A new attempt reconnects a fresh, empty desktop container. The host
+    // clipboard has not changed, so only a cleared watermark makes start()
+    // push it again.
+    const target2 = fakeTarget();
+    desktopClipboard.connect(target2);
+    clipboardSync.start();
+
+    await vi.waitFor(() => expect(target2.pasted).toEqual(["aurora-staging"]));
+  });
+});
+
+describe("clipboardSync pushToDesktop failure path", () => {
+  test("a push with no desktop connected leaves the guard unset, so the same text retries successfully once connected", () => {
+    stubClipboard({});
+    clipboardSync.start();
+    stubSelection("kube-system");
+
+    // No desktopClipboard.connect() yet: sendToDesktop returns false, and
+    // pushToDesktop must not record the text as synced anyway.
+    window.dispatchEvent(new Event("copy"));
+
+    const target = fakeTarget();
+    desktopClipboard.connect(target);
+    window.dispatchEvent(new Event("copy"));
+
+    expect(target.pasted).toEqual(["kube-system"]);
+  });
+});
+
 describe("clipboardSync lifecycle", () => {
   test("start is idempotent, so a double-invoked effect pushes once", () => {
     const target = fakeTarget();

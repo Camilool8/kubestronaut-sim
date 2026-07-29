@@ -39,13 +39,9 @@ const XK = {
   Home: 0xff50,
   End: 0xff57,
   b: 0x0062,
-  c: 0x0063,
   f: 0x0066,
   l: 0x006c,
-  t: 0x0074,
   u: 0x0075,
-  v: 0x0076,
-  w: 0x0077,
   // Shifted forms. A chord that holds Shift must name the shifted keysym:
   // X11 derives the character from keycode + modifier state, so Shift plus
   // a lowercase keysym is an inconsistent pair that GTK accelerators
