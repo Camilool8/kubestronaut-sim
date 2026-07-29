@@ -309,3 +309,32 @@ describe("clipboardSync desktop-change wiring", () => {
     }
   });
 });
+
+describe("clipboardSync lifecycle", () => {
+  test("start is idempotent, so a double-invoked effect pushes once", () => {
+    const target = fakeTarget();
+    desktopClipboard.connect(target);
+    stubClipboard({});
+    clipboardSync.start();
+    clipboardSync.start();
+    stubSelection("cygnus");
+
+    window.dispatchEvent(new Event("copy"));
+
+    expect(target.pasted).toEqual(["cygnus"]);
+  });
+
+  test("stop then start re-arms the listeners", () => {
+    const target = fakeTarget();
+    desktopClipboard.connect(target);
+    stubClipboard({});
+    clipboardSync.start();
+    clipboardSync.stop();
+    clipboardSync.start();
+    stubSelection("helios");
+
+    window.dispatchEvent(new Event("copy"));
+
+    expect(target.pasted).toEqual(["helios"]);
+  });
+});
