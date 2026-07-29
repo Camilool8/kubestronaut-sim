@@ -16,6 +16,11 @@ The series is incomplete: plans exist for milestones A, B, C and F, and
 specs for A, B, C, D, F and G. The rest were never written down in this
 form.
 
+Not everything here is a milestone. `specs/2026-07-28-clipboard-sync-design.md`
+records a single piece of work — host↔desktop clipboard sync — and is
+kept here because it is the same kind of artifact, frozen the moment it
+shipped.
+
 For anything current, use:
 
 | You want | Read |
