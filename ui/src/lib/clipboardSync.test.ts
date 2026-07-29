@@ -132,10 +132,58 @@ describe("clipboardSync host read", () => {
   test("start wires focus to a host read", async () => {
     const target = fakeTarget();
     desktopClipboard.connect(target);
-    stubClipboard({ readText: vi.fn(async () => "5 Pods") });
+    // Different values for the mount-time read and the focus-triggered read:
+    // if the two reads returned the same text, the dedup guard in
+    // pushToDesktop would make the second read a no-op even with the focus
+    // listener deleted, and the test would pass either way.
+    let hostText = "5 Pods";
+    stubClipboard({ readText: vi.fn(async () => hostText) });
     clipboardSync.start();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(target.pasted).toEqual(["5 Pods"]); // the mount-time read
 
+    hostText = "3 Deployments";
     window.dispatchEvent(new Event("focus"));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(target.pasted).toEqual(["5 Pods", "3 Deployments"]);
+  });
+
+  test("start wires visibilitychange to a host read", async () => {
+    const target = fakeTarget();
+    desktopClipboard.connect(target);
+    let hostText = "5 Pods";
+    stubClipboard({ readText: vi.fn(async () => hostText) });
+    clipboardSync.start();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(target.pasted).toEqual(["5 Pods"]); // the mount-time read
+
+    hostText = "3 Deployments";
+    document.dispatchEvent(new Event("visibilitychange"));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(target.pasted).toEqual(["5 Pods", "3 Deployments"]);
+  });
+
+  test("stop removes the focus and visibilitychange listeners", async () => {
+    const target = fakeTarget();
+    desktopClipboard.connect(target);
+    let hostText = "5 Pods";
+    stubClipboard({ readText: vi.fn(async () => hostText) });
+    clipboardSync.start();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(target.pasted).toEqual(["5 Pods"]); // the mount-time read
+
+    clipboardSync.stop();
+    hostText = "3 Deployments"; // a value distinct from lastSynced, so a
+    // stray read would not be caught by the dedup guard
+    window.dispatchEvent(new Event("focus"));
+    document.dispatchEvent(new Event("visibilitychange"));
     await Promise.resolve();
     await Promise.resolve();
 
