@@ -19,6 +19,49 @@ export interface ClipboardTarget {
   clipboardPasteFrom(text: string): void;
 }
 
+/**
+ * Characters the exam's own content actually contains, mapped to the ASCII a
+ * terminal can take. Typographic only — nothing here changes a resource name.
+ */
+const TRANSLITERATIONS: Record<string, string> = {
+  "—": "-", // em dash
+  "–": "-", // en dash
+  "‘": "'", // left single quote
+  "’": "'", // right single quote
+  "“": '"', // left double quote
+  "”": '"', // right double quote
+  "…": "...", // ellipsis
+  " ": " ", // non-breaking space
+};
+
+/**
+ * Reduces text to ASCII before it crosses the RFB socket.
+ *
+ * Any non-ASCII byte silently kills the transfer — measured against TigerVNC
+ * 1.12 with noVNC 1.7, for characters both inside latin-1 (U+00E9) and outside
+ * it (U+2014), at 7 characters as readily as at 205. noVNC's own encoder reads
+ * as correct, so the fault is most likely server-side; this is a workaround at
+ * the only layer we control.
+ *
+ * Lossy on purpose. Losing an em dash beats losing the whole paste and being
+ * told it worked.
+ */
+export function toAsciiForDesktop(text: string): string {
+  let out = "";
+  for (const ch of text) {
+    const mapped = TRANSLITERATIONS[ch];
+    if (mapped !== undefined) {
+      out += mapped;
+    } else if (ch.codePointAt(0)! < 0x80) {
+      out += ch;
+    } else {
+      // Matches what noVNC's own latin-1 fallback does with what it cannot send.
+      out += "?";
+    }
+  }
+  return out;
+}
+
 export type CopyOutcome =
   /** Reached both the browser clipboard and the exam desktop. */
   | "desktop"
@@ -58,6 +101,20 @@ class DesktopClipboard {
   }
 
   /**
+   * The single point where text crosses to the desktop. Everything that pushes
+   * goes through here so the ASCII reduction cannot be bypassed.
+   */
+  private pushToTarget(text: string): boolean {
+    if (!this.target) return false;
+    try {
+      this.target.clipboardPasteFrom(toAsciiForDesktop(text));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Called on disconnect/unmount. Ignores a stale target so a viewport
    * torn down after a newer one connected cannot clear the live link.
    */
@@ -79,16 +136,9 @@ class DesktopClipboard {
    * two are independent, and the desktop is the one that matters here.
    */
   async copy(text: string): Promise<CopyOutcome> {
-    let reachedDesktop = false;
-    if (this.target) {
-      try {
-        this.target.clipboardPasteFrom(text);
-        reachedDesktop = true;
-      } catch {
-        // A viewport that dropped between the click and this call; the
-        // browser clipboard below is still worth having.
-      }
-    }
+    // A viewport that dropped between the click and this call, or a target
+    // that threw, still leaves the browser clipboard below worth having.
+    const reachedDesktop = this.pushToTarget(text);
 
     let reachedBrowser = false;
     try {
@@ -107,13 +157,7 @@ class DesktopClipboard {
    * the browser's. Backs the clipboard panel's Send button.
    */
   sendToDesktop(text: string): boolean {
-    if (!this.target) return false;
-    try {
-      this.target.clipboardPasteFrom(text);
-      return true;
-    } catch {
-      return false;
-    }
+    return this.pushToTarget(text);
   }
 
   /**

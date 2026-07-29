@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { desktopClipboard, type ClipboardTarget } from "./desktopClipboard";
+import { desktopClipboard, toAsciiForDesktop, type ClipboardTarget } from "./desktopClipboard";
 
 function fakeTarget(): ClipboardTarget & { pasted: string[] } {
   const pasted: string[] = [];
@@ -166,5 +166,69 @@ describe("inbound clipboard", () => {
     expect(notified).toBe(1);
 
     unsubscribe();
+  });
+});
+
+describe("toAsciiForDesktop", () => {
+  test("leaves ASCII untouched", () => {
+    expect(toAsciiForDesktop("kubectl get pods -A")).toBe("kubectl get pods -A");
+  });
+
+  test("transliterates the typography the banks actually use", () => {
+    expect(toAsciiForDesktop("a—b")).toBe("a-b");
+    expect(toAsciiForDesktop("a–b")).toBe("a-b");
+    expect(toAsciiForDesktop("‘x’")).toBe("'x'");
+    expect(toAsciiForDesktop("“x”")).toBe('"x"');
+    expect(toAsciiForDesktop("a…")).toBe("a...");
+    expect(toAsciiForDesktop("a b")).toBe("a b");
+  });
+
+  test("replaces anything else non-ASCII rather than dropping it", () => {
+    // Whatever we cannot represent must still be visible as a gap.
+    expect(toAsciiForDesktop("a中b")).toBe("a?b");
+    expect(toAsciiForDesktop("aéb")).toBe("a?b");
+  });
+
+  test("preserves newlines and tabs", () => {
+    expect(toAsciiForDesktop("one\ntwo\tthree")).toBe("one\ntwo\tthree");
+  });
+
+  test("handles astral characters as a single replacement", () => {
+    // Iterating by code point, not code unit, so a surrogate pair is one "?".
+    expect(toAsciiForDesktop("a\u{1F600}b")).toBe("a?b");
+  });
+});
+
+describe("desktopClipboard sanitises every push", () => {
+  test("copy() sends ASCII to the desktop but the original to the browser", async () => {
+    const writeText = stubBrowserClipboard();
+    const target = fakeTarget();
+    desktopClipboard.connect(target);
+
+    expect(await desktopClipboard.copy("aurora — staging")).toBe("desktop");
+    expect(target.pasted).toEqual(["aurora - staging"]);
+    expect(writeText).toHaveBeenCalledWith("aurora — staging");
+  });
+
+  test("sendToDesktop() sanitises", () => {
+    const target = fakeTarget();
+    desktopClipboard.connect(target);
+
+    expect(desktopClipboard.sendToDesktop("a — b")).toBe(true);
+    expect(target.pasted).toEqual(["a - b"]);
+  });
+
+  test("pasteFromHost() sanitises before sending the chord", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: { readText: async () => "quota — 5 Pods", writeText: async () => {} },
+      configurable: true,
+    });
+    const target = fakeTarget();
+    desktopClipboard.connect(target);
+    let chords = 0;
+
+    expect(await desktopClipboard.pasteFromHost(() => chords++)).toBe("sent");
+    expect(target.pasted).toEqual(["quota - 5 Pods"]);
+    expect(chords).toBe(1);
   });
 });
