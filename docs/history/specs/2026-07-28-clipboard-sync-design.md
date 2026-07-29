@@ -157,3 +157,45 @@ remain the fastest way to move a single resource name.
 **No polling.** Reading the clipboard on an interval would keep the
 desktop current within a second or two, but it burns a permission-gated
 API in a loop for a case that `focus` already covers.
+
+## Found during verification: non-ASCII never crossed at all
+
+The browser check earned its place. With everything above working, text
+containing any non-ASCII character silently failed to reach the desktop —
+nothing pasted, and the UI still reported success. Measured with controlled
+strings through the same path, each followed by a right-click paste:
+
+| Probe | Result |
+|---|---|
+| `AAA-BBB`, 7 chars, ASCII | pastes |
+| `AAA—BBB`, 7 chars, one em dash (U+2014) | nothing |
+| `XXXéYYY`, 7 chars, e-acute (U+00E9) | nothing |
+| 182 chars, 3 lines, ASCII | pastes |
+| 205 chars, 1 line, two em dashes | nothing |
+
+Length, newlines and the latin-1 boundary are all ruled out: `é` sits
+inside latin-1 and fails exactly like `—`, which does not.
+
+noVNC 1.7's encoder reads as correct. `clipboardPasteFrom`
+(`core/rfb.js:500`) takes the extended-clipboard path, and
+`extendedClipboardProvide` (`:3170`) encodes UTF-8, writes a correct
+big-endian byte length, packs bytes with `charCodeAt` and deflates. The
+latin-1 fallback at `:509-530` substitutes `?` for anything above `0xff` —
+and nothing arrives rather than `?`, which proves that fallback is not in
+play. The fault is therefore most likely TigerVNC 1.12 on the server side.
+That was not confirmed at the byte level, and patching a vendored
+dependency or the VNC server was out of scope.
+
+**The fix is a transliteration at the only layer we control.**
+`toAsciiForDesktop` in `desktopClipboard` maps the typography the banks
+actually contain — em and en dashes, curly quotes, ellipsis, non-breaking
+space — and replaces anything else non-ASCII with `?`, matching what
+noVNC's own fallback does with what it cannot send. It is applied in one
+private `pushToTarget`, the single place text crosses to the desktop, so
+`copy()`, `sendToDesktop()` and `pasteFromHost()` all inherit it and a
+fourth caller cannot bypass it.
+
+Lossy on purpose, and only in one direction: `copy()` still writes the
+original Unicode to the host clipboard, which has no such limitation.
+Question 1's own prose contains em dashes, so before this the headline
+case — copy the whole question — was exactly the one that broke.

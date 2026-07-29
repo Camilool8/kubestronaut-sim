@@ -58,11 +58,17 @@ for the full command and configuration reference.
 4. **Score** — percent, pass/fail, expandable per-question checks, full
    solutions, and a New attempt button.
 
-Click any value in a question to copy it, then paste in the exam
-terminal with Ctrl+Shift+V — or ⌘V on a Mac, which the page translates
-along with ⌘C, ⌘K and the line-motion chords. Press `?` for the full
-list. Anything else in your clipboard reaches the desktop through the
-Clipboard panel.
+Anything you copy reaches the exam desktop automatically — highlight text
+in a question and press ⌘C, or copy from any other app and come back to
+the tab. Paste in the exam terminal with Ctrl+V, ⌘V, the terminal's own
+Ctrl+Shift+V, or right-click → Paste. Copying in the terminal works the
+same way in reverse. Press `?` for the full shortcut list. Firefox mirrors
+in-page copies the same way; it just can't read what you copied in
+another app, so the Clipboard panel covers that case.
+
+What reaches the desktop is reduced to ASCII, so an em dash arrives as a
+hyphen and curly quotes arrive straight. The clipboard channel drops any
+non-ASCII character outright, and a hyphen beats losing the paste.
 
 `down` then `up` resumes your exam state, including an in-progress
 session. Light and dark themes follow your system. The exam needs a
