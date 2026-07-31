@@ -199,3 +199,89 @@ func waitForCalls(t *testing.T, counter *atomic.Int32, want int32) {
 	}
 	t.Fatalf("Runner.Run calls = %d after 2s, want >= %d", counter.Load(), want)
 }
+
+// mcqTestExam is a minimal mcq exam for grader-branch tests: two
+// one-point questions.
+func mcqTestExam() *exam.Exam {
+	return &exam.Exam{
+		Name: "test-bank",
+		Type: exam.TypeMCQ,
+		Questions: []exam.Question{
+			{ID: "q01", Weight: 1, Options: []string{"a", "b", "c"}, Correct: []int{1}},
+			{ID: "q02", Weight: 1, Options: []string{"a", "b", "c"}, Correct: []int{0}},
+		},
+	}
+}
+
+// TestGradeMCQUsesStoredAnswersAndNeverSSH pins the engine branch: an
+// mcq exam grades the session's stored answers purely — the ssh Runner
+// must never be consulted — and records the same Results schema the
+// hands-on path does.
+func TestGradeMCQUsesStoredAnswersAndNeverSSH(t *testing.T) {
+	mgr, err := session.New(t.TempDir()+"/session.json", "test-bank", time.Hour, time.Now, func() {})
+	if err != nil {
+		t.Fatalf("session.New: %v", err)
+	}
+	if _, err := mgr.Start(session.ModeExam, time.Hour); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if err := mgr.SetAnswer("q01", []int{1}); err != nil {
+		t.Fatalf("SetAnswer: %v", err)
+	}
+	if err := mgr.End("submitted"); err != nil {
+		t.Fatalf("End: %v", err)
+	}
+
+	runner := &countingRunner{}
+	g := newGrader(mcqTestExam(), mgr, runner, time.Second)
+	g.Grade()
+	waitForGraded(t, mgr)
+
+	if got := runner.calls.Load(); got != 0 {
+		t.Errorf("Runner.Run calls during an mcq grade = %d, want 0", got)
+	}
+	raw, gradeErr, _ := mgr.Results()
+	if gradeErr != "" {
+		t.Fatalf("gradeError = %q, want empty", gradeErr)
+	}
+	if !strings.Contains(string(raw), `"percent":50`) {
+		t.Errorf("results JSON = %s, want percent 50 (1 of 2 answered correctly)", raw)
+	}
+	if !strings.Contains(string(raw), `"selected":[1]`) {
+		t.Errorf("results JSON = %s, want q01's selected [1] embedded for review", raw)
+	}
+}
+
+// TestPracticeGradeMCQ pins training mode's "score my work": pure,
+// instant, never persisted, no ssh.
+func TestPracticeGradeMCQ(t *testing.T) {
+	mgr, err := session.New(t.TempDir()+"/session.json", "test-bank", time.Hour, time.Now, func() {})
+	if err != nil {
+		t.Fatalf("session.New: %v", err)
+	}
+	if _, err := mgr.Start(session.ModeTraining, 0); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if err := mgr.SetAnswer("q01", []int{1}); err != nil {
+		t.Fatalf("SetAnswer: %v", err)
+	}
+	if err := mgr.SetAnswer("q02", []int{0}); err != nil {
+		t.Fatalf("SetAnswer: %v", err)
+	}
+
+	runner := &countingRunner{}
+	g := newGrader(mcqTestExam(), mgr, runner, time.Second)
+	raw, err := g.PracticeGrade()
+	if err != nil {
+		t.Fatalf("PracticeGrade: %v", err)
+	}
+	if got := runner.calls.Load(); got != 0 {
+		t.Errorf("Runner.Run calls during an mcq practice grade = %d, want 0", got)
+	}
+	if !strings.Contains(string(raw), `"percent":100`) {
+		t.Errorf("practice results = %s, want percent 100", raw)
+	}
+	if results, _, graded := mgr.Results(); graded {
+		t.Errorf("practice grade persisted results (%s), want nothing recorded", results)
+	}
+}

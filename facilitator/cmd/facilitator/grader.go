@@ -9,6 +9,7 @@ import (
 
 	"kubestronaut-sim/facilitator/internal/evaluate"
 	"kubestronaut-sim/facilitator/internal/exam"
+	"kubestronaut-sim/facilitator/internal/mcqgrade"
 	"kubestronaut-sim/facilitator/internal/session"
 )
 
@@ -73,7 +74,7 @@ func (g *grader) Grade() {
 			}
 		}()
 
-		res := evaluate.Grade(g.ex, g.bank, g.runner, g.timeout)
+		res := g.evaluateResults()
 		data, err := json.Marshal(res)
 		if err != nil {
 			if setErr := g.mgr.SetGradeError(token, err.Error()); setErr != nil {
@@ -109,10 +110,22 @@ func (g *grader) PracticeGrade() (json.RawMessage, error) {
 	}
 	defer g.inFlight.Store(false)
 
-	res := evaluate.Grade(g.ex, g.bank, g.runner, g.timeout)
+	res := g.evaluateResults()
 	raw, err := json.Marshal(res)
 	if err != nil {
 		return nil, fmt.Errorf("marshal practice results: %w", err)
 	}
 	return raw, nil
+}
+
+// evaluateResults produces the graded Results for the active exam by
+// whichever engine it belongs to: hands-on runs the ssh checks against
+// the cluster; mcq scores the session's stored answers, pure and
+// instant. Both return the same schema, which is why everything
+// downstream of this call is engine-agnostic.
+func (g *grader) evaluateResults() *evaluate.Results {
+	if g.ex.Type == exam.TypeMCQ {
+		return mcqgrade.Grade(g.ex, g.bank, g.mgr.Answers())
+	}
+	return evaluate.Grade(g.ex, g.bank, g.runner, g.timeout)
 }
