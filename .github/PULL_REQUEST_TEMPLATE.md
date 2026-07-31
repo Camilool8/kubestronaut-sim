@@ -4,7 +4,7 @@
 
 ## Verification
 
-CI runs the four bank gates, the Go tests, the UI suite, the image
+CI runs the five bank gates, the Go tests, the UI suite, the image
 builds and a shell syntax pass. It cannot run `tests/smoke.sh`, which is
 the only thing that checks a fresh environment scores 0 and the
 reference solutions score 100%.
