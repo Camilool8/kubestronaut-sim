@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getBoot,
   getControlStatus,
+  getExam,
   getSession,
   pollSession,
   startControlReset,
@@ -10,11 +11,13 @@ import {
   type BootStatus,
   type ControlActionResponse,
   type ControlStatus,
+  type ExamType,
   type SessionSnapshot,
 } from "./api";
 import { BootProgress } from "./screens/BootProgress";
 import { Start } from "./screens/Start";
 import { Exam, ExamGateControls } from "./screens/Exam";
+import { McqExam } from "./screens/McqExam";
 import { Score } from "./screens/Score";
 import { DesktopRequired, gateOverridden, useDesktopGate } from "./components/DesktopRequired";
 import { BackgroundJobChip } from "./components/BackgroundJobChip";
@@ -83,6 +86,32 @@ export default function App() {
   // genuinely missing.
   const gateBlocked =
     gateVerdict === "blocked" || (gateVerdict === "narrow" && !gateOverridden());
+
+  // Which engine the active bank runs on. null until /api/exam answers,
+  // which every consumer below treats as hands-on — the conservative
+  // read (gates apply). Retried on a timer because during a cold boot
+  // the facilitator is not listening yet, and an mcq bank's whole point
+  // is being usable before the cluster is: the boot-screen bypass below
+  // depends on this value arriving as soon as the server can answer.
+  const [examType, setExamType] = useState<ExamType | null>(null);
+  useEffect(() => {
+    let stopped = false;
+    let timer = 0;
+    const tick = async () => {
+      try {
+        const exam = await getExam();
+        if (!stopped) setExamType(exam.examType ?? "hands-on");
+      } catch {
+        if (!stopped) timer = window.setTimeout(tick, 3000);
+      }
+    };
+    tick();
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+    };
+  }, [catalogVersion]);
+  const isMcq = examType === "mcq";
 
   const applySession = useCallback((next: SessionSnapshot) => {
     seenSession.current = true;
@@ -264,9 +293,15 @@ export default function App() {
   //    reverts to "building" for the whole of one — and ControlProgress
   //    is already reporting it, in more detail. Without this the two
   //    would fight over the same information.
+  // An mcq bank is exempt: it needs nothing the boot screen is waiting
+  // for (the facilitator answering IS its readiness), and the server's
+  // start gate is bypassed for mcq to match. The cluster keeps building
+  // silently behind the lobby so switching back to a hands-on bank
+  // stays seamless.
   const booting =
     boot !== null &&
     boot.state !== "ready" &&
+    !isMcq &&
     session?.state !== "running" &&
     !showOverlay &&
     !backgroundedJob;
@@ -293,11 +328,20 @@ export default function App() {
         );
         break;
       case "running":
-        // The exam is a terminal beside a remote desktop; on a phone there
-        // is no layout that works. The lobby and score screens stay usable,
-        // and a running session still shows its countdown and an End exam
-        // control here — the server-side timer keeps going regardless, so
-        // nobody may be stranded without a way to submit.
+        // A multiple-choice exam is the one exam type that genuinely
+        // works on a phone — no terminal, no remote desktop — so the
+        // desktop gate never applies to it.
+        if (isMcq) {
+          screen = (
+            <McqExam session={session} fetchedAt={fetchedAt} onSessionChange={applySession} />
+          );
+          break;
+        }
+        // The hands-on exam is a terminal beside a remote desktop; on a
+        // phone there is no layout that works. The lobby and score screens
+        // stay usable, and a running session still shows its countdown and
+        // an End exam control here — the server-side timer keeps going
+        // regardless, so nobody may be stranded without a way to submit.
         screen = gateBlocked ? (
           <DesktopRequired verdict={gateVerdict}>
             <ExamGateControls

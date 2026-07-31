@@ -79,8 +79,10 @@ export function Start({
   // card the exam screen shows on first run is reachable here, before
   // the clock exists.
   const [introOpen, setIntroOpen] = useState(false);
-  // A phone can browse the catalog; it cannot run the exam.
-  const examBlocked = useDesktopGate() === "blocked";
+  // A phone can browse the catalog; it cannot run a hands-on exam. An
+  // mcq exam it CAN run — the gate is about the terminal-and-desktop
+  // split screen, which mcq does not have.
+  const phoneBlocked = useDesktopGate() === "blocked";
 
   // Through useAsync so it also drives the top progress bar. It used to be
   // a hand-rolled cancelled flag with no indicator at all: while it was in
@@ -88,6 +90,8 @@ export function Start({
   // indistinguishable from the endpoint being down.
   const examState = useAsync((signal) => getExam(signal), [catalogVersion]);
   const exam = examState.data;
+  const isMcq = exam?.examType === "mcq";
+  const examBlocked = phoneBlocked && !isMcq;
 
   const banksState = useAsync((signal) => getBanks(signal), [catalogVersion]);
 
@@ -238,7 +242,7 @@ export function Start({
         )}
 
         <ul className="start-tips">
-          {strings.start.tips.map((tip) => (
+          {(isMcq ? strings.start.tipsMcq : strings.start.tips).map((tip) => (
             <li key={tip}>{tip}</li>
           ))}
         </ul>
@@ -275,16 +279,20 @@ export function Start({
             {starting ? strings.start.starting : strings.start.startExam}
           </button>
           {/* Marks the card seen: someone who read it here should not
-              have it thrown at them again the moment the exam opens. */}
-          <button
-            className="btn"
-            onClick={() => {
-              markIntroSeen();
-              setIntroOpen(true);
-            }}
-          >
-            {strings.intro.open}
-          </button>
+              have it thrown at them again the moment the exam opens.
+              Hidden for mcq — the card walks through the split-screen
+              desktop layout, none of which exists there. */}
+          {!isMcq && (
+            <button
+              className="btn"
+              onClick={() => {
+                markIntroSeen();
+                setIntroOpen(true);
+              }}
+            >
+              {strings.intro.open}
+            </button>
+          )}
           {/* Say why rather than leaving a dead button: the catalog is
               worth browsing on a phone, starting an exam is not. */}
           {examBlocked && <p className="start-blocked">{strings.mobile.startDisabled}</p>}

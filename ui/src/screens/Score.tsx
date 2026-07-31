@@ -10,6 +10,7 @@ import {
 } from "../api";
 import { CheckList } from "../components/CheckList";
 import { DomainBreakdown } from "../components/DomainBreakdown";
+import { McqAnswerReview } from "../components/McqAnswerReview";
 import { Icon } from "../components/Icon";
 import { Markdown } from "../components/Markdown";
 import { PendingBar } from "../components/Pending";
@@ -228,6 +229,11 @@ function QuestionResultDetails({ question }: { question: QuestionResult }) {
       .finally(() => setLoadingSolution(false));
   };
 
+  // mcq results carry the option texts; hands-on results never do. That
+  // presence is the branch — no examType prop needed, the results
+  // themselves say which engine graded them.
+  const isMcq = question.options !== undefined;
+
   return (
     <details className="question-result">
       <summary>
@@ -238,11 +244,11 @@ function QuestionResultDetails({ question }: { question: QuestionResult }) {
           {question.earned}/{question.total}
         </span>
       </summary>
-      <CheckList checks={question.checks} />
+      {isMcq ? <McqAnswerReview question={question} /> : <CheckList checks={question.checks} />}
       <details className="solution-details" onToggle={handleToggle}>
         <summary>
           <Icon name="chevron-down" className="disclosure-chevron" />
-          {strings.score.showSolution}
+          {isMcq ? strings.mcq.explanation : strings.score.showSolution}
         </summary>
         {loadingSolution && <p>{strings.score.loadingSolution}</p>}
         {solutionError && <p className="error-text">{solutionError}</p>}

@@ -181,9 +181,11 @@ export function QuestionPanel({
             </div>
             {selected && (
               <div className="question-nav-tools">
-                <span className="instance-chip">
-                  {strings.questionPanel.sshHint(selected.instance)}
-                </span>
+                {selected.instance && (
+                  <span className="instance-chip">
+                    {strings.questionPanel.sshHint(selected.instance)}
+                  </span>
+                )}
                 <button
                   className="question-mark"
                   onClick={() => marksStore.toggleMark(selected.id)}

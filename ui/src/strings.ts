@@ -26,6 +26,14 @@ export const strings = {
       "Each question has a working directory pre-created at /opt/course/<n>.",
       "The timer starts the moment you click Start and cannot be paused.",
     ],
+    // The mcq counterpart of `tips`: no ssh, no desktop, no working
+    // directories — none of those exist for a multiple-choice bank.
+    tipsMcq: [
+      "Answer in the question panel — pick an option and it saves immediately.",
+      "Multi-select questions score all-or-nothing: every correct option, nothing else.",
+      "You can change any answer until you submit or time runs out.",
+      "The timer starts the moment you click Start and cannot be paused.",
+    ],
     // The catalog and the exam summary are separate endpoints, so one can
     // fail while the other renders. Say which one, and that the button
     // below is the thing that will not work.
@@ -264,6 +272,42 @@ export const strings = {
     reseedFailed: (detail: string) => `Couldn't reset that question (${detail}).`,
     examOnly: "Hints are available in Training mode.",
     failed: (detail: string) => `Couldn't load that hint (${detail}).`,
+  },
+
+  mcq: {
+    regionLabel: "Question",
+    selectOne: "Select one answer",
+    selectAll: "Select all that apply",
+    // The option letter is part of how people talk about mcq items
+    // ("the answer is C"), so it is text, not decoration.
+    optionLabel: (letter: string, text: string) => `${letter}. ${text}`,
+    // The save failed and the selection on screen is NOT what the server
+    // has. Louder than a generic toast: an unsaved answer scores zero.
+    saveFailed: (detail: string) =>
+      `Couldn't save that answer (${detail}) — it is not recorded. Pick it again to retry.`,
+    // The attempt ended (timer, or a submit elsewhere) between the click
+    // and the save; the screen is about to flip to the score on its own.
+    saveConflict: "The attempt has ended — that last change wasn't recorded.",
+    answered: "answered",
+    unanswered: "unanswered",
+    // Submit dialog: unlike the hands-on screen, here the UI genuinely
+    // knows what is unanswered — the answers live server-side.
+    reviewUnanswered: (n: number) =>
+      n === 1 ? "1 question is unanswered:" : `${n} questions are unanswered:`,
+    allAnswered: "Every question has an answer.",
+    confirmBody: "This cannot be undone. Your answers are already saved; grading begins immediately.",
+    // Training-mode per-question reveal. Same 403-backed gate as the
+    // hands-on solution link, same wording family.
+    checkAnswer: "Check answer",
+    loadingAnswer: "Loading the explanation…",
+    // Score review.
+    yourAnswer: "Your answer",
+    correctAnswer: "Correct answer",
+    notAnswered: "Not answered",
+    explanation: "Explanation",
+    optionCorrectSelected: "correct — you selected it",
+    optionCorrectMissed: "correct — you did not select it",
+    optionWrongSelected: "your selection — incorrect",
   },
 
   practice: {

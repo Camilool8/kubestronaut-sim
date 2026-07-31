@@ -27,13 +27,19 @@ export interface SessionSnapshot {
 
 export interface ExamQuestionInfo {
   id: string;
-  instance: string;
+  /** Which shell host grades this question. Absent on an mcq exam. */
+  instance?: string;
   domain: string;
   weight: number;
   totalPoints: number;
   /** How many hint tiers this question has; 0 when it has none. */
   hintCount: number;
+  /** mcq only: true for a select-all-that-apply question. */
+  multi?: boolean;
 }
+
+/** Which engine grades the active bank. */
+export type ExamType = "hands-on" | "mcq";
 
 /** One selectable attempt mode, described by the server. */
 export interface ExamMode {
@@ -46,6 +52,7 @@ export interface ExamMode {
 export interface ExamInfo {
   name: string;
   title: string;
+  examType: ExamType;
   durationSeconds: number;
   passingScore: number;
   kubernetesVersion: string;
@@ -56,9 +63,14 @@ export interface ExamInfo {
 
 export interface QuestionDetail {
   id: string;
-  instance: string;
+  /** Absent on an mcq exam. */
+  instance?: string;
   domain: string;
   markdown: string;
+  /** mcq only: the selectable choices. The answer key is never served here. */
+  options?: string[];
+  /** mcq only: true for a select-all-that-apply question. */
+  multi?: boolean;
 }
 
 export interface SolutionDetail {
@@ -82,6 +94,15 @@ export interface QuestionResult {
   earned: number;
   total: number;
   checks: CheckResult[];
+  /**
+   * mcq only (absent on hands-on results): the candidate's selection
+   * (absent when unanswered), the answer key, and the option texts —
+   * everything the score review needs without re-fetching the question.
+   */
+  selected?: number[];
+  correct?: number[];
+  options?: string[];
+  multi?: boolean;
 }
 
 export interface Results {
@@ -323,6 +344,53 @@ export function pollSession(
     window.clearInterval(interval);
     window.removeEventListener("focus", onFocus);
   };
+}
+
+export type AnswerResponse =
+  | { ok: true; id: string; selected: number[] }
+  | { ok: false; error: string };
+
+/**
+ * PUT /api/questions/{id}/answer — record (or clear, with []) the
+ * selection for one mcq question. Called on every option click. The 409
+ * — the attempt ended under us, e.g. the timer expired between the
+ * click and the request — is a tagged union, not a throw: the session
+ * poller will flip the screen momentarily, and the caller just tells
+ * the candidate the click didn't count.
+ */
+export async function putAnswer(
+  id: string,
+  selected: number[],
+  signal?: AbortSignal,
+): Promise<AnswerResponse> {
+  const res = await request(`/api/questions/${encodeURIComponent(id)}/answer`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ selected }),
+    signal,
+  });
+  if (res.status === 409) {
+    return { ok: false, error: await readError(res) };
+  }
+  if (!res.ok) {
+    throw new Error(await readError(res));
+  }
+  const body = (await res.json()) as { id: string; selected: number[] };
+  return { ok: true, ...body };
+}
+
+/**
+ * GET /api/answers — every stored selection, keyed by question id. The
+ * bulk read McqExam hydrates from on mount, so a reload (or facilitator
+ * restart) resumes with each answer intact.
+ */
+export async function getAnswers(signal?: AbortSignal): Promise<Record<string, number[]>> {
+  const res = await request("/api/answers", { signal });
+  if (!res.ok) {
+    throw new Error(await readError(res));
+  }
+  const body = (await res.json()) as { answers: Record<string, number[]> };
+  return body.answers ?? {};
 }
 
 // ---- control plane (conductor, proxied by the facilitator) ----
