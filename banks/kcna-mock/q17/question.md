@@ -1,0 +1,1 @@
+A Pod needs configuration data that is stored in a ConfigMap named `app-config` in the same namespace. Which of the following are valid ways for the Pod to consume the ConfigMap's data? Choose all that apply.

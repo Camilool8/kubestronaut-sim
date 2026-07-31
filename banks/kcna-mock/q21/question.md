@@ -1,0 +1,1 @@
+A Pod named `web-0` has been stuck in the `Pending` phase for several minutes. You want to see the events that explain why the scheduler has not placed it on a node. Which command shows this information?

@@ -1,0 +1,1 @@
+A stateful application writes its data to an `emptyDir` volume. The team notices that the data disappears whenever the pod is deleted and rescheduled onto another node. What is the recommended way to keep the data available wherever the pod runs?

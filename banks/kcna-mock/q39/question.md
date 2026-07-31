@@ -1,0 +1,1 @@
+An application's CPU usage spikes during business hours and drops at night. The team wants Kubernetes to automatically raise and lower the number of pod replicas based on measured CPU utilization. Which component should they use?

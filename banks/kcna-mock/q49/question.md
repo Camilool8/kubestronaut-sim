@@ -1,0 +1,1 @@
+A team installs the same Helm chart twice into a cluster — once as `payments-dev` and once as `payments-prod` — each with a different values file. In Helm terminology, what are `payments-dev` and `payments-prod`?

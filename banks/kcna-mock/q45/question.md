@@ -1,0 +1,1 @@
+A team runs Argo CD inside their Kubernetes cluster. Argo CD continuously watches a Git repository and applies any changes it finds to the cluster. Which deployment model does this describe, and why is it often preferred?

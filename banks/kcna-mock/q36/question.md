@@ -1,0 +1,1 @@
+A security team requires that application containers must not run as the root user, and they want Kubernetes to refuse to start any container that would. Which setting most directly enforces this requirement?
