@@ -47,9 +47,17 @@ pull_retry() {
 
 # Archive path for a prebaked image, or empty if it was not baked in.
 # The transform has to match the one the Dockerfile's preload stage uses.
+#
+# Must return 0 either way: load_image calls this inside a command
+# substitution, and under `set -e` a non-zero status there kills the
+# whole bootstrap — which silently turned the documented pull fallback
+# for a non-prebaked image into an instant boot failure with no output.
 archive_for() {
-  local path="/opt/sim/images/$(printf '%s' "$1" | tr '/:@' '___').tar"
-  [ -f "$path" ] && printf '%s' "$path"
+  local path
+  path="/opt/sim/images/$(printf '%s' "$1" | tr '/:@' '___').tar"
+  if [ -f "$path" ]; then
+    printf '%s' "$path"
+  fi
 }
 
 # Side-loads images into the kind nodes. Prefers an archive baked into
