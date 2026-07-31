@@ -1,7 +1,7 @@
-**CRI (Container Runtime Interface)** is correct: the CRI is the gRPC API the kubelet uses to talk to the container runtime for operations such as pulling images and starting and stopping containers. Any runtime that implements the CRI — containerd and CRI-O being the two most common — can be swapped in without modifying Kubernetes, which is exactly what makes the migration in the scenario possible.
+**CSI** is correct: the Container Storage Interface is the open standard that lets storage providers expose their systems to Kubernetes (and other orchestrators) through a driver, covering operations such as dynamic provisioning, attaching, and mounting volumes. Because drivers are developed out of tree against this stable interface, vendors can ship and update them on their own schedule without touching Kubernetes core code — exactly what the scenario requires. A StorageClass then points PersistentVolumeClaims at the vendor's CSI driver.
 
 Why the others are wrong:
 
-- **OCI (Open Container Initiative)** — the OCI standardizes the container image format and the low-level runtime specification (implemented by runc and similar tools), not the interface between the kubelet and a high-level runtime.
-- **CNI (Container Network Interface)** — the CNI is the plugin interface for configuring Pod networking, such as attaching network interfaces and assigning IP addresses; it has nothing to do with choosing a container runtime.
-- **CSI (Container Storage Interface)** — the CSI lets storage vendors expose volume provisioning and attachment to Kubernetes through drivers; it standardizes storage integration, not container runtimes.
+- **OCI** — the Open Container Initiative standardizes container image formats, the low-level runtime specification, and image distribution; it says nothing about how volumes are provisioned or attached.
+- **CNI** — the Container Network Interface is the plugin standard for pod networking, covering how pods are attached to the network and get IP addresses, not how storage is integrated.
+- **CRI** — the Container Runtime Interface is the API between the kubelet and the container runtime (such as containerd or CRI-O) for running containers; it does not define storage driver behavior.

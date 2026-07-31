@@ -296,10 +296,10 @@ spec:
       domain: Container Orchestration
       multi: false
       options:
-        - "kube-apiserver"
-        - "kube-scheduler"
-        - "kube-proxy"
-        - "kubelet"
+        - "It removes the pod from the endpoints of Services that select it, but leaves the container running"
+        - "It marks the node as NotReady so no further pods are scheduled onto it"
+        - "It deletes the pod so the scheduler can recreate it on a different node"
+        - "It kills the container and restarts it, subject to the pod's restart policy"
       correct: [3]
     - id: q32
       domain: Container Orchestration
@@ -332,10 +332,10 @@ spec:
       domain: Container Orchestration
       multi: false
       options:
-        - "It serves as the DNS server for the cluster"
-        - "It pulls container images from registries"
-        - "It enforces NetworkPolicy rules between pods"
-        - "It programs network rules (for example, iptables or IPVS) so traffic sent to a Service IP is forwarded to one of the Service's backend pods"
+        - "It acts as the cluster's DNS server, resolving Service names to IP addresses for pods"
+        - "It pulls container images from registries so the kubelet can start a pod's containers"
+        - "It enforces NetworkPolicy rules that control which pods are allowed to communicate"
+        - "It programs network rules (iptables or IPVS) that forward Service IP traffic to a backend pod"
       correct: [3]
     - id: q36
       domain: Container Orchestration
@@ -557,8 +557,8 @@ spec:
       domain: Cloud Native Architecture
       multi: false
       options:
-        - "OCI (Open Container Initiative)"
-        - "CNI (Container Network Interface)"
-        - "CSI (Container Storage Interface)"
-        - "CRI (Container Runtime Interface)"
+        - "OCI"
+        - "CNI"
+        - "CRI"
+        - "CSI"
       correct: [3]

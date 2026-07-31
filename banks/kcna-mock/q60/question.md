@@ -1,3 +1,3 @@
-A cluster administrator wants to replace containerd with CRI-O on the worker nodes of a Kubernetes 1.35 cluster. Because both runtimes implement the same standard interface, the kubelet can use either one without any changes to Kubernetes itself.
+A storage vendor wants Kubernetes clusters to dynamically provision, attach, and mount volumes on its storage system through a vendor-supplied driver, without any changes to Kubernetes itself.
 
-Which specification defines this interface between the kubelet and the container runtime?
+Which specification defines the standard interface that the vendor's driver must implement?
