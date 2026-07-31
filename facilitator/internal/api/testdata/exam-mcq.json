@@ -1,0 +1,28 @@
+{
+  "metadata": {
+    "name": "mcq-bank",
+    "title": "MCQ Test Exam"
+  },
+  "spec": {
+    "examType": "mcq",
+    "duration": "10m",
+    "passingScore": 75,
+    "kubernetesVersion": "1.35",
+    "questions": [
+      {
+        "id": "q01",
+        "domain": "Smoke",
+        "multi": false,
+        "options": ["Alpha", "Bravo", "Charlie"],
+        "correct": [1]
+      },
+      {
+        "id": "q02",
+        "domain": "Smoke",
+        "multi": true,
+        "options": ["One", "Two", "Three", "Four"],
+        "correct": [0, 2]
+      }
+    ]
+  }
+}

@@ -12,7 +12,7 @@ through that proxy (`facilitator/cmd/facilitator/main.go:170-174`).
 Host ports are in [cli.md](cli.md).
 
 Errors are `{"error":"..."}` as `application/json`
-(`facilitator/internal/api/api.go:533`,
+(`facilitator/internal/api/api.go:641`,
 `conductor/internal/api/api.go:115`). Both `/healthz` endpoints answer
 in plain text, and the desktop's locked responses in HTML or plain
 text.
@@ -39,9 +39,10 @@ closes every mode-based gate below while idle.
 
 | Gate | Open when | Closed response | Source |
 |---|---|---|---|
-| Solutions | `state == "ended"`, **or** `mode == "training"` | 403 | `facilitator/internal/api/api.go:239` |
-| Hints | `mode == "training"` and `state != "idle"` | 403 | `facilitator/internal/api/api.go:296-304` |
-| Mid-attempt score | `mode == "training"` and `state == "running"` | 403 on mode, 409 on state | `facilitator/internal/api/api.go:338-347` |
+| Solutions | `state == "ended"`, **or** `mode == "training"` | 403 | `facilitator/internal/api/api.go:265` |
+| Hints | `mode == "training"` and `state != "idle"` | 403 | `facilitator/internal/api/api.go:323-328` |
+| Mid-attempt score | `mode == "training"` and `state == "running"` | 403 on mode, 409 on state | `facilitator/internal/api/api.go:444-450` |
+| Answer writes (mcq) | `state == "running"` | 409 | `facilitator/internal/api/api.go:376-379` |
 | Desktop | `state == "running"`, any mode | 403 | `facilitator/cmd/facilitator/main.go:163-165` |
 | Re-seed | `mode == "training"` and `state == "running"` | 403 | `conductor/internal/control/reseed.go:83-89` |
 | Bank switch | `state != "running"` | 409 | `conductor/internal/control/control.go:198-204` |
@@ -62,7 +63,7 @@ None of these gates is a security control. Every `solution.md` and
 ### GET /healthz
 
 Backs the compose healthcheck. Always 200, `text/plain`, body `ok`
-(`facilitator/internal/api/api.go:102-106`).
+(`facilitator/internal/api/api.go:109-113`).
 
 ### GET /api/boot
 
@@ -86,7 +87,7 @@ fields.
 `state` is `booting`, `ready` or `failed`, and `error` is populated
 only for `failed`. Always 200: "still building" is a normal answer to
 this question, not an error
-(`facilitator/internal/api/api.go:438-440`). The `/shared/ready` marker
+(`facilitator/internal/api/api.go:546-548`). The `/shared/ready` marker
 is the authority on readiness and overrides whatever the phase file
 claims, in both directions
 (`facilitator/internal/bootstate/bootstate.go:95-129`).
@@ -100,6 +101,7 @@ selectable modes. Always 200.
 {
   "name": "ckad-mock-01",
   "title": "CKAD Mock Exam 01",
+  "examType": "hands-on",
   "durationSeconds": 7200,
   "passingScore": 66,
   "kubernetesVersion": "1.35",
@@ -114,10 +116,15 @@ selectable modes. Always 200.
 }
 ```
 
+`examType` is `hands-on` or `mcq` (`facilitator/internal/exam/exam.go`
+normalizes an absent `spec.examType` to `hands-on`). For hands-on,
 `totalPoints` sums the question's checks, excluding any whose
 `# points:` header was malformed
-(`facilitator/internal/api/api.go:173-181`). `questions` marshals as
-`[]`, never `null`.
+(`facilitator/internal/api/api.go:191-199`). For mcq questions the
+entry is `{"id", "domain", "weight", "totalPoints", "hintCount",
+"multi"}` — no `instance`, `totalPoints` equals `weight`, and `multi`
+marks a select-all-that-apply question. `questions` marshals as `[]`,
+never `null`.
 
 ### GET /api/questions/{id}
 
@@ -128,11 +135,19 @@ question needs no restart.
 {"id": "q01", "instance": "instance-1", "domain": "Application Environment, Configuration and Security", "markdown": "..."}
 ```
 
+For an mcq exam the response instead carries the choices — never the
+answer key, which reaches the client only inside graded results
+(`facilitator/internal/api/api.go:217-221`):
+
+```json
+{"id": "q01", "domain": "Kubernetes Fundamentals", "markdown": "...", "options": ["...", "...", "...", "..."], "multi": false}
+```
+
 | Code | When |
 |---|---|
 | 200 | `id` names a question in the loaded exam. |
-| 404 | It does not (`facilitator/internal/api/api.go:206`). |
-| 500 | `question.md` could not be read (`facilitator/internal/api/api.go:212`). |
+| 404 | It does not (`facilitator/internal/api/api.go:229`). |
+| 500 | `question.md` could not be read (`facilitator/internal/api/api.go:235`). |
 
 ### GET /api/questions/{id}/solution
 
@@ -146,12 +161,16 @@ The question's `solution.md`. Gated — see
 | Code | When |
 |---|---|
 | 200 | Gate open, `id` known. |
-| 403 | Gate closed (`facilitator/internal/api/api.go:239-241`). |
-| 404 | Gate open, unknown `id` (`facilitator/internal/api/api.go:245-247`). |
-| 500 | `solution.md` could not be read (`facilitator/internal/api/api.go:250-253`). |
+| 403 | Gate closed (`facilitator/internal/api/api.go:265-267`). |
+| 404 | Gate open, unknown `id` (`facilitator/internal/api/api.go:271-273`). |
+| 500 | `solution.md` could not be read (`facilitator/internal/api/api.go:277-280`). |
 
 The gate is checked before the id is looked up, so the endpoint cannot
 be used to discover which question ids exist.
+
+In an mcq bank `solution.md` is the question's explanation (why the
+correct answer is correct and why each distractor is wrong); the same
+gate applies unchanged.
 
 ### GET /api/questions/{id}/hints/{n}
 
@@ -166,12 +185,52 @@ over the `hintCount` reported by `GET /api/exam`.
 | Code | When |
 |---|---|
 | 200 | Training attempt, known `id`, `n` in range. |
-| 403 | Not a training attempt, or no attempt at all (`facilitator/internal/api/api.go:297-304`). |
-| 404 | Unknown `id`, or `n` outside 1..`hintCount` (`facilitator/internal/api/api.go:309-327`). |
-| 500 | `hints.md` could not be read (`facilitator/internal/api/api.go:321`). |
+| 403 | Not a training attempt, or no attempt at all (`facilitator/internal/api/api.go:323-328`). |
+| 404 | Unknown `id`, or `n` outside 1..`hintCount` (`facilitator/internal/api/api.go:334-351`). |
+| 500 | `hints.md` could not be read (`facilitator/internal/api/api.go:346`). |
 
 The route is registered unconditionally, so the difference between 404
 and 403 never leaks the attempt's mode.
+
+### PUT /api/questions/{id}/answer
+
+Records the candidate's selection for one mcq question: an idempotent
+upsert the UI issues on every option click. `selected` holds 0-based
+indices into the question's `options`; an empty array means
+"deselected everything" and deletes the stored entry. The response
+echoes the stored (sorted) selection.
+
+```json
+{"selected": [0, 2]}
+```
+
+```json
+{"id": "q07", "selected": [0, 2]}
+```
+
+| Code | When |
+|---|---|
+| 200 | Stored (`facilitator/internal/api/api.go:423`). |
+| 400 | Not an mcq exam, the body is not `{"selected":[...]}`, an index is out of range or duplicated, or more than one index on a single-answer question (`facilitator/internal/api/api.go:372-409`). |
+| 404 | Unknown `id` (`facilitator/internal/api/api.go:383-386`). |
+| 409 | No attempt is running (`facilitator/internal/api/api.go:376-379`, re-checked at the write: `:414-418`). |
+
+The 409 is checked before the id lookup, matching the solution
+handler's ordering. Selections are persisted in the session file
+(format v4, `facilitator/internal/session/session.go`), so a page
+reload — or a facilitator restart — resumes with every answer intact.
+
+### GET /api/answers
+
+Every stored selection, keyed by question id — the bulk read the UI
+hydrates from on mount and the score review reads after grading.
+Always 200; `{"answers":{}}` when idle or on a hands-on bank. Never
+includes the answer key
+(`facilitator/internal/api/api.go:435-437`).
+
+```json
+{"answers": {"q01": [1], "q07": [0, 2]}}
+```
 
 ### POST /api/session/start
 
@@ -187,18 +246,21 @@ The response is the session shape documented under
 
 | Code | When |
 |---|---|
-| 200 | Started (`facilitator/internal/api/api.go:423`). |
-| 400 | `mode` is not `exam`, `training` or `speed` (`facilitator/internal/api/api.go:414`). |
-| 409 | The environment is still starting (`facilitator/internal/api/api.go:399-401`), or a session is already running or ended (`facilitator/internal/api/api.go:420`). |
+| 200 | Started (`facilitator/internal/api/api.go:531`). |
+| 400 | `mode` is not `exam`, `training` or `speed` (`facilitator/internal/api/api.go:522`). |
+| 409 | The environment is still starting (`facilitator/internal/api/api.go:507-510`), or a session is already running or ended (`facilitator/internal/api/api.go:528`). |
 
 The readiness gate is what stops a 120-minute clock starting against a
 half-built environment: the facilitator answers long before the cluster
-is usable.
+is usable. **An mcq exam skips the readiness gate** — it needs no
+cluster, no instances and no desktop, so the attempt starts the moment
+the facilitator can answer, while the environment finishes booting in
+the background (`facilitator/internal/api/api.go:503-510`).
 
 ### GET /api/session
 
 Current session state. Always 200
-(`facilitator/internal/api/api.go:443`).
+(`facilitator/internal/api/api.go:551`).
 
 ```json
 {
@@ -225,8 +287,8 @@ background; the desktop locks immediately. No body.
 
 | Code | When |
 |---|---|
-| 202 | Ended; the body is the session shape (`facilitator/internal/api/api.go:454`). |
-| 409 | The session is idle, or already ended with results recorded (`facilitator/internal/api/api.go:447-450`). |
+| 202 | Ended; the body is the session shape (`facilitator/internal/api/api.go:562`). |
+| 409 | The session is idle, or already ended with results recorded (`facilitator/internal/api/api.go:555-558`). |
 
 Re-POSTing on an ended-but-ungraded session succeeds as a no-op and
 retries the grade (`facilitator/internal/session/session.go:331-335`).
@@ -239,10 +301,10 @@ same shape as `GET /api/results`.
 
 | Code | When |
 |---|---|
-| 200 | Graded (`facilitator/internal/api/api.go:358-360`). |
-| 403 | Not a training attempt (`facilitator/internal/api/api.go:341`). |
-| 409 | No attempt is running (`facilitator/internal/api/api.go:345`), or a grading run is already in flight (`facilitator/internal/api/api.go:355`). |
-| 501 | This build has no practice grader wired (`facilitator/internal/api/api.go:349`). |
+| 200 | Graded (`facilitator/internal/api/api.go:461-464`). |
+| 403 | Not a training attempt (`facilitator/internal/api/api.go:445`). |
+| 409 | No attempt is running (`facilitator/internal/api/api.go:449`), or a grading run is already in flight (`facilitator/internal/api/api.go:459`). |
+| 501 | This build has no practice grader wired (`facilitator/internal/api/api.go:453`). |
 
 The score is never persisted, so `GET /api/results` still answers 409
 afterwards — `tests/smoke.sh:573` pins that.
@@ -253,10 +315,10 @@ The graded scoreboard for the ended attempt.
 
 | Code | When |
 |---|---|
-| 200 | Grading finished (`facilitator/internal/api/api.go:490-492`). |
-| 202 | Ended, still grading: `{"state":"grading"}` (`facilitator/internal/api/api.go:479`). |
-| 409 | The session has not ended (`facilitator/internal/api/api.go:473`). |
-| 500 | Grading failed; the body carries the error (`facilitator/internal/api/api.go:483`). |
+| 200 | Grading finished (`facilitator/internal/api/api.go:597-601`). |
+| 202 | Ended, still grading: `{"state":"grading"}` (`facilitator/internal/api/api.go:586`). |
+| 409 | The session has not ended (`facilitator/internal/api/api.go:581`). |
+| 500 | Grading failed; the body carries the error (`facilitator/internal/api/api.go:591`). |
 
 ```json
 {
@@ -288,6 +350,32 @@ every check in each. `percent` is integer `earned * 100 / total`, and
 `passed` is `percent >= passingScore`
 (`facilitator/internal/evaluate/evaluate.go:169-171`).
 
+An mcq attempt is graded from the session's stored answers
+(`facilitator/internal/mcqgrade/mcqgrade.go`), all-or-nothing per
+question, into the same schema: each question carries one synthetic
+`answer` check plus four mcq-only review fields —
+
+```json
+{
+  "id": "q07",
+  "instance": "",
+  "domain": "Container Orchestration",
+  "earned": 0,
+  "total": 1,
+  "checks": [
+    {"name": "answer", "desc": "Correct answer selected", "points": 1, "earned": 0, "passed": false, "message": "selected A — correct A, D"}
+  ],
+  "selected": [0],
+  "correct": [0, 3],
+  "options": ["...", "...", "...", "..."],
+  "multi": true
+}
+```
+
+`selected` is absent when the question was never answered. This is the
+only place the answer key ever reaches the client
+(`facilitator/internal/evaluate/evaluate.go:119-135`).
+
 ### DELETE /api/session
 
 Returns the session to idle from any state, clearing results, and locks
@@ -296,8 +384,8 @@ and switch (`conductor/internal/control/control.go:339-356`).
 
 | Code | When |
 |---|---|
-| 204 | Reset, from any state (`facilitator/internal/api/api.go:462`). |
-| 500 | The reset could not be persisted (`facilitator/internal/api/api.go:459`). |
+| 204 | Reset, from any state (`facilitator/internal/api/api.go:571`). |
+| 500 | The reset could not be persisted (`facilitator/internal/api/api.go:567`). |
 
 ### /desktop and /desktop/
 
@@ -323,7 +411,7 @@ Any path that is not `/api/*` or `/desktop*` serves the embedded UI:
 the real file when one exists, otherwise `index.html`, so client-side
 routes such as `/score` load. An unmatched path under `/api/` is a JSON
 404, never `index.html`
-(`facilitator/internal/api/api.go:501-505`).
+(`facilitator/internal/api/api.go:609-613`).
 
 ## Conductor
 

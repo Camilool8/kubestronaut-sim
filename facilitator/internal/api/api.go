@@ -6,6 +6,8 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
@@ -70,6 +72,11 @@ func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desk
 	mux.HandleFunc("GET /api/questions/{id}", s.handleQuestion)
 	mux.HandleFunc("GET /api/questions/{id}/solution", s.handleSolution)
 	mux.HandleFunc("GET /api/questions/{id}/hints/{n}", s.handleHint)
+	// Registered unconditionally (ServeMux patterns are static, like the
+	// hints route on a hintless bank); the PUT handler rejects hands-on
+	// exams itself.
+	mux.HandleFunc("PUT /api/questions/{id}/answer", s.handleAnswerPut)
+	mux.HandleFunc("GET /api/answers", s.handleAnswersGet)
 	mux.HandleFunc("POST /api/session/start", s.handleSessionStart)
 	mux.HandleFunc("GET /api/session", s.handleSessionGet)
 	mux.HandleFunc("POST /api/session/end", s.handleSessionEnd)
@@ -109,6 +116,7 @@ func handleHealthz(w http.ResponseWriter, r *http.Request) {
 type examResponse struct {
 	Name              string             `json:"name"`
 	Title             string             `json:"title"`
+	ExamType          string             `json:"examType"`
 	DurationSeconds   int                `json:"durationSeconds"`
 	PassingScore      int                `json:"passingScore"`
 	KubernetesVersion string             `json:"kubernetesVersion"`
@@ -128,20 +136,24 @@ type examMode struct {
 
 // examQuestionInfo is one question's entry in the GET /api/exam
 // response. TotalPoints is computed here (not stored on exam.Question)
-// as the sum of every non-Skip check's Points.
+// as the sum of every non-Skip check's Points for hands-on, and is
+// simply the weight for mcq. Instance is omitted for mcq questions —
+// there is nothing to ssh into. Multi is mcq-only.
 type examQuestionInfo struct {
 	ID          string `json:"id"`
-	Instance    string `json:"instance"`
+	Instance    string `json:"instance,omitempty"`
 	Domain      string `json:"domain"`
 	Weight      int    `json:"weight"`
 	TotalPoints int    `json:"totalPoints"`
 	HintCount   int    `json:"hintCount"`
+	Multi       bool   `json:"multi,omitempty"`
 }
 
 func (s *server) handleExam(w http.ResponseWriter, r *http.Request) {
 	resp := examResponse{
 		Name:              s.ex.Name,
 		Title:             s.ex.Title,
+		ExamType:          s.ex.Type,
 		DurationSeconds:   int(s.ex.Duration.Seconds()),
 		PassingScore:      s.ex.PassingScore,
 		KubernetesVersion: s.ex.KubernetesVersion,
@@ -150,14 +162,20 @@ func (s *server) handleExam(w http.ResponseWriter, r *http.Request) {
 		Questions: make([]examQuestionInfo, 0, len(s.ex.Questions)),
 	}
 	for _, q := range s.ex.Questions {
-		resp.Questions = append(resp.Questions, examQuestionInfo{
-			ID:          q.ID,
-			Instance:    q.Instance,
-			Domain:      q.Domain,
-			Weight:      q.Weight,
-			TotalPoints: totalPoints(q),
-			HintCount:   q.HintCount,
-		})
+		info := examQuestionInfo{
+			ID:        q.ID,
+			Instance:  q.Instance,
+			Domain:    q.Domain,
+			Weight:    q.Weight,
+			HintCount: q.HintCount,
+			Multi:     q.Multi,
+		}
+		if s.ex.Type == exam.TypeMCQ {
+			info.TotalPoints = q.Weight
+		} else {
+			info.TotalPoints = totalPoints(q)
+		}
+		resp.Questions = append(resp.Questions, info)
 	}
 	resp.Modes = []examMode{
 		{ID: session.ModeExam, DurationSeconds: int(s.ex.Duration.Seconds())},
@@ -191,12 +209,17 @@ func (s *server) findQuestion(id string) (exam.Question, bool) {
 	return exam.Question{}, false
 }
 
-// questionResponse is the GET /api/questions/{id} JSON shape.
+// questionResponse is the GET /api/questions/{id} JSON shape. Options
+// and Multi are mcq-only; the answer key (exam.Question.Correct) is
+// deliberately never part of this response — it reaches the client only
+// inside graded results, mirroring the solution.md gate.
 type questionResponse struct {
-	ID       string `json:"id"`
-	Instance string `json:"instance"`
-	Domain   string `json:"domain"`
-	Markdown string `json:"markdown"`
+	ID       string   `json:"id"`
+	Instance string   `json:"instance,omitempty"`
+	Domain   string   `json:"domain"`
+	Markdown string   `json:"markdown"`
+	Options  []string `json:"options,omitempty"`
+	Multi    bool     `json:"multi,omitempty"`
 }
 
 func (s *server) handleQuestion(w http.ResponseWriter, r *http.Request) {
@@ -218,6 +241,8 @@ func (s *server) handleQuestion(w http.ResponseWriter, r *http.Request) {
 		Instance: q.Instance,
 		Domain:   q.Domain,
 		Markdown: string(md),
+		Options:  q.Options,
+		Multi:    q.Multi,
 	})
 }
 
@@ -332,6 +357,85 @@ func (s *server) handleHint(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// answerResponse is the PUT /api/questions/{id}/answer JSON shape.
+type answerResponse struct {
+	ID       string `json:"id"`
+	Selected []int  `json:"selected"`
+}
+
+// handleAnswerPut records the candidate's selection for one mcq
+// question: an idempotent upsert, called on every option click, with an
+// empty selection meaning "deselected everything". The 409-before-404
+// ordering matches the solution handler: the endpoint must not double as
+// a question-id oracle for whatever state the session is in.
+func (s *server) handleAnswerPut(w http.ResponseWriter, r *http.Request) {
+	if s.ex.Type != exam.TypeMCQ {
+		writeJSONError(w, http.StatusBadRequest, "not a multiple-choice exam")
+		return
+	}
+	if s.mgr.Snapshot().State != "running" {
+		writeJSONError(w, http.StatusConflict, "no attempt is running")
+		return
+	}
+
+	id := r.PathValue("id")
+	q, ok := s.findQuestion(id)
+	if !ok {
+		writeJSONError(w, http.StatusNotFound, "unknown question "+id)
+		return
+	}
+
+	var body struct {
+		Selected []int `json:"selected"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "body must be JSON: {\"selected\":[...]}")
+		return
+	}
+	seen := make(map[int]bool, len(body.Selected))
+	for _, n := range body.Selected {
+		if n < 0 || n >= len(q.Options) {
+			writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("selected index %d is out of range", n))
+			return
+		}
+		if seen[n] {
+			writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("selected index %d appears twice", n))
+			return
+		}
+		seen[n] = true
+	}
+	if !q.Multi && len(body.Selected) > 1 {
+		writeJSONError(w, http.StatusBadRequest, id+" takes a single answer")
+		return
+	}
+
+	if err := s.mgr.SetAnswer(id, body.Selected); err != nil {
+		// The attempt ended between the state check above and the write
+		// (timer expiry, a concurrent submit): a clean 409, not a 500.
+		if errors.Is(err, session.ErrConflict) {
+			writeJSONError(w, http.StatusConflict, "no attempt is running")
+			return
+		}
+		writeJSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, answerResponse{ID: id, Selected: s.mgr.Answers()[id]})
+}
+
+// answersResponse is the GET /api/answers JSON shape.
+type answersResponse struct {
+	Answers map[string][]int `json:"answers"`
+}
+
+// handleAnswersGet returns every stored selection — the bulk read the UI
+// hydrates from on mount (resume after a reload or restart) and the
+// review reads after grading. It answers in any state (empty when idle)
+// and never includes the answer key.
+func (s *server) handleAnswersGet(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, answersResponse{Answers: s.mgr.Answers()})
+}
+
 // handlePracticeGrade scores the work so far without ending the attempt
 // and without recording anything. Training only: in an exam, finding out
 // your score mid-attempt is precisely the thing the format withholds.
@@ -396,7 +500,11 @@ func (s *server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 	// clock against a half-built environment. Without it, "the UI came
 	// up, so I clicked Start" burns real exam time on questions whose
 	// seed data does not exist yet.
-	if !s.bootState().Ready() {
+	//
+	// An mcq exam needs none of that — no instances, no seed data, no
+	// desktop — so it starts the moment the facilitator can answer,
+	// while the cluster finishes booting in the background.
+	if s.ex.Type != exam.TypeMCQ && !s.bootState().Ready() {
 		writeJSONError(w, http.StatusConflict, "the exam environment is still starting")
 		return
 	}
