@@ -12,4 +12,4 @@ reference solutions score 100%.
 - [ ] I ran `tests/smoke.sh` locally
 - [ ] Not needed — this change cannot affect grading or the environment
 
-See [docs/testing.md](../blob/main/docs/testing.md).
+See [docs/testing.md](https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/testing.md).
