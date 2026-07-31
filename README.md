@@ -101,6 +101,7 @@ networks and boot sequence.
 | Document | What it covers |
 |---|---|
 | [docs/cli.md](docs/cli.md) | `./sim` subcommands, environment variables, host ports |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Symptoms and fixes, from preflight to grading |
 | [docs/architecture.md](docs/architecture.md) | Containers, networks, boot sequence, data flow |
 | [docs/api.md](docs/api.md) | HTTP API for the facilitator and conductor |
 | [docs/bank-spec.md](docs/bank-spec.md) | Question bank format and the validator contract |
