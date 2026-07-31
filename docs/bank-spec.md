@@ -5,13 +5,18 @@ per question. The conductor scans every `banks/*/exam.yaml` into the catalog
 the lobby renders; [banks/catalog.yaml](../banks/catalog.yaml) adds
 coming-soon entries whose exam engine does not exist yet.
 
-Four gates decide whether a bank ships —
+Five gates decide whether a bank ships —
 [bank-weights.sh](../tests/bank-weights.sh),
 [check-lint.sh](../tests/check-lint.sh),
 [check-lib.sh](../tests/check-lib.sh) and
-[bank-hints.sh](../tests/bank-hints.sh). All are offline and run at the top
-of [tests/smoke.sh](../tests/smoke.sh), so a bank mistake fails in seconds
-rather than forty minutes into a cold boot.
+[bank-hints.sh](../tests/bank-hints.sh) for hands-on banks, and
+[bank-mcq.sh](../tests/bank-mcq.sh) for multiple-choice ones. All are
+offline and run at the top of [tests/smoke.sh](../tests/smoke.sh), so a
+bank mistake fails in seconds rather than forty minutes into a cold boot.
+
+There are two exam engines. Everything down to
+[Multiple-choice banks](#multiple-choice-banks-examtype-mcq) describes
+the hands-on shape; that section describes where mcq banks differ.
 
 ## exam.yaml
 
@@ -82,7 +87,7 @@ directory listing.
 | `metadata.name` | Bank id. Convention: the conductor rejects a mismatch with the directory name only when the field is non-empty ([catalog.go:159](../conductor/internal/catalog/catalog.go)) |
 | `metadata.title`, `.certification`, `.description` | Lobby card title, badge (`CKAD`/`CKA`/`CKS`) and one-line blurb |
 | `metadata.hidden` | Keeps the bank out of the lobby while leaving it a legal `switch` target. Exists for `smoke-01`; a bank worth shipping is worth listing |
-| `spec.examType` | Defaults to `hands-on` when absent ([catalog.go:164-166](../conductor/internal/catalog/catalog.go)); any other value lists the bank disabled |
+| `spec.examType` | `hands-on` (the default when absent, [catalog.go:164-166](../conductor/internal/catalog/catalog.go)) or `mcq`; any other value lists the bank disabled with a "no engine yet" note |
 | `spec.duration` | The Exam clock. Enforced: the facilitator ends the session at 0:00 |
 | `spec.speedDuration` | The Speed clock, defaulting to half `spec.duration` ([exam.go:105-110](../facilitator/internal/exam/exam.go)). A malformed value fails the load |
 | `spec.passingScore` | Percent. Enforced by the facilitator's `Results.Passed` |
@@ -143,8 +148,8 @@ no curriculum, stays green.
 | `validate.d/NN_name.sh` | One scoring criterion each, run in lexical order |
 | `solution.md` | Full walkthrough, shown after the exam |
 
-A question with no `validate.d/*.sh` is a hard load error
-([exam.go:147-149](../facilitator/internal/exam/exam.go)) as well as a
+A hands-on question with no `validate.d/*.sh` is a hard load error
+([exam.go](../facilitator/internal/exam/exam.go)) as well as a
 weights-gate failure.
 
 `files/` is how a question hands the candidate starting material — a Dockerfile
@@ -158,6 +163,83 @@ edits across a `./sim down && ./sim up`. A reset clears `/opt/course` first and
 seeds fresh copies; a restart does not. Do not ship anything under `files/`
 that a check reads without the candidate having modified it — that scores
 whether the copy worked, not whether they did anything.
+
+## Multiple-choice banks (examType: mcq)
+
+An mcq bank is exam.yaml plus, per question, a stem and an explanation.
+No cluster is involved anywhere: nothing to seed, nothing to ssh into,
+grading is a set comparison inside the facilitator
+([mcqgrade](../facilitator/internal/mcqgrade/mcqgrade.go)) against the
+selections the session stored. That is also why an mcq attempt starts
+before the environment finishes booting, and why the exam screen works
+on a phone.
+
+```yaml
+spec:
+  examType: mcq
+  duration: 90m
+  speedDuration: 45m
+  passingScore: 75
+  domainWeights:
+    Kubernetes Fundamentals: 44
+    Container Orchestration: 28
+    Cloud Native Application Delivery: 16
+    Cloud Native Architecture: 12
+  questions:
+    - id: q01
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "The kubelet"
+        - "The kube-scheduler"
+        - "The kube-apiserver"
+        - "etcd"
+      correct: [2]
+```
+
+Differences from the hands-on shape:
+
+- **No `spec.instances`.** Declaring any marks the bank unavailable
+  ([catalog.go](../conductor/internal/catalog/catalog.go)) — nothing
+  would ever ssh to them.
+- **Question keys are `id / domain / (weight) / multi / options /
+  correct`**, in that order, one per line —
+  [bank-mcq.sh](../tests/bank-mcq.sh) parses the block with a regex kept
+  honest by the same directory cross-check bank-weights.sh uses.
+- **`weight` is optional and defaults to 1**, matching the real exam's
+  uniform scoring. Domain balance is then question-count share.
+- **`options`** is 3-6 single-line quoted strings (inline markdown such
+  as backticks is fine; block scalars are rejected by the gate).
+- **`correct`** holds sorted 0-based indices into `options`. A
+  `multi: false` question has exactly one; a `multi: true` question has
+  at least two and never all of them. The key stays server-side: it is
+  never served with the question, only inside graded results.
+- **Scoring is all-or-nothing per question**: the selected set must
+  equal the correct set. A `multi: true` stem should end with
+  "Choose all that apply." so the candidate knows the rules.
+- **The question directory holds `question.md` and `solution.md`
+  only** — no `setup.sh`, `validate.d/` or `files/` (the gate enforces
+  their absence). `question.md` is the stem alone; the options render
+  from exam.yaml, so never enumerate them in the stem. `solution.md` is
+  the explanation shown in review: why the correct answer is correct,
+  then a "Why the others are wrong" bullet per distractor, bolding each
+  option's text verbatim. `hints.md` works as for hands-on banks and is
+  optional.
+- **`./sim grade` refuses mcq banks** — the answers live in the
+  session, not the cluster. Grade through the UI or the API.
+
+[bank-mcq.sh](../tests/bank-mcq.sh) asserts, per mcq bank: the id set
+matches the directories on disk; every stem and explanation exists (the
+explanation with a length floor); option and correct-index arity as
+above; mcq purity; `domainWeights` sums to 100 with bidirectional
+domain coverage; each domain's share within 2 percentage points of its
+target; and that no single option position is correct on more than half
+of the single-answer questions — a degenerate key reads like a pattern.
+
+One trade-off to know when editing a shipped bank: answers are stored
+by option index, so reordering or editing `options` mid-attempt
+silently changes what a stored selection means. Reset the session after
+editing an mcq bank's options.
 
 ## Code blocks in question.md and solution.md
 
