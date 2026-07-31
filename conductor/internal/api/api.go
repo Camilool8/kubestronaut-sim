@@ -101,6 +101,8 @@ func writeOpError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "a re-seed is already running")
 	case errors.Is(err, control.ErrNotTraining):
 		writeError(w, http.StatusForbidden, err.Error())
+	case errors.Is(err, control.ErrNoReseed):
+		writeError(w, http.StatusBadRequest, err.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, err.Error())
 	}

@@ -39,7 +39,14 @@ chmod 600 /root/.ssh/authorized_keys /home/candidate/.ssh/authorized_keys
 # EVERY question, not just this instance's: a bank is free to move a
 # question between instances, and copying a few kilobytes twice is
 # cheaper than a question whose material silently isn't there.
+# An mcq bank has no per-question working directories — skipping the
+# loop avoids creating dozens of empty /opt/course/<n> dirs for
+# questions that are answered in the browser.
+exam_type="hands-on"
 if [ -n "${BANK:-}" ] && [ -f "/banks/${BANK}/exam.yaml" ]; then
+  exam_type=$(yq -r '.spec.examType // "hands-on"' "/banks/${BANK}/exam.yaml")
+fi
+if [ "$exam_type" != "mcq" ] && [ -n "${BANK:-}" ] && [ -f "/banks/${BANK}/exam.yaml" ]; then
   for qid in $(yq -r '.spec.questions[].id' "/banks/${BANK}/exam.yaml"); do
     digits=$(printf '%s' "$qid" | tr -dc '0-9')
     [ -n "$digits" ] || continue

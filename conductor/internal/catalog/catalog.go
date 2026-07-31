@@ -189,24 +189,35 @@ func buildEntry(id string, raw []byte) (Entry, error) {
 		entry.Note = "bank id is not a valid slug"
 		return entry, nil
 	}
-	if examType != "hands-on" {
+	switch examType {
+	case "hands-on":
+		if len(doc.Spec.Instances) == 0 || len(doc.Spec.Instances) > len(allowedInstances) {
+			entry.Available = false
+			entry.Note = "bank must declare 1-2 instances"
+			return entry, nil
+		}
+		for _, inst := range doc.Spec.Instances {
+			if !allowedInstances[inst.Name] {
+				entry.Available = false
+				entry.Note = fmt.Sprintf("instance %q is outside the fixed instance-1/instance-2 topology", inst.Name)
+				return entry, nil
+			}
+		}
+	case "mcq":
+		// An mcq bank grades in the facilitator, not over ssh; declaring
+		// instances is an authoring mistake, not something to silently
+		// ignore.
+		if len(doc.Spec.Instances) > 0 {
+			entry.Available = false
+			entry.Note = "mcq banks declare no instances"
+			return entry, nil
+		}
+	default:
 		entry.Available = false
 		if entry.Note == "" {
 			entry.Note = fmt.Sprintf("exam type %q has no engine yet", examType)
 		}
 		return entry, nil
-	}
-	if len(doc.Spec.Instances) == 0 || len(doc.Spec.Instances) > len(allowedInstances) {
-		entry.Available = false
-		entry.Note = "bank must declare 1-2 instances"
-		return entry, nil
-	}
-	for _, inst := range doc.Spec.Instances {
-		if !allowedInstances[inst.Name] {
-			entry.Available = false
-			entry.Note = fmt.Sprintf("instance %q is outside the fixed instance-1/instance-2 topology", inst.Name)
-			return entry, nil
-		}
 	}
 	return entry, nil
 }

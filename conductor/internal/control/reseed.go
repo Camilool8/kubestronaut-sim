@@ -27,6 +27,10 @@ var ErrUnknownQuestion = errors.New("control: unknown question")
 // thing to offer while practising and a hostile one during an exam.
 var ErrNotTraining = errors.New("control: re-seeding is available in Training mode only")
 
+// ErrNoReseed rejects a re-seed against an mcq bank: there is no
+// setup.sh and no cluster state to restore. Mapped to 400.
+var ErrNoReseed = errors.New("control: nothing to reseed in a multiple-choice bank")
+
 // questionIDPattern is the only shape a question id may take. It is the
 // first of two gates — HasQuestion is the second — because this value
 // arrives from the browser and ends up inside a shell command.
@@ -72,6 +76,11 @@ func (c *Controller) Reseed(ctx context.Context, qid string) error {
 	// it is real.
 	if c.Catalog == nil || !c.Catalog.HasQuestion(bank, qid) {
 		return fmt.Errorf("%w: %q is not in bank %q", ErrUnknownQuestion, qid, bank)
+	}
+	// Checked before anything shells out: an mcq bank has no setup.sh,
+	// so the exec below would only ever produce a confusing bash error.
+	if entry, ok := c.Catalog.Get(bank); ok && entry.ExamType == "mcq" {
+		return ErrNoReseed
 	}
 
 	// Defers to jobs rather than competing with them: a reset is
