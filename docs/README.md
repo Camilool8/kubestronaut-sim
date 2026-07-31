@@ -16,6 +16,8 @@ pages are for changing the thing.
   non-obvious rules that will otherwise cost you an afternoon.
 - [testing.md](testing.md) — what to run before pushing, what CI
   enforces, and what CI structurally cannot.
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — symptoms and fixes, from
+  the preflight through boot, an attempt, and grading.
 
 ## Looking something up
 
@@ -27,7 +29,9 @@ pages are for changing the thing.
 
 ## Project state
 
-- [follow-ups.md](follow-ups.md) — the open backlog.
+- [follow-ups.md](follow-ups.md) — deliberate divergences from the real
+  exam, accepted trade-offs, and constraints that read like gaps. The
+  open backlog is in GitHub issues.
 - [../PRODUCT.md](../PRODUCT.md) — scope, durable constraints, and what
   is deliberately not built.
 - [../DESIGN.md](../DESIGN.md) — the UI design system.
