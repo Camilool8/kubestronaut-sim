@@ -31,6 +31,10 @@ bash tests/bank-weights.sh || fail "bank weights are out of balance"
 bash tests/check-lint.sh || fail "validate.d checks have brittle idioms"
 bash tests/check-lib.sh || fail "banks/_lib/checks.sh helpers are broken"
 bash tests/bank-hints.sh || fail "hints are malformed, or are just the solution"
+# The mcq banks' shape gate — answer keys, explanations, purity. Same
+# slot for the same reason: a broken key would otherwise surface as a
+# wrong grade half an hour into the mcq section below.
+bash tests/bank-mcq.sh || fail "mcq banks are malformed"
 
 ./sim purge   # cold start: the fresh-grade-0 assertion needs pristine cluster state
 
@@ -536,6 +540,160 @@ api_name=$(json_field name)
 ./sim grade | tee /tmp/grade-back.txt
 read -r _ be0 _ _ < <(grep '^RESULT ' /tmp/grade-back.txt)
 [ "$be0" = "0" ] || fail "ckad after switch-back should score 0, got ${be0}"
+
+echo "== mcq: kcna-mock — switch, blank/partial/full grades, answer gates =="
+# No cluster wait anywhere in this section: an mcq bank needs no
+# seeding, so the switch is quick, and session start deliberately skips
+# the boot gate — an attempt starts even while the cluster is mid-boot.
+curl -fsS -X POST -H 'Content-Type: application/json' -d '{"bank":"kcna-mock"}' \
+  http://localhost:8080/api/control/switch >/dev/null || fail "mcq: switch to kcna-mock not accepted"
+wait_control
+
+status=$(req GET /api/exam)
+[ "$status" = "200" ] || fail "mcq: /api/exam expected 200, got $status"
+[ "$(json_field name)" = "kcna-mock" ] || fail "mcq: active exam should be kcna-mock, got '$(json_field name)'"
+[ "$(json_field examType)" = "mcq" ] || fail "mcq: examType should be mcq, got '$(json_field examType)'"
+qcount=$(RESP="$RESP" python3 -c '
+import json, os
+with open(os.environ["RESP"]) as f:
+    data = json.load(f)
+print(len(data.get("questions", [])))
+')
+[ "$qcount" = "60" ] || fail "mcq: /api/exam should list 60 questions, got ${qcount}"
+
+# The answer key is derived from the bank at run time on purpose: a
+# checked-in copy would drift the first time a question was edited, and
+# what this section proves is that bank and grader agree. Read through
+# the same yq the boot scripts use, so the host needs none.
+docker compose exec -T k8s-env yq -o=json '.spec.questions' /banks/kcna-mock/exam.yaml \
+  | tr -d '\r' > /tmp/smoke-mcq-key.json \
+  || fail "mcq: could not read the kcna-mock question list from k8s-env"
+
+# wait_mcq_results polls until grading lands. MCQ grading is in-process
+# — no cluster checks — so this converges in seconds.
+wait_mcq_results() {
+  local budget=60 interval=2 elapsed=0 rstatus=""
+  while [ "$elapsed" -lt "$budget" ]; do
+    rstatus=$(req GET /api/results)
+    [ "$rstatus" = "200" ] && return 0
+    sleep "$interval"; elapsed=$((elapsed + interval))
+  done
+  fail "mcq: /api/results did not reach 200 within ${budget}s (last status ${rstatus})"
+  return 1
+}
+
+# Blank honesty: an attempt that answers nothing must grade 0 and not
+# pass — not error, and not score by some default.
+status=$(req POST /api/session/start)
+[ "$status" = "200" ] || fail "mcq: blank start expected 200, got $status"
+status=$(req POST /api/session/end)
+[ "$status" = "202" ] || fail "mcq: blank end expected 202, got $status"
+if wait_mcq_results; then
+  [ "$(json_field percent)" = "0" ] || fail "mcq: blank attempt percent should be 0, got '$(json_field percent)'"
+  [ "$(json_field passed)" = "False" ] || fail "mcq: blank attempt must not pass, got '$(json_field passed)'"
+fi
+status=$(req DELETE /api/session)
+[ "$status" = "204" ] || fail "mcq: blank cleanup DELETE expected 204, got $status"
+
+# All-or-nothing: a multi question answered with all-but-one of its
+# correct indices earns 0, never partial credit.
+read -r mq mcorrect < <(python3 -c '
+import json
+qs = json.load(open("/tmp/smoke-mcq-key.json"))
+q = next((q for q in qs if q.get("multi")), None)
+if q:
+    print(q["id"], ",".join(str(i) for i in q["correct"]))
+') || true
+if [ -z "${mq:-}" ]; then
+  fail "mcq: no multi-select question found in the derived key"
+else
+  status=$(req POST /api/session/start)
+  [ "$status" = "200" ] || fail "mcq: partial start expected 200, got $status"
+
+  # The gates that hold while an exam attempt runs: the question body
+  # never carries the key, and the explanation stays sealed.
+  status=$(req GET /api/questions/q01)
+  [ "$status" = "200" ] || fail "mcq: GET /api/questions/q01 expected 200, got $status"
+  grep -q '"correct"' "$RESP" && fail "mcq: GET /api/questions/q01 leaks the answer key" || true
+  status=$(req GET /api/questions/q01/solution)
+  [ "$status" = "403" ] || fail "mcq: explanation should be 403 mid-exam, got $status"
+
+  partial=${mcorrect%,*}
+  curl -s -o "$RESP" -w '%{http_code}' -X PUT -H 'Content-Type: application/json' \
+    -d "{\"selected\":[${partial}]}" "${BASE}/api/questions/${mq}/answer" > /tmp/smoke-mcq-put.txt
+  [ "$(cat /tmp/smoke-mcq-put.txt)" = "200" ] \
+    || fail "mcq: partial PUT expected 200, got $(cat /tmp/smoke-mcq-put.txt)"
+
+  status=$(req POST /api/session/end)
+  [ "$status" = "202" ] || fail "mcq: partial end expected 202, got $status"
+
+  # A write after the end must refuse, not quietly amend a graded paper.
+  curl -s -o "$RESP" -w '%{http_code}' -X PUT -H 'Content-Type: application/json' \
+    -d "{\"selected\":[${partial}]}" "${BASE}/api/questions/${mq}/answer" > /tmp/smoke-mcq-late.txt
+  [ "$(cat /tmp/smoke-mcq-late.txt)" = "409" ] \
+    || fail "mcq: a PUT after end should be 409, got $(cat /tmp/smoke-mcq-late.txt)"
+
+  if wait_mcq_results; then
+    mearned=$(RESP="$RESP" MQ="$mq" python3 -c '
+import json, os
+with open(os.environ["RESP"]) as f:
+    data = json.load(f)
+for q in data.get("questions", []):
+    if q.get("id") == os.environ["MQ"]:
+        print(q.get("earned", ""))
+')
+    [ "$mearned" = "0" ] \
+      || fail "mcq: all-or-nothing — ${mq} with a partial selection should earn 0, got '${mearned}'"
+  fi
+  status=$(req DELETE /api/session)
+  [ "$status" = "204" ] || fail "mcq: partial cleanup DELETE expected 204, got $status"
+fi
+
+# Full-marks self-consistency: answer everything from the derived key
+# and the grader must agree the bank scores 100%.
+status=$(req POST /api/session/start)
+[ "$status" = "200" ] || fail "mcq: full start expected 200, got $status"
+put_bad=0
+while IFS=$'\t' read -r qid key; do
+  [ -n "$qid" ] || continue
+  code=$(curl -s -o "$RESP" -w '%{http_code}' -X PUT -H 'Content-Type: application/json' \
+    -d "{\"selected\":${key}}" "${BASE}/api/questions/${qid}/answer")
+  [ "$code" = "200" ] || { put_bad=$((put_bad+1)); echo "  mcq: PUT ${qid} answer got ${code}"; }
+done < <(python3 -c '
+import json
+for q in json.load(open("/tmp/smoke-mcq-key.json")):
+    print(q["id"] + "\t" + json.dumps(q["correct"]))
+')
+[ "$put_bad" -eq 0 ] || fail "mcq: ${put_bad} answer PUT(s) did not return 200"
+
+# The response echoes the STORED selection: send one multi answer in
+# reverse order and expect it back sorted.
+if [ -n "${mq:-}" ]; then
+  rev=$(python3 -c "print(sorted([${mcorrect}], reverse=True))")
+  curl -s -o "$RESP" -w '%{http_code}' -X PUT -H 'Content-Type: application/json' \
+    -d "{\"selected\":${rev}}" "${BASE}/api/questions/${mq}/answer" > /tmp/smoke-mcq-echo.txt
+  [ "$(cat /tmp/smoke-mcq-echo.txt)" = "200" ] \
+    || fail "mcq: reversed PUT expected 200, got $(cat /tmp/smoke-mcq-echo.txt)"
+  want=$(python3 -c "print(sorted([${mcorrect}]))")
+  [ "$(json_field selected)" = "$want" ] \
+    || fail "mcq: PUT should echo the sorted selection ${want}, got '$(json_field selected)'"
+fi
+
+status=$(req POST /api/session/end)
+[ "$status" = "202" ] || fail "mcq: full end expected 202, got $status"
+if wait_mcq_results; then
+  [ "$(json_field percent)" = "100" ] || fail "mcq: full-key percent should be 100, got '$(json_field percent)'"
+  [ "$(json_field passed)" = "True" ] || fail "mcq: full-key attempt should pass, got '$(json_field passed)'"
+fi
+status=$(req DELETE /api/session)
+[ "$status" = "204" ] || fail "mcq: full cleanup DELETE expected 204, got $status"
+
+# Leave ckad-mock-01 active: every section below assumes it.
+curl -fsS -X POST -H 'Content-Type: application/json' -d '{"bank":"ckad-mock-01"}' \
+  http://localhost:8080/api/control/switch >/dev/null || fail "mcq: switch back to ckad-mock-01 not accepted"
+wait_control
+status=$(req GET /api/exam)
+[ "$(json_field name)" = "ckad-mock-01" ] || fail "mcq: active exam should be back to ckad-mock-01, got '$(json_field name)'"
 
 echo "== training mode: hints, solutions mid-attempt, scoring without ending =="
 # Every gate below is server-side session state, so this is the only
