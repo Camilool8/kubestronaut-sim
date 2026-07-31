@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 )
@@ -91,6 +92,13 @@ type Manager struct {
 	endReason  string
 	results    json.RawMessage
 	gradeError string
+
+	// answers holds an mcq attempt's selections, qid → sorted option
+	// indices. Never mutated in place: SetAnswer replaces the whole map,
+	// so captureLocked/restoreLocked rollback stays correct with a plain
+	// pointer copy. Always nil for a hands-on attempt — the cluster is
+	// that engine's answer sheet.
+	answers map[string][]int
 }
 
 // Snapshot is a read-only view of a session at one instant.
@@ -129,14 +137,18 @@ type persistedState struct {
 	Mode            string          `json:"mode"`
 	Results         json.RawMessage `json:"results,omitempty"`
 	GradeError      string          `json:"gradeError"`
+	// Answers is an mcq attempt's selections; absent for hands-on
+	// attempts, which store nothing per question.
+	Answers map[string][]int `json:"answers,omitempty"`
 }
 
 // persistedVersion is the on-disk format this build reads and writes.
 // Version 1 files predate bank identity and attempt tokens; version 2
-// predates attempt modes. Both are discarded on load by the existing
-// version guard, which is the whole migration: a discarded file starts
-// the session idle, and an idle session has no mode to migrate.
-const persistedVersion = 3
+// predates attempt modes; version 3 predates mcq answer storage. All are
+// discarded on load by the existing version guard, which is the whole
+// migration: a discarded file starts the session idle, and an idle
+// session has no mode or answers to migrate.
+const persistedVersion = 4
 
 // New loads the session persisted at path, or starts idle if the file is
 // missing or unreadable/corrupt (any non-missing read or parse failure is
@@ -220,6 +232,7 @@ func New(path, bank string, dur time.Duration, clock func() time.Time, onExpire 
 	m.endReason = doc.EndReason
 	m.results = doc.Results
 	m.gradeError = doc.GradeError
+	m.answers = doc.Answers
 	if doc.EndedAt != nil {
 		m.endedAt = *doc.EndedAt
 	}
@@ -278,6 +291,7 @@ func (m *Manager) Start(mode string, dur time.Duration) (Snapshot, error) {
 	m.endReason = ""
 	m.results = nil
 	m.gradeError = ""
+	m.answers = nil
 
 	if err := m.persistLocked(); err != nil {
 		m.restoreLocked(prev)
@@ -355,6 +369,7 @@ func (m *Manager) Reset() error {
 	m.endReason = ""
 	m.results = nil
 	m.gradeError = ""
+	m.answers = nil
 
 	if err := m.persistLocked(); err != nil {
 		m.restoreLocked(prev)
@@ -446,6 +461,64 @@ func (m *Manager) checkGradeWriteLocked(token string) error {
 	return nil
 }
 
+// SetAnswer records the candidate's selection for one mcq question:
+// selected option indices, stored sorted. An empty (or nil) selection
+// deletes the entry — that is what deselecting every option means. It
+// returns ErrConflict unless the session is running: answers exist only
+// inside a live attempt. On a persist failure nothing changes.
+//
+// The map is replaced, not mutated, so the capture/restore rollback and
+// any snapshot a caller holds stay consistent.
+func (m *Manager) SetAnswer(qid string, selected []int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.state != stateRunning {
+		return fmt.Errorf("session: set answer: %w", ErrConflict)
+	}
+
+	prev := m.captureLocked()
+
+	next := make(map[string][]int, len(m.answers)+1)
+	for k, v := range m.answers {
+		next[k] = v
+	}
+	if len(selected) == 0 {
+		delete(next, qid)
+	} else {
+		sel := make([]int, len(selected))
+		copy(sel, selected)
+		sort.Ints(sel)
+		next[qid] = sel
+	}
+	if len(next) == 0 {
+		next = nil
+	}
+	m.answers = next
+
+	if err := m.persistLocked(); err != nil {
+		m.restoreLocked(prev)
+		return fmt.Errorf("session: set answer: %w", err)
+	}
+	return nil
+}
+
+// Answers returns a deep copy of the current attempt's selections, empty
+// (never nil) when there are none. It is readable in any state: the
+// grader reads it after End, and the review UI after grading.
+func (m *Manager) Answers() map[string][]int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	out := make(map[string][]int, len(m.answers))
+	for k, v := range m.answers {
+		sel := make([]int, len(v))
+		copy(sel, v)
+		out[k] = sel
+	}
+	return out
+}
+
 // Results returns the current results, gradeError, and whether grading
 // has reached a terminal outcome (results were set, or grading failed and
 // gradeError was set) — the third value distinguishes "still grading"
@@ -477,6 +550,9 @@ type mutableFields struct {
 	endReason  string
 	results    json.RawMessage
 	gradeError string
+	// The map pointer is enough: answers maps are replaced wholesale,
+	// never mutated in place (see the field's comment on Manager).
+	answers map[string][]int
 }
 
 // captureLocked snapshots the fields a transition may need to roll back.
@@ -492,6 +568,7 @@ func (m *Manager) captureLocked() mutableFields {
 		endReason:  m.endReason,
 		results:    m.results,
 		gradeError: m.gradeError,
+		answers:    m.answers,
 	}
 }
 
@@ -507,6 +584,7 @@ func (m *Manager) restoreLocked(f mutableFields) {
 	m.endReason = f.endReason
 	m.results = f.results
 	m.gradeError = f.gradeError
+	m.answers = f.answers
 }
 
 // untimedLocked reports whether the current attempt has no deadline.
@@ -651,6 +729,7 @@ func (m *Manager) persistLocked() error {
 		Mode:            m.mode,
 		Results:         m.results,
 		GradeError:      m.gradeError,
+		Answers:         m.answers,
 	}
 	if !m.endedAt.IsZero() {
 		endedAt := m.endedAt
