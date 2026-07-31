@@ -20,11 +20,22 @@ import (
 	"time"
 )
 
+// The two exam types a bank may declare in spec.examType. An empty value
+// normalizes to TypeHandsOn: v1alpha1 banks predate the field.
+const (
+	TypeHandsOn = "hands-on"
+	TypeMCQ     = "mcq"
+)
+
 // Exam is a fully loaded exam: its metadata plus every question and the
 // checks that grade it.
 type Exam struct {
 	Name              string
 	Title             string
+	// Type is spec.examType, normalized: TypeHandsOn or TypeMCQ. Any
+	// other value is a load error — the conductor should never have made
+	// such a bank active, and the facilitator must not guess.
+	Type              string
 	Duration          time.Duration // parsed from spec.duration, e.g. "120m"
 	// SpeedDuration is the compressed clock for a speed attempt. A bank
 	// may set spec.speedDuration; otherwise it is half Duration, which is
@@ -36,18 +47,25 @@ type Exam struct {
 }
 
 // Question is a single exam question: its identity plus the checks that
-// grade a candidate's solution to it.
+// grade a candidate's solution to it (hands-on), or its options and
+// answer key (mcq).
 type Question struct {
 	ID       string
-	Instance string
+	Instance string // hands-on only
 	Domain   string
 	Weight   int
-	Checks   []Check // in lexical order of validate.d/*.sh
+	Checks   []Check // in lexical order of validate.d/*.sh; hands-on only
 	// HintCount is how many tiers <qid>/hints.md declares. Only the count
 	// is loaded at boot; the text is read per request, exactly as
 	// question.md and solution.md already are — so editing a hint needs
 	// no restart, and a bank with no hints is not an error.
 	HintCount int
+
+	// MCQ only. Correct holds strictly increasing indices into Options
+	// and is never serialized to the client before grading.
+	Options []string
+	Correct []int
+	Multi   bool // true = "select all that apply"
 }
 
 // Check is one scoring criterion for a question, backed by a single
@@ -67,15 +85,19 @@ type examDoc struct {
 		Title string `json:"title"`
 	} `json:"metadata"`
 	Spec struct {
+		ExamType          string `json:"examType"`
 		Duration          string `json:"duration"`
 		SpeedDuration     string `json:"speedDuration"`
 		PassingScore      int    `json:"passingScore"`
 		KubernetesVersion string `json:"kubernetesVersion"`
 		Questions         []struct {
-			ID       string `json:"id"`
-			Instance string `json:"instance"`
-			Domain   string `json:"domain"`
-			Weight   int    `json:"weight"`
+			ID       string   `json:"id"`
+			Instance string   `json:"instance"`
+			Domain   string   `json:"domain"`
+			Weight   int      `json:"weight"`
+			Options  []string `json:"options"`
+			Correct  []int    `json:"correct"`
+			Multi    bool     `json:"multi"`
 		} `json:"questions"`
 	} `json:"spec"`
 }
@@ -109,9 +131,18 @@ func Load(examJSONPath, bankDir string) (*Exam, error) {
 		}
 	}
 
+	examType := doc.Spec.ExamType
+	if examType == "" {
+		examType = TypeHandsOn
+	}
+	if examType != TypeHandsOn && examType != TypeMCQ {
+		return nil, fmt.Errorf("exam: unknown spec.examType %q", examType)
+	}
+
 	e := &Exam{
 		Name:              doc.Metadata.Name,
 		Title:             doc.Metadata.Title,
+		Type:              examType,
 		Duration:          dur,
 		SpeedDuration:     speed,
 		PassingScore:      doc.Spec.PassingScore,
@@ -119,21 +150,67 @@ func Load(examJSONPath, bankDir string) (*Exam, error) {
 	}
 
 	for _, q := range doc.Spec.Questions {
-		checks, err := loadChecks(bankDir, q.ID)
-		if err != nil {
-			return nil, err
-		}
-		e.Questions = append(e.Questions, Question{
+		question := Question{
 			ID:        q.ID,
 			Instance:  q.Instance,
 			Domain:    q.Domain,
 			Weight:    q.Weight,
-			Checks:    checks,
 			HintCount: countHints(bankDir, q.ID),
-		})
+		}
+		switch examType {
+		case TypeMCQ:
+			if err := validateMCQ(q.ID, q.Options, q.Correct, q.Multi); err != nil {
+				return nil, err
+			}
+			question.Options = q.Options
+			question.Correct = q.Correct
+			question.Multi = q.Multi
+			// The real exam scores uniformly; weight stays optional.
+			if question.Weight == 0 {
+				question.Weight = 1
+			}
+		default:
+			checks, err := loadChecks(bankDir, q.ID)
+			if err != nil {
+				return nil, err
+			}
+			question.Checks = checks
+		}
+		e.Questions = append(e.Questions, question)
 	}
 
 	return e, nil
+}
+
+// validateMCQ enforces the answer-key shape documented in
+// docs/bank-spec.md: 3-6 options; correct indices strictly increasing and
+// in range; a single-answer question has exactly one, a multi-select at
+// least two and fewer than all.
+func validateMCQ(qid string, options []string, correct []int, multi bool) error {
+	if len(options) < 3 || len(options) > 6 {
+		return fmt.Errorf("exam: question %s must declare 3-6 options, has %d", qid, len(options))
+	}
+	if len(correct) == 0 {
+		return fmt.Errorf("exam: question %s declares no correct indices", qid)
+	}
+	for i, c := range correct {
+		if c < 0 || c >= len(options) {
+			return fmt.Errorf("exam: question %s correct index %d is out of range for %d options", qid, c, len(options))
+		}
+		if i > 0 && c <= correct[i-1] {
+			return fmt.Errorf("exam: question %s correct indices must be strictly increasing, got %v", qid, correct)
+		}
+	}
+	if !multi && len(correct) != 1 {
+		return fmt.Errorf("exam: single-answer question %s must declare exactly one correct index, has %d", qid, len(correct))
+	}
+	if multi && len(correct) < 2 {
+		return fmt.Errorf("exam: multi-select question %s must declare at least two correct indices, has %d", qid, len(correct))
+	}
+	if multi && len(correct) >= len(options) {
+		return fmt.Errorf("exam: multi-select question %s must declare fewer than all options as correct", qid)
+	}
+	return nil
 }
 
 // loadChecks reads bankDir/qid/validate.d/*.sh in lexical filename order
