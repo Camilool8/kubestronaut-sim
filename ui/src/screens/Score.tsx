@@ -156,8 +156,8 @@ export function Score({ onNewAttempt, endReason, mode }: ScoreProps) {
       <DomainBreakdown questions={results.questions} />
 
       <div className="score-questions">
-        {results.questions.map((q) => (
-          <QuestionResultDetails key={q.id} question={q} />
+        {results.questions.map((q, i) => (
+          <QuestionResultDetails key={q.id} question={q} index={i} />
         ))}
       </div>
 
@@ -207,7 +207,7 @@ function Grading({ startedAt, pollError }: { startedAt: number; pollError: strin
   );
 }
 
-function QuestionResultDetails({ question }: { question: QuestionResult }) {
+function QuestionResultDetails({ question, index }: { question: QuestionResult; index: number }) {
   const [solution, setSolution] = useState<SolutionDetail | null>(null);
   const [solutionError, setSolutionError] = useState<string | null>(null);
   const [loadingSolution, setLoadingSolution] = useState(false);
@@ -233,12 +233,20 @@ function QuestionResultDetails({ question }: { question: QuestionResult }) {
   // presence is the branch — no examType prop needed, the results
   // themselves say which engine graded them.
   const isMcq = question.options !== undefined;
+  // results.questions is in the same order the candidate answered them
+  // in (mcqgrade.Grade iterates the session's drawn subset, in draw
+  // order), so index+1 is the exact Q-number the exam screen showed —
+  // the bank id (question.id) is meaningless here for the same reason
+  // it was during the attempt: an artifact of the pool a random draw
+  // sampled from, not something the candidate ever saw as "the id".
+  // Hands-on ids are the real ssh-able question directories, unaffected.
+  const label = isMcq ? strings.mcq.questionNumber(index + 1) : question.id;
 
   return (
     <details className="question-result">
       <summary>
         <Icon name="chevron-down" className="disclosure-chevron" />
-        <span className="qr-id">{question.id}</span>
+        <span className="qr-id">{label}</span>
         <span className="qr-domain">{question.domain}</span>
         <span className="qr-points">
           {question.earned}/{question.total}
