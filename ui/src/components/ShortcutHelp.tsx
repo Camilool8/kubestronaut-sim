@@ -7,20 +7,6 @@ interface ShortcutHelpProps {
   onClose: () => void;
 }
 
-// The page's own shortcuts. Hardcoded rather than derived because they
-// live in three different components (QuestionPanel, PanelResizer,
-// useFocusTrap) and there is no registry to read them from — if one
-// moves, this table has to move with it.
-const BROWSER_SHORTCUTS: ReadonlyArray<[string, string]> = [
-  ["[  /  ]", "Previous / next question"],
-  ["?", "This list"],
-  ["Esc", "Close a panel or dialog"],
-  ["← / →", "Resize the question panel (when the divider has focus)"],
-  ["Shift + ← / →", "Resize in bigger steps"],
-  ["Home / End", "Narrowest / widest panel"],
-  ["Enter or Space", "Collapse or expand the panel"],
-];
-
 /**
  * The shortcut reference, as a modal — unlike the keyboard settings
  * popover. This one is a table you read and dismiss, not a control you
@@ -39,7 +25,7 @@ export function ShortcutHelp({ onClose }: ShortcutHelpProps) {
       <h3 className="shortcut-group">{strings.keyboard.helpBrowser}</h3>
       <table className="shortcut-table">
         <tbody>
-          {BROWSER_SHORTCUTS.map(([keys, does]) => (
+          {strings.keyboard.browserShortcuts.map(([keys, does]) => (
             <tr key={keys}>
               <td>
                 <kbd>{keys}</kbd>

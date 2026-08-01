@@ -29,7 +29,7 @@ export const strings = {
     // The mcq counterpart of `tips`: no ssh, no desktop, no working
     // directories — none of those exist for a multiple-choice bank.
     tipsMcq: [
-      "Answer in the question panel — pick an option and it saves immediately.",
+      "Answer in the question panel: pick an option and it saves immediately.",
       "Multi-select questions score all-or-nothing: every correct option, nothing else.",
       "You can change any answer until you submit or time runs out.",
       "The timer starts the moment you click Start and cannot be paused.",
@@ -38,13 +38,17 @@ export const strings = {
     // fail while the other renders. Say which one, and that the button
     // below is the thing that will not work.
     examFailed: (detail: string) =>
-      `Couldn't load this exam's summary (${detail}). The facilitator may still be starting — check it with \`docker compose ps facilitator\`.`,
+      `Couldn't load this exam's summary (${detail}). The facilitator may still be starting; check it with \`docker compose ps facilitator\`.`,
     modeLegend: "How do you want to run this?",
-    startExam: "Start Exam",
+    // The button names what the chosen mode starts. "Start Exam" over a
+    // selected Training row promised the wrong thing at the exact moment
+    // of commitment (#22).
+    start: (mode: string) =>
+      mode === "training" ? "Start Training" : mode === "speed" ? "Start Speed Run" : "Start Exam",
     starting: "Starting…",
     catalogErrorTitle: "Couldn't load the exam catalog",
     catalogErrorBody: (detail: string) =>
-      `The control plane did not answer (${detail}). Your current exam below still works — the list of other exams needs the conductor container.`,
+      `The control plane did not answer (${detail}). Your current exam below still works. The list of other exams needs the conductor container.`,
     catalogRetry: "Retry",
   },
 
@@ -55,22 +59,28 @@ export const strings = {
     // exactly like an exam with no questions. Say which part broke, and
     // that the parts the clock depends on did not.
     questionsFailed: (detail: string) =>
-      `Couldn't load the question list (${detail}). The timer and the exam desktop are unaffected — the questions are served by the facilitator, so check it is up with \`docker compose ps facilitator\`.`,
-    endExam: "End Exam",
+      `Couldn't load the question list (${detail}). The timer and the exam desktop are unaffected. The questions are served by the facilitator, so check it is up with \`docker compose ps facilitator\`.`,
+    // Mode-aware: Training's end control must not wear exam urgency.
+    // Ending is equally final in both modes (one attempt record), but
+    // what ends is different — an exam, or a practice session (#22).
+    endAttempt: (mode: string) => (mode === "training" ? "End Training" : "End Exam"),
     ending: "Ending…",
     // Submitting is the one control that must never fail silently: the
     // server-side clock keeps running whatever the button looks like.
     endFailed: (detail: string) =>
-      `Couldn't submit the exam (${detail}). The session is still running — try again, or submit from a desktop.`,
-    confirmTitle: "End the exam?",
+      `Couldn't submit the exam (${detail}). The session is still running; try again, or submit from a desktop.`,
+    confirmTitle: (mode: string) =>
+      mode === "training" ? "End this training session?" : "End the exam?",
     reviewMarked: (n: number) =>
       n === 1 ? "1 question is marked for review:" : `${n} questions are marked for review:`,
     // "Never opened" rather than "unanswered": the UI knows it rendered
     // the text, not whether the work was done.
     reviewUnseen: (n: number) =>
       n === 1 ? "1 question was never opened:" : `${n} questions were never opened:`,
-    confirmBody:
-      "This cannot be undone. The desktop will lock immediately and grading will begin.",
+    confirmBody: (mode: string) =>
+      mode === "training"
+        ? "This ends the session for good; the desktop locks and your work is scored. A training score is feedback on where you stand, not an exam result."
+        : "This cannot be undone. The desktop will lock immediately and grading will begin.",
     cancel: "Cancel",
     desktopTitle: "Exam desktop",
     resizePanel: "Resize the question panel",
@@ -93,7 +103,7 @@ export const strings = {
     // The clock keeps running through this, so the copy has to say the
     // session is unharmed rather than leave the candidate wondering.
     loadFailed: (detail: string) =>
-      `Couldn't load this question (${detail}). The exam is still running — the desktop and the timer are unaffected.`,
+      `Couldn't load this question (${detail}). The exam is still running; the desktop and the timer are unaffected.`,
     retry: "Retry",
     prev: "Previous question",
     next: "Next question",
@@ -113,7 +123,7 @@ export const strings = {
     // Still takes the chord rather than hardcoding it, so there is one
     // place to change if the binding ever moves — but it is now the same
     // chord for every candidate on every platform.
-    copiedToDesktop: (value: string, chord: string) => `Copied ${value} — paste with ${chord}`,
+    copiedToDesktop: (value: string, chord: string) => `Copied ${value}. Paste with ${chord}`,
     copied: (value: string) => `Copied ${value}`,
     copyFailed: "Could not copy that value.",
   },
@@ -122,7 +132,7 @@ export const strings = {
     plainLanguage: "text",
     copyBlock: "Copy",
     copyBlockLabel: (language: string) => `Copy ${language} code block`,
-    copiedBlockToDesktop: (chord: string) => `Copied to the exam desktop — paste with ${chord}.`,
+    copiedBlockToDesktop: (chord: string) => `Copied to the exam desktop. Paste with ${chord}.`,
     copiedBlock: "Copied to the clipboard.",
     copyFailed: "Couldn't copy that.",
   },
@@ -149,7 +159,7 @@ export const strings = {
     legend: [
       {
         title: "Questions",
-        body: "Step through with ‹ and ›, or the [ and ] keys. Click the question number to see all of them at once and jump anywhere. The chip below names the instance to ssh into. Click any value in the text — a name, a label, an image tag, a path — to copy it, then paste in the desktop terminal.",
+        body: "Step through with ‹ and ›, or the [ and ] keys. Click the question number to see all of them at once and jump anywhere. The chip below names the instance to ssh into. Click any value in the text (a name, a label, an image tag, a path) to copy it, then paste in the desktop terminal.",
       },
       {
         title: "Exam desktop",
@@ -183,7 +193,7 @@ export const strings = {
       ["Proctoring", "None. No webcam, no ID checks, no lockdown browser", "PSI remote proctoring"],
       [
         "Question pool",
-        "One fixed set per exam — you will see the same questions again",
+        "One fixed set per exam; you will see the same questions again",
         "Drawn from a much larger pool",
       ],
       ["Retakes", "Reset and retry as often as you like", "Limited, paid retakes"],
@@ -217,7 +227,7 @@ export const strings = {
     // is the only question the candidate actually has.
     reconnecting: (attempt: number) =>
       attempt > 1
-        ? `Desktop connection lost. Reconnecting — attempt ${attempt}.`
+        ? `Desktop connection lost. Reconnecting, attempt ${attempt}.`
         : "Desktop connection lost. Reconnecting…",
     skip: "Skip past the exam desktop (it captures Tab while focused)",
   },
@@ -230,7 +240,7 @@ export const strings = {
     questions: (n: number) => `${n} questions`,
     switchConfirmTitle: (title: string) => `Switch to ${title}?`,
     switchConfirmBody:
-      "This wipes all cluster and instance state and rebuilds from scratch. It usually takes about 2–4 minutes.",
+      "This wipes all cluster and instance state and rebuilds from scratch. It usually takes about 2-4 minutes.",
     switchConfirm: "Switch exam",
     cancel: "Cancel",
   },
@@ -238,7 +248,7 @@ export const strings = {
   modes: {
     exam: {
       label: "Exam",
-      blurb: (mins: number) => `${mins} minutes. No hints, no solutions — the real thing.`,
+      blurb: (mins: number) => `${mins} minutes. No hints, no solutions: the real thing.`,
     },
     training: {
       label: "Training",
@@ -250,7 +260,7 @@ export const strings = {
     },
     speed: {
       label: "Speed",
-      blurb: (mins: number) => `${mins} minutes — half the usual. No hints. For pacing practice.`,
+      blurb: (mins: number) => `${mins} minutes, half the usual. No hints. For pacing practice.`,
     },
   },
 
@@ -295,10 +305,10 @@ export const strings = {
     // The save failed and the selection on screen is NOT what the server
     // has. Louder than a generic toast: an unsaved answer scores zero.
     saveFailed: (detail: string) =>
-      `Couldn't save that answer (${detail}) — it is not recorded. Pick it again to retry.`,
+      `Couldn't save that answer (${detail}). It is not recorded; pick it again to retry.`,
     // The attempt ended (timer, or a submit elsewhere) between the click
     // and the save; the screen is about to flip to the score on its own.
-    saveConflict: "The attempt has ended — that last change wasn't recorded.",
+    saveConflict: "The attempt has ended; that last change wasn't recorded.",
     answered: "answered",
     unanswered: "unanswered",
     // Submit dialog: unlike the hands-on screen, here the UI genuinely
@@ -306,7 +316,10 @@ export const strings = {
     reviewUnanswered: (n: number) =>
       n === 1 ? "1 question is unanswered:" : `${n} questions are unanswered:`,
     allAnswered: "Every question has an answer.",
-    confirmBody: "This cannot be undone. Your answers are already saved; grading begins immediately.",
+    confirmBody: (mode: string) =>
+      mode === "training"
+        ? "This ends the session for good; your answers are already saved. A training score is feedback on where you stand, not an exam result."
+        : "This cannot be undone. Your answers are already saved; grading begins immediately.",
     // Training-mode per-question reveal. Same 403-backed gate as the
     // hands-on solution link, same wording family.
     checkAnswer: "Check answer",
@@ -316,9 +329,14 @@ export const strings = {
     correctAnswer: "Correct answer",
     notAnswered: "Not answered",
     explanation: "Explanation",
-    optionCorrectSelected: "correct — you selected it",
-    optionCorrectMissed: "correct — you did not select it",
-    optionWrongSelected: "your selection — incorrect",
+    optionCorrectSelected: "correct, and you selected it",
+    optionCorrectMissed: "correct, and you did not select it",
+    optionWrongSelected: "your selection, incorrect",
+    // The footer's running tally. Deliberately "completed", not a
+    // position — the position badge lives in the header, and two
+    // different numbers both claiming to locate the candidate was the
+    // confusion this footer used to cause.
+    answeredCount: (n: number, total: number) => `${n} / ${total} completed`,
   },
 
   practice: {
@@ -327,9 +345,13 @@ export const strings = {
     title: "Your work so far",
     // Said out loud because a mid-attempt score is the one number a
     // candidate is most likely to over-read.
-    note: "Not recorded, and not your final score — this is where you stand right now.",
+    note: "Not recorded, and not your final score. This is where you stand right now.",
     close: "Close",
     failed: (detail: string) => `Couldn't score right now (${detail}).`,
+    // One line per question. The label is the id on a hands-on exam and
+    // the attempt position (Q3) on an mcq one, matching what the rest of
+    // each screen calls the question.
+    questionScore: (label: string, earned: number, total: number) => `${label}: ${earned}/${total}`,
   },
 
   clipboard: {
@@ -373,7 +395,34 @@ export const strings = {
     colPress: "Press",
     colSends: "Sends",
     colDoes: "Does",
-    noneMac: "No shortcuts are being translated — this is not a Mac, or translation is switched off.",
+    noneMac: "No shortcuts are being translated. This is not a Mac, or translation is switched off.",
+    // The page's own shortcuts. Kept as copy rather than derived because
+    // the handlers live in three different components (QuestionPanel,
+    // PanelResizer, useFocusTrap) and there is no registry to read them
+    // from — if one moves, this table has to move with it.
+    browserShortcuts: [
+      ["[  /  ]", "Previous / next question"],
+      ["?", "This list"],
+      ["Esc", "Close a panel or dialog"],
+      ["← / →", "Resize the question panel (when the divider has focus)"],
+      ["Shift + ← / →", "Resize in bigger steps"],
+      ["Home / End", "Narrowest / widest panel"],
+    ],
+  },
+  // What each translated Mac chord does on the exam desktop. Owned here,
+  // read by lib/desktopKeymap.ts beside the chords themselves, rendered
+  // by the shortcut-help table.
+  keymap: {
+    copy: "Copy",
+    paste: "Paste",
+    clearScreen: "Clear the screen",
+    startOfLine: "Start of line",
+    endOfLine: "End of line",
+    backWord: "Back one word",
+    forwardWord: "Forward one word",
+    deleteToStartOfLine: "Delete to start of line",
+    newTerminalTab: "New terminal tab",
+    closeTerminalTab: "Close terminal tab",
   },
   boot: {
     title: "Building your exam environment",
@@ -388,11 +437,25 @@ export const strings = {
     // Names the one command that shows the whole story. A candidate who
     // hits this needs the log, not reassurance.
     failedHint:
-      "Nothing was lost — no attempt had started. `docker compose logs k8s-env` has the full output.",
+      "Nothing was lost: no attempt had started. `docker compose logs k8s-env` has the full output.",
     retry: "Try building again",
     // Shown when the browser can reach nothing at all, which during a
     // cold boot most likely means the container is still coming up.
     unreachable: "Waiting for the exam services to start…",
+    // The phase checklist's labels, mirroring the `phase` calls in
+    // images/k8s-env/{start,bootstrap}.sh. The ids stay in
+    // BootProgress.tsx (they are protocol, not copy); the server's own
+    // label wins for the running step if the two lists ever drift.
+    phaseLabels: {
+      dockerd: "Starting the container runtime",
+      "helm-repo": "Publishing the local Helm repository",
+      "create-cluster": "Creating the Kubernetes cluster",
+      "api-server": "Waiting for the API server",
+      cni: "Installing the pod network",
+      ingress: "Installing the ingress controller",
+      seed: "Setting up the exam questions",
+      finalize: "Finishing up",
+    },
   },
   control: {
     resetTitle: "Rebuilding your exam environment",
@@ -402,7 +465,7 @@ export const strings = {
     failedTitle: (op: string) => (op === "switch" ? "Switch failed" : "Reset failed"),
     // The measured cluster rebuild is 90–240s. Promising "1–2 minutes"
     // and then blowing past it turns a normal wait into a perceived hang.
-    hint: "Rebuilding the Kubernetes cluster. Usually about 2–4 minutes — you can leave this tab open.",
+    hint: "Rebuilding the Kubernetes cluster. Usually about 2-4 minutes. You can leave this tab open.",
     // For jobs with no recreate-cluster phase (a switch to or reset of a
     // multiple-choice bank): promising minutes for a seconds-long job is
     // the same mistake in the other direction.
@@ -430,7 +493,7 @@ export const strings = {
     // "HTTP 502" is true and useless. Name the likely cause and the
     // check that confirms it; keep the raw status as trailing detail.
     actionFailed: (detail: string) =>
-      `Couldn't reach the control plane (${detail}). The conductor container may be down — check it with \`docker compose ps conductor\`.`,
+      `Couldn't reach the control plane (${detail}). The conductor container may be down; check it with \`docker compose ps conductor\`.`,
     newAttempt: "New attempt",
     newAttemptHint:
       "Wipes all cluster and instance state and returns you to the lobby, where you can retry this exam or pick a different one.",
@@ -440,7 +503,7 @@ export const strings = {
     // Names the constraint instead of apologising for it, and says why
     // it is a real capability limit rather than a layout preference.
     title: "This exam needs a desktop",
-    why: "You work through a full Linux terminal and remote desktop, side by side with the questions — the same split screen as the real exam. That needs a keyboard and room to see both.",
+    why: "You work through a full Linux terminal and remote desktop, side by side with the questions, the same split screen as the real exam. That needs a keyboard and room to see both.",
     requirements: [
       "A desktop or laptop browser",
       "A physical keyboard",
@@ -450,11 +513,11 @@ export const strings = {
     continueAnyway: "Continue anyway",
     startDisabled: "Open this on a desktop to start the exam.",
     sessionRunning:
-      "An exam is running. The clock keeps going wherever you are — submit here if you cannot get to a desktop in time.",
+      "An exam is running. The clock keeps going wherever you are; submit here if you cannot get to a desktop in time.",
     // Training has no deadline, so the urgency above would be a lie. The
     // counter beside this one counts up for the same reason.
     sessionRunningUntimed:
-      "A training attempt is open. There is no time limit — pick it up on a desktop whenever you are ready, or submit it here.",
+      "A training attempt is open. There is no time limit; pick it up on a desktop whenever you are ready, or submit it here.",
   },
 
   score: {
@@ -464,14 +527,14 @@ export const strings = {
     // understating one — the elapsed counter beside this is the honest
     // answer, so the copy only has to bound it and say not to navigate away.
     gradingBody:
-      "Evaluating your exam over SSH. A full bank usually finishes in well under a minute — leave this tab open.",
+      "Evaluating your exam over SSH. A full bank usually finishes in well under a minute; leave this tab open.",
     gradingFailedTitle: "Grading failed",
     retry: "Retry",
     // The poll could not reach the facilitator. Not terminal — the poll is
     // still running — so the copy says what is happening and that it will
     // keep trying, rather than reading like a dead end.
     pollFailed: (detail: string) =>
-      `Still trying to reach the facilitator (${detail}). Retrying every few seconds — leave this tab open.`,
+      `Still trying to reach the facilitator (${detail}). Retrying every few seconds; leave this tab open.`,
     // The re-grade request itself failed. The Retry button is showing
     // again underneath this, so the copy names the likely check.
     retryFailed: (detail: string) =>
@@ -491,7 +554,7 @@ export const strings = {
     domainColumn: "Domain",
     domainScore: "Score",
     domainUnknown: "Unclassified",
-    modeNote: (mode: string) => `${mode} attempt — not a comparable exam result.`,
+    modeNote: (mode: string) => `${mode} attempt: not a comparable exam result.`,
     endReason: (reason: string) =>
       reason === "expired"
         ? "Session ended automatically: time expired."
@@ -508,16 +571,6 @@ export const strings = {
     // to study something the grader never measured. Say whose fault it is.
     checkSkippedMessage: "Not graded: this check's points header is malformed in the bank.",
     showSolution: "Show solution",
-    reseed: "Reset this question",
-    reseeding: "Resetting…",
-    reseedTitle: "Reset this question?",
-    // Said plainly: this is the one control in training mode that
-    // destroys work, and "reset" is a word people click without reading.
-    reseedBody:
-      "This re-runs the question's setup, putting it back exactly as it started. Anything you have done for this question is discarded. Other questions are untouched.",
-    reseedConfirm: "Reset it",
-    reseedDone: "Question reset to its starting state.",
-    reseedFailed: (detail: string) => `Couldn't reset that question (${detail}).`,
     loadingSolution: "Loading solution…",
   },
 } as const;

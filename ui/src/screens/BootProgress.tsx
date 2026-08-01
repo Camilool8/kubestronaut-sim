@@ -22,14 +22,14 @@ interface BootProgressProps {
 // ever drift, the server's own label wins for the running step (below),
 // so the worst case is a mislabelled future step — never a wrong "now".
 const PHASES: ReadonlyArray<{ id: string; label: string }> = [
-  { id: "dockerd", label: "Starting the container runtime" },
-  { id: "helm-repo", label: "Publishing the local Helm repository" },
-  { id: "create-cluster", label: "Creating the Kubernetes cluster" },
-  { id: "api-server", label: "Waiting for the API server" },
-  { id: "cni", label: "Installing the pod network" },
-  { id: "ingress", label: "Installing the ingress controller" },
-  { id: "seed", label: "Setting up the exam questions" },
-  { id: "finalize", label: "Finishing up" },
+  { id: "dockerd", label: strings.boot.phaseLabels.dockerd },
+  { id: "helm-repo", label: strings.boot.phaseLabels["helm-repo"] },
+  { id: "create-cluster", label: strings.boot.phaseLabels["create-cluster"] },
+  { id: "api-server", label: strings.boot.phaseLabels["api-server"] },
+  { id: "cni", label: strings.boot.phaseLabels.cni },
+  { id: "ingress", label: strings.boot.phaseLabels.ingress },
+  { id: "seed", label: strings.boot.phaseLabels.seed },
+  { id: "finalize", label: strings.boot.phaseLabels.finalize },
 ];
 
 function parseStamp(stamp: string | undefined): number | null {

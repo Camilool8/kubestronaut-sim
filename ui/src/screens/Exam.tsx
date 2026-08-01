@@ -113,7 +113,7 @@ export function ExamGateControls({ session, fetchedAt, onSessionChange }: ExamPr
         </p>
       )}
       <button className="btn btn-danger" onClick={end} disabled={ending}>
-        {ending ? strings.exam.ending : strings.exam.endExam}
+        {ending ? strings.exam.ending : strings.exam.endAttempt(session.mode)}
       </button>
     </div>
   );
@@ -359,8 +359,8 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
       </div>
 
       {confirmOpen && (
-        <Dialog title={strings.exam.confirmTitle} onClose={() => setConfirmOpen(false)}>
-          <p>{strings.exam.confirmBody}</p>
+        <Dialog title={strings.exam.confirmTitle(session.mode)} onClose={() => setConfirmOpen(false)}>
+          <p>{strings.exam.confirmBody(session.mode)}</p>
           {/* Submitting used to be a bare yes/no. The two things a
               candidate most wants to know at that moment — did I flag
               anything for another look, and is there a question I never
@@ -389,7 +389,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
               {strings.exam.cancel}
             </button>
             <button className="btn btn-danger" onClick={handleConfirmEnd} disabled={ending}>
-              {ending ? strings.exam.ending : strings.exam.endExam}
+              {ending ? strings.exam.ending : strings.exam.endAttempt(session.mode)}
             </button>
           </div>
         </Dialog>
@@ -422,7 +422,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
           {practice.questions.map((q) => (
             <details key={q.id} className="score-question">
               <summary>
-                {q.id} — {q.earned}/{q.total}
+                {strings.practice.questionScore(q.id, q.earned, q.total)}
               </summary>
               <CheckList checks={q.checks} />
             </details>

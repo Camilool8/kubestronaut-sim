@@ -209,7 +209,25 @@ describe("McqExam answering", () => {
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText(/1 question is unanswered/)).toBeInTheDocument();
-    expect(screen.getByText("q02", { selector: ".submit-review-ids" })).toBeInTheDocument();
+    // Listed as the attempt position, never the bank id — q02 is an
+    // artifact of the pool, and the candidate has only ever seen Q2.
+    expect(screen.getByText("Q2", { selector: ".submit-review-ids" })).toBeInTheDocument();
+    expect(screen.queryByText("q02", { selector: ".submit-review-ids" })).not.toBeInTheDocument();
+  });
+
+  test("a training attempt ends Training, not an Exam", async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    const training: SessionSnapshot = { ...session, mode: "training", untimed: true };
+    render(<McqExam session={training} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+
+    await screen.findByText("Which component persists cluster state?");
+    // The educational mode must not wear exam urgency at the moment of
+    // commitment: label, dialog title and confirm all say Training.
+    expect(screen.queryByRole("button", { name: /end exam/i })).not.toBeInTheDocument();
+    await user.click(screen.getAllByRole("button", { name: /end training/i })[0]);
+    expect(await screen.findByRole("dialog")).toHaveAccessibleName(/training/i);
+    expect(screen.queryByText(/cannot be undone/i)).not.toBeInTheDocument();
   });
 });
 

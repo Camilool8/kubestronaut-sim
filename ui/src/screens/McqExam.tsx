@@ -164,14 +164,21 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
   ).length;
 
   // Computed when the dialog opens, matching the hands-on screen's
-  // reasoning: nobody is looking at these lists until then.
+  // reasoning: nobody is looking at these lists until then. Listed as
+  // attempt positions (Q7), never bank ids — the ids are artifacts of
+  // the pool this attempt was drawn from, and every other part of this
+  // screen already says Q-numbers.
   const unansweredIds = confirmOpen
     ? questions
-        .filter((q) => (answers[q.id] ?? []).length === 0)
-        .map((q) => q.id)
+        .map((q, i) => ({ q, i }))
+        .filter(({ q }) => (answers[q.id] ?? []).length === 0)
+        .map(({ i }) => strings.mcq.questionNumber(i + 1))
     : [];
   const markedIds = confirmOpen
-    ? questions.filter((q) => marksStore.isMarked(q.id)).map((q) => q.id)
+    ? questions
+        .map((q, i) => ({ q, i }))
+        .filter(({ q }) => marksStore.isMarked(q.id))
+        .map(({ i }) => strings.mcq.questionNumber(i + 1))
     : [];
 
   const handleConfirmEnd = async () => {
@@ -274,10 +281,10 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
 
       {confirmOpen && (
         <Dialog
-          title={strings.exam.confirmTitle}
+          title={strings.exam.confirmTitle(session.mode)}
           onClose={() => setConfirmOpen(false)}
         >
-          <p>{strings.mcq.confirmBody}</p>
+          <p>{strings.mcq.confirmBody(session.mode)}</p>
           <div className="submit-review">
             {unansweredIds.length > 0 ? (
               <p>
@@ -312,7 +319,7 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
               onClick={handleConfirmEnd}
               disabled={ending}
             >
-              {ending ? strings.exam.ending : strings.exam.endExam}
+              {ending ? strings.exam.ending : strings.exam.endAttempt(session.mode)}
             </button>
           </div>
         </Dialog>
@@ -328,10 +335,12 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
             {practice.earned} / {practice.total} ({practice.percent}%)
           </p>
           <p className="control-hint">{strings.practice.note}</p>
-          {practice.questions.map((q) => (
+          {practice.questions.map((q, i) => (
             <details key={q.id} className="score-question">
+              {/* Position, never the bank id — the id is an artifact of
+                  the pool this attempt was drawn from. */}
               <summary>
-                {q.id} — {q.earned}/{q.total}
+                {strings.practice.questionScore(strings.mcq.questionNumber(i + 1), q.earned, q.total)}
               </summary>
               <CheckList checks={q.checks} />
             </details>
@@ -551,7 +560,7 @@ function McqQuestion({
           {strings.mcq.previous}
         </button>
         <span className="mcq-progress" aria-hidden="true">
-          {answeredCount} / {total} completed
+          {strings.mcq.answeredCount(answeredCount, total)}
         </span>
         {next ? (
           <button className="btn" onClick={() => onSelect(next.id)}>
@@ -560,7 +569,7 @@ function McqQuestion({
           </button>
         ) : (
           <button className="btn btn-primary" onClick={onEndExam}>
-            {strings.exam.endExam}
+            {strings.exam.endAttempt(mode)}
           </button>
         )}
       </footer>

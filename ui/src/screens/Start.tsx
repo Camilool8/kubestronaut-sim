@@ -276,7 +276,7 @@ export function Start({
             onClick={handleStart}
             disabled={starting || examBlocked}
           >
-            {starting ? strings.start.starting : strings.start.startExam}
+            {starting ? strings.start.starting : strings.start.start(mode)}
           </button>
           {/* Marks the card seen: someone who read it here should not
               have it thrown at them again the moment the exam opens.

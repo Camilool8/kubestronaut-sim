@@ -20,6 +20,7 @@
 // nothing else needs to know whether a desktop is connected.
 
 import { isMac } from "./platform";
+import { strings } from "../strings";
 
 /** The slice of noVNC's RFB this module needs. */
 export interface KeyTarget {
@@ -75,18 +76,18 @@ const MAC_CHORDS: Record<string, Chord> = {
   // The two that matter. xfce4-terminal's copy/paste are Ctrl+Shift+C/V,
   // and MiscShowUnsafePasteDialog is already off in the image, so a
   // multi-line paste lands without a confirmation dialog.
-  "meta+c": { keysym: XK.C, code: "KeyC", ctrl: true, shift: true, describes: "Copy" },
-  "meta+v": { keysym: XK.V, code: "KeyV", ctrl: true, shift: true, describes: "Paste" },
+  "meta+c": { keysym: XK.C, code: "KeyC", ctrl: true, shift: true, describes: strings.keymap.copy },
+  "meta+v": { keysym: XK.V, code: "KeyV", ctrl: true, shift: true, describes: strings.keymap.paste },
   // macOS Terminal clears with ⌘K; the Linux equivalent is Ctrl+L.
-  "meta+k": { keysym: XK.l, code: "KeyL", ctrl: true, describes: "Clear the screen" },
+  "meta+k": { keysym: XK.l, code: "KeyL", ctrl: true, describes: strings.keymap.clearScreen },
   // Line movement. On macOS these are ⌘←/→; readline wants Home/End.
-  "meta+arrowleft": { keysym: XK.Home, code: "Home", describes: "Start of line" },
-  "meta+arrowright": { keysym: XK.End, code: "End", describes: "End of line" },
+  "meta+arrowleft": { keysym: XK.Home, code: "Home", describes: strings.keymap.startOfLine },
+  "meta+arrowright": { keysym: XK.End, code: "End", describes: strings.keymap.endOfLine },
   // Word movement. macOS uses ⌥←/→; readline binds Alt+B / Alt+F.
-  "alt+arrowleft": { keysym: XK.b, code: "KeyB", alt: true, describes: "Back one word" },
-  "alt+arrowright": { keysym: XK.f, code: "KeyF", alt: true, describes: "Forward one word" },
+  "alt+arrowleft": { keysym: XK.b, code: "KeyB", alt: true, describes: strings.keymap.backWord },
+  "alt+arrowright": { keysym: XK.f, code: "KeyF", alt: true, describes: strings.keymap.forwardWord },
   // ⌘⌫ deletes to the start of the line on macOS; readline is Ctrl+U.
-  "meta+backspace": { keysym: XK.u, code: "KeyU", ctrl: true, describes: "Delete to start of line" },
+  "meta+backspace": { keysym: XK.u, code: "KeyU", ctrl: true, describes: strings.keymap.deleteToStartOfLine },
 };
 
 /**
@@ -99,8 +100,8 @@ const MAC_CHORDS: Record<string, Chord> = {
  * offered explicitly, with that caveat, rather than enabled quietly.
  */
 export const BROWSER_RESERVED: Record<string, Chord> = {
-  "meta+t": { keysym: XK.T, code: "KeyT", ctrl: true, shift: true, describes: "New terminal tab" },
-  "meta+w": { keysym: XK.W, code: "KeyW", ctrl: true, shift: true, describes: "Close terminal tab" },
+  "meta+t": { keysym: XK.T, code: "KeyT", ctrl: true, shift: true, describes: strings.keymap.newTerminalTab },
+  "meta+w": { keysym: XK.W, code: "KeyW", ctrl: true, shift: true, describes: strings.keymap.closeTerminalTab },
 };
 
 const STORAGE_KEY = "sim.desktopKeymap.enabled";

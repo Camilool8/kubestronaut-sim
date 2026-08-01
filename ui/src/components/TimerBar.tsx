@@ -93,7 +93,7 @@ export function TimerBar({ session, fetchedAt, title, onEndClick, extras }: Time
         )}
       </div>
       <button id="end-exam-button" className="btn btn-danger" onClick={onEndClick}>
-        {strings.exam.endExam}
+        {strings.exam.endAttempt(session.mode)}
       </button>
     </header>
   );
