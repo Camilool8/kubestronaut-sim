@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   endSession,
   getAnswers,
@@ -93,7 +100,10 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
   const index = questions.findIndex((q) => q.id === selectedId);
   const selected = index === -1 ? undefined : questions[index];
   const prev = index > 0 ? questions[index - 1] : undefined;
-  const next = index >= 0 && index < questions.length - 1 ? questions[index + 1] : undefined;
+  const next =
+    index >= 0 && index < questions.length - 1
+      ? questions[index + 1]
+      : undefined;
 
   useEffect(() => {
     if (selectedId) marksStore.markViewed(selectedId);
@@ -149,12 +159,16 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
     [answers],
   );
 
-  const answeredCount = questions.filter((q) => (answers[q.id] ?? []).length > 0).length;
+  const answeredCount = questions.filter(
+    (q) => (answers[q.id] ?? []).length > 0,
+  ).length;
 
   // Computed when the dialog opens, matching the hands-on screen's
   // reasoning: nobody is looking at these lists until then.
   const unansweredIds = confirmOpen
-    ? questions.filter((q) => (answers[q.id] ?? []).length === 0).map((q) => q.id)
+    ? questions
+        .filter((q) => (answers[q.id] ?? []).length === 0)
+        .map((q) => q.id)
     : [];
   const markedIds = confirmOpen
     ? questions.filter((q) => marksStore.isMarked(q.id)).map((q) => q.id)
@@ -212,7 +226,11 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
         extras={
           <>
             {session.mode === "training" && (
-              <button className="btn" onClick={() => void scoreNow()} disabled={scoring}>
+              <button
+                className="btn"
+                onClick={() => void scoreNow()}
+                disabled={scoring}
+              >
                 {scoring ? strings.practice.scoring : strings.practice.scoreNow}
               </button>
             )}
@@ -223,7 +241,9 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
       <div className="mcq-body">
         {examState.status === "error" && (
           <div className="pane-error" role="alert">
-            <p className="error-text">{strings.exam.questionsFailed(examState.error ?? "")}</p>
+            <p className="error-text">
+              {strings.exam.questionsFailed(examState.error ?? "")}
+            </p>
             <button className="btn" onClick={examState.reload}>
               {strings.questionPanel.retry}
             </button>
@@ -253,13 +273,18 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
       </div>
 
       {confirmOpen && (
-        <Dialog title={strings.exam.confirmTitle} onClose={() => setConfirmOpen(false)}>
+        <Dialog
+          title={strings.exam.confirmTitle}
+          onClose={() => setConfirmOpen(false)}
+        >
           <p>{strings.mcq.confirmBody}</p>
           <div className="submit-review">
             {unansweredIds.length > 0 ? (
               <p>
                 {strings.mcq.reviewUnanswered(unansweredIds.length)}{" "}
-                <span className="submit-review-ids">{unansweredIds.join(", ")}</span>
+                <span className="submit-review-ids">
+                  {unansweredIds.join(", ")}
+                </span>
               </p>
             ) : (
               <p>{strings.mcq.allAnswered}</p>
@@ -267,16 +292,26 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
             {markedIds.length > 0 && (
               <p>
                 {strings.exam.reviewMarked(markedIds.length)}{" "}
-                <span className="submit-review-ids">{markedIds.join(", ")}</span>
+                <span className="submit-review-ids">
+                  {markedIds.join(", ")}
+                </span>
               </p>
             )}
           </div>
           {endError && <p className="error-text">{endError}</p>}
           <div className="confirm-actions">
-            <button className="btn" onClick={() => setConfirmOpen(false)} disabled={ending}>
+            <button
+              className="btn"
+              onClick={() => setConfirmOpen(false)}
+              disabled={ending}
+            >
               {strings.exam.cancel}
             </button>
-            <button className="btn btn-danger" onClick={handleConfirmEnd} disabled={ending}>
+            <button
+              className="btn btn-danger"
+              onClick={handleConfirmEnd}
+              disabled={ending}
+            >
               {ending ? strings.exam.ending : strings.exam.endExam}
             </button>
           </div>
@@ -284,7 +319,11 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
       )}
 
       {practice && (
-        <Dialog title={strings.practice.title} onClose={() => setPractice(null)} wide>
+        <Dialog
+          title={strings.practice.title}
+          onClose={() => setPractice(null)}
+          wide
+        >
           <p className="score-headline">
             {practice.earned} / {practice.total} ({practice.percent}%)
           </p>
@@ -345,7 +384,10 @@ function McqQuestion({
   const jumpTriggerRef = useRef<HTMLButtonElement>(null);
   useSyncExternalStore(marksStore.subscribe, marksStore.getVersion);
 
-  const load = useCallback((signal: AbortSignal) => getQuestion(info.id, signal), [info.id]);
+  const load = useCallback(
+    (signal: AbortSignal) => getQuestion(info.id, signal),
+    [info.id],
+  );
   const question = useAsync(load, [info.id]);
 
   const selection = answers[info.id] ?? [];
@@ -388,10 +430,16 @@ function McqQuestion({
             aria-expanded={jumpOpen}
             aria-controls={jumpOpen ? "mcq-jump" : undefined}
           >
-            <span className="question-id">{strings.mcq.questionNumber(index + 1)}</span>
-            <span className="question-points">{strings.questionPanel.points(info.totalPoints)}</span>
+            <span className="question-id">
+              {strings.mcq.questionNumber(index + 1)}
+            </span>
+            <span className="question-points">
+              {strings.questionPanel.points(info.totalPoints)}
+            </span>
             <Icon name="chevron-down" className="disclosure-chevron" />
-            <span className="sr-only">{strings.questionPanel.position(index + 1, total)}</span>
+            <span className="sr-only">
+              {strings.questionPanel.position(index + 1, total)}
+            </span>
           </button>
           <button
             className="question-nav-step"
@@ -433,7 +481,9 @@ function McqQuestion({
           loading={<McqSkeleton />}
           error={(message, reload) => (
             <div className="pane-error" role="alert">
-              <p className="error-text">{strings.questionPanel.loadFailed(message)}</p>
+              <p className="error-text">
+                {strings.questionPanel.loadFailed(message)}
+              </p>
               <button className="btn" onClick={reload}>
                 {strings.questionPanel.retry}
               </button>
@@ -444,11 +494,16 @@ function McqQuestion({
             <>
               <Markdown>{data.markdown}</Markdown>
               <fieldset className="mcq-options">
-                <legend>{info.multi ? strings.mcq.selectAll : strings.mcq.selectOne}</legend>
+                <legend>
+                  {info.multi ? strings.mcq.selectAll : strings.mcq.selectOne}
+                </legend>
                 {(data.options ?? []).map((text, i) => {
                   const checked = selection.includes(i);
                   return (
-                    <label key={i} className={`mcq-option${checked ? " mcq-option-on" : ""}`}>
+                    <label
+                      key={i}
+                      className={`mcq-option${checked ? " mcq-option-on" : ""}`}
+                    >
                       <input
                         type="checkbox"
                         name={`answer-${info.id}`}
@@ -468,7 +523,11 @@ function McqQuestion({
               </fieldset>
               {mode === "training" && <McqCheckAnswer questionId={info.id} />}
               {mode === "training" && info.hintCount > 0 && (
-                <HintTray key={info.id} questionId={info.id} hintCount={info.hintCount} />
+                <HintTray
+                  key={info.id}
+                  questionId={info.id}
+                  hintCount={info.hintCount}
+                />
               )}
             </>
           )}
@@ -482,12 +541,16 @@ function McqQuestion({
           confirm dialog as the header button — the unanswered/marked
           review lives there once, not twice. */}
       <footer className="mcq-footer">
-        <button className="btn" onClick={() => prev && onSelect(prev.id)} disabled={!prev}>
+        <button
+          className="btn"
+          onClick={() => prev && onSelect(prev.id)}
+          disabled={!prev}
+        >
           <Icon name="chevron-left" />
           {strings.mcq.previous}
         </button>
         <span className="mcq-progress" aria-hidden="true">
-          {answeredCount} / {total}
+          {answeredCount} / {total} completed
         </span>
         {next ? (
           <button className="btn" onClick={() => onSelect(next.id)}>
@@ -558,7 +621,10 @@ function McqCheckAnswer({ questionId }: { questionId: string }) {
   };
 
   return (
-    <details className="solution-details mcq-check-answer" onToggle={handleToggle}>
+    <details
+      className="solution-details mcq-check-answer"
+      onToggle={handleToggle}
+    >
       <summary>
         <Icon name="chevron-down" className="disclosure-chevron" />
         {strings.mcq.checkAnswer}
@@ -581,11 +647,19 @@ interface McqJumpProps {
 // Every question at once, grouped by domain, with the one state the
 // hands-on grid cannot have: answered/unanswered, which here the UI
 // genuinely knows — the answers are server state it holds a copy of.
-function McqJump({ questions, answers, selectedId, onSelect, onDismiss }: McqJumpProps) {
+function McqJump({
+  questions,
+  answers,
+  selectedId,
+  onSelect,
+  onDismiss,
+}: McqJumpProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    ref.current?.querySelector<HTMLElement>('[aria-current="true"]')?.focus({ preventScroll: true });
+    ref.current
+      ?.querySelector<HTMLElement>('[aria-current="true"]')
+      ?.focus({ preventScroll: true });
   }, []);
 
   useEffect(() => {
@@ -609,7 +683,10 @@ function McqJump({ questions, answers, selectedId, onSelect, onDismiss }: McqJum
       }
       byDomain.get(q.domain)?.push(q);
     }
-    return order.map((domain) => ({ domain, questions: byDomain.get(domain) ?? [] }));
+    return order.map((domain) => ({
+      domain,
+      questions: byDomain.get(domain) ?? [],
+    }));
   }, [questions]);
 
   // The tile's own sequence position (1-65), not its bank id — same
@@ -641,11 +718,17 @@ function McqJump({ questions, answers, selectedId, onSelect, onDismiss }: McqJum
                     <span className="question-tile-id">
                       {strings.mcq.questionNumber(positionOf.get(q.id) ?? 0)}
                     </span>
-                    {answered && <Icon name="check" className="question-tile-answered" />}
-                    {marked && <Icon name="flag-filled" className="question-tile-mark" />}
+                    {answered && (
+                      <Icon name="check" className="question-tile-answered" />
+                    )}
+                    {marked && (
+                      <Icon name="flag-filled" className="question-tile-mark" />
+                    )}
                     <span className="sr-only">
                       {[
-                        answered ? strings.mcq.answered : strings.mcq.unanswered,
+                        answered
+                          ? strings.mcq.answered
+                          : strings.mcq.unanswered,
                         marked ? strings.questionPanel.marked : null,
                       ]
                         .filter(Boolean)
