@@ -1527,9 +1527,15 @@
   background: var(--surface-hover);
 }
 
-.mode-option-on {
+/* The inset bar is the mandatory third channel: it survives greyscale
+   and colour-blindness, so selection is never an accent border alone —
+   the same treatment as the current question tile and the active bank
+   card (#31). */
+.mode-option-on,
+.mode-option-on:hover {
   border-color: var(--accent);
   background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .mode-name {
@@ -3073,13 +3079,18 @@
   margin-bottom: var(--space-2);
 }
 
+/* An anchored control, so 6px like every other one — radius-m is for
+   things that float. States follow the tile-state system: hover moves
+   the fill and never the edge, and selection takes all three channels
+   (accent edge, wash, inset bar) so it can never be mistaken for a
+   hovered row or reduced to color alone. */
 .mcq-option {
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
   padding: var(--space-3);
   border: 1px solid var(--border);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-s);
   background: var(--surface-raised);
   cursor: pointer;
   /* 44px minimum touch target on the row itself. */
@@ -3087,12 +3098,14 @@
 }
 
 .mcq-option:hover {
-  border-color: var(--accent);
+  background: var(--raised-hover);
 }
 
-.mcq-option-on {
+.mcq-option-on,
+.mcq-option-on:hover {
   border-color: var(--accent);
   background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 /* The native control stays visible and focusable — it is the input, and
