@@ -1,0 +1,1 @@
+During a security review, a teammate claims the values stored in a Kubernetes Secret are already protected, because `kubectl get secret db-creds -o yaml` shows them as unreadable strings. Which statement is accurate?

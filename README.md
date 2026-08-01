@@ -4,14 +4,17 @@ Open-source, killer.sh-style exam simulator for the Kubestronaut
 certifications, run locally on your own machine. Deliberately harder
 than the real exams.
 
-One hands-on bank ships today: **CKAD Mock Exam 01**, 22 questions
+Two banks ship today. **CKAD Mock Exam 01** is hands-on: 22 questions
 across all five curriculum domains, 120 minutes, 66% to pass, against a
-two-node Kubernetes 1.35 cluster. CKA, KCNA/KCSA and CKS appear in the
-catalog as coming soon.
+two-node Kubernetes 1.35 cluster. **KCNA Mock Exam** is multiple-choice
+in the real exam's shape: 97 original questions, 65 drawn per attempt
+and weighted to the post-November-2025 curriculum on every draw, 90
+minutes, 75% to pass, every question with a full explanation for
+review. CKA, KCSA and CKS appear in the catalog as coming soon.
 
-Questions are graded on behaviour wherever behaviour is the point — a
-policy that actually denies, an Ingress the controller really routes —
-not on the shape of your YAML.
+Hands-on questions are graded on behaviour wherever behaviour is the
+point — a policy that actually denies, an Ingress the controller really
+routes — not on the shape of your YAML.
 
 ## Quickstart
 

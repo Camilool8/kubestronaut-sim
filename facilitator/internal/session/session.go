@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 )
@@ -91,6 +92,21 @@ type Manager struct {
 	endReason  string
 	results    json.RawMessage
 	gradeError string
+
+	// answers holds an mcq attempt's selections, qid → sorted option
+	// indices. Never mutated in place: SetAnswer replaces the whole map,
+	// so captureLocked/restoreLocked rollback stays correct with a plain
+	// pointer copy. Always nil for a hands-on attempt — the cluster is
+	// that engine's answer sheet.
+	answers map[string][]int
+
+	// questionIDs is the attempt's drawn subset, in draw order — set once
+	// at StartMCQ and immutable for the attempt's life, exactly like mode
+	// and attemptDur above. Nil for a hands-on attempt, and for an mcq
+	// attempt started via plain Start (no pooling): "no subset" means
+	// "the whole bank", the pre-pooling behaviour every existing bank
+	// still gets by default.
+	questionIDs []string
 }
 
 // Snapshot is a read-only view of a session at one instant.
@@ -129,14 +145,22 @@ type persistedState struct {
 	Mode            string          `json:"mode"`
 	Results         json.RawMessage `json:"results,omitempty"`
 	GradeError      string          `json:"gradeError"`
+	// Answers is an mcq attempt's selections; absent for hands-on
+	// attempts, which store nothing per question.
+	Answers map[string][]int `json:"answers,omitempty"`
+	// QuestionIDs is a pooled mcq attempt's drawn subset, in draw order;
+	// absent for hands-on attempts and for mcq attempts with no pooling.
+	QuestionIDs []string `json:"questionIds,omitempty"`
 }
 
 // persistedVersion is the on-disk format this build reads and writes.
 // Version 1 files predate bank identity and attempt tokens; version 2
-// predates attempt modes. Both are discarded on load by the existing
-// version guard, which is the whole migration: a discarded file starts
-// the session idle, and an idle session has no mode to migrate.
-const persistedVersion = 3
+// predates attempt modes; version 3 predates mcq answer storage; version
+// 4 predates a pooled mcq attempt's drawn question-id subset. All are
+// discarded on load by the existing version guard, which is the whole
+// migration: a discarded file starts the session idle, and an idle
+// session has no mode, answers, or question ids to migrate.
+const persistedVersion = 5
 
 // New loads the session persisted at path, or starts idle if the file is
 // missing or unreadable/corrupt (any non-missing read or parse failure is
@@ -220,6 +244,8 @@ func New(path, bank string, dur time.Duration, clock func() time.Time, onExpire 
 	m.endReason = doc.EndReason
 	m.results = doc.Results
 	m.gradeError = doc.GradeError
+	m.answers = doc.Answers
+	m.questionIDs = doc.QuestionIDs
 	if doc.EndedAt != nil {
 		m.endedAt = *doc.EndedAt
 	}
@@ -258,6 +284,16 @@ func New(path, bank string, dur time.Duration, clock func() time.Time, onExpire 
 // untimed. Passing an unknown mode is a programming error and is
 // rejected rather than silently treated as an exam.
 func (m *Manager) Start(mode string, dur time.Duration) (Snapshot, error) {
+	return m.StartMCQ(mode, dur, nil)
+}
+
+// StartMCQ is Start plus a pooled mcq attempt's drawn question-id subset,
+// persisted so a resume (or a facilitator restart) shows the exact same
+// questions in the exact same order. questionIDs is nil for every
+// hands-on attempt and for an mcq attempt with no pooling configured —
+// "no subset" means "the whole bank", exactly what plain Start already
+// gives every existing bank.
+func (m *Manager) StartMCQ(mode string, dur time.Duration, questionIDs []string) (Snapshot, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -278,6 +314,12 @@ func (m *Manager) Start(mode string, dur time.Duration) (Snapshot, error) {
 	m.endReason = ""
 	m.results = nil
 	m.gradeError = ""
+	m.answers = nil
+	if len(questionIDs) == 0 {
+		m.questionIDs = nil
+	} else {
+		m.questionIDs = append([]string(nil), questionIDs...)
+	}
 
 	if err := m.persistLocked(); err != nil {
 		m.restoreLocked(prev)
@@ -286,6 +328,18 @@ func (m *Manager) Start(mode string, dur time.Duration) (Snapshot, error) {
 	m.armTimerLocked(m.attemptDur)
 
 	return m.snapshotLocked(), nil
+}
+
+// QuestionIDs returns a copy of the current attempt's drawn subset, in
+// draw order — empty (never nil) when there is none (hands-on, an mcq
+// attempt started via plain Start, or no attempt at all).
+func (m *Manager) QuestionIDs() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	out := make([]string, len(m.questionIDs))
+	copy(out, m.questionIDs)
+	return out
 }
 
 // newAttemptToken mints the random identity for one attempt. Grading
@@ -355,6 +409,8 @@ func (m *Manager) Reset() error {
 	m.endReason = ""
 	m.results = nil
 	m.gradeError = ""
+	m.answers = nil
+	m.questionIDs = nil
 
 	if err := m.persistLocked(); err != nil {
 		m.restoreLocked(prev)
@@ -446,6 +502,64 @@ func (m *Manager) checkGradeWriteLocked(token string) error {
 	return nil
 }
 
+// SetAnswer records the candidate's selection for one mcq question:
+// selected option indices, stored sorted. An empty (or nil) selection
+// deletes the entry — that is what deselecting every option means. It
+// returns ErrConflict unless the session is running: answers exist only
+// inside a live attempt. On a persist failure nothing changes.
+//
+// The map is replaced, not mutated, so the capture/restore rollback and
+// any snapshot a caller holds stay consistent.
+func (m *Manager) SetAnswer(qid string, selected []int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.state != stateRunning {
+		return fmt.Errorf("session: set answer: %w", ErrConflict)
+	}
+
+	prev := m.captureLocked()
+
+	next := make(map[string][]int, len(m.answers)+1)
+	for k, v := range m.answers {
+		next[k] = v
+	}
+	if len(selected) == 0 {
+		delete(next, qid)
+	} else {
+		sel := make([]int, len(selected))
+		copy(sel, selected)
+		sort.Ints(sel)
+		next[qid] = sel
+	}
+	if len(next) == 0 {
+		next = nil
+	}
+	m.answers = next
+
+	if err := m.persistLocked(); err != nil {
+		m.restoreLocked(prev)
+		return fmt.Errorf("session: set answer: %w", err)
+	}
+	return nil
+}
+
+// Answers returns a deep copy of the current attempt's selections, empty
+// (never nil) when there are none. It is readable in any state: the
+// grader reads it after End, and the review UI after grading.
+func (m *Manager) Answers() map[string][]int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	out := make(map[string][]int, len(m.answers))
+	for k, v := range m.answers {
+		sel := make([]int, len(v))
+		copy(sel, v)
+		out[k] = sel
+	}
+	return out
+}
+
 // Results returns the current results, gradeError, and whether grading
 // has reached a terminal outcome (results were set, or grading failed and
 // gradeError was set) — the third value distinguishes "still grading"
@@ -477,21 +591,29 @@ type mutableFields struct {
 	endReason  string
 	results    json.RawMessage
 	gradeError string
+	// The map pointer is enough: answers maps are replaced wholesale,
+	// never mutated in place (see the field's comment on Manager).
+	answers map[string][]int
+	// Likewise: questionIDs is replaced wholesale (set once at
+	// StartMCQ, cleared at Reset), never mutated in place.
+	questionIDs []string
 }
 
 // captureLocked snapshots the fields a transition may need to roll back.
 // The caller must hold m.mu.
 func (m *Manager) captureLocked() mutableFields {
 	return mutableFields{
-		mode:       m.mode,
-		attemptDur: m.attemptDur,
-		state:      m.state,
-		attempt:    m.attempt,
-		startedAt:  m.startedAt,
-		endedAt:    m.endedAt,
-		endReason:  m.endReason,
-		results:    m.results,
-		gradeError: m.gradeError,
+		mode:        m.mode,
+		attemptDur:  m.attemptDur,
+		state:       m.state,
+		attempt:     m.attempt,
+		startedAt:   m.startedAt,
+		endedAt:     m.endedAt,
+		endReason:   m.endReason,
+		results:     m.results,
+		gradeError:  m.gradeError,
+		answers:     m.answers,
+		questionIDs: m.questionIDs,
 	}
 }
 
@@ -507,6 +629,8 @@ func (m *Manager) restoreLocked(f mutableFields) {
 	m.endReason = f.endReason
 	m.results = f.results
 	m.gradeError = f.gradeError
+	m.answers = f.answers
+	m.questionIDs = f.questionIDs
 }
 
 // untimedLocked reports whether the current attempt has no deadline.
@@ -638,11 +762,11 @@ func (m *Manager) snapshotLocked() Snapshot {
 // hold m.mu.
 func (m *Manager) persistLocked() error {
 	doc := persistedState{
-		Version:         persistedVersion,
-		Bank:            m.bank,
-		Attempt:         m.attempt,
-		State:           m.state,
-		StartedAt:       m.startedAt,
+		Version:   persistedVersion,
+		Bank:      m.bank,
+		Attempt:   m.attempt,
+		State:     m.state,
+		StartedAt: m.startedAt,
 		// The ATTEMPT's duration, not the manager default — this is what
 		// a resume reads back, so a training attempt must persist as 0
 		// and stay untimed across a restart.
@@ -651,6 +775,8 @@ func (m *Manager) persistLocked() error {
 		Mode:            m.mode,
 		Results:         m.results,
 		GradeError:      m.gradeError,
+		Answers:         m.answers,
+		QuestionIDs:     m.questionIDs,
 	}
 	if !m.endedAt.IsZero() {
 		endedAt := m.endedAt

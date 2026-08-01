@@ -246,11 +246,24 @@ through.
 | Step | Owner | What happens |
 |---|---|---|
 | Lobby | facilitator | Serves the embedded UI, the bank catalog through the control proxy, and `GET /api/exam`. |
-| Start | facilitator | `POST /api/session/start` moves idle -> running and arms an expiry timer. 409 until k8s-env is ready. |
+| Start | facilitator | `POST /api/session/start` moves idle -> running and arms an expiry timer. 409 until k8s-env is ready (hands-on banks only — see below). |
 | Work | desktop, instances | The candidate drives Xfce over noVNC, reaches `instance-1` and `instance-2` over ssh, and reads docs through docs-proxy. |
 | End | facilitator | Submit, or the timer expires. running -> ended, and the desktop locks. |
 | Grade | facilitator | `internal/evaluate` runs every check over ssh, asynchronously. |
 | Score | facilitator | `GET /api/results` serves the graded breakdown; solutions unlock. |
+
+A multiple-choice bank (`spec.examType: mcq` — KCNA today) runs the
+same lifecycle on the same session machinery with the cluster cut out
+of the loop entirely. Start skips the readiness gate, since nothing the
+boot is building is used; the Work step is the UI alone, with every
+option click stored via `PUT /api/questions/{id}/answer` into the
+session file (the first candidate input this product persists —
+format v4); and Grade is `internal/mcqgrade` scoring the stored
+selections against the bank's key, pure and instant, into the same
+Results schema `evaluate` produces. k8s-env still boots and still skips
+per-question seeding for such banks (`images/k8s-env/bootstrap.sh`
+branches on examType), so switching back to a hands-on bank costs a
+normal switch, not a cold boot.
 
 The mode is chosen once at start and is immutable for the life of the
 attempt: `exam` is the bank's duration with no help, `training` is

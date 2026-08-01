@@ -1,0 +1,1 @@
+A platform team maintains one set of base Kubernetes manifests and needs slightly different variants for dev, staging, and production — different replica counts and image tags — without introducing a templating language. Which approach fits best?

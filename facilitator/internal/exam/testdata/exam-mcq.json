@@ -1,0 +1,42 @@
+{
+  "apiVersion": "sim.kubestronaut.dev/v1alpha2",
+  "kind": "Exam",
+  "metadata": {
+    "name": "kcna-fixture",
+    "title": "KCNA Fixture Exam"
+  },
+  "spec": {
+    "examType": "mcq",
+    "duration": "90m",
+    "speedDuration": "45m",
+    "passingScore": 75,
+    "kubernetesVersion": "1.35",
+    "questions": [
+      {
+        "id": "q01",
+        "domain": "Kubernetes Fundamentals",
+        "multi": false,
+        "options": [
+          "The kubelet",
+          "The kube-scheduler",
+          "The kube-apiserver",
+          "etcd"
+        ],
+        "correct": [2]
+      },
+      {
+        "id": "q02",
+        "domain": "Container Orchestration",
+        "weight": 2,
+        "multi": true,
+        "options": [
+          "CNI",
+          "CSI",
+          "SMI",
+          "CRI"
+        ],
+        "correct": [0, 3]
+      }
+    ]
+  }
+}

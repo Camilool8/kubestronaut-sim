@@ -47,9 +47,17 @@ pull_retry() {
 
 # Archive path for a prebaked image, or empty if it was not baked in.
 # The transform has to match the one the Dockerfile's preload stage uses.
+#
+# Must return 0 either way: load_image calls this inside a command
+# substitution, and under `set -e` a non-zero status there kills the
+# whole bootstrap — which silently turned the documented pull fallback
+# for a non-prebaked image into an instant boot failure with no output.
 archive_for() {
-  local path="/opt/sim/images/$(printf '%s' "$1" | tr '/:@' '___').tar"
-  [ -f "$path" ] && printf '%s' "$path"
+  local path
+  path="/opt/sim/images/$(printf '%s' "$1" | tr '/:@' '___').tar"
+  if [ -f "$path" ]; then
+    printf '%s' "$path"
+  fi
 }
 
 # Side-loads images into the kind nodes. Prefers an archive baked into
@@ -153,9 +161,17 @@ kubectl -n ingress-nginx wait --for=condition=Available \
 # it, so it has to exist by the time seeding starts.
 
 # seed only a freshly created cluster — re-seeding a resumed one would
-# overwrite candidate work (setup.sh scripts re-apply initial state)
+# overwrite candidate work (setup.sh scripts re-apply initial state).
+# An mcq bank has no setup.sh at all (docs/bank-spec.md): the questions
+# live entirely in exam.yaml and the answers in the facilitator's
+# session, so there is nothing to seed and the loop below would crash on
+# the missing scripts.
+exam_type=$(yq -r '.spec.examType // "hands-on"' "${BANK_DIR}/exam.yaml")
 phase seed "Setting up the exam questions" 7
-if [ "$created" = "1" ]; then
+if [ "$exam_type" = "mcq" ]; then
+  echo "multiple-choice bank; no cluster seeding needed"
+  detail "no cluster seeding for a multiple-choice bank"
+elif [ "$created" = "1" ]; then
   preload_bank_images
   qids=$(yq -r '.spec.questions[].id' "${BANK_DIR}/exam.yaml")
   total=$(printf '%s\n' "$qids" | grep -c . || true)
@@ -176,27 +192,40 @@ fi
 
 # regenerate the desktop's login banner for the active bank (consumed by
 # the desktop image's .bashrc; regenerated on every bootstrap so a bank
-# switch or reset updates it)
+# switch or reset updates it). The mcq variant exists for the corner
+# case of opening the desktop with an mcq bank active — nothing there
+# refers to instances that play no part in the exam.
 mkdir -p /shared/exam
 title=$(yq -r '.metadata.title' "${BANK_DIR}/exam.yaml")
-{
-  echo "=============================================================="
-  echo " ${title}"
-  echo "=============================================================="
-  echo " Solve questions on the exam instances:"
-  for inst in $(yq -r '.spec.instances[].name' "${BANK_DIR}/exam.yaml"); do
-    echo "   ssh ${inst}"
-  done
-  echo " Working directories are pre-created at /opt/course/<n>."
-  echo " Firefox is limited to the allowlisted documentation sites."
-  # One instruction, no platform caveat. The browser intercepts Ctrl+V and
-  # Cmd+V identically over the canvas and turns either into the terminal's
-  # Ctrl+Shift+V (ui/src/components/DesktopViewport.tsx), so Ctrl+V is
-  # true for everyone reading this and there is nothing to qualify.
-  echo " Click any value in the question panel to copy it, then paste"
-  echo " here with Ctrl+V."
-  echo "=============================================================="
-} > /shared/exam/motd
+if [ "$exam_type" = "mcq" ]; then
+  {
+    echo "=============================================================="
+    echo " ${title}"
+    echo "=============================================================="
+    echo " This is a multiple-choice exam: answer in the question panel."
+    echo " The desktop is not needed for this bank."
+    echo "=============================================================="
+  } > /shared/exam/motd
+else
+  {
+    echo "=============================================================="
+    echo " ${title}"
+    echo "=============================================================="
+    echo " Solve questions on the exam instances:"
+    for inst in $(yq -r '.spec.instances[].name' "${BANK_DIR}/exam.yaml"); do
+      echo "   ssh ${inst}"
+    done
+    echo " Working directories are pre-created at /opt/course/<n>."
+    echo " Firefox is limited to the allowlisted documentation sites."
+    # One instruction, no platform caveat. The browser intercepts Ctrl+V and
+    # Cmd+V identically over the canvas and turns either into the terminal's
+    # Ctrl+Shift+V (ui/src/components/DesktopViewport.tsx), so Ctrl+V is
+    # true for everyone reading this and there is nothing to qualify.
+    echo " Click any value in the question panel to copy it, then paste"
+    echo " here with Ctrl+V."
+    echo "=============================================================="
+  } > /shared/exam/motd
+fi
 
 phase finalize "Finishing up" 8
 touch /shared/ready

@@ -1,0 +1,7 @@
+**etcd uses the Raft consensus algorithm, which requires a majority (quorum) of members to agree before committing a write; an odd number maximizes fault tolerance per added member without the wasted node that an even-sized cluster would add** is correct: a 3-member cluster tolerates 1 failure with a majority of 2 still available; a 5-member cluster tolerates 2 failures. A 4-member cluster still only tolerates 1 failure (needing a majority of 3) — the same fault tolerance as a 3-member cluster, for one extra node providing zero additional benefit. Odd sizes are simply the efficient choice for the same reason in any majority-quorum system.
+
+Why the others are wrong:
+
+- **etcd's storage engine only supports an odd number of shards** — etcd is not a sharded database; every member of the cluster holds the full replicated dataset, so sharding is not a relevant concept here at all.
+- **An odd number is required so the Kubernetes API server can round-robin requests evenly** — the API server's connections to etcd (and any load balancing among them) have nothing to do with cluster SIZE being odd or even; that is purely a consequence of Raft's majority-quorum requirement.
+- **Even-numbered etcd clusters are not supported by the Kubernetes API at all** — an even-sized etcd cluster is technically valid and will run; it is simply a worse trade-off (no extra fault tolerance for the added member), not something Kubernetes refuses to operate against.

@@ -34,7 +34,7 @@ it as `MISSING (./sim up needs it)` (`sim:74`).
 | `./sim reset` | POSTs `/api/control/reset` and polls `/api/control/status` until the job settles. Same code path as the UI's New attempt button. | The session, both instances' work directories and podman stores, the exam registry's contents, and the kind cluster. |
 | `./sim ssh [instance]` | `docker compose exec <instance> su - candidate`, defaulting to `instance-1`. | Nothing. |
 | `./sim status` | `docker compose ps`. | Nothing. |
-| `./sim grade` | Runs the facilitator's session-free scoreboard against the environment as it stands (`docker compose exec facilitator /entrypoint.sh grade`). | Nothing. It records no result and touches no session state. |
+| `./sim grade` | Runs the facilitator's session-free scoreboard against the environment as it stands (`docker compose exec facilitator /entrypoint.sh grade`). Hands-on banks only: an mcq bank's answers live in the session, not the cluster, so `grade` refuses with a pointer to the UI/API rather than printing a misleading 0%. | Nothing. It records no result and touches no session state. |
 | `./sim help` | Prints the usage string. It is also the default with no argument (`sim:4`), and what an unknown subcommand prints before exiting 1 (`sim:120`). | Nothing. |
 
 ### up

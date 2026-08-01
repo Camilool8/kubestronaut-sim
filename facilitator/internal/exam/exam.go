@@ -9,8 +9,10 @@ package exam
 
 import (
 	"bufio"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -20,11 +22,22 @@ import (
 	"time"
 )
 
+// The two exam types a bank may declare in spec.examType. An empty value
+// normalizes to TypeHandsOn: v1alpha1 banks predate the field.
+const (
+	TypeHandsOn = "hands-on"
+	TypeMCQ     = "mcq"
+)
+
 // Exam is a fully loaded exam: its metadata plus every question and the
 // checks that grade it.
 type Exam struct {
 	Name              string
 	Title             string
+	// Type is spec.examType, normalized: TypeHandsOn or TypeMCQ. Any
+	// other value is a load error — the conductor should never have made
+	// such a bank active, and the facilitator must not guess.
+	Type              string
 	Duration          time.Duration // parsed from spec.duration, e.g. "120m"
 	// SpeedDuration is the compressed clock for a speed attempt. A bank
 	// may set spec.speedDuration; otherwise it is half Duration, which is
@@ -33,21 +46,40 @@ type Exam struct {
 	PassingScore      int
 	KubernetesVersion string
 	Questions         []Question // in exam.yaml order
+
+	// DomainWeights is spec.domainWeights: each curriculum domain's
+	// published percentage share. Historically read by no Go code (only
+	// tests/bank-mcq.sh, a build gate) — DrawMCQ is what made it a
+	// runtime value, since a pooled draw needs it to know each domain's
+	// target question count.
+	DomainWeights map[string]int
+	// ExamLength is spec.examLength: how many questions a pooled mcq
+	// attempt draws from Questions. Zero (or >= len(Questions)) means no
+	// pooling — DrawMCQ returns every question, in bank order, exactly
+	// as every mcq bank behaved before this field existed.
+	ExamLength int
 }
 
 // Question is a single exam question: its identity plus the checks that
-// grade a candidate's solution to it.
+// grade a candidate's solution to it (hands-on), or its options and
+// answer key (mcq).
 type Question struct {
 	ID       string
-	Instance string
+	Instance string // hands-on only
 	Domain   string
 	Weight   int
-	Checks   []Check // in lexical order of validate.d/*.sh
+	Checks   []Check // in lexical order of validate.d/*.sh; hands-on only
 	// HintCount is how many tiers <qid>/hints.md declares. Only the count
 	// is loaded at boot; the text is read per request, exactly as
 	// question.md and solution.md already are — so editing a hint needs
 	// no restart, and a bank with no hints is not an error.
 	HintCount int
+
+	// MCQ only. Correct holds strictly increasing indices into Options
+	// and is never serialized to the client before grading.
+	Options []string
+	Correct []int
+	Multi   bool // true = "select all that apply"
 }
 
 // Check is one scoring criterion for a question, backed by a single
@@ -67,15 +99,21 @@ type examDoc struct {
 		Title string `json:"title"`
 	} `json:"metadata"`
 	Spec struct {
-		Duration          string `json:"duration"`
-		SpeedDuration     string `json:"speedDuration"`
-		PassingScore      int    `json:"passingScore"`
-		KubernetesVersion string `json:"kubernetesVersion"`
+		ExamType          string         `json:"examType"`
+		Duration          string         `json:"duration"`
+		SpeedDuration     string         `json:"speedDuration"`
+		PassingScore      int            `json:"passingScore"`
+		KubernetesVersion string         `json:"kubernetesVersion"`
+		DomainWeights     map[string]int `json:"domainWeights"`
+		ExamLength        int            `json:"examLength"`
 		Questions         []struct {
-			ID       string `json:"id"`
-			Instance string `json:"instance"`
-			Domain   string `json:"domain"`
-			Weight   int    `json:"weight"`
+			ID       string   `json:"id"`
+			Instance string   `json:"instance"`
+			Domain   string   `json:"domain"`
+			Weight   int      `json:"weight"`
+			Options  []string `json:"options"`
+			Correct  []int    `json:"correct"`
+			Multi    bool     `json:"multi"`
 		} `json:"questions"`
 	} `json:"spec"`
 }
@@ -109,31 +147,92 @@ func Load(examJSONPath, bankDir string) (*Exam, error) {
 		}
 	}
 
+	examType := doc.Spec.ExamType
+	if examType == "" {
+		examType = TypeHandsOn
+	}
+	if examType != TypeHandsOn && examType != TypeMCQ {
+		return nil, fmt.Errorf("exam: unknown spec.examType %q", examType)
+	}
+
 	e := &Exam{
 		Name:              doc.Metadata.Name,
 		Title:             doc.Metadata.Title,
+		Type:              examType,
 		Duration:          dur,
 		SpeedDuration:     speed,
 		PassingScore:      doc.Spec.PassingScore,
 		KubernetesVersion: doc.Spec.KubernetesVersion,
+		DomainWeights:     doc.Spec.DomainWeights,
+		ExamLength:        doc.Spec.ExamLength,
 	}
 
 	for _, q := range doc.Spec.Questions {
-		checks, err := loadChecks(bankDir, q.ID)
-		if err != nil {
-			return nil, err
-		}
-		e.Questions = append(e.Questions, Question{
+		question := Question{
 			ID:        q.ID,
 			Instance:  q.Instance,
 			Domain:    q.Domain,
 			Weight:    q.Weight,
-			Checks:    checks,
 			HintCount: countHints(bankDir, q.ID),
-		})
+		}
+		switch examType {
+		case TypeMCQ:
+			if err := validateMCQ(q.ID, q.Options, q.Correct, q.Multi); err != nil {
+				return nil, err
+			}
+			question.Options = q.Options
+			question.Correct = q.Correct
+			question.Multi = q.Multi
+			// The real exam scores uniformly; weight stays optional.
+			if question.Weight == 0 {
+				question.Weight = 1
+			}
+		default:
+			checks, err := loadChecks(bankDir, q.ID)
+			if err != nil {
+				return nil, err
+			}
+			question.Checks = checks
+		}
+		e.Questions = append(e.Questions, question)
+	}
+
+	if examType == TypeMCQ && e.ExamLength > len(e.Questions) {
+		return nil, fmt.Errorf("exam: spec.examLength %d exceeds the pool of %d questions", e.ExamLength, len(e.Questions))
 	}
 
 	return e, nil
+}
+
+// validateMCQ enforces the answer-key shape documented in
+// docs/bank-spec.md: 3-6 options; correct indices strictly increasing and
+// in range; a single-answer question has exactly one, a multi-select at
+// least two and fewer than all.
+func validateMCQ(qid string, options []string, correct []int, multi bool) error {
+	if len(options) < 3 || len(options) > 6 {
+		return fmt.Errorf("exam: question %s must declare 3-6 options, has %d", qid, len(options))
+	}
+	if len(correct) == 0 {
+		return fmt.Errorf("exam: question %s declares no correct indices", qid)
+	}
+	for i, c := range correct {
+		if c < 0 || c >= len(options) {
+			return fmt.Errorf("exam: question %s correct index %d is out of range for %d options", qid, c, len(options))
+		}
+		if i > 0 && c <= correct[i-1] {
+			return fmt.Errorf("exam: question %s correct indices must be strictly increasing, got %v", qid, correct)
+		}
+	}
+	if !multi && len(correct) != 1 {
+		return fmt.Errorf("exam: single-answer question %s must declare exactly one correct index, has %d", qid, len(correct))
+	}
+	if multi && len(correct) < 2 {
+		return fmt.Errorf("exam: multi-select question %s must declare at least two correct indices, has %d", qid, len(correct))
+	}
+	if multi && len(correct) >= len(options) {
+		return fmt.Errorf("exam: multi-select question %s must declare fewer than all options as correct", qid)
+	}
+	return nil
 }
 
 // loadChecks reads bankDir/qid/validate.d/*.sh in lexical filename order
@@ -251,6 +350,146 @@ func countHints(bankDir, qid string) int {
 		return 0
 	}
 	return len(hintHeading.FindAllIndex(raw, -1))
+}
+
+// DrawMCQ returns the question ids for one mcq attempt: a fresh, random,
+// domain-stratified subset sized to ex.ExamLength when ex has opted into
+// pooling (ExamLength set and smaller than the pool), or every question
+// in ex.Questions, unchanged, in bank order, otherwise — a hands-on
+// exam, an mcq bank with no ExamLength, and the hidden smoke-mcq fixture
+// all take this path, so pooling is additive and never a default a bank
+// falls into by accident.
+//
+// Each domain contributes a fixed target count (domainTargets' largest-
+// remainder rounding of ex.DomainWeights against ex.ExamLength) rather
+// than letting the draw land wherever chance puts it — a candidate's set
+// of questions must match the curriculum's published weights every time,
+// not just on average, which an unstratified sample cannot promise.
+func DrawMCQ(ex *Exam) ([]string, error) {
+	all := make([]string, len(ex.Questions))
+	for i, q := range ex.Questions {
+		all[i] = q.ID
+	}
+	if ex.Type != TypeMCQ || ex.ExamLength <= 0 || ex.ExamLength >= len(ex.Questions) {
+		return all, nil
+	}
+
+	// Domain order comes from first appearance in Questions, not from
+	// DomainWeights (a map, so unordered) — this is what keeps the drawn
+	// exam flowing through the curriculum in the same order the bank was
+	// authored in (Fundamentals, Orchestration, ...), with only the
+	// identity and order WITHIN a domain randomized.
+	var domainOrder []string
+	poolByDomain := map[string][]string{}
+	seenDomain := map[string]bool{}
+	for _, q := range ex.Questions {
+		if !seenDomain[q.Domain] {
+			seenDomain[q.Domain] = true
+			domainOrder = append(domainOrder, q.Domain)
+		}
+		poolByDomain[q.Domain] = append(poolByDomain[q.Domain], q.ID)
+	}
+
+	targets, err := domainTargets(ex.DomainWeights, domainOrder, ex.ExamLength)
+	if err != nil {
+		return nil, err
+	}
+
+	drawn := make([]string, 0, ex.ExamLength)
+	for _, d := range domainOrder {
+		k := targets[d]
+		pool := poolByDomain[d]
+		if k > len(pool) {
+			return nil, fmt.Errorf("exam: domain %q needs %d questions for a %d-question draw, pool has only %d", d, k, ex.ExamLength, len(pool))
+		}
+		shuffled, err := secureShuffle(pool)
+		if err != nil {
+			return nil, err
+		}
+		drawn = append(drawn, shuffled[:k]...)
+	}
+	return drawn, nil
+}
+
+// domainTargets distributes n across the domains in order, in the ratios
+// domainWeights declares, by largest-remainder rounding: each domain
+// first takes floor(weight*n/100), then the few leftover slots (n minus
+// that sum, which is always smaller than len(order) since the weights
+// sum to 100) go to the domains with the largest fractional remainder,
+// ties breaking toward whichever domain appears earlier in order — so
+// the same bank always targets the same counts; only DrawMCQ's shuffle
+// varies between attempts.
+func domainTargets(domainWeights map[string]int, order []string, n int) (map[string]int, error) {
+	if len(domainWeights) == 0 {
+		return nil, fmt.Errorf("exam: spec.domainWeights is required to draw a %d-question subset", n)
+	}
+
+	type remainder struct {
+		domain string
+		frac   float64
+		index  int
+	}
+
+	targets := make(map[string]int, len(order))
+	remainders := make([]remainder, 0, len(order))
+	assigned := 0
+	for i, d := range order {
+		w, ok := domainWeights[d]
+		if !ok {
+			return nil, fmt.Errorf("exam: domain %q has questions but no spec.domainWeights entry", d)
+		}
+		raw := float64(w) * float64(n) / 100
+		floor := int(raw)
+		targets[d] = floor
+		assigned += floor
+		remainders = append(remainders, remainder{domain: d, frac: raw - float64(floor), index: i})
+	}
+
+	leftover := n - assigned
+	if leftover < 0 || leftover > len(order) {
+		return nil, fmt.Errorf("exam: domainWeights do not add up cleanly for a %d-question draw", n)
+	}
+
+	sort.Slice(remainders, func(i, j int) bool {
+		if remainders[i].frac != remainders[j].frac {
+			return remainders[i].frac > remainders[j].frac
+		}
+		return remainders[i].index < remainders[j].index
+	})
+	for i := 0; i < leftover; i++ {
+		targets[remainders[i].domain]++
+	}
+	return targets, nil
+}
+
+// secureShuffle returns a copy of ids in a cryptographically random
+// order (Fisher-Yates); ids itself is never mutated.
+func secureShuffle(ids []string) ([]string, error) {
+	out := make([]string, len(ids))
+	copy(out, ids)
+	for i := len(out) - 1; i > 0; i-- {
+		j, err := secureIntn(i + 1)
+		if err != nil {
+			return nil, err
+		}
+		out[i], out[j] = out[j], out[i]
+	}
+	return out, nil
+}
+
+// secureIntn returns a uniform random int in [0, n) using crypto/rand —
+// the same source the session package already uses for attempt tokens,
+// rather than introducing math/rand's separate, unseeded-by-default
+// convention into a codebase that has never needed it.
+func secureIntn(n int) (int, error) {
+	if n <= 1 {
+		return 0, nil
+	}
+	bi, err := rand.Int(rand.Reader, big.NewInt(int64(n)))
+	if err != nil {
+		return 0, fmt.Errorf("exam: draw randomness: %w", err)
+	}
+	return int(bi.Int64()), nil
 }
 
 // SplitHints returns the tier bodies of a hints.md, in order. Text before

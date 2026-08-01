@@ -106,6 +106,10 @@ export function ControlProgress({
   const jobStarted = parseStamp(job.startedAt);
   const totalElapsed = jobStarted === null ? null : formatElapsed(now - jobStarted);
   const doneCount = job.phases.filter((p) => p.state === "done").length;
+  // An mcq reset/switch never advertises this phase — see resetPhases/
+  // switchPhases in control.go. Its absence is exactly the "no cluster
+  // rebuild" signal the hint needs, with no extra prop to thread through.
+  const hasClusterRebuild = job.phases.some((p) => p.id === "recreate-cluster");
 
   return (
     <div className="control-overlay">
@@ -188,7 +192,7 @@ export function ControlProgress({
         ) : (
           <>
             <p className="control-hint">
-              {strings.control.hint}
+              {hasClusterRebuild ? strings.control.hint : strings.control.hintFast}
               {totalElapsed && (
                 <span className="control-elapsed" aria-hidden="true">
                   {strings.control.elapsed(totalElapsed)}

@@ -1,0 +1,1 @@
+A team runs its Kubernetes cluster on a managed cloud provider and wants to expose a web application to the public internet. They want the cloud provider to automatically provision an external IP address that routes traffic to the Service's Pods. Which Service type should they choose?

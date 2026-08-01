@@ -78,7 +78,11 @@ type bankDoc struct {
 		Duration          string `json:"duration"`
 		PassingScore      int    `json:"passingScore"`
 		KubernetesVersion string `json:"kubernetesVersion"`
-		Instances         []struct {
+		// ExamLength is a pooled mcq bank's declared draw size — see
+		// docs/bank-spec.md. The catalog card must show this, not the
+		// size of the full authored pool behind it.
+		ExamLength int `json:"examLength"`
+		Instances  []struct {
 			Name string `json:"name"`
 		} `json:"instances"`
 		Questions []struct {
@@ -151,6 +155,17 @@ func (c *Catalog) mergeComingSoon(path string, raw []byte) {
 	}
 }
 
+// declaredQuestionCount mirrors the facilitator's own
+// (*server).declaredQuestionCount: a pooled mcq bank's card shows its
+// draw size, not the full authored pool behind it. examLength <= 0 or
+// >= poolSize means no pooling, exactly as exam.DrawMCQ treats it.
+func declaredQuestionCount(examLength, poolSize int) int {
+	if examLength > 0 && examLength < poolSize {
+		return examLength
+	}
+	return poolSize
+}
+
 func buildEntry(id string, raw []byte) (Entry, error) {
 	var doc bankDoc
 	if err := json.Unmarshal(raw, &doc); err != nil {
@@ -173,7 +188,7 @@ func buildEntry(id string, raw []byte) (Entry, error) {
 		ExamType:          examType,
 		PassingScore:      doc.Spec.PassingScore,
 		KubernetesVersion: doc.Spec.KubernetesVersion,
-		QuestionCount:     len(doc.Spec.Questions),
+		QuestionCount:     declaredQuestionCount(doc.Spec.ExamLength, len(doc.Spec.Questions)),
 		Available:         true,
 		Hidden:            doc.Metadata.Hidden,
 	}
@@ -189,24 +204,35 @@ func buildEntry(id string, raw []byte) (Entry, error) {
 		entry.Note = "bank id is not a valid slug"
 		return entry, nil
 	}
-	if examType != "hands-on" {
+	switch examType {
+	case "hands-on":
+		if len(doc.Spec.Instances) == 0 || len(doc.Spec.Instances) > len(allowedInstances) {
+			entry.Available = false
+			entry.Note = "bank must declare 1-2 instances"
+			return entry, nil
+		}
+		for _, inst := range doc.Spec.Instances {
+			if !allowedInstances[inst.Name] {
+				entry.Available = false
+				entry.Note = fmt.Sprintf("instance %q is outside the fixed instance-1/instance-2 topology", inst.Name)
+				return entry, nil
+			}
+		}
+	case "mcq":
+		// An mcq bank grades in the facilitator, not over ssh; declaring
+		// instances is an authoring mistake, not something to silently
+		// ignore.
+		if len(doc.Spec.Instances) > 0 {
+			entry.Available = false
+			entry.Note = "mcq banks declare no instances"
+			return entry, nil
+		}
+	default:
 		entry.Available = false
 		if entry.Note == "" {
 			entry.Note = fmt.Sprintf("exam type %q has no engine yet", examType)
 		}
 		return entry, nil
-	}
-	if len(doc.Spec.Instances) == 0 || len(doc.Spec.Instances) > len(allowedInstances) {
-		entry.Available = false
-		entry.Note = "bank must declare 1-2 instances"
-		return entry, nil
-	}
-	for _, inst := range doc.Spec.Instances {
-		if !allowedInstances[inst.Name] {
-			entry.Available = false
-			entry.Note = fmt.Sprintf("instance %q is outside the fixed instance-1/instance-2 topology", inst.Name)
-			return entry, nil
-		}
 	}
 	return entry, nil
 }

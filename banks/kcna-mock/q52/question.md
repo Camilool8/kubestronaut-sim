@@ -1,0 +1,1 @@
+A company must be able to switch all users to a new application version at once, and instantly switch back if problems appear. Running two full production environments in parallel is acceptable. Which delivery strategy best meets these requirements?

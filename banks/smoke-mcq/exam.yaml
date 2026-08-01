@@ -1,0 +1,49 @@
+apiVersion: sim.kubestronaut.dev/v1alpha2
+kind: Exam
+metadata:
+  name: smoke-mcq
+  title: Smoke Test MCQ Bank
+  certification: NONE
+  # Keeps this out of the lobby while leaving it a valid switch target.
+  # See Entry.Hidden in conductor/internal/catalog/catalog.go.
+  hidden: true
+  description: >-
+    Not an exam. Three trivial multiple-choice questions that exist so
+    tests can exercise the mcq engine — loader, answer endpoints, grading,
+    bank switching — without depending on the full kcna-mock bank. An mcq
+    bank needs no cluster seeding, so switching to it costs seconds.
+spec:
+  examType: mcq
+  duration: 90m
+  speedDuration: 45m
+  passingScore: 75
+  kubernetesVersion: "1.35"
+  domainWeights:
+    Smoke: 100
+  questions:
+    - id: q01
+      domain: Smoke
+      multi: false
+      options:
+        - Blue
+        - Green
+        - Red
+      correct: [1]
+    - id: q02
+      domain: Smoke
+      multi: false
+      options:
+        - One
+        - Two
+        - Three
+        - Four
+      correct: [2]
+    - id: q03
+      domain: Smoke
+      multi: true
+      options:
+        - Monday
+        - Saturday
+        - Wednesday
+        - Sunday
+      correct: [1, 3]

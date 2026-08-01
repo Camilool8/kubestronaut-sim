@@ -76,6 +76,13 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
     bank = os.path.basename(bank_dir)
     text = open(exam_path, encoding="utf-8").read()
 
+    # MCQ banks have a different question shape (no instance, no
+    # validate.d) and their own gate: tests/bank-mcq.sh. Skip them here
+    # BEFORE the directory cross-check, or (3) fails on every mcq bank.
+    if re.search(r"^\s*examType:\s*mcq\s*$", text, re.M):
+        print(f"{bank}: mcq — covered by tests/bank-mcq.sh")
+        continue
+
     questions = [m.groupdict() for m in Q_RE.finditer(text)]
     on_disk = sorted(
         os.path.basename(p) for p in glob.glob(os.path.join(bank_dir, "q*"))

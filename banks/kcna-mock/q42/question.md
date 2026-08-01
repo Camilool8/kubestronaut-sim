@@ -1,0 +1,1 @@
+A pod is `Running` and its containers are not restarting, but it never receives any traffic from the Service that selects it. Describing the pod shows that its readiness probe has been failing since startup. What is happening?

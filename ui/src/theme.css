@@ -2877,3 +2877,260 @@
   color: var(--text-muted);
   font-style: italic;
 }
+
+/* ===== Multiple-choice exam screen =====
+
+   One centred column: nav row, stem, options. Reuses the hands-on
+   panel's .question-nav / .question-jump / .question-tile families so
+   the two exam types read as one product; everything mcq-specific is
+   namespaced .mcq-*. Mobile-first — this is the one exam type with no
+   desktop requirement, so the column simply narrows on a phone. */
+
+.mcq-layout {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* overflow: hidden, not auto — the column below owns its own scroll
+   (Scroll-Inside Rule) so .mcq-footer can stay pinned under it instead
+   of drifting off with a long stem. A short question no longer leaves a
+   dead run of viewport under the options: the footer's margin-top: auto
+   pulls it down to the bottom of this box every time. */
+.mcq-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  padding: var(--space-4) var(--space-3);
+}
+
+/* position: relative is load-bearing: .question-jump (reused as
+   .mcq-jump) is absolutely positioned against this box, exactly as it
+   is against .question-panel on the hands-on screen. min-height: 0 lets
+   .mcq-pane's overflow-y actually engage instead of stretching the flex
+   column past its parent. */
+.mcq-question {
+  position: relative;
+  width: 100%;
+  max-width: 760px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mcq-pane {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-3) 0;
+}
+
+/* Previous / progress / Next-or-End Exam, pinned to the foot of the
+   column. Exactly one primary button on screen at a time: End Exam only
+   replaces Next once there is no next question to go to. */
+.mcq-footer {
+  flex-shrink: 0;
+  margin-top: auto;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.mcq-progress {
+  font-family: var(--font-mono);
+  font-size: var(--text-s);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --text-m is 15px because the hands-on question panel shares the
+   screen with a terminal (DESIGN.md, Typography). Nothing here shares
+   space with anything: this column is the whole screen, so its prose
+   gets the next step up rather than staying pinned to that constraint.
+   --text-l is an existing permission, not a new size — see p/li below;
+   headings are untouched, they already sit at --text-l or above. */
+.mcq-question .md p,
+.mcq-question .md li,
+.mcq-question .md blockquote {
+  font-size: var(--text-l);
+  line-height: 1.65;
+}
+
+.mcq-options {
+  border: 0;
+  padding: 0;
+  margin: var(--space-4) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mcq-options legend {
+  font-size: var(--text-s);
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.mcq-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--surface-raised);
+  cursor: pointer;
+  /* 44px minimum touch target on the row itself. */
+  min-height: 44px;
+}
+
+.mcq-option:hover {
+  border-color: var(--accent);
+}
+
+.mcq-option-on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* The native control stays visible and focusable — it is the input, and
+   its focus ring is the keyboard affordance. */
+.mcq-option input {
+  margin-top: 2px;
+  accent-color: var(--accent);
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.mcq-option-letter,
+.mcq-review-option .mcq-option-letter {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.mcq-option-on .mcq-option-letter {
+  color: var(--accent-strong);
+}
+
+.mcq-option-text {
+  min-width: 0;
+}
+
+/* Scoped to the live exam, not the shared .mcq-option-text/-letter used
+   by the score screen's answer review — that stays at the review's own
+   compact scale. */
+.mcq-question .mcq-option-text {
+  font-size: var(--text-l);
+  line-height: 1.5;
+}
+
+.mcq-question .mcq-option-letter {
+  font-size: var(--text-l);
+}
+
+.mcq-check-answer {
+  margin-top: var(--space-4);
+}
+
+/* The jump grid tile's answered state: same slot the hands-on grid
+   spends on points, here a check that means "an answer is saved". */
+.question-tile-answered {
+  width: 14px;
+  height: 14px;
+  color: var(--success);
+}
+
+.question-tile.answered {
+  border-color: var(--border-strong);
+}
+
+/* ===== Score-screen answer review (mcq) ===== */
+
+.mcq-review-summary {
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+.mcq-review-label {
+  color: var(--text-muted);
+}
+
+.mcq-review-options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.mcq-review-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+}
+
+.mcq-review-correct {
+  border-color: var(--success);
+}
+
+.mcq-review-missed {
+  border-style: dashed;
+  border-color: var(--success);
+}
+
+.mcq-review-wrong {
+  border-color: var(--danger);
+}
+
+/* Icon + text, right-aligned; the border colour is reinforcement, the
+   words are the information. */
+.mcq-review-state {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-s);
+  color: var(--text-muted);
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.mcq-review-state svg {
+  width: 14px;
+  height: 14px;
+}
+
+.mcq-review-correct .mcq-review-state svg,
+.mcq-review-missed .mcq-review-state svg {
+  color: var(--success);
+}
+
+.mcq-review-wrong .mcq-review-state svg {
+  color: var(--danger);
+}
+
+@media (max-width: 640px) {
+  .mcq-body {
+    padding: var(--space-3) var(--space-2);
+  }
+
+  .mcq-review-option {
+    flex-wrap: wrap;
+  }
+
+  .mcq-review-state {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

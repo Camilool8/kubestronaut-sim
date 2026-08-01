@@ -151,6 +151,7 @@ type examResponse struct {
 	DurationSeconds   int    `json:"durationSeconds"`
 	PassingScore      int    `json:"passingScore"`
 	KubernetesVersion string `json:"kubernetesVersion"`
+	QuestionCount     int    `json:"questionCount"`
 	Questions         []struct {
 		ID          string `json:"id"`
 		Instance    string `json:"instance"`
@@ -186,6 +187,9 @@ func TestExam(t *testing.T) {
 	}
 	if len(got.Questions) != 2 {
 		t.Fatalf("len(Questions) = %d, want 2", len(got.Questions))
+	}
+	if got.QuestionCount != 2 {
+		t.Errorf("QuestionCount = %d, want 2 (no pooling — mirrors len(Questions))", got.QuestionCount)
 	}
 
 	q01, q02 := got.Questions[0], got.Questions[1]

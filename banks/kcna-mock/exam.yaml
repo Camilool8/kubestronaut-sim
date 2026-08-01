@@ -1,0 +1,903 @@
+apiVersion: sim.kubestronaut.dev/v1alpha2
+kind: Exam
+metadata:
+  name: kcna-mock
+  title: KCNA Mock Exam
+  certification: KCNA
+  description: >-
+    65 questions drawn each attempt from a 97-question pool, in the real
+    exam's shape: 90 minutes, 75% to pass, weighted across the four KCNA
+    curriculum domains. Single-answer and select-all-that-apply items,
+    each with a full explanation for review.
+spec:
+  examType: mcq
+  duration: 90m
+  speedDuration: 45m
+  passingScore: 75
+  kubernetesVersion: "1.35"
+  domainWeights:
+    Kubernetes Fundamentals: 44
+    Container Orchestration: 28
+    Cloud Native Application Delivery: 16
+    Cloud Native Architecture: 12
+  # A pooled bank: 97 authored questions, 65 drawn at random per attempt,
+  # stratified by domainWeights so every draw still lands within the
+  # published curriculum split (see exam.DrawMCQ). Below 65 the pool is
+  # small enough to just serve whole, as every mcq bank did before this
+  # field existed — see docs/bank-spec.md.
+  examLength: 65
+  questions:
+    - id: q01
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "The kubelet"
+        - "The kube-scheduler"
+        - "The kube-apiserver"
+        - "The kube-controller-manager"
+      correct: [2]
+    - id: q02
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "kube-proxy"
+        - "The kubelet"
+        - "The container runtime"
+        - "The kube-controller-manager"
+      correct: [1]
+    - id: q03
+      domain: Kubernetes Fundamentals
+      multi: true
+      options:
+        - "kube-scheduler"
+        - "kubelet"
+        - "etcd"
+        - "kube-proxy"
+        - "The container runtime"
+      correct: [0, 2]
+    - id: q04
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "A physical or virtual machine that runs containerized workloads"
+        - "A lightweight virtual machine that isolates each container with its own kernel"
+        - "A controller that keeps a specified number of container replicas running"
+        - "The smallest deployable unit in Kubernetes: one or more containers that share networking and storage"
+      correct: [3]
+    - id: q05
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "An init container"
+        - "A sidecar container"
+        - "An ephemeral container"
+        - "A static Pod"
+      correct: [1]
+    - id: q06
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "The cluster has accepted the Pod, but one or more of its containers are not running yet"
+        - "All containers in the Pod terminated successfully and will not be restarted"
+        - "The Pod is running but is failing its readiness probe"
+        - "The Pod was deleted and is waiting for garbage collection"
+      correct: [0]
+    - id: q07
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "Stable network identities and ordered startup for each Pod replica"
+        - "The guarantee that exactly one Pod runs on every node in the cluster"
+        - "The ability to run Pods to completion on a schedule"
+        - "Declarative rolling updates and rollbacks, managed by creating and scaling ReplicaSets"
+      correct: [3]
+    - id: q08
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "Deployment"
+        - "StatefulSet"
+        - "DaemonSet"
+        - "Job"
+      correct: [2]
+    - id: q09
+      domain: Kubernetes Fundamentals
+      multi: true
+      options:
+        - "Job"
+        - "ReplicaSet"
+        - "CronJob"
+        - "DaemonSet"
+      correct: [0, 2]
+    - id: q10
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "StatefulSet"
+        - "Deployment"
+        - "DaemonSet"
+        - "ReplicaSet"
+      correct: [0]
+    - id: q11
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "Annotations"
+        - "Labels"
+        - "Label selectors"
+        - "Namespaces"
+      correct: [0]
+    - id: q12
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "Labels"
+        - "Namespaces"
+        - "Resource quotas"
+        - "Annotations"
+      correct: [1]
+    - id: q13
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "The Pod stays deleted until someone reapplies the manifest, because Kubernetes only acts when a manifest is submitted"
+        - "The ReplicaSet scales itself down to 2 replicas to match the new observed state"
+        - "The ReplicaSet controller sees that observed state (2 Pods) differs from desired state (3 Pods) and creates a replacement Pod"
+        - "The kube-scheduler restarts the deleted Pod on the same node with the same name"
+      correct: [2]
+    - id: q14
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "NodePort"
+        - "ClusterIP"
+        - "LoadBalancer"
+        - "ExternalName"
+      correct: [1]
+    - id: q15
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "ClusterIP"
+        - "NodePort"
+        - "LoadBalancer"
+        - "ExternalName"
+      correct: [2]
+    - id: q16
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "api.payments.svc.cluster.local"
+        - "api.svc.payments.cluster.local"
+        - "payments.api.svc.cluster.local"
+        - "api.frontend.svc.cluster.local"
+      correct: [0]
+    - id: q17
+      domain: Kubernetes Fundamentals
+      multi: true
+      options:
+        - "As environment variables in a container, for example with envFrom"
+        - "As files in a volume mounted into the container"
+        - "The kubelet injects every ConfigMap in the namespace into all containers automatically"
+        - "By pulling the ConfigMap as a container image layer at startup"
+      correct: [0, 1]
+    - id: q18
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "The values are encrypted with a key held by the kubelet, so they are safe"
+        - "The values are encrypted with the cluster's CA certificate and can only be decrypted by the API server"
+        - "The values are one-way hashed, so the original data cannot be recovered"
+        - "The values are only base64-encoded, so anyone allowed to read the Secret can trivially decode them"
+      correct: [3]
+    - id: q19
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "A PV is a request for storage that a PVC fulfills by provisioning a disk"
+        - "A PVC is a request for storage by a user that binds to a matching PV"
+        - "A PV and a PVC are two representations of the same API object"
+        - "A PVC creates storage directly on the node's local filesystem by default"
+      correct: [1]
+    - id: q20
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "It enforces storage capacity limits for each namespace"
+        - "It mounts a volume into every Pod in the cluster automatically"
+        - "It allows PersistentVolumes to be provisioned dynamically when a PersistentVolumeClaim requests the class"
+        - "It encrypts all data written to PersistentVolumes by default"
+      correct: [2]
+    - id: q21
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "kubectl describe pod web-0"
+        - "kubectl logs web-0"
+        - "kubectl exec web-0 -- ps aux"
+        - "kubectl get pod web-0 -o wide"
+      correct: [0]
+    - id: q22
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "kubectl create updates existing resources in place, while kubectl apply only works on new resources"
+        - "kubectl apply deletes and recreates the resource on every run"
+        - "kubectl create is required for resources defined in YAML files; apply only works with flags"
+        - "kubectl apply creates the resource if it does not exist and updates it to match the manifest on later runs"
+      correct: [3]
+    - id: q23
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "kubectl config set-cluster prod"
+        - "kubectl config use-context prod"
+        - "kubectl config set-context prod"
+        - "kubectl config view"
+      correct: [1]
+    - id: q24
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "A new controller binary is installed onto every node"
+        - "An existing built-in API resource is replaced with a custom implementation"
+        - "A new resource type is added to the Kubernetes API, so users can create custom objects with kubectl"
+        - "A ServiceAccount is granted permission to manage cluster resources"
+      correct: [2]
+    - id: q25
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "Whether the node has enough allocatable CPU and memory to satisfy the Pod's resource requests"
+        - "The Pod's resource limits, which the scheduler reserves on the node"
+        - "Live CPU utilization reported by metrics-server for each node"
+        - "The node currently running the fewest Pods is always selected"
+      correct: [0]
+    - id: q26
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "A Role applies only to human users, while a ClusterRole applies only to ServiceAccounts"
+        - "A Role grants read-only permissions, while a ClusterRole grants read-write permissions"
+        - "A Role is bound with a ClusterRoleBinding, while a ClusterRole is bound with a RoleBinding"
+        - "A Role grants permissions within a single namespace, while a ClusterRole can cover cluster-scoped resources or be reused across namespaces"
+      correct: [3]
+    - id: q27
+      domain: Container Orchestration
+      multi: true
+      options:
+        - "Compiling application source code into container images on every deployment"
+        - "Automatically replacing containers that fail so the actual state matches the declared desired state"
+        - "Scaling the number of running replicas up or down in response to demand"
+        - "Guaranteeing that application code is free of bugs before it runs"
+      correct: [1, 2]
+    - id: q28
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "A container always includes its own full guest operating system, while a VM shares the host kernel"
+        - "A container shares the host operating system kernel, while a VM runs its own guest operating system on virtualized hardware"
+        - "Containers require a hypervisor to run, while VMs run directly on the host kernel"
+        - "Containers and VMs provide identical isolation because both virtualize hardware"
+      correct: [1]
+    - id: q29
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "A managed registry service operated by the CNCF for hosting official images"
+        - "A Kubernetes-only format for packaging Helm charts"
+        - "Open standards for container image formats, runtimes, and distribution so images and runtimes are interoperable across tools"
+        - "A proprietary container runtime maintained by a single vendor"
+      correct: [2]
+    - id: q30
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "It defines a standard API that lets the kubelet manage containers through any compatible runtime, such as containerd or CRI-O"
+        - "It provides pod-to-pod networking between nodes"
+        - "It schedules pods onto nodes based on resource requests"
+        - "It stores the cluster's desired state and configuration data"
+      correct: [0]
+    - id: q31
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "It removes the pod from the endpoints of Services that select it, but leaves the container running"
+        - "It marks the node as NotReady so no further pods are scheduled onto it"
+        - "It deletes the pod so the scheduler can recreate it on a different node"
+        - "It kills the container and restarts it, subject to the pod's restart policy"
+      correct: [3]
+    - id: q32
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "It load-balances external HTTP traffic to Services"
+        - "It attaches pods to the network and assigns them IP addresses when they are created"
+        - "It encrypts Secrets stored in etcd"
+        - "It resolves Service names to IP addresses inside the cluster"
+      correct: [1]
+    - id: q33
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "Every pod gets its own IP address and can reach any other pod directly without NAT"
+        - "Pods must communicate through a NodePort Service, even inside the cluster"
+        - "Pods on different nodes cannot communicate unless an Ingress is created"
+        - "Traffic between pods on different nodes must pass through the kube-apiserver"
+      correct: [0]
+    - id: q34
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "NodePort Service"
+        - "NetworkPolicy"
+        - "Gateway API"
+        - "ClusterIP Service"
+      correct: [2]
+    - id: q35
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "It acts as the cluster's DNS server, resolving Service names to IP addresses for pods"
+        - "It pulls container images from registries so the kubelet can start a pod's containers"
+        - "It enforces NetworkPolicy rules that control which pods are allowed to communicate"
+        - "It programs network rules (iptables or IPVS) that forward Service IP traffic to a backend pod"
+      correct: [3]
+    - id: q36
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "Setting `runAsNonRoot: true` in the securityContext"
+        - "Setting `hostNetwork: true` in the pod spec"
+        - "Adding a NetworkPolicy that denies ingress traffic"
+        - "Setting `imagePullPolicy: Always` on the container"
+      correct: [0]
+    - id: q37
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "All traffic is denied until a policy explicitly allows it"
+        - "All traffic is allowed; restrictions only apply once a NetworkPolicy selects a pod"
+        - "Only traffic within the same node is allowed"
+        - "Only traffic to pods with the same labels is allowed"
+      correct: [1]
+    - id: q38
+      domain: Container Orchestration
+      multi: true
+      options:
+        - "Scanning images for known vulnerabilities before deployment"
+        - "Pulling from any public registry without restriction so teams always have the newest software"
+        - "Verifying image signatures and provenance to confirm where and how the image was built"
+        - "Using the `latest` tag everywhere so security patches are picked up automatically"
+      correct: [0, 2]
+    - id: q39
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "Vertical Pod Autoscaler (VPA)"
+        - "Cluster Autoscaler"
+        - "Horizontal Pod Autoscaler (HPA)"
+        - "kube-scheduler"
+      correct: [2]
+    - id: q40
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "It increases CPU and memory requests of individual pods"
+        - "It changes the number of replicas of a Deployment based on load"
+        - "It rebalances pods evenly across existing nodes"
+        - "It adds or removes nodes in the cluster when pods cannot be scheduled or nodes are underutilized"
+      correct: [3]
+    - id: q41
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "No node has enough allocatable CPU to satisfy the pod's CPU request"
+        - "The container image could not be pulled from the registry"
+        - "The application inside the container is crashing after startup"
+        - "The pod's liveness probe is failing"
+      correct: [0]
+    - id: q42
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "The kubelet is restarting the container each time the probe fails"
+        - "The pod is excluded from the Service's endpoints until the readiness probe succeeds, so no traffic is routed to it"
+        - "The image cannot be pulled, so the pod has no containers running"
+        - "The scheduler has evicted the pod from its node"
+      correct: [1]
+    - id: q43
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "Switch to a `hostPath` volume so the data lives on the node's filesystem"
+        - "Increase the pod's `terminationGracePeriodSeconds` so data has time to persist"
+        - "Use a PersistentVolumeClaim backed by a CSI-provisioned PersistentVolume, so the storage follows the pod independently of the node"
+        - "Add a second replica so each pod keeps its own copy of the data"
+      correct: [2]
+    - id: q44
+      domain: Cloud Native Application Delivery
+      multi: false
+      options:
+        - "The live objects currently running in the cluster"
+        - "The container images stored in the registry"
+        - "The declarative configuration stored in a Git repository"
+        - "The kubectl command history of the operations team"
+      correct: [2]
+    - id: q45
+      domain: Cloud Native Application Delivery
+      multi: false
+      options:
+        - "Pull-based deployment, because an in-cluster agent fetches changes so external systems do not need cluster credentials"
+        - "Push-based deployment, because the CI server pushes manifests into the cluster after every build"
+        - "Pull-based deployment, because developers must manually pull and apply each change with kubectl"
+        - "Push-based deployment, because Argo CD pushes commits back to the Git repository"
+      correct: [0]
+    - id: q46
+      domain: Cloud Native Application Delivery
+      multi: true
+      options:
+        - "Desired state is described declaratively and versioned in Git"
+        - "Operators apply ad-hoc changes directly to the cluster with kubectl edit"
+        - "An automated agent continuously reconciles the cluster toward the state defined in Git"
+        - "Container image binaries are committed to the Git repository alongside manifests"
+      correct: [0, 2]
+    - id: q47
+      domain: Cloud Native Application Delivery
+      multi: false
+      options:
+        - "Promoting a release from the staging environment to production"
+        - "Compiling the code, running unit tests, and building the container image"
+        - "Shifting a percentage of live traffic to a new version"
+        - "Rolling back a failed release in the production cluster"
+      correct: [1]
+    - id: q48
+      domain: Cloud Native Application Delivery
+      multi: false
+      options:
+        - "In the Git repository next to the application source code"
+        - "In a ConfigMap inside the target cluster"
+        - "On the local disk of each worker node ahead of time"
+        - "In a container registry such as an OCI-compliant artifact registry"
+      correct: [3]
+    - id: q49
+      domain: Cloud Native Application Delivery
+      multi: false
+      options:
+        - "Releases, which are installed instances of a chart with a specific configuration"
+        - "Charts, which are packages of Kubernetes manifest templates"
+        - "Repositories, which store packaged charts for distribution"
+        - "Values, which supply the configuration parameters for a chart"
+      correct: [0]
+    - id: q50
+      domain: Cloud Native Application Delivery
+      multi: false
+      options:
+        - "Write a Helm chart and template every field with Go template syntax"
+        - "Maintain three complete, independent copies of the manifests, one per environment"
+        - "Use Kustomize with a shared base and per-environment overlays that patch the base"
+        - "Store environment differences in a single ConfigMap that all environments share"
+      correct: [2]
+    - id: q51
+      domain: Cloud Native Application Delivery
+      multi: false
+      options:
+        - "Blue-green deployment"
+        - "Canary deployment"
+        - "Recreate deployment"
+        - "Rolling update"
+      correct: [1]
+    - id: q52
+      domain: Cloud Native Application Delivery
+      multi: false
+      options:
+        - "Rolling update, replacing Pods a few at a time"
+        - "Canary release, shifting a small share of traffic first"
+        - "Recreate strategy, stopping the old version before starting the new one"
+        - "Blue-green deployment, keeping two identical environments and switching traffic between them"
+      correct: [3]
+    - id: q53
+      domain: Cloud Native Application Delivery
+      multi: false
+      options:
+        - "kubectl delete deployment web"
+        - "kubectl rollout undo deployment/web"
+        - "kubectl scale deployment web --replicas=0"
+        - "kubectl rollout restart deployment/web"
+      correct: [1]
+    - id: q54
+      domain: Cloud Native Architecture
+      multi: false
+      options:
+        - "Alerts, dashboards, and reports"
+        - "Uptime, latency, and error rate"
+        - "Metrics, logs, and traces"
+        - "Events, audits, and probes"
+      correct: [2]
+    - id: q55
+      domain: Cloud Native Architecture
+      multi: false
+      options:
+        - "Prometheus scrapes HTTP endpoints such as /metrics exposed by its targets at a configured interval"
+        - "Each application pushes its metrics to Prometheus over a persistent gRPC stream"
+        - "Prometheus reads container logs from the node and parses metric values out of them"
+        - "The kubelet aggregates all Pod metrics and forwards them to Prometheus on a fixed schedule"
+      correct: [0]
+    - id: q56
+      domain: Cloud Native Architecture
+      multi: false
+      options:
+        - "A Service Level Agreement (SLA), because it defines consequences for missing the target"
+        - "A Service Level Indicator (SLI), because it quantifies the measured behavior of the service"
+        - "An error budget, because it defines how much unreliability the team may spend"
+        - "A Service Level Objective (SLO), because it is an internal reliability target set on a measured indicator"
+      correct: [3]
+    - id: q57
+      domain: Cloud Native Architecture
+      multi: false
+      options:
+        - "SSH into each running container and apply the patch in place"
+        - "Build a new container image containing the patch and roll out replacement Pods"
+        - "Use kubectl exec to update packages inside the Pods and keep them running"
+        - "Pause the Deployment and hot-patch the shared libraries on each node directly"
+      correct: [1]
+    - id: q58
+      domain: Cloud Native Architecture
+      multi: false
+      options:
+        - "A Horizontal Pod Autoscaler adjusting the replica count based on CPU utilization"
+        - "A Vertical Pod Autoscaler resizing the containers' CPU and memory requests"
+        - "A serverless platform such as Knative, which can scale workloads down to zero between requests"
+        - "The Cluster Autoscaler adding worker nodes when Pods cannot be scheduled"
+      correct: [2]
+    - id: q59
+      domain: Cloud Native Architecture
+      multi: false
+      options:
+        - "The project has demonstrated broad adoption, contributors from multiple organizations, and mature governance"
+        - "The project has been accepted into the CNCF and is in its earliest experimental stage"
+        - "The project is now maintained exclusively by CNCF staff rather than by its community"
+        - "The project has been merged into the Kubernetes codebase and follows its release cycle"
+      correct: [0]
+    - id: q60
+      domain: Cloud Native Architecture
+      multi: false
+      options:
+        - "OCI"
+        - "CNI"
+        - "CRI"
+        - "CSI"
+      correct: [3]
+    - id: q61
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "All traffic to the db Pods, since no `from` block restricts the source IP range"
+        - "Traffic from any Pod in the cluster, but only on port 5432"
+        - "No traffic at all, because NetworkPolicy resources are ignored unless a CNI plugin's own CRD also exists"
+        - "Only traffic from Pods labeled `app: api`, on port 5432"
+      correct: [3]
+    - id: q62
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "The Pod's memory request is larger than what any node currently has free to allocate"
+        - "The Pod's container is crashing on startup due to an out-of-memory condition"
+        - "The container image failed to pull because the registry is unreachable"
+        - "A NetworkPolicy is blocking the kubelet from registering the Pod"
+      correct: [0]
+    - id: q63
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "The claim is rejected by the API server at creation time"
+        - "The PVC stays in the `Pending` state indefinitely"
+        - "Kubernetes falls back to the cluster's default StorageClass automatically"
+        - "A 10Gi volume is provisioned from whichever StorageClass has the most free capacity"
+      correct: [1]
+    - id: q64
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "The container's process exited immediately after starting"
+        - "The Pod's resource requests exceed every node's allocatable capacity"
+        - "The image tag in the Pod's spec does not exist in the referenced registry, or the cluster lacks credentials to pull it"
+        - "A livenessProbe is repeatedly failing and restarting the container"
+      correct: [2]
+    - id: q65
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "The container starts normally as root, since `runAsNonRoot` only affects Pods that also set `runAsUser`"
+        - "Kubernetes automatically assigns the container a random non-root UID to satisfy the setting"
+        - "The setting is silently ignored because no `USER` instruction exists in the image"
+        - "The container fails to start, and the Pod reports an error indicating it would run as root"
+      correct: [3]
+    - id: q66
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "`kubectl logs <pod> --previous`"
+        - "`kubectl get events --field-selector involvedObject.kind=Deployment`"
+        - "`kubectl top pod`"
+        - "`kubectl rollout restart deployment`"
+      correct: [0]
+    - id: q67
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "All the `app: web` Pods, because the selector matches on `app: web` and treats `tier` as an optional filter"
+        - "No addresses at all — the Service's selector must match ALL of a Pod's labels to include it, and none of the Pods carry `tier: frontend`"
+        - "All the `app: web` Pods, but only on port 8080 instead of port 80"
+        - "An error, because a Service's selector cannot list more than one label"
+      correct: [1]
+    - id: q68
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "Both ingress controllers configure routing for it redundantly"
+        - "The Ingress is rejected by the API server for missing `ingressClassName`"
+        - "No controller processes the Ingress, so the routing rule never takes effect"
+        - "Kubernetes automatically creates a default IngressClass and assigns it"
+      correct: [2]
+    - id: q69
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "Increase the `livenessProbe`'s `failureThreshold`"
+        - "Add a `startupProbe` to give the application more time to initialize"
+        - "Change the container's `imagePullPolicy` to `Always`"
+        - "Raise the container's `resources.limits.memory`, or reduce the application's memory footprint"
+      correct: [3]
+    - id: q70
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "`volumeClaimTemplates`"
+        - "`podManagementPolicy`"
+        - "`serviceName`"
+        - "`updateStrategy`"
+      correct: [0]
+    - id: q71
+      domain: Container Orchestration
+      multi: false
+      options:
+        - "The Service's `targetPort` does not match the container's listening port"
+        - "A NetworkPolicy is denying ingress traffic to the `payments` Pods from the caller's namespace or Pod labels"
+        - "CoreDNS has not yet propagated the Service's DNS record"
+        - "The Pod's `dnsPolicy` is set to `None`"
+      correct: [1]
+    - id: q72
+      domain: Cloud Native Architecture
+      multi: false
+      options:
+        - "The Apache Software Foundation"
+        - "Google"
+        - "The Linux Foundation"
+        - "The Open Source Initiative (OSI)"
+      correct: [2]
+    - id: q73
+      domain: Cloud Native Architecture
+      multi: false
+      options:
+        - "Prometheus"
+        - "Envoy"
+        - "containerd"
+        - "Kubernetes"
+      correct: [3]
+    - id: q74
+      domain: Cloud Native Architecture
+      multi: false
+      options:
+        - "The Technical Oversight Committee (TOC)"
+        - "The Governing Board"
+        - "The End User Community"
+        - "A project's own maintainers, acting alone"
+      correct: [0]
+    - id: q75
+      domain: Cloud Native Architecture
+      multi: false
+      options:
+        - "To define the project's software license and intellectual-property terms"
+        - "To set expected standards of behavior for contributors and maintainers, so the community stays welcoming and collaboration stays healthy"
+        - "To specify the project's minimum supported Kubernetes version"
+        - "To describe the project's release cadence and versioning scheme"
+      correct: [1]
+    - id: q76
+      domain: Cloud Native Architecture
+      multi: false
+      options:
+        - "A certification exam bundle covering Kubernetes, KCNA, and CKA in one sitting"
+        - "A managed Kubernetes hosting service operated by the CNCF"
+        - "The CNCF's flagship conference, bringing together maintainers, contributors, and users from across the cloud native ecosystem"
+        - "An automated compliance scanner that checks a cluster against CNCF best practices"
+      correct: [2]
+    - id: q77
+      domain: Cloud Native Architecture
+      multi: false
+      options:
+        - "An official, ranked list of which tools are certified as production-ready"
+        - "A fixed reference architecture every CNCF project must implement"
+        - "A billing and cost-comparison tool for cloud providers"
+        - "To map and catalog the cloud native ecosystem's projects and products by category, helping users discover and compare options"
+      correct: [3]
+    - id: q78
+      domain: Cloud Native Architecture
+      multi: false
+      options:
+        - "Organizations that run cloud native technologies in production to operate their own business, rather than building and selling cloud native products"
+        - "Companies that sell managed Kubernetes distributions or cloud native SaaS products"
+        - "Individual open source contributors who are not affiliated with any company"
+        - "The maintainers of CNCF-hosted projects"
+      correct: [0]
+    - id: q79
+      domain: Cloud Native Architecture
+      multi: false
+      options:
+        - "Infrastructure as code"
+        - "Design for failure"
+        - "The twelve-factor app methodology"
+        - "Immutable infrastructure"
+      correct: [1]
+    - id: q80
+      domain: Cloud Native Application Delivery
+      multi: false
+      options:
+        - "Running `kubectl apply` from a CI pipeline instead of a developer's laptop"
+        - "Storing container images in a Git-based registry instead of a container registry"
+        - "A Git repository is the single source of truth for a system's declarative desired state, and an automated agent continuously reconciles the live environment to match it"
+        - "A branching strategy that requires one branch per environment"
+      correct: [2]
+    - id: q81
+      domain: Cloud Native Application Delivery
+      multi: false
+      options:
+        - "Continuous delivery only applies to containerized applications; continuous deployment applies to any application"
+        - "Continuous deployment runs tests before merging; continuous delivery runs tests after merging"
+        - "Continuous delivery requires a canary release; continuous deployment requires a blue-green release"
+        - "Continuous delivery leaves a final, manual approval gate before a release reaches production; continuous deployment releases every change that passes its pipeline straight to production automatically"
+      correct: [3]
+    - id: q82
+      domain: Cloud Native Application Delivery
+      multi: false
+      options:
+        - "A packaged collection of Kubernetes manifest templates, plus a set of default configuration values, versioned and installed as a single unit"
+        - "A container image built specifically to run inside a Helm-managed cluster"
+        - "A CustomResourceDefinition that extends the Kubernetes API with new object kinds"
+        - "A CI/CD pipeline definition that builds and tests an application before deployment"
+      correct: [0]
+    - id: q83
+      domain: Cloud Native Application Delivery
+      multi: false
+      options:
+        - "`kubectl get replicasets`"
+        - "`kubectl rollout status deployment/<name>`"
+        - "`kubectl logs deployment/<name>`"
+        - "`kubectl top deployment`"
+      correct: [1]
+    - id: q84
+      domain: Cloud Native Application Delivery
+      multi: false
+      options:
+        - "Blue-green deployment"
+        - "Rolling update"
+        - "Canary deployment"
+        - "Recreate"
+      correct: [2]
+    - id: q85
+      domain: Cloud Native Application Delivery
+      multi: false
+      options:
+        - "`kubectl exec`"
+        - "`kubectl cp`"
+        - "`kubectl attach`"
+        - "`kubectl debug`"
+      correct: [3]
+    - id: q86
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "To divide a single cluster into multiple virtual, isolated scopes for organizing and separating resources between teams, environments, or applications"
+        - "To physically partition a cluster's nodes into separate hardware pools"
+        - "To define which container runtime a Pod's containers use"
+        - "To encrypt Secrets so only Pods in the same Namespace can decrypt them"
+      correct: [0]
+    - id: q87
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "A ConfigMap can only be consumed as environment variables, while a Secret can only be mounted as a file"
+        - "A Secret is intended for sensitive data and is base64-encoded (not encrypted by default) with access typically restricted further by RBAC, while a ConfigMap is for non-sensitive configuration stored in plain text"
+        - "A Secret is cluster-scoped, while a ConfigMap is Namespace-scoped"
+        - "A ConfigMap requires a running Pod to create, while a Secret can be created independently"
+      correct: [1]
+    - id: q88
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "Labels can only be added to Pods, while annotations can be added to any object"
+        - "Annotations are immutable once set, while labels can be changed at any time"
+        - "Labels are key/value pairs used to identify and SELECT objects (by Services, ReplicaSets, and `kubectl` queries, among others), while annotations attach arbitrary, non-identifying metadata that is not used for selection"
+        - "Labels are stored in etcd, while annotations are stored only in memory on the API server"
+      correct: [2]
+    - id: q89
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "A ReplicaSet manages multiple Deployments, one per replica"
+        - "They are two names for the exact same object, kept for backward compatibility"
+        - "A ReplicaSet only exists transiently during a rollout and is deleted once the rollout finishes"
+        - "A Deployment manages one or more ReplicaSets on the user's behalf, creating a new ReplicaSet for each rollout so it can orchestrate rolling updates and rollbacks between versions"
+      correct: [3]
+    - id: q90
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "To ensure that a copy of a specific Pod runs on every node (or every node matching a selector) in the cluster, automatically adding a copy to new nodes as they join"
+        - "To run a Pod exactly once and then guarantee it terminates successfully"
+        - "To run Pods on a fixed schedule, similar to a cron job"
+        - "To scale a Pod's replica count up and down automatically based on CPU usage"
+      correct: [0]
+    - id: q91
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "To run in the background alongside the main containers for the Pod's entire lifetime, monitoring their health"
+        - "To run one or more setup tasks to completion BEFORE any of the Pod's main (app) containers start, with each init container required to finish successfully before the next one begins"
+        - "To provide a lightweight base image that all of the Pod's other containers inherit from"
+        - "To restart the Pod's main container automatically whenever it crashes"
+      correct: [1]
+    - id: q92
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "`kubectl create` supports YAML manifests, while `kubectl apply` only accepts JSON"
+        - "`kubectl apply` only works on Deployments, while `kubectl create` works on any object kind"
+        - "`kubectl apply` computes a diff against the object's last applied configuration and can update an existing object to match the file, while `kubectl create` only creates a new object and fails if one with that name already exists"
+        - "`kubectl apply` requires a running admission webhook, while `kubectl create` does not"
+      correct: [2]
+    - id: q93
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "A taint marks a node as unhealthy, and a toleration tells the kubelet to ignore health checks on it"
+        - "A toleration forces a Pod to be scheduled onto a specific tainted node, overriding the scheduler's normal placement logic"
+        - "A taint and toleration pair replaces the need for resource requests and limits"
+        - "A taint on a node repels Pods from being scheduled there unless a Pod carries a matching toleration, letting nodes be reserved for only the workloads that explicitly tolerate them"
+      correct: [3]
+    - id: q94
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "A failing liveness probe causes the kubelet to restart the container, while a failing readiness probe only removes the Pod from a Service's Endpoints without restarting anything"
+        - "A liveness probe only runs once at startup, while a readiness probe runs continuously"
+        - "A readiness probe can only check HTTP endpoints, while a liveness probe can only check TCP ports"
+        - "A liveness probe applies to the whole Pod, while a readiness probe applies only to individual containers"
+      correct: [0]
+    - id: q95
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "A single compressed file containing the entire filesystem as one flat layer"
+        - "A set of read-only filesystem layers stacked on top of each other, plus a manifest and configuration describing how to assemble and run them"
+        - "A virtual machine disk image plus a hypervisor configuration file"
+        - "A Kubernetes-specific format that only the kubelet can interpret"
+      correct: [1]
+    - id: q96
+      domain: Kubernetes Fundamentals
+      multi: false
+      options:
+        - "etcd's storage engine only supports an odd number of shards"
+        - "An odd number is required so the Kubernetes API server can round-robin requests evenly"
+        - "etcd uses the Raft consensus algorithm, which requires a majority (quorum) of members to agree before committing a write; an odd number maximizes fault tolerance per added member without the wasted node that an even-sized cluster would add"
+        - "Even-numbered etcd clusters are not supported by the Kubernetes API at all"
+      correct: [2]
+    - id: q97
+      domain: Kubernetes Fundamentals
+      multi: true
+      options:
+        - "Average CPU utilization across the target's Pods"
+        - "Average memory utilization across the target's Pods"
+        - "The Pod's own restart count"
+        - "A custom or external metric supplied through the metrics API (such as requests per second)"
+      correct: [0, 1, 3]

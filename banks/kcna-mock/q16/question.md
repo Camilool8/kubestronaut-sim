@@ -1,0 +1,1 @@
+A Pod running in the `frontend` namespace needs to call a Service named `api` that lives in the `payments` namespace. The cluster uses the default DNS domain `cluster.local`. Which fully qualified DNS name resolves to the Service?

@@ -18,16 +18,15 @@ comingSoon:
     certification: CKA
     examType: hands-on
     note: Administrator-track bank not written yet
-  - id: kcna-mock
-    title: KCNA Mock Exam
-    certification: KCNA
-    examType: mcq
-    note: Multiple-choice engine not built yet
+  # kcna-mock is gone from this list: banks/kcna-mock/ is a real,
+  # runnable mcq bank now. (While both existed the real directory
+  # shadowed the entry here — see catalog.go — but a stale entry is a
+  # trap for the next reader, so it is removed rather than left inert.)
   - id: kcsa-mock
     title: KCSA Mock Exam
     certification: KCSA
     examType: mcq
-    note: Multiple-choice engine not built yet
+    note: Bank not written yet
   - id: cks-mock
     title: CKS Mock Exam
     certification: CKS

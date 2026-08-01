@@ -19,11 +19,13 @@ import { BackgroundJobChip } from "./components/BackgroundJobChip";
 import { PanelResizer } from "./components/PanelResizer";
 import { QuestionPanel } from "./components/QuestionPanel";
 import { ToastLayer } from "./components/Toast";
+import { McqExam } from "./screens/McqExam";
+import { McqAnswerReview } from "./components/McqAnswerReview";
 import { SPLIT_QUERY } from "./lib/useMediaQuery";
 import { matchMediaMock } from "./test/setup";
 import { marksStore } from "./components/marksStore";
 import { toastStore } from "./components/toastStore";
-import type { ControlJob, ExamQuestionInfo } from "./api";
+import type { ControlJob, ExamQuestionInfo, SessionSnapshot } from "./api";
 
 // Component-level scans run outside App's <main>, so the page-level
 // region rule is not meaningful here. Everything else runs at axe's
@@ -461,6 +463,147 @@ describe("axe: no WCAG violations", () => {
     toastStore.push({ kind: "info", message: "Desktop connection restored." });
     toastStore.push({ kind: "warning", message: "5 minutes remaining." });
     const { container } = render(<ToastLayer />);
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  // ---- mcq engine surfaces. Every state the multiple-choice screen can
+  // put on screen gets its own scan: unscanned states are exactly how
+  // past violations survived (see the exam-panel comment above).
+
+  const mcqSession: SessionSnapshot = {
+    state: "running",
+    bank: "kcna-mock",
+    startedAt: "2026-07-31T12:00:00Z",
+    durationSeconds: 5400,
+    remainingSeconds: 5000,
+    endReason: "",
+    mode: "exam",
+    untimed: false,
+  };
+
+  const mcqExamJSON = {
+    name: "kcna-mock",
+    title: "KCNA Mock Exam",
+    examType: "mcq",
+    durationSeconds: 5400,
+    passingScore: 75,
+    kubernetesVersion: "1.35",
+    questions: [
+      { id: "q01", domain: "Kubernetes Fundamentals", weight: 1, totalPoints: 1, hintCount: 0 },
+      {
+        id: "q02",
+        domain: "Container Orchestration",
+        weight: 1,
+        totalPoints: 1,
+        hintCount: 0,
+        multi: true,
+      },
+    ],
+  };
+
+  const mcqQuestionJSON = {
+    id: "q01",
+    domain: "Kubernetes Fundamentals",
+    markdown: "Which component persists cluster state?",
+    options: ["The kubelet", "etcd", "kube-proxy"],
+    multi: false,
+  };
+
+  function stubMcqFetch(answers: Record<string, number[]> = {}) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        const body = url.includes("/api/exam")
+          ? mcqExamJSON
+          : url.includes("/api/answers")
+            ? { answers }
+            : url.includes("/solution")
+              ? { id: "q01", markdown: "**etcd** is correct: it stores cluster state." }
+              : url.includes("/api/questions/q02")
+                ? { ...mcqQuestionJSON, id: "q02", multi: true, options: ["CNI", "CSI", "CRI", "OCI"] }
+                : url.includes("/api/questions/")
+                  ? mcqQuestionJSON
+                  : {};
+        return new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+  }
+
+  test("mcq exam screen, single-answer question", async () => {
+    stubMcqFetch();
+    const { container } = render(
+      <McqExam session={mcqSession} fetchedAt={Date.now()} onSessionChange={() => {}} />,
+    );
+    await screen.findByText("Which component persists cluster state?");
+    expect(screen.getByRole("checkbox", { name: /etcd/ })).toBeInTheDocument();
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  test("mcq exam screen, multi-select question with the jump grid open", async () => {
+    stubMcqFetch({ q01: [1] });
+    const user = userEvent.setup();
+    const { container } = render(
+      <McqExam session={mcqSession} fetchedAt={Date.now()} onSessionChange={() => {}} />,
+    );
+    await screen.findByText("Which component persists cluster state?");
+    await user.click(screen.getByRole("button", { name: /show all questions/i }));
+    expect(container.querySelector("#mcq-jump")).not.toBeNull();
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  test("mcq submit dialog with the unanswered list", async () => {
+    stubMcqFetch({ q01: [1] });
+    const user = userEvent.setup();
+    const { container } = render(
+      <McqExam session={mcqSession} fetchedAt={Date.now()} onSessionChange={() => {}} />,
+    );
+    await screen.findByText("Which component persists cluster state?");
+    await user.click(screen.getByRole("button", { name: /end exam/i }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText(/1 question is unanswered/)).toBeInTheDocument();
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  test("mcq training check-answer revealed", async () => {
+    stubMcqFetch();
+    const user = userEvent.setup();
+    const { container } = render(
+      <McqExam
+        session={{ ...mcqSession, mode: "training", untimed: true }}
+        fetchedAt={Date.now()}
+        onSessionChange={() => {}}
+      />,
+    );
+    await screen.findByText("Which component persists cluster state?");
+    await user.click(screen.getByText(/check answer/i));
+    expect(await screen.findByText(/stores cluster state/)).toBeInTheDocument();
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  // The review renders three marked states (correct-selected,
+  // correct-missed, wrong-selected) plus a neutral row — all four at
+  // once here, each carrying icon + text, never colour alone.
+  test("score answer review (mcq)", async () => {
+    const { container } = render(
+      <McqAnswerReview
+        question={{
+          id: "q02",
+          instance: "",
+          domain: "Container Orchestration",
+          earned: 0,
+          total: 1,
+          checks: [],
+          selected: [0, 2],
+          correct: [0, 1],
+          options: ["CNI", "CSI", "CRI", "OCI"],
+          multi: true,
+        }}
+      />,
+    );
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 });

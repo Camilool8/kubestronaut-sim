@@ -1,0 +1,28 @@
+{
+  "metadata": {
+    "name": "mcq-pool-bank",
+    "title": "MCQ Pool Test Exam"
+  },
+  "spec": {
+    "examType": "mcq",
+    "duration": "10m",
+    "passingScore": 75,
+    "kubernetesVersion": "1.35",
+    "domainWeights": {
+      "Domain A": 60,
+      "Domain B": 40
+    },
+    "examLength": 5,
+    "questions": [
+      { "id": "a1", "domain": "Domain A", "multi": false, "options": ["Alpha", "Bravo", "Charlie"], "correct": [0] },
+      { "id": "a2", "domain": "Domain A", "multi": false, "options": ["Alpha", "Bravo", "Charlie"], "correct": [0] },
+      { "id": "a3", "domain": "Domain A", "multi": false, "options": ["Alpha", "Bravo", "Charlie"], "correct": [0] },
+      { "id": "a4", "domain": "Domain A", "multi": false, "options": ["Alpha", "Bravo", "Charlie"], "correct": [0] },
+      { "id": "a5", "domain": "Domain A", "multi": false, "options": ["Alpha", "Bravo", "Charlie"], "correct": [0] },
+      { "id": "b1", "domain": "Domain B", "multi": false, "options": ["One", "Two", "Three"], "correct": [1] },
+      { "id": "b2", "domain": "Domain B", "multi": false, "options": ["One", "Two", "Three"], "correct": [1] },
+      { "id": "b3", "domain": "Domain B", "multi": false, "options": ["One", "Two", "Three"], "correct": [1] },
+      { "id": "b4", "domain": "Domain B", "multi": false, "options": ["One", "Two", "Three"], "correct": [1] }
+    ]
+  }
+}

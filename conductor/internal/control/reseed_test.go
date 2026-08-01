@@ -108,6 +108,50 @@ func TestReseedRejectsAnythingNotInTheBank(t *testing.T) {
 	}
 }
 
+// An mcq bank has no setup.sh: the refusal must come before anything
+// shells out, even in training mode.
+func TestReseedRefusedForMCQBank(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]string{"state": "running", "mode": "training"})
+	}))
+	t.Cleanup(srv.Close)
+
+	dir := t.TempDir()
+	bankFile := filepath.Join(dir, "bank")
+	if err := os.WriteFile(bankFile, []byte("kcna-mock\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	catDir := t.TempDir()
+	doc := `{
+  "metadata": {"name": "kcna-mock", "title": "KCNA"},
+  "spec": {
+    "examType": "mcq", "duration": "90m",
+    "questions": [{"id": "q07", "domain": "D", "options": ["a", "b", "c"], "correct": [0]}]
+  }
+}`
+	if err := os.WriteFile(filepath.Join(catDir, "kcna-mock.json"), []byte(doc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cat, err := catalog.Load(catDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eng := &fakeEngine{}
+	c := newTestController(t, eng, srv.URL)
+	c.BankFile = bankFile
+	c.Catalog = cat
+
+	if err := c.Reseed(context.Background(), "q07"); !errors.Is(err, ErrNoReseed) {
+		t.Fatalf("Reseed on an mcq bank = %v, want ErrNoReseed", err)
+	}
+	for _, call := range eng.recorded() {
+		if strings.HasPrefix(call, "exec:") {
+			t.Fatalf("an mcq reseed still reached the engine: %q", call)
+		}
+	}
+}
+
 // Re-running setup.sh destroys that question's work. Fine while
 // practising; hostile during an exam.
 func TestReseedRefusedOutsideTraining(t *testing.T) {

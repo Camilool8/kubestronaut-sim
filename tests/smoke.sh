@@ -31,6 +31,10 @@ bash tests/bank-weights.sh || fail "bank weights are out of balance"
 bash tests/check-lint.sh || fail "validate.d checks have brittle idioms"
 bash tests/check-lib.sh || fail "banks/_lib/checks.sh helpers are broken"
 bash tests/bank-hints.sh || fail "hints are malformed, or are just the solution"
+# The mcq banks' shape gate — answer keys, explanations, purity. Same
+# slot for the same reason: a broken key would otherwise surface as a
+# wrong grade half an hour into the mcq section below.
+bash tests/bank-mcq.sh || fail "mcq banks are malformed"
 
 ./sim purge   # cold start: the fresh-grade-0 assertion needs pristine cluster state
 
@@ -536,6 +540,235 @@ api_name=$(json_field name)
 ./sim grade | tee /tmp/grade-back.txt
 read -r _ be0 _ _ < <(grep '^RESULT ' /tmp/grade-back.txt)
 [ "$be0" = "0" ] || fail "ckad after switch-back should score 0, got ${be0}"
+
+echo "== mcq: kcna-mock — switch, blank/partial/full grades, answer gates =="
+# No cluster wait anywhere in this section: an mcq bank needs no
+# seeding, so the switch is quick, and session start deliberately skips
+# the boot gate — an attempt starts even while the cluster is mid-boot.
+curl -fsS -X POST -H 'Content-Type: application/json' -d '{"bank":"kcna-mock"}' \
+  http://localhost:8080/api/control/switch >/dev/null || fail "mcq: switch to kcna-mock not accepted"
+wait_control
+
+status=$(req GET /api/exam)
+[ "$status" = "200" ] || fail "mcq: /api/exam expected 200, got $status"
+[ "$(json_field name)" = "kcna-mock" ] || fail "mcq: active exam should be kcna-mock, got '$(json_field name)'"
+[ "$(json_field examType)" = "mcq" ] || fail "mcq: examType should be mcq, got '$(json_field examType)'"
+# kcna-mock is pooled (97 authored, 65 drawn per attempt — see exam.yaml
+# spec.examLength): questionCount is the DECLARED length a candidate
+# gets, which must read 65 even here, before any attempt has drawn a
+# subset; the questions array at this point is still the full pool, not
+# yet narrowed to one attempt's draw.
+[ "$(json_field questionCount)" = "65" ] \
+  || fail "mcq: /api/exam questionCount should be 65 (the draw length), got '$(json_field questionCount)'"
+poolcount=$(RESP="$RESP" python3 -c '
+import json, os
+with open(os.environ["RESP"]) as f:
+    data = json.load(f)
+print(len(data.get("questions", [])))
+')
+[ "$poolcount" = "97" ] || fail "mcq: /api/exam should list the full 97-question pool before any attempt starts, got ${poolcount}"
+
+# The answer key is derived from the bank at run time on purpose: a
+# checked-in copy would drift the first time a question was edited, and
+# what this section proves is that bank and grader agree. Read through
+# the same yq the boot scripts use, so the host needs none. This is the
+# full 97-question POOL's key — a superset of any one attempt's own
+# 65-question draw, which is looked up from it by id below.
+docker compose exec -T k8s-env yq -o=json '.spec.questions' /banks/kcna-mock/exam.yaml \
+  | tr -d '\r' > /tmp/smoke-mcq-key.json \
+  || fail "mcq: could not read the kcna-mock question list from k8s-env"
+
+# wait_mcq_results polls until grading lands. MCQ grading is in-process
+# — no cluster checks — so this converges in seconds.
+wait_mcq_results() {
+  local budget=60 interval=2 elapsed=0 rstatus=""
+  while [ "$elapsed" -lt "$budget" ]; do
+    rstatus=$(req GET /api/results)
+    [ "$rstatus" = "200" ] && return 0
+    sleep "$interval"; elapsed=$((elapsed + interval))
+  done
+  fail "mcq: /api/results did not reach 200 within ${budget}s (last status ${rstatus})"
+  return 1
+}
+
+# current_exam_ids prints the CURRENT attempt's drawn subset, one id per
+# line — /api/exam's own questions array once a pooled attempt has
+# started, in draw order. Reads the last response $req landed in $RESP.
+current_exam_ids() {
+  RESP="$RESP" python3 -c '
+import json, os
+with open(os.environ["RESP"]) as f:
+    data = json.load(f)
+for q in data.get("questions", []):
+    print(q["id"])
+'
+}
+
+# first_multi_in_current_exam prints the id of a multi-select question
+# in the CURRENT attempt's drawn subset, or nothing if none landed there
+# — a pooled draw does not guarantee every question "flavor" appears.
+first_multi_in_current_exam() {
+  RESP="$RESP" python3 -c '
+import json, os
+with open(os.environ["RESP"]) as f:
+    data = json.load(f)
+for q in data.get("questions", []):
+    if q.get("multi"):
+        print(q["id"])
+        break
+'
+}
+
+# Blank honesty: an attempt that answers nothing must grade 0 and not
+# pass — not error, and not score by some default. Any draw does.
+status=$(req POST /api/session/start)
+[ "$status" = "200" ] || fail "mcq: blank start expected 200, got $status"
+status=$(req POST /api/session/end)
+[ "$status" = "202" ] || fail "mcq: blank end expected 202, got $status"
+if wait_mcq_results; then
+  [ "$(json_field percent)" = "0" ] || fail "mcq: blank attempt percent should be 0, got '$(json_field percent)'"
+  [ "$(json_field passed)" = "False" ] || fail "mcq: blank attempt must not pass, got '$(json_field passed)'"
+fi
+status=$(req DELETE /api/session)
+[ "$status" = "204" ] || fail "mcq: blank cleanup DELETE expected 204, got $status"
+
+# All-or-nothing needs a multi-select question, but a 65-of-97 pooled
+# draw is not guaranteed to include one every time (7 of the 97 are
+# multi). Retry a fresh attempt — cheap, no cluster involved — until one
+# lands, rather than let this section flake on an unlucky draw.
+mq=""
+for _ in $(seq 1 30); do
+  status=$(req POST /api/session/start)
+  [ "$status" = "200" ] || fail "mcq: partial start expected 200, got $status"
+  status=$(req GET /api/exam)
+  [ "$status" = "200" ] || fail "mcq: /api/exam expected 200, got $status"
+  mq=$(first_multi_in_current_exam)
+  [ -n "$mq" ] && break
+  status=$(req DELETE /api/session)
+  [ "$status" = "204" ] || fail "mcq: partial retry cleanup DELETE expected 204, got $status"
+done
+if [ -z "$mq" ]; then
+  fail "mcq: no multi-select question landed in 30 pooled draws — check the pool still has enough multi questions"
+else
+  mcorrect=$(MQ="$mq" python3 -c '
+import json, os
+qs = json.load(open("/tmp/smoke-mcq-key.json"))
+q = next(q for q in qs if q["id"] == os.environ["MQ"])
+print(",".join(str(i) for i in q["correct"]))
+')
+  # A question drawn into this attempt is guaranteed present, whatever
+  # id it turns out to be — this is the same body/explanation gate the
+  # original fixed-id checks proved, just against a question this run
+  # actually has instead of an id that might have been drawn out.
+  status=$(req GET /api/questions/"$mq")
+  [ "$status" = "200" ] || fail "mcq: GET /api/questions/$mq expected 200, got $status"
+  grep -q '"correct"' "$RESP" && fail "mcq: GET /api/questions/$mq leaks the answer key" || true
+  status=$(req GET /api/questions/"$mq"/solution)
+  [ "$status" = "403" ] || fail "mcq: explanation should be 403 mid-exam, got $status"
+
+  partial=${mcorrect%,*}
+  curl -s -o "$RESP" -w '%{http_code}' -X PUT -H 'Content-Type: application/json' \
+    -d "{\"selected\":[${partial}]}" "${BASE}/api/questions/${mq}/answer" > /tmp/smoke-mcq-put.txt
+  [ "$(cat /tmp/smoke-mcq-put.txt)" = "200" ] \
+    || fail "mcq: partial PUT expected 200, got $(cat /tmp/smoke-mcq-put.txt)"
+
+  status=$(req POST /api/session/end)
+  [ "$status" = "202" ] || fail "mcq: partial end expected 202, got $status"
+
+  # A write after the end must refuse, not quietly amend a graded paper.
+  curl -s -o "$RESP" -w '%{http_code}' -X PUT -H 'Content-Type: application/json' \
+    -d "{\"selected\":[${partial}]}" "${BASE}/api/questions/${mq}/answer" > /tmp/smoke-mcq-late.txt
+  [ "$(cat /tmp/smoke-mcq-late.txt)" = "409" ] \
+    || fail "mcq: a PUT after end should be 409, got $(cat /tmp/smoke-mcq-late.txt)"
+
+  if wait_mcq_results; then
+    mearned=$(RESP="$RESP" MQ="$mq" python3 -c '
+import json, os
+with open(os.environ["RESP"]) as f:
+    data = json.load(f)
+for q in data.get("questions", []):
+    if q.get("id") == os.environ["MQ"]:
+        print(q.get("earned", ""))
+')
+    [ "$mearned" = "0" ] \
+      || fail "mcq: all-or-nothing — ${mq} with a partial selection should earn 0, got '${mearned}'"
+  fi
+  status=$(req DELETE /api/session)
+  [ "$status" = "204" ] || fail "mcq: partial cleanup DELETE expected 204, got $status"
+fi
+
+# Full-marks self-consistency: answer this attempt's own drawn subset —
+# not the 97-question pool file, which is a superset a fresh draw need
+# not fully contain — from the derived key, and the grader must agree
+# the attempt scores 100%.
+status=$(req POST /api/session/start)
+[ "$status" = "200" ] || fail "mcq: full start expected 200, got $status"
+status=$(req GET /api/exam)
+[ "$status" = "200" ] || fail "mcq: /api/exam expected 200, got $status"
+current_exam_ids > /tmp/smoke-mcq-drawn-ids.txt
+drawn_count=$(wc -l < /tmp/smoke-mcq-drawn-ids.txt | tr -d ' ')
+[ "$drawn_count" = "65" ] || fail "mcq: this attempt drew ${drawn_count} questions, want 65"
+fmq=$(first_multi_in_current_exam)
+
+put_bad=0
+while IFS=$'\t' read -r qid key; do
+  [ -n "$qid" ] || continue
+  code=$(curl -s -o "$RESP" -w '%{http_code}' -X PUT -H 'Content-Type: application/json' \
+    -d "{\"selected\":${key}}" "${BASE}/api/questions/${qid}/answer")
+  [ "$code" = "200" ] || { put_bad=$((put_bad+1)); echo "  mcq: PUT ${qid} answer got ${code}"; }
+done < <(DRAWN=/tmp/smoke-mcq-drawn-ids.txt python3 -c '
+import json, os
+drawn = {line.strip() for line in open(os.environ["DRAWN"]) if line.strip()}
+for q in json.load(open("/tmp/smoke-mcq-key.json")):
+    if q["id"] in drawn:
+        print(q["id"] + "\t" + json.dumps(q["correct"]))
+')
+[ "$put_bad" -eq 0 ] || fail "mcq: ${put_bad} answer PUT(s) did not return 200"
+
+# The response echoes the STORED selection: send one multi answer in
+# reverse order and expect it back sorted. Best-effort — this attempt's
+# own 65-question draw may not happen to include a multi-select question
+# even though the partial block above (which retries specifically for
+# one) already proved the sorted-storage contract once.
+if [ -n "${fmq:-}" ]; then
+  fmcorrect=$(MQ="$fmq" python3 -c '
+import json, os
+qs = json.load(open("/tmp/smoke-mcq-key.json"))
+q = next(q for q in qs if q["id"] == os.environ["MQ"])
+print(",".join(str(i) for i in q["correct"]))
+')
+  rev=$(python3 -c "print(sorted([${fmcorrect}], reverse=True))")
+  curl -s -o "$RESP" -w '%{http_code}' -X PUT -H 'Content-Type: application/json' \
+    -d "{\"selected\":${rev}}" "${BASE}/api/questions/${fmq}/answer" > /tmp/smoke-mcq-echo.txt
+  [ "$(cat /tmp/smoke-mcq-echo.txt)" = "200" ] \
+    || fail "mcq: reversed PUT expected 200, got $(cat /tmp/smoke-mcq-echo.txt)"
+  want=$(python3 -c "print(sorted([${fmcorrect}]))")
+  [ "$(json_field selected)" = "$want" ] \
+    || fail "mcq: PUT should echo the sorted selection ${want}, got '$(json_field selected)'"
+fi
+
+status=$(req POST /api/session/end)
+[ "$status" = "202" ] || fail "mcq: full end expected 202, got $status"
+if wait_mcq_results; then
+  [ "$(json_field percent)" = "100" ] || fail "mcq: full-key percent should be 100, got '$(json_field percent)'"
+  [ "$(json_field passed)" = "True" ] || fail "mcq: full-key attempt should pass, got '$(json_field passed)'"
+  gcount=$(RESP="$RESP" python3 -c '
+import json, os
+with open(os.environ["RESP"]) as f:
+    data = json.load(f)
+print(len(data.get("questions", [])))
+')
+  [ "$gcount" = "65" ] || fail "mcq: graded question count should be 65 (the drawn subset), got ${gcount}"
+fi
+status=$(req DELETE /api/session)
+[ "$status" = "204" ] || fail "mcq: full cleanup DELETE expected 204, got $status"
+
+# Leave ckad-mock-01 active: every section below assumes it.
+curl -fsS -X POST -H 'Content-Type: application/json' -d '{"bank":"ckad-mock-01"}' \
+  http://localhost:8080/api/control/switch >/dev/null || fail "mcq: switch back to ckad-mock-01 not accepted"
+wait_control
+status=$(req GET /api/exam)
+[ "$(json_field name)" = "ckad-mock-01" ] || fail "mcq: active exam should be back to ckad-mock-01, got '$(json_field name)'"
 
 echo "== training mode: hints, solutions mid-attempt, scoring without ending =="
 # Every gate below is server-side session state, so this is the only

@@ -65,12 +65,20 @@ func loadExamConfig() examConfig {
 // load the exam, grade it synchronously over the real ssh Runner, print
 // the grade.sh-parity scoreboard to stdout, done. No session file, no
 // HTTP server.
+//
+// An mcq exam has no cluster to inspect — the only answer sheet is the
+// live session's stored selections, which this session-free path
+// deliberately does not read. Refusing beats grading an empty answer map
+// and printing a misleading 0%.
 func runGrade() error {
 	cfg := loadExamConfig()
 
 	ex, err := exam.Load(cfg.examJSON, cfg.bankDir)
 	if err != nil {
 		return fmt.Errorf("load exam: %w", err)
+	}
+	if ex.Type == exam.TypeMCQ {
+		return fmt.Errorf("%s is a multiple-choice bank; answers live in the session, so grade it from the UI or POST /api/session/end (see docs/cli.md)", ex.Name)
 	}
 
 	runner := evaluate.NewSSHRunner(cfg.sshKey)

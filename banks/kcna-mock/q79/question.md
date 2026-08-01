@@ -1,0 +1,1 @@
+A team designs its services to assume that any dependency — a downstream API, a database, a node — can fail at any time, and builds in retries, timeouts, and graceful degradation rather than trying to make every component individually failure-proof. Which cloud native principle does this describe?

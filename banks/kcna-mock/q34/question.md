@@ -1,0 +1,1 @@
+A team wants to route external HTTP traffic to different backend Services based on hostname and URL path. They want a role-oriented, more expressive API that is the successor to Ingress. Which Kubernetes API should they use?

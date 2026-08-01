@@ -6,9 +6,11 @@ import type { BanksResponse, ExamInfo } from "../api";
 const ckadExam: ExamInfo = {
   name: "ckad",
   title: "CKAD Simulator",
+  examType: "hands-on",
   durationSeconds: 7200,
   passingScore: 66,
   kubernetesVersion: "1.33",
+  questionCount: 0,
   questions: [],
 };
 

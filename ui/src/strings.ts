@@ -26,6 +26,14 @@ export const strings = {
       "Each question has a working directory pre-created at /opt/course/<n>.",
       "The timer starts the moment you click Start and cannot be paused.",
     ],
+    // The mcq counterpart of `tips`: no ssh, no desktop, no working
+    // directories — none of those exist for a multiple-choice bank.
+    tipsMcq: [
+      "Answer in the question panel — pick an option and it saves immediately.",
+      "Multi-select questions score all-or-nothing: every correct option, nothing else.",
+      "You can change any answer until you submit or time runs out.",
+      "The timer starts the moment you click Start and cannot be paused.",
+    ],
     // The catalog and the exam summary are separate endpoints, so one can
     // fail while the other renders. Say which one, and that the button
     // below is the thing that will not work.
@@ -266,6 +274,53 @@ export const strings = {
     failed: (detail: string) => `Couldn't load that hint (${detail}).`,
   },
 
+  mcq: {
+    regionLabel: "Question",
+    selectOne: "Select one answer",
+    selectAll: "Select all that apply",
+    // Footer nav labels: short pagination wording, deliberately not the
+    // header stepper's fuller "Previous/Next question" aria-labels — the
+    // two controls do the same thing, and matching text would give a
+    // screen reader (and a test query) two identically-named buttons.
+    previous: "Previous",
+    next: "Next",
+    // The candidate's own sequence position (1-65), never the bank's
+    // internal question id (q61, q28, ...) — that id is an artifact of
+    // a 97-question pool a random draw samples from, meaningless (and
+    // non-sequential) to whoever is sitting the exam.
+    questionNumber: (n: number) => `Q${n}`,
+    // The option letter is part of how people talk about mcq items
+    // ("the answer is C"), so it is text, not decoration.
+    optionLabel: (letter: string, text: string) => `${letter}. ${text}`,
+    // The save failed and the selection on screen is NOT what the server
+    // has. Louder than a generic toast: an unsaved answer scores zero.
+    saveFailed: (detail: string) =>
+      `Couldn't save that answer (${detail}) — it is not recorded. Pick it again to retry.`,
+    // The attempt ended (timer, or a submit elsewhere) between the click
+    // and the save; the screen is about to flip to the score on its own.
+    saveConflict: "The attempt has ended — that last change wasn't recorded.",
+    answered: "answered",
+    unanswered: "unanswered",
+    // Submit dialog: unlike the hands-on screen, here the UI genuinely
+    // knows what is unanswered — the answers live server-side.
+    reviewUnanswered: (n: number) =>
+      n === 1 ? "1 question is unanswered:" : `${n} questions are unanswered:`,
+    allAnswered: "Every question has an answer.",
+    confirmBody: "This cannot be undone. Your answers are already saved; grading begins immediately.",
+    // Training-mode per-question reveal. Same 403-backed gate as the
+    // hands-on solution link, same wording family.
+    checkAnswer: "Check answer",
+    loadingAnswer: "Loading the explanation…",
+    // Score review.
+    yourAnswer: "Your answer",
+    correctAnswer: "Correct answer",
+    notAnswered: "Not answered",
+    explanation: "Explanation",
+    optionCorrectSelected: "correct — you selected it",
+    optionCorrectMissed: "correct — you did not select it",
+    optionWrongSelected: "your selection — incorrect",
+  },
+
   practice: {
     scoreNow: "Score my work",
     scoring: "Scoring…",
@@ -348,6 +403,10 @@ export const strings = {
     // The measured cluster rebuild is 90–240s. Promising "1–2 minutes"
     // and then blowing past it turns a normal wait into a perceived hang.
     hint: "Rebuilding the Kubernetes cluster. Usually about 2–4 minutes — you can leave this tab open.",
+    // For jobs with no recreate-cluster phase (a switch to or reset of a
+    // multiple-choice bank): promising minutes for a seconds-long job is
+    // the same mistake in the other direction.
+    hintFast: "Restarting the exam services. Usually a few seconds.",
     stepOf: (step: number, total: number, label: string) =>
       `Step ${step} of ${total}: ${label}`,
     elapsed: (span: string) => `Elapsed ${span}`,

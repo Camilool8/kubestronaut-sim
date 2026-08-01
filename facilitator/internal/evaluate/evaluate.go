@@ -115,6 +115,16 @@ type QuestionResult struct {
 	Earned   int           `json:"earned"`
 	Total    int           `json:"total"`
 	Checks   []CheckResult `json:"checks"`
+
+	// MCQ only, set by internal/mcqgrade and absent (omitempty) from
+	// hands-on results: the candidate's selections, the answer key, and
+	// the option texts, so the score page can render an answer review
+	// without re-fetching the question. The key reaches the client only
+	// here — after grading — mirroring the solution.md gate.
+	Selected []int    `json:"selected,omitempty"`
+	Correct  []int    `json:"correct,omitempty"`
+	Options  []string `json:"options,omitempty"`
+	Multi    bool     `json:"multi,omitempty"`
 }
 
 // CheckResult is one validate.d check's graded outcome.
@@ -219,7 +229,12 @@ func (r *Results) Scoreboard() string {
 	fmt.Fprintf(&b, "=== %s results ===\n", r.Bank)
 	for _, q := range r.Questions {
 		b.WriteString("\n")
-		fmt.Fprintf(&b, "-- %s (on %s)\n", q.ID, q.Instance)
+		if q.Instance == "" {
+			// mcq questions grade against the session, not an instance.
+			fmt.Fprintf(&b, "-- %s\n", q.ID)
+		} else {
+			fmt.Fprintf(&b, "-- %s (on %s)\n", q.ID, q.Instance)
+		}
 		for _, c := range q.Checks {
 			switch {
 			case c.skip:

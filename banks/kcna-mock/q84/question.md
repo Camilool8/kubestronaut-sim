@@ -1,0 +1,1 @@
+Which deployment strategy routes a small percentage of live production traffic to a new version first, observes it, and only shifts the rest of the traffic over once it looks healthy — limiting the blast radius of a bad release?

@@ -83,6 +83,24 @@ describe("ControlProgress", () => {
     expect(pending?.textContent).not.toMatch(/\d+s/);
   });
 
+  test("shows the cluster-rebuild hint when the job has a recreate-cluster phase", () => {
+    render(<ControlProgress job={runningJob} {...props} />);
+    expect(screen.getByText(/Rebuilding the Kubernetes cluster/)).toBeInTheDocument();
+  });
+
+  test("shows the fast hint for a job with no recreate-cluster phase (mcq reset/switch)", () => {
+    const mcqJob: ControlJob = {
+      ...runningJob,
+      phases: [
+        { id: "end-session", label: "End session and clear answers", state: "done" },
+        { id: "verify", label: "Verify environment", state: "running", startedAt: runningJob.startedAt },
+      ],
+    };
+    render(<ControlProgress job={mcqJob} {...props} />);
+    expect(screen.queryByText(/Rebuilding the Kubernetes cluster/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Restarting the exam services/)).toBeInTheDocument();
+  });
+
   test("the running phase surfaces the command's latest output line", () => {
     const withDetail: ControlJob = {
       ...runningJob,

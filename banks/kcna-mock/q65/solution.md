@@ -1,0 +1,7 @@
+**The container fails to start, and the Pod reports an error indicating it would run as root** is correct: `runAsNonRoot: true` is not a request the kubelet quietly overrides — it is a hard admission-time guarantee. Kubernetes resolves the effective user the container would run as (here, root, since the image sets none and no `runAsUser` overrides it) and refuses to start the container at all when that resolves to UID 0, surfacing an error such as "container has runAsNonRoot and image will run as root".
+
+Why the others are wrong:
+
+- **The container starts normally as root, since `runAsNonRoot` only affects Pods that also set `runAsUser`** — the two fields are independent; `runAsNonRoot` alone is enough to enforce the check against whatever user the container would otherwise run as.
+- **Kubernetes automatically assigns the container a random non-root UID to satisfy the setting** — that behavior belongs to a Pod Security Standards mutating pattern some platforms add on top, not to `runAsNonRoot` itself, which only ever validates and refuses, never rewrites the UID.
+- **The setting is silently ignored because no `USER` instruction exists in the image** — `securityContext.runAsNonRoot` is a Kubernetes-level admission check independent of whether the image itself declares a user; the absence of a `USER` instruction only decides what UID the check finds (root), not whether the check runs.

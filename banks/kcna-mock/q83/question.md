@@ -1,0 +1,1 @@
+A Deployment's rollout appears stuck partway through — some Pods are on the new version, some on the old. Which command shows the rollout's step-by-step progress and whether it is actually still advancing?

@@ -146,6 +146,100 @@ func TestSwitchableRejectsUnavailableAndUnknown(t *testing.T) {
 	}
 }
 
+// A real mcq bank is runnable now that the engine exists: available,
+// switchable, and it shadows any coming-soon entry of the same id.
+func TestMCQBankIsAvailableAndSwitchable(t *testing.T) {
+	dir := writeFixtures(t)
+	mcq := `{
+  "metadata": {"name": "kcna-mock", "title": "KCNA Mock Exam", "certification": "KCNA"},
+  "spec": {
+    "examType": "mcq",
+    "duration": "90m",
+    "passingScore": 75,
+    "questions": [
+      {"id": "q01", "domain": "D1", "multi": false, "options": ["a", "b", "c"], "correct": [0]}
+    ]
+  }
+}`
+	if err := os.WriteFile(filepath.Join(dir, "kcna-mock.json"), []byte(mcq), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	c, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	e, ok := c.Get("kcna-mock")
+	if !ok {
+		t.Fatal("kcna-mock missing")
+	}
+	if !e.Available {
+		t.Errorf("mcq bank = %+v, want Available", e)
+	}
+	if e.ComingSoon {
+		t.Error("real bank must shadow the coming-soon entry, not merge with it")
+	}
+	if err := c.Switchable("kcna-mock"); err != nil {
+		t.Errorf("Switchable(kcna-mock) = %v, want nil", err)
+	}
+}
+
+// Declaring instances in an mcq bank is an authoring mistake: nothing
+// would ever ssh to them, so the bank is listed but disabled with a
+// reason rather than silently accepted.
+func TestMCQBankWithInstancesIsUnavailable(t *testing.T) {
+	dir := t.TempDir()
+	mcq := `{
+  "metadata": {"name": "bad-mcq", "title": "Bad MCQ"},
+  "spec": {
+    "examType": "mcq",
+    "duration": "90m",
+    "instances": [{"name": "instance-1"}],
+    "questions": [{"id": "q01", "domain": "D1", "options": ["a", "b", "c"], "correct": [0]}]
+  }
+}`
+	if err := os.WriteFile(filepath.Join(dir, "bad-mcq.json"), []byte(mcq), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	c, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	e, ok := c.Get("bad-mcq")
+	if !ok {
+		t.Fatal("bad-mcq missing")
+	}
+	if e.Available {
+		t.Error("mcq bank declaring instances must not be Available")
+	}
+	if e.Note == "" {
+		t.Error("unavailable bank should say why")
+	}
+}
+
+// Exam types neither engine implements stay advertised-but-disabled.
+func TestUnknownExamTypeStaysUnavailable(t *testing.T) {
+	dir := t.TempDir()
+	doc := `{
+  "metadata": {"name": "essay-bank", "title": "Essay"},
+  "spec": {"examType": "essay", "duration": "90m", "questions": []}
+}`
+	if err := os.WriteFile(filepath.Join(dir, "essay-bank.json"), []byte(doc), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	c, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	e, _ := c.Get("essay-bank")
+	if e.Available {
+		t.Error("unknown exam type must not be Available")
+	}
+	if !strings.Contains(e.Note, "no engine yet") {
+		t.Errorf("Note = %q, want the no-engine explanation", e.Note)
+	}
+}
+
 // A hidden bank is the mechanism that lets tests/smoke.sh keep covering
 // the whole bank-switch path now that the CKA bank is gone. It has to be
 // invisible in the lobby and simultaneously a legal switch target — if

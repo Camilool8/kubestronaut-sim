@@ -1,0 +1,1 @@
+A running Pod's container image has no shell and no debugging tools installed, so `kubectl exec` into it is not useful for troubleshooting. Which kubectl subcommand attaches a separate, ephemeral debugging container to the running Pod without restarting it?

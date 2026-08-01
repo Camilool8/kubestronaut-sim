@@ -26,10 +26,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      # All four are offline and take seconds in total. They are the
+      # All five are offline and take seconds in total. They are the
       # cheapest failures in the project and the easiest to introduce:
       # a mis-weighted question, a check that grades spelling, a hint
-      # that is really the solution.
+      # that is really the solution, an answer key that drifted from
+      # its options.
       - name: Weights and domain balance
         run: bash tests/bank-weights.sh
       - name: Check idioms
@@ -38,6 +39,8 @@ jobs:
         run: bash tests/check-lib.sh
       - name: Hints
         run: bash tests/bank-hints.sh
+      - name: MCQ banks
+        run: bash tests/bank-mcq.sh
 
   go:
     name: Go (${{ matrix.module }})

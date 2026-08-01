@@ -1,0 +1,1 @@
+During a deployment, a team routes 5% of production traffic to the new version of an application, watches error rates and latency, and only then gradually increases traffic until the old version is retired. Which delivery strategy is this?
