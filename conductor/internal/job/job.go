@@ -16,6 +16,16 @@ import (
 // HTTP layer maps it to 409 Conflict.
 var ErrBusy = errors.New("job: another control operation is in flight")
 
+// maxLogLines bounds the retained build log. The wipe and bootstrap
+// phases print a few hundred lines over several minutes; 200 keeps the
+// recent story without turning the store into a log file.
+const maxLogLines = 200
+
+// maxLogLineBytes truncates a single retained line. kind and bootstrap
+// lines are short; anything longer is a wall of output nobody reads in
+// a 12rem pane.
+const maxLogLineBytes = 500
+
 // PhaseState is the lifecycle of one phase within a job.
 type PhaseState string
 
@@ -79,6 +89,13 @@ type Store struct {
 	seq     int
 	current *Job
 	last    *Job
+
+	// log holds the retained command output of the job named logJobID —
+	// the in-flight job, or the last one once it settles (a failed job's
+	// log is exactly the one worth reading). Kept outside Job so Status
+	// snapshots stay small; served by its own endpoint.
+	log      []string
+	logJobID string
 }
 
 // NewStore returns an empty store; clock stands in for time.Now so tests
@@ -108,7 +125,42 @@ func (s *Store) Begin(op, bank string, phases []PhaseSpec) (Job, error) {
 		j.Phases = append(j.Phases, Phase{ID: p.ID, Label: p.Label, State: PhasePending})
 	}
 	s.current = j
+	// A new job owns the log from its first line; the previous job's
+	// retained output would otherwise leak into this one's pane.
+	s.log = nil
+	s.logJobID = j.ID
 	return *cloneJob(j), nil
+}
+
+// AppendLog retains one line of command output for job jobID, dropping
+// the oldest line beyond maxLogLines. Calls naming a job that is no
+// longer current are ignored — the same stale-goroutine guard as
+// SetPhaseDetail.
+func (s *Store) AppendLog(jobID, line string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.currentIfLocked(jobID) == nil {
+		return
+	}
+	if len(line) > maxLogLineBytes {
+		line = line[:maxLogLineBytes]
+	}
+	if len(s.log) == maxLogLines {
+		copy(s.log, s.log[1:])
+		s.log[len(s.log)-1] = line
+		return
+	}
+	s.log = append(s.log, line)
+}
+
+// Log returns the retained build log and the job it belongs to: the
+// in-flight job while one runs, otherwise the last settled one.
+func (s *Store) Log() (jobID string, lines []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.logJobID, append([]string(nil), s.log...)
 }
 
 // StartPhase marks phase id as running on job jobID, completing any

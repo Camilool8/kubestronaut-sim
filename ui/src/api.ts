@@ -455,6 +455,21 @@ export async function getControlStatus(signal?: AbortSignal): Promise<ControlSta
   return (await res.json()) as ControlStatus;
 }
 
+/** The bounded build log of the in-flight control job — or the last one,
+ * whose log is exactly the story a failed rebuild needs to tell. */
+export interface ControlLog {
+  jobId: string;
+  lines: string[];
+}
+
+export async function getControlLog(signal?: AbortSignal): Promise<ControlLog> {
+  const res = await request("/api/control/log", { signal });
+  if (!res.ok) {
+    throw new Error(await readError(res));
+  }
+  return (await res.json()) as ControlLog;
+}
+
 export type ControlActionResponse =
   | { ok: true; job: ControlJob }
   | { ok: false; error: string };

@@ -1856,6 +1856,50 @@
   margin-left: var(--space-2);
 }
 
+/* The build log disclosure: the retained output behind the checklist's
+   one-line tails. The pane scrolls inside itself (Scroll-Inside rule) so
+   the dialog's header and actions never move, and flex-shrink keeps the
+   checklist the senior scroll region when height runs out. */
+.control-log {
+  margin: 0 0 var(--space-2);
+  flex-shrink: 0;
+}
+
+.control-log summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--text-s);
+  color: var(--text-muted);
+}
+
+.control-log summary::-webkit-details-marker {
+  display: none;
+}
+
+.control-log summary:hover {
+  color: var(--text);
+}
+
+.control-log-pane {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--text-muted);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  padding: var(--space-2) var(--space-3);
+  max-height: 12rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .control-phases li.phase-done {
   color: var(--text);
 }

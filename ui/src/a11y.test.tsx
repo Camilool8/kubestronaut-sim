@@ -330,9 +330,14 @@ describe("axe: no WCAG violations", () => {
   });
 
   test("control progress overlay, running and failed", async () => {
+    const user = userEvent.setup();
     const { container, rerender } = render(
       <ControlProgress job={runningJob} onRetry={() => {}} onDismiss={() => {}} onBackground={() => {}} />,
     );
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+
+    // The build log pane is a focusable scroll region; scan it open.
+    await user.click(screen.getByText(/show build log/i));
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
 
     rerender(

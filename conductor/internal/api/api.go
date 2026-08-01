@@ -39,6 +39,17 @@ func New(ops Ops, store *job.Store) http.Handler {
 		writeJSON(w, http.StatusOK, store.Status())
 	})
 
+	// The bounded build log for the in-flight job (or the last one — a
+	// failed job's log is exactly the one worth reading). Its own route,
+	// polled only while the pane is open, so status responses stay small.
+	mux.HandleFunc("GET /api/control/log", func(w http.ResponseWriter, r *http.Request) {
+		jobID, lines := store.Log()
+		if lines == nil {
+			lines = []string{}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"jobId": jobID, "lines": lines})
+	})
+
 	mux.HandleFunc("POST /api/control/reset", func(w http.ResponseWriter, r *http.Request) {
 		j, err := ops.StartReset()
 		if err != nil {

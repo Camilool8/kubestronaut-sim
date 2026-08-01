@@ -425,6 +425,10 @@ func (c *Controller) execChecked(ctx context.Context, jobID, phaseID, service st
 	}
 	onLine := func(line string) {
 		c.Store.SetPhaseDetail(jobID, phaseID, tail(line, maxDetailBytes))
+		// The same line, kept instead of overwritten: the store's bounded
+		// build log is what lets a candidate who looked away read the
+		// minutes they missed instead of a single 160-byte tail.
+		c.Store.AppendLog(jobID, line)
 	}
 	exit, out, err := c.Engine.Exec(ctx, id, cmd, onLine)
 	if err != nil {

@@ -411,6 +411,13 @@ export const strings = {
       `Step ${step} of ${total}: ${label}`,
     elapsed: (span: string) => `Elapsed ${span}`,
     reconnecting: "Restarting the exam services. The page will reconnect on its own.",
+    // The pane behind this is the real command output the rebuild is
+    // producing, not a synthesized progress number — a percentage here
+    // would be invented, and the log is the honest alternative.
+    showLog: "Show build log",
+    logLabel: "Build log",
+    logEmpty: "No output yet. The current phase has not printed anything.",
+    logUnavailable: "The log pauses while the exam services restart.",
     background: "Run in background",
     progressLabel: "Rebuild progress",
     reopen: (label: string) => `${label}. Show details.`,
