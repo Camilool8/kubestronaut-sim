@@ -284,6 +284,11 @@ export const strings = {
     // screen reader (and a test query) two identically-named buttons.
     previous: "Previous",
     next: "Next",
+    // The candidate's own sequence position (1-65), never the bank's
+    // internal question id (q61, q28, ...) — that id is an artifact of
+    // a 97-question pool a random draw samples from, meaningless (and
+    // non-sequential) to whoever is sitting the exam.
+    questionNumber: (n: number) => `Q${n}`,
     // The option letter is part of how people talk about mcq items
     // ("the answer is C"), so it is text, not decoration.
     optionLabel: (letter: string, text: string) => `${letter}. ${text}`,

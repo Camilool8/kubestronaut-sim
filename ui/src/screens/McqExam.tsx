@@ -388,11 +388,8 @@ function McqQuestion({
             aria-expanded={jumpOpen}
             aria-controls={jumpOpen ? "mcq-jump" : undefined}
           >
-            <span className="question-id">{info.id}</span>
+            <span className="question-id">{strings.mcq.questionNumber(index + 1)}</span>
             <span className="question-points">{strings.questionPanel.points(info.totalPoints)}</span>
-            <span className="question-nav-count" aria-hidden="true">
-              {index + 1} / {total}
-            </span>
             <Icon name="chevron-down" className="disclosure-chevron" />
             <span className="sr-only">{strings.questionPanel.position(index + 1, total)}</span>
           </button>
@@ -409,8 +406,15 @@ function McqQuestion({
           {/* The domain, where the hands-on screen shows the ssh chip —
               the one per-question fact an mcq candidate can use. */}
           <span className="instance-chip">{info.domain}</span>
+          {/* Position, not answered count: this sits directly under the
+              nav row's own position badge, and a DIFFERENT number here
+              (the old answered-count) read as a second, conflicting
+              "which question am I on" — most confusing right after
+              stepping back to an earlier question. Answered-count still
+              lives in the footer, away from anything claiming to be a
+              position. */}
           <span className="mcq-progress" aria-hidden="true">
-            {answeredCount} / {total}
+            {index + 1} / {total}
           </span>
           <button
             className="question-mark"
@@ -608,6 +612,15 @@ function McqJump({ questions, answers, selectedId, onSelect, onDismiss }: McqJum
     return order.map((domain) => ({ domain, questions: byDomain.get(domain) ?? [] }));
   }, [questions]);
 
+  // The tile's own sequence position (1-65), not its bank id — same
+  // reasoning as the nav badge above: q.id is an artifact of the pool a
+  // random draw sampled from, not something the candidate should see.
+  const positionOf = useMemo(() => {
+    const m = new Map<string, number>();
+    questions.forEach((q, i) => m.set(q.id, i + 1));
+    return m;
+  }, [questions]);
+
   return (
     <div className="question-jump mcq-jump" id="mcq-jump" ref={ref}>
       {groups.map((group) => (
@@ -625,7 +638,9 @@ function McqJump({ questions, answers, selectedId, onSelect, onDismiss }: McqJum
                     onClick={() => onSelect(q.id)}
                     aria-current={current ? "true" : undefined}
                   >
-                    <span className="question-tile-id">{q.id}</span>
+                    <span className="question-tile-id">
+                      {strings.mcq.questionNumber(positionOf.get(q.id) ?? 0)}
+                    </span>
                     {answered && <Icon name="check" className="question-tile-answered" />}
                     {marked && <Icon name="flag-filled" className="question-tile-mark" />}
                     <span className="sr-only">
