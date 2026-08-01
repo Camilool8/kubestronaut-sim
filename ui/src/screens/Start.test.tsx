@@ -73,7 +73,6 @@ describe("Start composition", () => {
     expect(await screen.findByText("Active exam")).toBeInTheDocument();
     const start = screen.getByRole("button", { name: "Start Exam" });
     const catalog = await screen.findByRole("heading", { name: "Switch exam" });
-    // eslint-disable-next-line no-bitwise
     expect(start.compareDocumentPosition(catalog) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
