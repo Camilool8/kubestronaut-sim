@@ -28,8 +28,6 @@ export type IconName =
   | "chevron-left"
   | "chevron-right"
   | "chevron-down"
-  | "panel-collapse"
-  | "panel-expand"
   | "check"
   | "cross"
   | "flag"
@@ -56,19 +54,6 @@ const PATHS: Record<IconName, ReactNode> = {
   "chevron-left": <path d="M14.5 7L9.5 12l5 5" />,
   "chevron-right": <path d="M9.5 7l5 5-5 5" />,
   "chevron-down": <path d="M7 9.5l5 5 5-5" />,
-  // A bar the panel folds against, plus the direction it travels.
-  "panel-collapse": (
-    <>
-      <path d="M4.5 4.5v15" />
-      <path d="M16 8l-4 4 4 4" />
-    </>
-  ),
-  "panel-expand": (
-    <>
-      <path d="M4.5 4.5v15" />
-      <path d="M12 8l4 4-4 4" />
-    </>
-  ),
   check: <path d="M4.5 12.5l5 5 10-11" />,
   cross: (
     <>
@@ -126,18 +111,19 @@ const PATHS: Record<IconName, ReactNode> = {
 
 interface IconProps {
   name: IconName;
-  /** Rides the type it sits in. Override only for a fixed-size control. */
-  size?: string | number;
   className?: string;
 }
 
-export function Icon({ name, size = "1em", className }: IconProps) {
+// Always 1em: an icon rides the type it sits in, and no call site ever
+// asked for anything else — the size prop that offered to was dead code
+// pretending to be an API (#32). A fixed-size control sizes its type.
+export function Icon({ name, className }: IconProps) {
   return (
     <svg
       className={className ? `icon ${className}` : "icon"}
       viewBox="0 0 24 24"
-      width={size}
-      height={size}
+      width="1em"
+      height="1em"
       fill="none"
       stroke="currentColor"
       strokeWidth={1.75}

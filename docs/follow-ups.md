@@ -31,9 +31,6 @@ Known, chosen, and not currently worth the cost of changing.
 - **The ingress `ValidatingWebhookConfiguration` is left in place.** It
   matches the real exam's behaviour, including rejecting a malformed
   Ingress.
-- **`.impeccable/design.json` is tracked but read by nothing in this
-  repository.** It is the sidecar for an external tool; it costs 37KB
-  and confuses nobody who does not have that tool.
 - **CI builds images with `PRELOAD=none`.** A full preload in CI would
   cost more minutes than it would catch bugs. Cross-architecture
   coverage is therefore partial, and a cold-cache smoke run on the

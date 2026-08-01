@@ -122,6 +122,16 @@ components:
     textColor: "{colors.text}"
     rounded: "{rounded.s}"
     padding: "0.35em 0.5em"
+  mcq-option:
+    backgroundColor: "{colors.surface-raised}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.s}"
+    padding: "0.75rem"
+  mcq-option-on:
+    backgroundColor: "{colors.accent-soft}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.s}"
+    padding: "0.75rem"
   bank-card-active:
     backgroundColor: "{colors.accent-soft}"
     textColor: "{colors.text}"
@@ -224,7 +234,7 @@ IBM Plex Sans (`system-ui`, -apple-system, Segoe UI) and JetBrains Mono
 | `--text-hero` | 3.25rem | Mono 700, 1.1, tabular | the score percentage. One site |
 | `--text-2xl` | 1.75rem | Sans 700, 1.25, -0.01em | `.start-card h1`, the exam title. One site |
 | `--text-xl` | 1.375rem | Sans 700, 1.25, -0.01em | the verdict (tracked to 0.12em), the score headline, the boot-panel and desktop-required headings |
-| `--text-l` | 1.125rem | Mono 700, 0.03em, tabular | the countdown, stat values, `.md h2` |
+| `--text-l` | 1.125rem | Two settings | as Mono 700, 0.03em, tabular: the countdown, stat values, `.md h2`. As Sans 400, 1.65: the mcq question prose and options — the one full-screen reading surface, whose 760px column at 18px is a ~75ch measure |
 | `--text-m` | 0.9375rem | Sans 400, 1.55 | the base. 15px and not 16px: the question panel is 360px wide and shares the screen with a terminal |
 | `--text-s` | 0.85rem | Sans or Mono | the secondary step and the busiest non-base size — 30 sites in `theme.css`, including mode blurbs, bank meta, clipboard fields, keyboard rows, shortcut tables, the theme toggle |
 | `--text-xs` | 0.75rem | Sans 600, 0.06em, uppercase | labels — section headings, stat labels, column heads, the bank badge, jump-grid domain heads, the code-block language tag (0.08em) |
@@ -252,18 +262,23 @@ fourth mirror.
 
 Two panes and a stack: a resizable question panel beside a fluid desktop
 viewport under a wrapping topbar, and a single centred column everywhere
-else. There are five full-page surfaces — `screens/Start.tsx`,
-`screens/Exam.tsx`, `screens/Score.tsx`, `screens/BootProgress.tsx` and
-`components/DesktopRequired.tsx`.
+else. There are six full-page surfaces — `screens/Start.tsx`,
+`screens/Exam.tsx`, `screens/McqExam.tsx`, `screens/Score.tsx`,
+`screens/BootProgress.tsx` and `components/DesktopRequired.tsx`.
 
 | Surface | Width |
 |---|---|
 | Lobby card | `min(680px, 100%)` |
+| MCQ question column | `max-width: 760px` |
 | Score page | `max-width: 820px` |
 | About drawer | `min(480px, 92vw)` |
 | Confirm dialog | `min(440px, 90%)` |
+| Wide confirm dialog | `min(560px, 92%)` |
 | Control dialog | `min(92vw, 520px)` |
+| Boot panel | `min(94vw, 560px)` |
+| Desktop-required card | `min(34rem, 100%)` |
 | Clipboard panel, keyboard popover | `min(92vw, 380px)` |
+| Toast layer | `min(380px, calc(100vw - 2rem))` |
 
 **Spacing** is six steps, `--space-1` to `--space-6`: 0.25 / 0.5 / 0.75 /
 1 / 1.5 / 2rem. Cards take `--space-6` and drop to `--space-4` below
@@ -381,6 +396,8 @@ own type, weight 600.
 | Card fill | `--surface` for cards that float, `--bg` for panels inset *within* a card — an inversion that reads correctly because the page tone is darker than the card in light and lighter in dark |
 | Card padding | `--space-6` on the lobby card, `--space-5` on dialogs and the drawer, `--space-3`/`--space-4` on dense containers; one step less below 600px |
 | Bank card states | rest on the page fill with a `--border-strong` hairline, hover steps the fill, and the active exam takes an accent border, `--accent-soft` *and* a 3px inset bar |
+| Bank description | `.bank-desc` — the bank's one-line pitch at `--text-s` muted, two-line clamped, visible on the card rather than hidden in a `title=` tooltip touch devices never see |
+| Lobby order | the card reads as one decision: an "Active exam" `.start-eyebrow` (the `--text-xs` label recipe) over the h1, stats, mode picker, Start — then tips as fine print, then the catalog demoted to "Switch exam" at the bottom |
 | The Legible Refusal | an unavailable exam is not a disabled control but a refusal with a reason, and the reason is the point of rendering it. `--text` for the title, `--text-muted` for the meta and reason line, and unavailability marked by `disabled`, `cursor: default`, a muted badge and an italic reason — never by opacity |
 
 ### Form controls
@@ -393,31 +410,32 @@ borrow the anchored idioms — 6px corners, a hairline border, a
 
 | Control | Site | Treatment |
 |---|---|---|
-| Radio group | mode picker, `screens/Start.tsx:252` | native `<input type="radio">` inside a `<label>` row, in a borderless `<fieldset>` whose `legend` is `--text-s` muted. `.mode-option` is 6px on `--border`, hover steps the fill, and the chosen row takes an accent border plus `--accent-soft` |
+| Radio group | mode picker, `screens/Start.tsx` | native `<input type="radio">` inside a `<label>` row, in a borderless `<fieldset>` whose `legend` is `--text-s` muted. `.mode-option` is 6px on `--border`, hover steps the fill, and the chosen row takes the full three-channel selection: accent border, `--accent-soft`, 3px inset bar |
 | Textarea | clipboard panel, `components/ClipboardPanel.tsx:87` | `.clipboard-input` — mono at `--text-s`, `--surface-raised` fill, `--border` hairline, 6px, `resize: vertical` |
 | Checkbox ×2 | keyboard settings, `components/KeyboardSettings.tsx:49` and `:60` | native and unstyled, in a `.keyboard-row` flex row beside a `--text-s` label. The second is `disabled` while the first is off |
 
 ### Icons
 
-Fifteen hand-authored SVGs in `ui/src/components/Icon.tsx` on a 24 grid,
+Thirteen hand-authored SVGs in `ui/src/components/Icon.tsx` on a 24 grid,
 `fill: none`, `stroke: currentColor`, stroke-width 1.75, round caps and
 joins — the conventions `ui/public/favicon.svg` was already drawn with:
-`chevron-left`, `chevron-right`, `chevron-down`, `panel-collapse`,
-`panel-expand`, `check`, `cross`, `flag`, `flag-filled`, `copy`,
-`keyboard`, `theme-auto`, `theme-light`, `theme-dark`, `help`.
+`chevron-left`, `chevron-right`, `chevron-down`, `check`, `cross`,
+`flag`, `flag-filled`, `copy`, `keyboard`, `theme-auto`, `theme-light`,
+`theme-dark`, `help`.
 
 Sized on `1em`, so an icon rides the type it sits in, and `currentColor`
 throughout, so both themes and every state colour come free. Always
 `aria-hidden` by construction: `Icon` takes no label prop, which is what
 stops a later call site from making an icon load-bearing.
 
-**The Arrow Vocabulary.** Three roles, one shape family.
+**The Arrow Vocabulary.** Two roles, one shape family. (A third pair,
+`panel-collapse`/`panel-expand`, was deleted with the panel-collapse
+control itself: the panel has no collapsed state to toggle into.)
 
 | Meaning | Icon | Rotates |
 |---|---|---|
 | Step to a sibling (previous / next question) | `chevron-left` / `chevron-right` | no |
 | Expand or collapse a disclosure in place | `chevron-down` | 180° on open |
-| Collapse a panel sideways | `panel-collapse` / `panel-expand` | no |
 
 The rotating chevron is load-bearing: it lets an expanded disclosure drop
 the accent border that was byte-identical to the current question tile's.
@@ -429,8 +447,8 @@ There is no site nav. What stands in for it:
 | Element | Treatment |
 |---|---|
 | Topbar (exam only) | `--surface` under a hairline bottom border, wrapping rather than compressing, title flexing from an 8rem basis and ellipsing |
-| Question navigator | one header row — prev, the current question's id and points, next — above the pane, with the instance chip and the review-mark toggle on a second row |
-| Jump grid | a full-panel disclosure of every question as mono tiles auto-filled from a 4.25rem minimum, grouped under their curriculum domain, which is where the long domain string gets a full line. No scrim, no `role="dialog"`, no focus trap: dimming a live remote desktop to pick question 12 would read as a fault |
+| Question navigator | one header row — prev, the current question's id and points, next — above the pane, with the bank's optional question title (`.question-nav-title`, the one flex item in the row allowed to ellipse), the instance chip and the review-mark toggle on a second row |
+| Jump grid | a full-panel disclosure of every question as mono tiles auto-filled from a 4.25rem minimum, grouped under their curriculum domain, which is where the long domain string gets a full line. A bank that ships question titles adds a muted sans line per tile and widens every grid to a 7.5rem minimum as a set (`.question-grid-titled`). No scrim, no `role="dialog"`, no focus trap: dimming a live remote desktop to pick question 12 would read as a fault |
 | Floating controls | theme toggle and info button, fixed top-right in one flex cluster so their spacing comes from layout rather than a guessed offset |
 | Skip link | the `.sr-only` clip idiom, never a transform; on focus it becomes `position: fixed`, so its visible state is anchored to the viewport rather than to the pane it lives in |
 
@@ -451,6 +469,36 @@ stand down on `target?.closest("input, textarea, [contenteditable]")`
 the RFB canvas owns the keyboard, and while a dialog is open. Alt+arrows
 were rejected: those are Back/Forward on Windows and Linux, and in a
 router-less SPA Back leaves a running exam.
+
+### The MCQ exam surface
+
+`screens/McqExam.tsx`: a single centred 760px reading column under the
+same topbar, no desktop pane. The nav header reuses the hands-on
+navigator's classes; the instance chip's slot carries the question's
+domain, the one per-question fact an mcq candidate can use. Positions
+(`Q7`) are the only question identity the candidate ever sees — the
+bank's pool ids are an artifact of the random draw and never render,
+including in the submit dialog's unanswered list and the practice
+dialog.
+
+| Element | Treatment |
+|---|---|
+| `.mcq-option` | an anchored control: `--surface-raised` fill on `--border`, 6px corners, 44px minimum touch target. Hover steps the fill to `--raised-hover` and never moves the edge |
+| `.mcq-option-on` | the full three-channel selection: accent edge, `--accent-soft` wash, 3px inset bar — plus the visible native checkbox as the non-visual channel. The option letter goes `--accent-strong` on the wash |
+| `.mcq-footer` | Previous / answered-tally / Next, with the final question's Next giving way to the one primary button. The tally deliberately counts completion; position lives in the header, and two numbers both claiming to locate the candidate was the confusion this footer used to cause |
+| Answered tile | the jump grid's tile plus a check icon and "answered" sr text — server state, not a rendering guess, because mcq answers are saved per click |
+
+### Result and teaching components
+
+| Component | Treatment |
+|---|---|
+| `CheckList` | per-check rows for a graded question: mark, description, `earned/points`, message, under an `.sr-only` header row. Three outcomes: `--success` check, `--danger` cross, and a muted `·` for a check that never ran (a malformed points header in the bank), whose message says so in italics rather than posing as a failure |
+| `DomainBreakdown` | the score page's per-domain table, weakest first, each row carrying a pill-radius bar (`.domain-bar`) whose width is the one data-driven inline style on the page |
+| `McqAnswerReview` | the mcq score review: every option re-rendered with icon-plus-words state (`correct, and you selected it` family), never colour alone; solid `--success` edge for correct-selected, dashed for correct-missed, `--danger` for wrong-selected |
+| `HintTray` | training's two-tier hints and solution reveal, a `details` disclosure family keyed by question id so a revealed hint never travels to the next question |
+| `Toast` | two fixed-position live regions — polite for info (5s TTL), assertive for warnings (which persist and carry a `!` mark as the non-colour channel) — above every overlay, so a confirmation is never rendered invisible |
+| `ExamIntro` | the how-this-works card: a self-contained `role="img"` schematic with numbered 50% circles and a prose legend, deliberately not an overlay tour measured against live layout |
+| `.control-log-pane` | the rebuild dialog's build log: retained command output in mono `--text-xs` on `--surface-raised`, scrolling inside its own 12rem box (Scroll-Inside), following the newest line unless the reader scrolls up |
 
 ## Motion
 

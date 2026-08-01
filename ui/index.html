@@ -11,6 +11,18 @@
     <title>kubestronaut-sim</title>
   </head>
   <body>
+    <!-- Applies a stored theme before first paint, so a dark-theme user
+         never sees a light flash on reload. Reads the same key as
+         ThemeProvider and the Go locked page; anything but "light" or
+         "dark" means system, which is the no-attribute default. -->
+    <script>
+      try {
+        var simTheme = localStorage.getItem("sim.theme");
+        if (simTheme === "light" || simTheme === "dark") {
+          document.documentElement.setAttribute("data-theme", simTheme);
+        }
+      } catch (e) {}
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

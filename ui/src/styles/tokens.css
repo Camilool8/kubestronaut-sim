@@ -97,6 +97,12 @@
      on purpose: a border is not text, so it answers to the 3:1 floor of
      WCAG 1.4.11, which 4.0:1 clears — and moving them would change the
      visual weight of the design.
+     Audited 2026-08-01 (#24): the only plain-accent TEXT left in
+     theme.css is the bank badge (on the card's --bg fill, 4.5:1), a
+     running control phase (on --surface, 4.8:1) and the focused skip
+     link (on --surface, 4.8:1) — all at or over the floor. The mcq
+     option letter and the selected question-tile points already use
+     --accent-strong on their washes.
      --accent-contrast 4.8:1 on --accent (the primary button)
      --accent-strong 6.4:1 on --surface, 5.4:1 on --accent-soft, 5.6:1 on
      --surface-raised — it is the accent for text sitting on --accent-soft

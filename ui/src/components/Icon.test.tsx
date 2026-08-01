@@ -46,8 +46,6 @@ describe("Icon", () => {
       "chevron-left",
       "chevron-right",
       "chevron-down",
-      "panel-collapse",
-      "panel-expand",
       "check",
       "cross",
       "flag",
