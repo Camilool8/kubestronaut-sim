@@ -25,6 +25,7 @@ spec:
     - name: instance-1
   questions:
     - id: q01
+      title: Smoke test
       instance: instance-1
       domain: Smoke
       weight: 1

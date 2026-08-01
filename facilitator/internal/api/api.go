@@ -148,6 +148,7 @@ type examMode struct {
 // there is nothing to ssh into. Multi is mcq-only.
 type examQuestionInfo struct {
 	ID          string `json:"id"`
+	Title       string `json:"title,omitempty"`
 	Instance    string `json:"instance,omitempty"`
 	Domain      string `json:"domain"`
 	Weight      int    `json:"weight"`
@@ -173,6 +174,7 @@ func (s *server) handleExam(w http.ResponseWriter, r *http.Request) {
 	for _, q := range pool {
 		info := examQuestionInfo{
 			ID:        q.ID,
+			Title:     q.Title,
 			Instance:  q.Instance,
 			Domain:    q.Domain,
 			Weight:    q.Weight,
@@ -278,6 +280,7 @@ func (s *server) findQuestion(id string) (exam.Question, bool) {
 // inside graded results, mirroring the solution.md gate.
 type questionResponse struct {
 	ID       string   `json:"id"`
+	Title    string   `json:"title,omitempty"`
 	Instance string   `json:"instance,omitempty"`
 	Domain   string   `json:"domain"`
 	Markdown string   `json:"markdown"`
@@ -301,6 +304,7 @@ func (s *server) handleQuestion(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, questionResponse{
 		ID:       q.ID,
+		Title:    q.Title,
 		Instance: q.Instance,
 		Domain:   q.Domain,
 		Markdown: string(md),

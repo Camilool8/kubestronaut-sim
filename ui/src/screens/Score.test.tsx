@@ -17,6 +17,8 @@ const results = {
   questions: [
     {
       id: "q01",
+      // Optional in the bank format; the review row shows it beside the id.
+      title: "Namespaces & quotas",
       instance: "instance-1",
       domain: "Application Environment",
       earned: 0,
@@ -202,6 +204,14 @@ describe("Score results poll", () => {
     await screen.findByText("q01", {}, { timeout: 6_000 });
     expect(screen.queryByText(/still trying to reach the facilitator/i)).toBeNull();
   }, 10_000);
+});
+
+describe("Score review rows", () => {
+  test("a question's bank title shows beside its id", async () => {
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+    await screen.findByText("q01");
+    expect(screen.getByText("Namespaces & quotas")).toBeInTheDocument();
+  });
 });
 
 describe("Score heading", () => {

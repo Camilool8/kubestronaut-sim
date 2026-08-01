@@ -451,6 +451,7 @@ function McqQuestion({
           </button>
         </div>
         <div className="question-nav-tools">
+          {info.title && <span className="question-nav-title">{info.title}</span>}
           {/* The domain, where the hands-on screen shows the ssh chip —
               the one per-question fact an mcq candidate can use. */}
           <span className="instance-chip">{info.domain}</span>
@@ -698,12 +699,16 @@ function McqJump({
     return m;
   }, [questions]);
 
+  // Tiles widen as a set, not per question — same rule as the hands-on
+  // jump grid. Today no mcq bank ships titles, so this stays compact.
+  const titled = questions.some((q) => q.title);
+
   return (
     <div className="question-jump mcq-jump" id="mcq-jump" ref={ref}>
       {groups.map((group) => (
         <div className="question-jump-group" key={group.domain}>
           <h2>{group.domain}</h2>
-          <ul className="question-grid">
+          <ul className={`question-grid${titled ? " question-grid-titled" : ""}`}>
             {group.questions.map((q) => {
               const current = q.id === selectedId;
               const answered = (answers[q.id] ?? []).length > 0;
@@ -721,6 +726,7 @@ function McqJump({
                     {answered && (
                       <Icon name="check" className="question-tile-answered" />
                     )}
+                    {q.title && <span className="question-tile-title">{q.title}</span>}
                     {marked && (
                       <Icon name="flag-filled" className="question-tile-mark" />
                     )}

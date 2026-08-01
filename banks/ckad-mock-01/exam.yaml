@@ -37,90 +37,112 @@ spec:
     - name: instance-2
   questions:
     - id: q01
+      title: Namespaces & ResourceQuota
       instance: instance-1
       domain: Application Environment, Configuration and Security
       weight: 9
     - id: q02
+      title: Fix a failing Deployment
       instance: instance-1
       domain: Application Deployment
       weight: 9
     - id: q03
+      title: NetworkPolicy lockdown
       instance: instance-2
       domain: Services and Networking
       weight: 9
     - id: q04
+      title: CronJob and Job
       instance: instance-2
       domain: Application Design and Build
       weight: 6
     - id: q05
+      title: Init container and native sidecar
       instance: instance-1
       domain: Application Design and Build
       weight: 6
     - id: q06
+      title: ConfigMaps, as env and as a volume
       instance: instance-2
       domain: Application Environment, Configuration and Security
       weight: 9
     - id: q07
+      title: Lock down a Pod
       instance: instance-1
       domain: Application Environment, Configuration and Security
       weight: 9
     - id: q08
+      title: Route two Services with one Ingress
       instance: instance-2
       domain: Services and Networking
       weight: 9
     - id: q09
+      title: Build, push and run a container image
       instance: instance-1
       domain: Application Design and Build
       weight: 6
     - id: q10
+      title: Persistent and ephemeral storage
       instance: instance-2
       domain: Application Design and Build
       weight: 6
     - id: q11
+      title: Helm release management
       instance: instance-1
       domain: Application Deployment
       weight: 9
     - id: q12
+      title: Roll out, then roll back
       instance: instance-2
       domain: Application Deployment
       weight: 9
     - id: q13
+      title: Kustomize overlay
       instance: instance-1
       domain: Application Deployment
       weight: 9
     - id: q14
+      title: Secrets, and a Deployment that cannot read one
       instance: instance-2
       domain: Application Environment, Configuration and Security
       weight: 9
     - id: q15
+      title: ServiceAccounts and tokens
       instance: instance-1
       domain: Application Environment, Configuration and Security
       weight: 9
     - id: q16
+      title: Health checks
       instance: instance-2
       domain: Application Observability and Maintenance
       weight: 9
     - id: q17
+      title: Find out why two workloads are broken
       instance: instance-1
       domain: Application Observability and Maintenance
       weight: 9
     - id: q18
+      title: Bring a manifest up to date
       instance: instance-2
       domain: Application Observability and Maintenance
       weight: 9
     - id: q19
+      title: A Service that reaches nothing
       instance: instance-1
       domain: Services and Networking
       weight: 9
     - id: q20
+      title: Expose a Deployment on a node port
       instance: instance-2
       domain: Services and Networking
       weight: 9
     - id: q21
+      title: The adapter pattern
       instance: instance-1
       domain: Application Design and Build
       weight: 6
     - id: q22
+      title: The ambassador pattern
       instance: instance-2
       domain: Application Design and Build
       weight: 6

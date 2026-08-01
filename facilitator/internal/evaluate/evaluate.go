@@ -110,6 +110,7 @@ type Results struct {
 // QuestionResult is one question's graded outcome.
 type QuestionResult struct {
 	ID       string        `json:"id"`
+	Title    string        `json:"title,omitempty"`
 	Instance string        `json:"instance"`
 	Domain   string        `json:"domain"`
 	Earned   int           `json:"earned"`
@@ -157,7 +158,7 @@ func Grade(ex *exam.Exam, bank string, r Runner, checkTimeout time.Duration) *Re
 	}
 
 	for _, q := range ex.Questions {
-		qr := QuestionResult{ID: q.ID, Instance: q.Instance, Domain: q.Domain}
+		qr := QuestionResult{ID: q.ID, Title: q.Title, Instance: q.Instance, Domain: q.Domain}
 
 		for _, c := range q.Checks {
 			if c.Skip {

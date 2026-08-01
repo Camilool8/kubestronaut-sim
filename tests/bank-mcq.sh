@@ -45,6 +45,7 @@ MIN_OPTIONS, MAX_OPTIONS = 3, 6
 # fail; it cannot silently pass by finding nothing.
 Q_RE = re.compile(
     r"-\s+id:\s*(?P<id>\S+)\s*\n"
+    r"(?:\s+title:\s*.+\n)?"
     r"\s+domain:\s*(?P<domain>.+?)\s*\n"
     r"(?:\s+weight:\s*(?P<weight>\d+)\s*\n)?"
     r"\s+multi:\s*(?P<multi>true|false)\s*\n"

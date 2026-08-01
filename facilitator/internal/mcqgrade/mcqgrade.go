@@ -69,6 +69,7 @@ func Grade(ex *exam.Exam, bank string, answers map[string][]int, questionIDs []s
 
 		qr := evaluate.QuestionResult{
 			ID:       q.ID,
+			Title:    q.Title,
 			Domain:   q.Domain,
 			Earned:   cr.Earned,
 			Total:    q.Weight,

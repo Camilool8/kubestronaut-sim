@@ -65,6 +65,7 @@ type Exam struct {
 // answer key (mcq).
 type Question struct {
 	ID       string
+	Title    string // optional short label; empty means the UI falls back to the id
 	Instance string // hands-on only
 	Domain   string
 	Weight   int
@@ -108,6 +109,7 @@ type examDoc struct {
 		ExamLength        int            `json:"examLength"`
 		Questions         []struct {
 			ID       string   `json:"id"`
+			Title    string   `json:"title"`
 			Instance string   `json:"instance"`
 			Domain   string   `json:"domain"`
 			Weight   int      `json:"weight"`
@@ -170,6 +172,7 @@ func Load(examJSONPath, bankDir string) (*Exam, error) {
 	for _, q := range doc.Spec.Questions {
 		question := Question{
 			ID:        q.ID,
+			Title:     q.Title,
 			Instance:  q.Instance,
 			Domain:    q.Domain,
 			Weight:    q.Weight,

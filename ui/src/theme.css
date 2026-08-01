@@ -566,6 +566,19 @@
   gap: var(--space-2);
 }
 
+/* The bank's short label for the current question. The one flex item in
+   this row allowed to shrink below its content (min-width: 0), so at
+   narrow panel widths the title ellipses while the instance chip — the
+   most load-bearing fact in the header — stays whole. */
+.question-nav-title {
+  font-size: var(--text-s);
+  color: var(--text-muted);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* The review mark is a candidate's own scratch note, not a reading from
    the grader, so it stays muted at rest and never takes the accent — the
    instance chip beside it is the one accent object this header is allowed. */
@@ -727,6 +740,25 @@
   right: 0.3em;
   font-size: var(--text-xs);
   color: var(--text-muted);
+}
+
+/* The bank's short label, when it ships one: a sans line under the mono
+   id, ellipsed so the tile stays a tile. Muted holds on the current
+   tile's wash too — --text-muted on --accent-soft is 5.2:1 light and
+   5.5:1 dark, over the 4.5:1 floor. */
+.question-tile-title {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A grid with titles gets wider tiles as a set — mixing compact and wide
+   tiles in one grid would read as two different controls. */
+.question-grid-titled {
+  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
 }
 
 /* which box to ssh into — the single most load-bearing fact per question.
@@ -1232,6 +1264,16 @@
 .qr-id {
   font-family: var(--font-mono);
   font-weight: 700;
+}
+
+/* The question's name, when the bank ships one. Inherits the summary's
+   600 weight — the row's readable identity — while the domain stays the
+   muted, flexible filler beside it. */
+.qr-title {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .qr-domain {

@@ -51,6 +51,7 @@ spec:
     - name: instance-2
   questions:
     - id: q01
+      title: Namespaces & ResourceQuota
       instance: instance-1
       domain: Application Environment, Configuration and Security
       weight: 25
@@ -80,7 +81,8 @@ Keep the `questions:` keys in that order, one per line, with no inline
 comments. [bank-weights.sh](../tests/bank-weights.sh) parses the block with a
 regex, not a YAML library, so a reordered key or a trailing comment hides a
 question from the gate — which then fails the bank for disagreeing with the
-directory listing.
+directory listing. The one optional key, `title:`, goes directly after `id:`;
+both gate regexes tolerate it there and nowhere else.
 
 | Field | Meaning and status |
 |---|---|
@@ -97,6 +99,7 @@ directory listing.
 | `spec.environment.allowedDomains` | Domain suffixes the desktop browser may reach through the docs proxy, subdomains included ([proxy/entrypoint.sh](../proxy/entrypoint.sh)). Omit it to inherit `allow.DefaultDomains` ([allow.go](../proxy/internal/allow/allow.go)), the smallest set that leaves the documentation sites usable |
 | `spec.instances` | 1 or 2 entries. Convention: names outside `instance-1`/`instance-2` only mark the bank unavailable in the lobby ([catalog.go:199-210](../conductor/internal/catalog/catalog.go)), and the facilitator's exam loader never parses the block at all |
 | `spec.questions[].id`, `.instance` | Question directory name, and the ssh host the grader runs its checks on |
+| `spec.questions[].title` | Optional short label shown in the question navigator, the jump grid and the score review. Absent, the UI falls back to the id (hands-on) or the attempt position (mcq) |
 | `spec.questions[].domain` | Must match a `domainWeights` key |
 | `spec.questions[].weight` | Must equal the sum of this question's `# points:` headers |
 

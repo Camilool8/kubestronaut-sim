@@ -27,6 +27,8 @@ export interface SessionSnapshot {
 
 export interface ExamQuestionInfo {
   id: string;
+  /** Optional short label from the bank; absent, displays fall back to the id. */
+  title?: string;
   /** Which shell host grades this question. Absent on an mcq exam. */
   instance?: string;
   domain: string;
@@ -72,6 +74,8 @@ export interface ExamInfo {
 
 export interface QuestionDetail {
   id: string;
+  /** Optional short label from the bank; absent, displays fall back to the id. */
+  title?: string;
   /** Absent on an mcq exam. */
   instance?: string;
   domain: string;
@@ -98,6 +102,8 @@ export interface CheckResult {
 
 export interface QuestionResult {
   id: string;
+  /** Optional short label from the bank; absent, displays fall back to the id. */
+  title?: string;
   instance: string;
   domain: string;
   earned: number;

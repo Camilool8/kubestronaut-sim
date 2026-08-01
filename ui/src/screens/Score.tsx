@@ -247,6 +247,7 @@ function QuestionResultDetails({ question, index }: { question: QuestionResult; 
       <summary>
         <Icon name="chevron-down" className="disclosure-chevron" />
         <span className="qr-id">{label}</span>
+        {question.title && <span className="qr-title">{question.title}</span>}
         <span className="qr-domain">{question.domain}</span>
         <span className="qr-points">
           {question.earned}/{question.total}

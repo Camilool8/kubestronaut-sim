@@ -82,9 +82,11 @@ describe("QuestionPanel copy affordance", () => {
 });
 
 // Three questions across two domains, which is the smallest fixture that
-// exercises both ends of the navigator and the grid's grouping.
+// exercises both ends of the navigator and the grid's grouping. q01
+// carries a title and the others do not, because title is optional in
+// the bank format and both renderings have to hold in one grid.
 const bank: ExamQuestionInfo[] = [
-  { id: "q01", instance: "instance-1", domain: "Config", weight: 5, totalPoints: 5, hintCount: 0 },
+  { id: "q01", title: "Namespaces & quotas", instance: "instance-1", domain: "Config", weight: 5, totalPoints: 5, hintCount: 0 },
   { id: "q02", instance: "instance-2", domain: "Networking", weight: 7, totalPoints: 7, hintCount: 0 },
   { id: "q03", instance: "instance-2", domain: "Networking", weight: 9, totalPoints: 9, hintCount: 0 },
 ];
@@ -139,6 +141,16 @@ describe("QuestionPanel navigator", () => {
     expect(selected).toEqual(["q03", "q01"]);
   });
 
+  test("a bank title shows in the header, and its absence renders nothing", async () => {
+    renderNav("q01");
+    expect(await screen.findByText("Namespaces & quotas")).toBeInTheDocument();
+
+    renderNav("q02");
+    // q02 has no title: the header falls back to the id alone rather
+    // than rendering an empty span or the word "undefined".
+    expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
+  });
+
   test("the bracket keys stay out of the way while the terminal has focus", async () => {
     const selected: string[] = [];
     const { container } = renderNav("q02", (id) => void selected.push(id));
@@ -177,6 +189,17 @@ describe("QuestionPanel jump grid", () => {
     // The domain finally gets a full line here instead of being ellipsed
     // to about eight characters inside a 360px row.
     expect(grid.getByRole("heading", { name: "Networking" })).toBeInTheDocument();
+  });
+
+  test("a titled bank shows its labels on the tiles and widens the grid as a set", async () => {
+    const grid = await openGrid("q01");
+    // The title is part of the tile, so a keyboard or screen-reader user
+    // gets it in the button's own name.
+    expect(grid.getByRole("button", { name: /Namespaces & quotas/ })).toBeInTheDocument();
+    // One question with a title widens every grid in the panel — a mixed
+    // grid of compact and wide tiles would read as two controls.
+    const list = document.querySelector(".question-grid");
+    expect(list?.className).toContain("question-grid-titled");
   });
 
   test("the current question is announced as current, not just drawn as selected", async () => {

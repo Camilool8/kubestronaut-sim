@@ -51,6 +51,12 @@ func TestLoad(t *testing.T) {
 		t.Errorf("Questions[1].ID = %q, want %q (file order not preserved)", q01.ID, "q01")
 	}
 
+	if q02.Title != "Fix a failing Deployment" {
+		t.Errorf("q02.Title = %q, want %q", q02.Title, "Fix a failing Deployment")
+	}
+	if q01.Title != "" {
+		t.Errorf("q01.Title = %q, want empty (title is optional)", q01.Title)
+	}
 	if q02.Instance != "instance-1" {
 		t.Errorf("q02.Instance = %q, want %q", q02.Instance, "instance-1")
 	}

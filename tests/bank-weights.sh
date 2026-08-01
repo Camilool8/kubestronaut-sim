@@ -31,6 +31,7 @@ TOLERANCE = 2.0  # percentage points
 # fail; it cannot silently pass by finding nothing.
 Q_RE = re.compile(
     r"-\s+id:\s*(?P<id>\S+)\s*\n"
+    r"(?:\s+title:\s*.+\n)?"
     r"\s+instance:\s*(?P<instance>\S+)\s*\n"
     r"\s+domain:\s*(?P<domain>.+?)\s*\n"
     r"\s+weight:\s*(?P<weight>\d+)\s*$",

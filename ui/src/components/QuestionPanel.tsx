@@ -181,6 +181,7 @@ export function QuestionPanel({
             </div>
             {selected && (
               <div className="question-nav-tools">
+                {selected.title && <span className="question-nav-title">{selected.title}</span>}
                 {selected.instance && (
                   <span className="instance-chip">
                     {strings.questionPanel.sshHint(selected.instance)}
@@ -317,6 +318,10 @@ function QuestionJump({ groups, selectedId, onSelect, onDismiss }: QuestionJumpP
     return () => node?.removeEventListener("keydown", onKeyDown);
   }, [onDismiss]);
 
+  // Tiles widen as a set, not per question: a grid mixing titled and
+  // untitled widths would read as two different controls.
+  const titled = groups.some((group) => group.questions.some((q) => q.title));
+
   return (
     <div className="question-jump" id="question-jump" ref={ref}>
       {groups.map((group) => (
@@ -324,7 +329,7 @@ function QuestionJump({ groups, selectedId, onSelect, onDismiss }: QuestionJumpP
           {/* h2, matching the shifted level the question markdown now
               renders its own title at — the topbar owns the exam's h1. */}
           <h2>{group.domain}</h2>
-          <ul className="question-grid">
+          <ul className={`question-grid${titled ? " question-grid-titled" : ""}`}>
             {group.questions.map((q) => {
               const current = q.id === selectedId;
               const marked = marksStore.isMarked(q.id);
@@ -340,6 +345,7 @@ function QuestionJump({ groups, selectedId, onSelect, onDismiss }: QuestionJumpP
                     <span className="question-tile-points">
                       {strings.questionPanel.points(q.totalPoints)}
                     </span>
+                    {q.title && <span className="question-tile-title">{q.title}</span>}
                     {marked && (
 <Icon name="flag-filled" className="question-tile-mark" />
                     )}
