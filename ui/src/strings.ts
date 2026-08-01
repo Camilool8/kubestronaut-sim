@@ -24,7 +24,6 @@ export const strings = {
       "Solve questions over SSH on the named instance (user: candidate).",
       "The desktop's Firefox reaches allowlisted documentation sites only.",
       "Each question has a working directory pre-created at /opt/course/<n>.",
-      "The timer starts the moment you click Start and cannot be paused.",
     ],
     // The mcq counterpart of `tips`: no ssh, no desktop, no working
     // directories — none of those exist for a multiple-choice bank.
@@ -32,8 +31,14 @@ export const strings = {
       "Answer in the question panel: pick an option and it saves immediately.",
       "Multi-select questions score all-or-nothing: every correct option, nothing else.",
       "You can change any answer until you submit or time runs out.",
-      "The timer starts the moment you click Start and cannot be paused.",
     ],
+    // The clock tip follows the chosen mode: "cannot be paused" printed
+    // under a selected, untimed Training row was the lobby contradicting
+    // itself (#22's last holdout, caught in the browser pass).
+    tipTimer: (mode: string) =>
+      mode === "training"
+        ? "Training is untimed. Exam and Speed start their clock the moment you click Start."
+        : "The timer starts the moment you click Start and cannot be paused.",
     // The catalog and the exam summary are separate endpoints, so one can
     // fail while the other renders. Say which one, and that the button
     // below is the thing that will not work.

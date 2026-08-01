@@ -244,11 +244,14 @@ export function Start({
           {examBlocked && <p className="start-blocked">{strings.mobile.startDisabled}</p>}
         </div>
 
-        {/* Fine print for the attempt ahead, after the act it qualifies. */}
+        {/* Fine print for the attempt ahead, after the act it qualifies.
+            The clock line tracks the chosen mode so an untimed Training
+            selection is never contradicted two lines below the button. */}
         <ul className="start-tips">
           {(isMcq ? strings.start.tipsMcq : strings.start.tips).map((tip) => (
             <li key={tip}>{tip}</li>
           ))}
+          <li>{strings.start.tipTimer(mode)}</li>
         </ul>
 
         <Async
