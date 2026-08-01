@@ -278,6 +278,12 @@ export const strings = {
     regionLabel: "Question",
     selectOne: "Select one answer",
     selectAll: "Select all that apply",
+    // Footer nav labels: short pagination wording, deliberately not the
+    // header stepper's fuller "Previous/Next question" aria-labels — the
+    // two controls do the same thing, and matching text would give a
+    // screen reader (and a test query) two identically-named buttons.
+    previous: "Previous",
+    next: "Next",
     // The option letter is part of how people talk about mcq items
     // ("the answer is C"), so it is text, not decoration.
     optionLabel: (letter: string, text: string) => `${letter}. ${text}`,
@@ -392,6 +398,10 @@ export const strings = {
     // The measured cluster rebuild is 90–240s. Promising "1–2 minutes"
     // and then blowing past it turns a normal wait into a perceived hang.
     hint: "Rebuilding the Kubernetes cluster. Usually about 2–4 minutes — you can leave this tab open.",
+    // For jobs with no recreate-cluster phase (a switch to or reset of a
+    // multiple-choice bank): promising minutes for a seconds-long job is
+    // the same mistake in the other direction.
+    hintFast: "Restarting the exam services. Usually a few seconds.",
     stepOf: (step: number, total: number, label: string) =>
       `Step ${step} of ${total}: ${label}`,
     elapsed: (span: string) => `Elapsed ${span}`,

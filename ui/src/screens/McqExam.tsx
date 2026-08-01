@@ -247,6 +247,7 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
             onSelect={setPickedId}
             onAnswer={applySelection}
             answeredCount={answeredCount}
+            onEndExam={() => setConfirmOpen(true)}
           />
         )}
       </div>
@@ -320,6 +321,7 @@ interface McqQuestionProps {
   onSelect: (id: string) => void;
   onAnswer: (qid: string, selection: number[]) => void;
   answeredCount: number;
+  onEndExam: () => void;
 }
 
 // One question: nav row, stem, options. Keyed by question id from the
@@ -337,6 +339,7 @@ function McqQuestion({
   onSelect,
   onAnswer,
   answeredCount,
+  onEndExam,
 }: McqQuestionProps) {
   const [jumpOpen, setJumpOpen] = useState(false);
   const jumpTriggerRef = useRef<HTMLButtonElement>(null);
@@ -467,6 +470,32 @@ function McqQuestion({
           )}
         </Async>
       </div>
+
+      {/* A labelled Previous/Next/End Exam row, distinct from the header's
+          compact icon steppers: those exist for a quick keyboard-adjacent
+          nudge, this is the discoverable, exam-shaped control a candidate
+          expects at the foot of a question. End Exam here opens the same
+          confirm dialog as the header button — the unanswered/marked
+          review lives there once, not twice. */}
+      <footer className="mcq-footer">
+        <button className="btn" onClick={() => prev && onSelect(prev.id)} disabled={!prev}>
+          <Icon name="chevron-left" />
+          {strings.mcq.previous}
+        </button>
+        <span className="mcq-progress" aria-hidden="true">
+          {answeredCount} / {total}
+        </span>
+        {next ? (
+          <button className="btn" onClick={() => onSelect(next.id)}>
+            {strings.mcq.next}
+            <Icon name="chevron-right" />
+          </button>
+        ) : (
+          <button className="btn btn-primary" onClick={onEndExam}>
+            {strings.exam.endExam}
+          </button>
+        )}
+      </footer>
 
       {jumpOpen && (
         <McqJump

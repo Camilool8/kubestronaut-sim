@@ -2892,10 +2892,15 @@
   flex-direction: column;
 }
 
+/* overflow: hidden, not auto — the column below owns its own scroll
+   (Scroll-Inside Rule) so .mcq-footer can stay pinned under it instead
+   of drifting off with a long stem. A short question no longer leaves a
+   dead run of viewport under the options: the footer's margin-top: auto
+   pulls it down to the bottom of this box every time. */
 .mcq-body {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   justify-content: center;
   padding: var(--space-4) var(--space-3);
@@ -2903,17 +2908,37 @@
 
 /* position: relative is load-bearing: .question-jump (reused as
    .mcq-jump) is absolutely positioned against this box, exactly as it
-   is against .question-panel on the hands-on screen. */
+   is against .question-panel on the hands-on screen. min-height: 0 lets
+   .mcq-pane's overflow-y actually engage instead of stretching the flex
+   column past its parent. */
 .mcq-question {
   position: relative;
   width: 100%;
   max-width: 760px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
 .mcq-pane {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: var(--space-3) 0;
+}
+
+/* Previous / progress / Next-or-End Exam, pinned to the foot of the
+   column. Exactly one primary button on screen at a time: End Exam only
+   replaces Next once there is no next question to go to. */
+.mcq-footer {
+  flex-shrink: 0;
+  margin-top: auto;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
 }
 
 .mcq-progress {
@@ -2921,6 +2946,19 @@
   font-size: var(--text-s);
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* --text-m is 15px because the hands-on question panel shares the
+   screen with a terminal (DESIGN.md, Typography). Nothing here shares
+   space with anything: this column is the whole screen, so its prose
+   gets the next step up rather than staying pinned to that constraint.
+   --text-l is an existing permission, not a new size — see p/li below;
+   headings are untouched, they already sit at --text-l or above. */
+.mcq-question .md p,
+.mcq-question .md li,
+.mcq-question .md blockquote {
+  font-size: var(--text-l);
+  line-height: 1.65;
 }
 
 .mcq-options {
@@ -2984,6 +3022,18 @@
 
 .mcq-option-text {
   min-width: 0;
+}
+
+/* Scoped to the live exam, not the shared .mcq-option-text/-letter used
+   by the score screen's answer review — that stays at the review's own
+   compact scale. */
+.mcq-question .mcq-option-text {
+  font-size: var(--text-l);
+  line-height: 1.5;
+}
+
+.mcq-question .mcq-option-letter {
+  font-size: var(--text-l);
 }
 
 .mcq-check-answer {

@@ -202,10 +202,51 @@ describe("McqExam answering", () => {
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
     await screen.findByText("Which component persists cluster state?");
-    await user.click(screen.getByRole("button", { name: /end exam/i }));
+    // On the last question the footer's End Exam button joins the
+    // header's — same action, same label, two locations. Either
+    // opens the identical dialog; the header's is first in the DOM.
+    await user.click(screen.getAllByRole("button", { name: /end exam/i })[0]);
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText(/1 question is unanswered/)).toBeInTheDocument();
     expect(screen.getByText("q02", { selector: ".submit-review-ids" })).toBeInTheDocument();
+  });
+});
+
+describe("McqExam footer navigation", () => {
+  test("Previous is disabled on the first question and steps back from later ones", async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+
+    await screen.findByText("Which component persists cluster state?");
+    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await screen.findByText("Which are container interface standards? Choose all that apply.");
+
+    await user.click(screen.getByRole("button", { name: "Previous" }));
+    await screen.findByText("Which component persists cluster state?");
+  });
+
+  test("the last question's footer shows End Exam instead of Next, and it opens the confirm dialog", async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+
+    await screen.findByText("Which component persists cluster state?");
+    expect(screen.getByRole("button", { name: "Next" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await screen.findByText("Which are container interface standards? Choose all that apply.");
+
+    // No more "Next" in the footer — the exam's last question replaces
+    // it with the same End Exam control the header carries throughout.
+    expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
+    const endExamButtons = screen.getAllByRole("button", { name: /end exam/i });
+    expect(endExamButtons).toHaveLength(2);
+
+    await user.click(endExamButtons[1]);
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 });
