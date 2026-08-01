@@ -1,0 +1,1 @@
+A Deployment's Pods keep restarting. `kubectl get pods` shows `CrashLoopBackOff` with a climbing restart count, and the last event reads `Back-off restarting failed container`. What is the most effective next command to find out WHY the container is crashing?

@@ -1,0 +1,7 @@
+**A Git repository is the single source of truth for a system's declarative desired state, and an automated agent continuously reconciles the live environment to match it** is correct: in GitOps, every change to infrastructure or application configuration goes through Git (a commit, reviewed via a pull request) rather than a direct, imperative command against the cluster. A controller — often running inside the cluster itself — watches the repository and applies whatever it finds there, so the repository's history is also an audit trail of every change ever made.
+
+Why the others are wrong:
+
+- **Running `kubectl apply` from a CI pipeline instead of a developer's laptop** — moving where an imperative command runs does not make a workflow GitOps; the defining trait is that Git is the source of truth an agent reconciles TOWARD, not merely a place a pipeline happens to read a manifest from before pushing it.
+- **Storing container images in a Git-based registry instead of a container registry** — GitOps is about how configuration and desired state are managed and reconciled, not about where binary image artifacts are stored; images still live in an OCI-compliant registry either way.
+- **A branching strategy that requires one branch per environment** — branch-per-environment is one possible way teams organize a GitOps repository, but it is a convention layered on top, not what defines GitOps itself; GitOps is fundamentally about declarative state plus automated reconciliation.

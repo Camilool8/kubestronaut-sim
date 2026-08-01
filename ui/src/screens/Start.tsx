@@ -232,7 +232,7 @@ export function Start({
             </div>
             <div>
               <div className="start-stat-label">{strings.start.questionsLabel}</div>
-              <div className="start-stat-value">{exam.questions.length}</div>
+              <div className="start-stat-value">{exam.questionCount}</div>
             </div>
             <div>
               <div className="start-stat-label">{strings.start.kubernetesLabel}</div>

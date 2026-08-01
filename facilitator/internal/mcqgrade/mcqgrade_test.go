@@ -37,7 +37,7 @@ func TestGradeAllCorrect(t *testing.T) {
 		"q01": {2},
 		"q02": {0, 3},
 		"q03": {1},
-	})
+	}, nil)
 
 	if res.Total != 4 {
 		t.Errorf("Total = %d, want 4", res.Total)
@@ -60,7 +60,7 @@ func TestGradeAllCorrect(t *testing.T) {
 }
 
 func TestGradeBlankScoresZero(t *testing.T) {
-	res := Grade(fixtureExam(), "kcna-fixture", nil)
+	res := Grade(fixtureExam(), "kcna-fixture", nil, nil)
 
 	if res.Earned != 0 {
 		t.Errorf("Earned = %d, want 0", res.Earned)
@@ -93,7 +93,7 @@ func TestGradeMultiAllOrNothing(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			res := Grade(fixtureExam(), "b", map[string][]int{"q02": c.selected})
+			res := Grade(fixtureExam(), "b", map[string][]int{"q02": c.selected}, nil)
 			q02 := res.Questions[1]
 			if q02.Earned != c.want {
 				t.Errorf("q02.Earned = %d, want %d", q02.Earned, c.want)
@@ -106,7 +106,7 @@ func TestGradeMultiAllOrNothing(t *testing.T) {
 }
 
 func TestGradeResultShapeCarriesReviewFields(t *testing.T) {
-	res := Grade(fixtureExam(), "b", map[string][]int{"q01": {0}})
+	res := Grade(fixtureExam(), "b", map[string][]int{"q01": {0}}, nil)
 	q01 := res.Questions[0]
 
 	if len(q01.Options) != 4 {
@@ -144,12 +144,40 @@ func TestGradePercentMath(t *testing.T) {
 	res := Grade(fixtureExam(), "b", map[string][]int{
 		"q02": {0, 3},
 		"q03": {1},
-	})
+	}, nil)
 	if res.Percent != 75 {
 		t.Errorf("Percent = %d, want 75", res.Percent)
 	}
 	if !res.Passed {
 		t.Errorf("Passed = false, want true at exactly the passing score")
+	}
+}
+
+// A pooled attempt is graded on exactly its drawn subset: an answer to a
+// pool question outside that subset must not appear in the results or
+// count toward the total, and the subset's own order is what Questions
+// comes back in — not the pool's.
+func TestGradeScopesToQuestionIDs(t *testing.T) {
+	res := Grade(fixtureExam(), "b", map[string][]int{
+		"q01": {2},
+		"q02": {0, 3},
+		"q03": {1},
+	}, []string{"q03", "q01"})
+
+	if len(res.Questions) != 2 {
+		t.Fatalf("len(Questions) = %d, want 2 (only the drawn subset)", len(res.Questions))
+	}
+	if res.Questions[0].ID != "q03" || res.Questions[1].ID != "q01" {
+		t.Errorf("Questions ids = [%s %s], want [q03 q01] (subset order preserved)",
+			res.Questions[0].ID, res.Questions[1].ID)
+	}
+	// q02 carried 2 of the 4 total points; excluded from the draw, it
+	// must not inflate Total either.
+	if res.Total != 2 {
+		t.Errorf("Total = %d, want 2 (q02's weight excluded)", res.Total)
+	}
+	if res.Earned != 2 {
+		t.Errorf("Earned = %d, want 2 (q01 and q03 both correct)", res.Earned)
 	}
 }
 

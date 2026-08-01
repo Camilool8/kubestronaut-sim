@@ -56,6 +56,15 @@ export interface ExamInfo {
   durationSeconds: number;
   passingScore: number;
   kubernetesVersion: string;
+  /**
+   * The exam's declared length — for a pooled mcq bank (more authored
+   * questions than any one attempt asks), this is the smaller
+   * per-attempt count, not the pool size. Before an attempt has drawn
+   * its subset, `questions` below still lists the full pool, so this is
+   * the field every question-count DISPLAY should read, never
+   * `questions.length`.
+   */
+  questionCount: number;
   questions: ExamQuestionInfo[];
   /** Rendered by the lobby's picker, so the modes are the server's list. */
   modes?: ExamMode[];

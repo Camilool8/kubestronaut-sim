@@ -1,0 +1,7 @@
+**A taint on a node repels Pods from being scheduled there unless a Pod carries a matching toleration, letting nodes be reserved for only the workloads that explicitly tolerate them** is correct: this is the inverse of a node selector or affinity rule, which pulls Pods TOWARD nodes. A taint instead pushes Pods AWAY by default, and only a Pod whose toleration matches the taint's key, value, and effect is allowed to schedule onto (or continue running on) that node — a common pattern for reserving nodes for a specific team or workload class, or for GPU-only nodes.
+
+Why the others are wrong:
+
+- **A taint marks a node as unhealthy, and a toleration tells the kubelet to ignore health checks on it** — taints are a scheduling-preference mechanism, entirely separate from node health/condition reporting, which Kubernetes tracks through node conditions instead.
+- **A toleration forces a Pod to be scheduled onto a specific tainted node, overriding the scheduler's normal placement logic** — a toleration only makes a node ELIGIBLE for a Pod; it does not force placement there. Actually landing on that node still depends on the scheduler's normal selection among all eligible nodes (or an additional affinity rule to prefer it).
+- **A taint and toleration pair replaces the need for resource requests and limits** — taints/tolerations control WHICH nodes a Pod may use; they say nothing about how much CPU or memory the Pod is granted, which remains entirely the job of `resources.requests`/`resources.limits`.

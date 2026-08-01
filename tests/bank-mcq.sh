@@ -16,8 +16,15 @@
 #      means a question was ported without changing shape;
 #   4. spec.domainWeights is present, sums to 100, and names exactly
 #      the domains the questions use;
-#   5. each domain's share of the points is within TOLERANCE percentage
-#      points of its spec.domainWeights entry;
+#   5. WITHOUT spec.examLength (or one >= the pool): each domain's share
+#      of the points is within TOLERANCE percentage points of its
+#      spec.domainWeights entry — the whole pool IS the exam every
+#      attempt, so its own composition has to match the curriculum.
+#      WITH a smaller spec.examLength: exam.DrawMCQ stratifies every
+#      draw to hit each domain's target count exactly regardless of the
+#      pool's own ratio (see facilitator/internal/exam/exam.go), so what
+#      this gate checks instead is that every domain's pool is at LEAST
+#      as deep as that target — a draw must always be possible;
 #   6. the answer key is not degenerate: no single option index is the
 #      answer to more than half of the single-answer questions.
 set -euo pipefail
@@ -73,6 +80,26 @@ def domain_weights(text):
         if em:
             out[em.group(1).strip()] = int(em.group(2))
     return out or None
+
+
+def exam_length(text):
+    """Parse spec.examLength: N, or None when absent."""
+    m = re.search(r"^\s*examLength:\s*(\d+)\s*$", text, re.M)
+    return int(m.group(1)) if m else None
+
+
+def domain_targets(weights, order, n):
+    """Largest-remainder rounding of n across order's domains, in the
+    ratios weights declares — the exact algorithm exam.DrawMCQ uses
+    (facilitator/internal/exam/exam.go), so this gate checks pool depth
+    against the same numbers a real draw will ask for."""
+    raw = {d: weights[d] * n / 100 for d in order}
+    targets = {d: int(raw[d]) for d in order}
+    leftover = n - sum(targets.values())
+    remainders = sorted(order, key=lambda d: (-(raw[d] - targets[d]), order.index(d)))
+    for d in remainders[:leftover]:
+        targets[d] += 1
+    return targets
 
 
 def parse_options(block):
@@ -235,18 +262,42 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
         fail(bank, f"spec.domainWeights lists {d!r} but no question uses it")
 
     # (5)
-    print(f"{bank}: {len(questions)} questions, {grand} points")
-    for d in sorted(by_domain, key=lambda x: -by_domain[x]):
-        got = by_domain[d] / grand * 100 if grand else 0
-        want = weights.get(d)
-        if want is None:
-            continue
-        drift = got - want
-        mark = "ok " if abs(drift) <= TOLERANCE else "OFF"
-        print(f"  [{mark}] {got:5.1f}%  target {want:2d}%  ({drift:+.1f})  {d}")
-        if abs(drift) > TOLERANCE:
-            fail(bank, f"{d} is {got:.1f}% of points, target {want}% "
-                       f"(drift {drift:+.1f}pp, tolerance ±{TOLERANCE:g})")
+    n = exam_length(text)
+    pooled = n is not None and n < len(questions)
+    print(f"{bank}: {len(questions)} questions, {grand} points"
+          + (f", examLength {n}" if pooled else ""))
+
+    if pooled:
+        # A stratified draw hits its target count regardless of the
+        # pool's own ratio, so what has to hold is pool depth, not
+        # points-share — see the header comment above invariant 5.
+        domain_order = []
+        pool_count = {}
+        for q in questions:
+            d = q["domain"]
+            if d not in pool_count:
+                domain_order.append(d)
+            pool_count[d] = pool_count.get(d, 0) + 1
+        targets = domain_targets(weights, domain_order, n)
+        for d in domain_order:
+            have, want = pool_count[d], targets[d]
+            mark = "ok " if have >= want else "OFF"
+            print(f"  [{mark}] pool {have:3d}  draw target {want:3d}  {d}")
+            if have < want:
+                fail(bank, f"{d} has {have} questions, but a {n}-question draw "
+                           f"needs {want} — the pool is too shallow for this domain")
+    else:
+        for d in sorted(by_domain, key=lambda x: -by_domain[x]):
+            got = by_domain[d] / grand * 100 if grand else 0
+            want = weights.get(d)
+            if want is None:
+                continue
+            drift = got - want
+            mark = "ok " if abs(drift) <= TOLERANCE else "OFF"
+            print(f"  [{mark}] {got:5.1f}%  target {want:2d}%  ({drift:+.1f})  {d}")
+            if abs(drift) > TOLERANCE:
+                fail(bank, f"{d} is {got:.1f}% of points, target {want}% "
+                           f"(drift {drift:+.1f}pp, tolerance ±{TOLERANCE:g})")
 
 if failures:
     print("\nBANK MCQ FAIL:", file=sys.stderr)

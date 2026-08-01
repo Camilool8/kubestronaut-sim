@@ -199,6 +199,20 @@ spec:
 
 Differences from the hands-on shape:
 
+- **`spec.examLength` (optional) pools the bank.** Author more questions
+  than a single attempt should ask, set `examLength` to the smaller
+  per-attempt count, and `session.Manager.StartMCQ` draws a fresh,
+  random subset on every `Start` ([exam.go](../facilitator/internal/exam/exam.go),
+  `DrawMCQ`) — stratified so each domain contributes exactly its
+  `domainWeights` share of `examLength` (largest-remainder rounding),
+  never left to chance. Absent, zero, or `>=` the pool's own size means
+  no pooling: every question is served, in bank order, exactly as an
+  mcq bank behaved before this field existed — the hidden `smoke-mcq`
+  fixture and any bank that has not opted in take this path. The drawn
+  subset is persisted with the session (survives a resume or a
+  facilitator restart) and is what grading, `GET /api/exam`, and every
+  single-question endpoint are scoped to for that attempt — a pool
+  question outside the draw is a 404, not merely ungraded.
 - **No `spec.instances`.** Declaring any marks the bank unavailable
   ([catalog.go](../conductor/internal/catalog/catalog.go)) — nothing
   would ever ssh to them.
@@ -232,9 +246,17 @@ Differences from the hands-on shape:
 matches the directories on disk; every stem and explanation exists (the
 explanation with a length floor); option and correct-index arity as
 above; mcq purity; `domainWeights` sums to 100 with bidirectional
-domain coverage; each domain's share within 2 percentage points of its
-target; and that no single option position is correct on more than half
-of the single-answer questions — a degenerate key reads like a pattern.
+domain coverage; and that no single option position is correct on more
+than half of the single-answer questions — a degenerate key reads like a
+pattern. The weight-versus-content check has two modes: without
+`examLength` (or one that does not shrink the pool), each domain's share
+of the pool's own points must sit within 2 percentage points of its
+target — the pool IS the exam. With a smaller `examLength`, that
+check instead requires each domain's POOL to be at least as deep as the
+per-domain count a stratified draw of that size would need (the same
+largest-remainder rounding `exam.DrawMCQ` uses) — the pool's own ratio
+is free to differ, since every draw is stratified to the target
+regardless.
 
 One trade-off to know when editing a shipped bank: answers are stored
 by option index, so reordering or editing `options` mid-attempt

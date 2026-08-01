@@ -151,6 +151,102 @@ func TestStartAndResetClearAnswers(t *testing.T) {
 
 // Version 3 files predate answer storage; the version guard must discard
 // them (the standing migration strategy), not resume them answerless.
+// A pooled mcq attempt's drawn subset is what StartMCQ adds over plain
+// Start: it must persist and survive a reload exactly like mode and
+// answers already do.
+func TestStartMCQPersistsQuestionIDsAndReload(t *testing.T) {
+	path := sessionPath(t)
+	clock, _ := fakeClock(epoch)
+	m, err := New(path, testBank, testDur, clock, func() {})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	want := []string{"q03", "q01", "q07"}
+	if _, err := m.StartMCQ(ModeExam, testDur, want); err != nil {
+		t.Fatalf("StartMCQ: %v", err)
+	}
+	if got := m.QuestionIDs(); !equalStrings(got, want) {
+		t.Errorf("QuestionIDs() after StartMCQ = %v, want %v", got, want)
+	}
+
+	m2, err := New(path, testBank, testDur, clock, func() {})
+	if err != nil {
+		t.Fatalf("New (reload): %v", err)
+	}
+	if got := m2.QuestionIDs(); !equalStrings(got, want) {
+		t.Errorf("QuestionIDs() after reload = %v, want %v", got, want)
+	}
+}
+
+// Plain Start is StartMCQ(mode, dur, nil) — every hands-on attempt, and
+// every mcq bank that has not opted into pooling, must get no subset at
+// all, not an empty-but-present one.
+func TestPlainStartHasNoQuestionIDs(t *testing.T) {
+	clock, _ := fakeClock(epoch)
+	m, err := New(sessionPath(t), testBank, testDur, clock, func() {})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if _, err := m.Start(ModeExam, testDur); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if got := m.QuestionIDs(); len(got) != 0 {
+		t.Errorf("QuestionIDs() after plain Start = %v, want empty", got)
+	}
+}
+
+// Reset clears the drawn subset along with everything else an attempt
+// carries — the whole point is that the NEXT Start draws fresh, not that
+// it inherits the previous attempt's questions.
+func TestResetClearsQuestionIDs(t *testing.T) {
+	clock, _ := fakeClock(epoch)
+	m, err := New(sessionPath(t), testBank, testDur, clock, func() {})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if _, err := m.StartMCQ(ModeExam, testDur, []string{"q01", "q02"}); err != nil {
+		t.Fatalf("StartMCQ: %v", err)
+	}
+	if err := m.Reset(); err != nil {
+		t.Fatalf("Reset: %v", err)
+	}
+	if got := m.QuestionIDs(); len(got) != 0 {
+		t.Errorf("QuestionIDs() after Reset = %v, want empty", got)
+	}
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func TestVersion4FileIsDiscarded(t *testing.T) {
+	path := sessionPath(t)
+	doc := `{"version":4,"bank":"` + testBank + `","attempt":"tok","state":"running",` +
+		`"startedAt":"2026-01-01T12:00:00Z","durationSeconds":7200,"endedAt":null,` +
+		`"endReason":"","mode":"exam","gradeError":""}`
+	if err := os.WriteFile(path, []byte(doc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	clock, _ := fakeClock(epoch)
+	m, err := New(path, testBank, testDur, clock, func() {})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if snap := m.Snapshot(); snap.State != "idle" {
+		t.Errorf("State after loading a v4 file = %q, want idle (discarded)", snap.State)
+	}
+}
+
 func TestVersion3FileIsDiscarded(t *testing.T) {
 	path := sessionPath(t)
 	doc := `{"version":3,"bank":"` + testBank + `","attempt":"tok","state":"running",` +

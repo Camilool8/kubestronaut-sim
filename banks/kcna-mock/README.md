@@ -1,11 +1,14 @@
 # KCNA Mock Exam bank
 
-60 original multiple-choice questions in the shape of the real KCNA
+97 original multiple-choice questions, of which 65 are drawn at random
+for each attempt (`spec.examLength`), in the shape of the real KCNA
 exam: 90 minutes, 75% to pass, single-answer and select-all-that-apply
-items, every question tagged to a curriculum domain and weighted to the
-official blueprint (Kubernetes Fundamentals 44%, Container Orchestration
-28%, Cloud Native Application Delivery 16%, Cloud Native Architecture
-12% — the post-November-2025 domains).
+items, every question tagged to a curriculum domain. Domain weights are
+enforced on every draw, not just on the pool as a whole (`exam.DrawMCQ`
+stratifies the sample so it always lands within the official blueprint:
+Kubernetes Fundamentals 44%, Container Orchestration 28%, Cloud Native
+Application Delivery 16%, Cloud Native Architecture 12% — the
+post-November-2025 domains).
 
 Every question was written for this project. Nothing here reproduces
 content from the actual exam (which is confidential under the Linux

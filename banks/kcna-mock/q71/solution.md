@@ -1,0 +1,7 @@
+**A NetworkPolicy is denying ingress traffic to the `payments` Pods from the caller's namespace or Pod labels** is correct: with populated Endpoints, kube-proxy already has healthy backends to route to, which rules out selector mismatches and unready Pods. A default-deny (or narrowly-scoped allow) NetworkPolicy on the `payments` Pods is the classic cause of a connection that is correctly routed at the Service layer but never completes — packets are dropped by the CNI's policy enforcement rather than rejected outright, which is exactly why the client sees a hang and eventual timeout instead of an immediate "connection refused".
+
+Why the others are wrong:
+
+- **The Service's `targetPort` does not match the container's listening port** — that would typically produce an immediate "connection refused" once a packet reaches the Pod, not a hang, and would usually go alongside failing readiness probes that would have kept the Pod out of Endpoints in the first place.
+- **CoreDNS has not yet propagated the Service's DNS record** — DNS resolution failing looks like "could not resolve host", a fast and distinct error from `curl`, not a hang after connecting; and the fact that Endpoints already resolved via `kubectl` means the Service object and its DNS name are fully in place.
+- **The Pod's `dnsPolicy` is set to `None`** — an explicit `None` policy without a matching `dnsConfig` would break DNS resolution entirely, again producing a fast resolution error rather than a connection-level timeout.

@@ -1,0 +1,7 @@
+**A failing liveness probe causes the kubelet to restart the container, while a failing readiness probe only removes the Pod from a Service's Endpoints without restarting anything** is correct: a liveness probe answers "is this container still working, or should it be killed and restarted?" — the response to failure is corrective, via a restart. A readiness probe answers a different question, "can this Pod currently handle traffic?" — the response to failure is simply to stop sending it requests (by pulling it out of Endpoints) until it reports ready again, which matters especially during startup or a temporary overload.
+
+Why the others are wrong:
+
+- **A liveness probe only runs once at startup, while a readiness probe runs continuously** — a startup delay of that kind is what a `startupProbe` provides; both liveness and readiness probes run continuously and repeatedly for the container's entire lifetime, on their own configured intervals.
+- **A readiness probe can only check HTTP endpoints, while a liveness probe can only check TCP ports** — both probe types support the exact same mechanisms (HTTP GET, TCP socket, and exec command); neither is restricted to one check type.
+- **A liveness probe applies to the whole Pod, while a readiness probe applies only to individual containers** — both probe types are configured per-container within a Pod's spec; neither one is inherently Pod-wide versus container-specific.

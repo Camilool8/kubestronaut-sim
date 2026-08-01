@@ -1,0 +1,1 @@
+From inside a Pod, `curl http://payments.default.svc.cluster.local` hangs until it times out. `kubectl get endpoints payments` returns addresses, so the Service does have matching, presumably healthy Pods. Which of the following is the most likely explanation?

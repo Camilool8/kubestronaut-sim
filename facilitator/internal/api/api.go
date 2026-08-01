@@ -120,7 +120,14 @@ type examResponse struct {
 	DurationSeconds   int                `json:"durationSeconds"`
 	PassingScore      int                `json:"passingScore"`
 	KubernetesVersion string             `json:"kubernetesVersion"`
-	Questions         []examQuestionInfo `json:"questions"`
+	// QuestionCount is the exam's declared length — ex.ExamLength for a
+	// pooled mcq bank, otherwise len(Questions) — and is what the lobby
+	// and the bank-switch cards must show. It is deliberately NOT always
+	// len(Questions) below: before an attempt exists there is nothing
+	// drawn yet, so Questions still lists the full pool, which for a
+	// pooled bank is larger than the exam a candidate will actually get.
+	QuestionCount int                `json:"questionCount"`
+	Questions     []examQuestionInfo `json:"questions"`
 	// Modes the lobby renders its picker from, so the three cards are
 	// described by the server rather than hardcoded in the UI.
 	Modes []examMode `json:"modes"`
@@ -150,6 +157,7 @@ type examQuestionInfo struct {
 }
 
 func (s *server) handleExam(w http.ResponseWriter, r *http.Request) {
+	pool := s.questionsForExamResponse()
 	resp := examResponse{
 		Name:              s.ex.Name,
 		Title:             s.ex.Title,
@@ -157,11 +165,12 @@ func (s *server) handleExam(w http.ResponseWriter, r *http.Request) {
 		DurationSeconds:   int(s.ex.Duration.Seconds()),
 		PassingScore:      s.ex.PassingScore,
 		KubernetesVersion: s.ex.KubernetesVersion,
+		QuestionCount:     s.declaredQuestionCount(),
 		// Pre-sized (not nil) so an exam with zero questions still
 		// marshals Questions as JSON "[]" rather than "null".
-		Questions: make([]examQuestionInfo, 0, len(s.ex.Questions)),
+		Questions: make([]examQuestionInfo, 0, len(pool)),
 	}
-	for _, q := range s.ex.Questions {
+	for _, q := range pool {
 		info := examQuestionInfo{
 			ID:        q.ID,
 			Instance:  q.Instance,
@@ -198,9 +207,63 @@ func totalPoints(q exam.Question) int {
 	return total
 }
 
-// findQuestion looks up a question by id in exam order. The second
-// return value is false when id names no question in the loaded exam.
+// declaredQuestionCount is the exam's length as the candidate is meant
+// to see it BEFORE an attempt exists to draw one from: ex.ExamLength for
+// a pooled mcq bank, otherwise the size of the whole pool. Every display
+// site (the lobby stat, the bank-switch cards) wants this, never
+// len(s.ex.Questions) directly — that would show the pool's full size on
+// a bank where a candidate never sees more than ExamLength of it.
+func (s *server) declaredQuestionCount() int {
+	if s.ex.ExamLength > 0 && s.ex.ExamLength < len(s.ex.Questions) {
+		return s.ex.ExamLength
+	}
+	return len(s.ex.Questions)
+}
+
+// questionsForExamResponse is what GET /api/exam lists under
+// "questions": the current attempt's drawn subset, in draw order, once a
+// pooled mcq attempt has started (or ended — the score screen's own
+// getExam call, if any, sees the same attempt) — and the full pool
+// otherwise, which for hands-on, an unpooled mcq bank, and the idle
+// window before any attempt has been started is exactly the previous,
+// pre-pooling behaviour.
+func (s *server) questionsForExamResponse() []exam.Question {
+	ids := s.mgr.QuestionIDs()
+	if len(ids) == 0 {
+		return s.ex.Questions
+	}
+	out := make([]exam.Question, 0, len(ids))
+	for _, id := range ids {
+		if q, ok := s.findQuestion(id); ok {
+			out = append(out, q)
+		}
+	}
+	return out
+}
+
+// findQuestion looks up a question by id in exam order, restricted to
+// the current attempt's drawn subset when one exists (a pooled mcq bank
+// once StartMCQ has run) — otherwise (hands-on; an mcq bank with no
+// pooling; the idle window before any attempt) the full pool, exactly as
+// before pooling existed. Every endpoint that reads or writes a single
+// question by id (GET /api/questions/{id}, its solution and hints, and
+// the answer PUT) goes through this, so none of them can be used to
+// touch a pool question outside what this attempt actually drew.
+// The second return value is false when id names no question at all, or
+// names one outside the current subset.
 func (s *server) findQuestion(id string) (exam.Question, bool) {
+	if ids := s.mgr.QuestionIDs(); len(ids) > 0 {
+		inSubset := false
+		for _, want := range ids {
+			if want == id {
+				inSubset = true
+				break
+			}
+		}
+		if !inSubset {
+			return exam.Question{}, false
+		}
+	}
 	for _, q := range s.ex.Questions {
 		if q.ID == id {
 			return q, true
@@ -523,7 +586,28 @@ func (s *server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	snap, err := s.mgr.Start(mode, s.durationFor(mode))
+	// A pooled mcq bank draws its subset fresh on every Start — Reset
+	// already clears the previous attempt's QuestionIDs, so "New attempt"
+	// always means a new random draw, not a replay of the last one. An
+	// unpooled bank (ExamLength unset, or a pool no bigger than it) draws
+	// the whole pool, unchanged — see exam.DrawMCQ.
+	var snap session.Snapshot
+	var err error
+	if s.ex.Type == exam.TypeMCQ {
+		ids, drawErr := exam.DrawMCQ(s.ex)
+		if drawErr != nil {
+			// A bank whose pool cannot satisfy its own domainWeights at
+			// this draw size is an authoring bug tests/bank-mcq.sh should
+			// have caught before this ever ran — surfaced as a 500
+			// rather than silently starting an attempt with too few
+			// questions in some domain.
+			writeJSONError(w, http.StatusInternalServerError, drawErr.Error())
+			return
+		}
+		snap, err = s.mgr.StartMCQ(mode, s.durationFor(mode), ids)
+	} else {
+		snap, err = s.mgr.Start(mode, s.durationFor(mode))
+	}
 	if err != nil {
 		writeJSONError(w, http.StatusConflict, err.Error())
 		return

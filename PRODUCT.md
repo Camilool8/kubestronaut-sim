@@ -68,9 +68,10 @@ The parts that constrain product decisions:
 - One hands-on bank: CKAD Mock Exam 01, 22 questions across all five
   curriculum domains. 120 minutes, 66% to pass, Kubernetes 1.35, two
   instances, kind two-node cluster.
-- One multiple-choice bank: KCNA Mock Exam, 60 original questions in
-  the real exam's shape — 90 minutes, 75% to pass, weighted to the
-  post-November-2025 curriculum domains, single-answer and
+- One multiple-choice bank: KCNA Mock Exam, 97 original questions
+  pooled down to 65 per attempt (`spec.examLength`), in the real exam's
+  shape — 90 minutes, 75% to pass, weighted to the post-November-2025
+  curriculum domains on every draw, single-answer and
   select-all-that-apply, every question with a full explanation.
 - Advertised but not runnable, shown disabled in the catalog with the
   reason: CKA and KCSA (banks not written) and CKS (needs security

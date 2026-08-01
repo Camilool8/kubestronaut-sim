@@ -10,6 +10,7 @@ const ckadExam: ExamInfo = {
   durationSeconds: 7200,
   passingScore: 66,
   kubernetesVersion: "1.33",
+  questionCount: 0,
   questions: [],
 };
 

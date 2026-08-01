@@ -252,6 +252,64 @@ func TestGradeMCQUsesStoredAnswersAndNeverSSH(t *testing.T) {
 	}
 }
 
+// mcqPooledTestExam is mcqTestExam plus a third question — standing in
+// for a pooled bank whose session drew only some of its pool. Grading
+// must honor the session's drawn subset, not "every question this Exam
+// happens to hold".
+func mcqPooledTestExam() *exam.Exam {
+	return &exam.Exam{
+		Name: "test-bank",
+		Type: exam.TypeMCQ,
+		Questions: []exam.Question{
+			{ID: "q01", Weight: 1, Options: []string{"a", "b", "c"}, Correct: []int{1}},
+			{ID: "q02", Weight: 1, Options: []string{"a", "b", "c"}, Correct: []int{0}},
+			{ID: "q03", Weight: 1, Options: []string{"a", "b", "c"}, Correct: []int{2}},
+		},
+	}
+}
+
+// TestGradeMCQPooledAttemptScoresOnlyItsDrawnSubset is the grading half
+// of the pooling feature: q02 is left out of this attempt's draw, so it
+// must not appear in — or add a point to — the graded results, even
+// though the Exam handed to newGrader still lists all three questions.
+func TestGradeMCQPooledAttemptScoresOnlyItsDrawnSubset(t *testing.T) {
+	mgr, err := session.New(t.TempDir()+"/session.json", "test-bank", time.Hour, time.Now, func() {})
+	if err != nil {
+		t.Fatalf("session.New: %v", err)
+	}
+	if _, err := mgr.StartMCQ(session.ModeExam, time.Hour, []string{"q01", "q03"}); err != nil {
+		t.Fatalf("StartMCQ: %v", err)
+	}
+	if err := mgr.SetAnswer("q01", []int{1}); err != nil { // correct
+		t.Fatalf("SetAnswer q01: %v", err)
+	}
+	if err := mgr.SetAnswer("q03", []int{2}); err != nil { // correct
+		t.Fatalf("SetAnswer q03: %v", err)
+	}
+	if err := mgr.End("submitted"); err != nil {
+		t.Fatalf("End: %v", err)
+	}
+
+	runner := &countingRunner{}
+	g := newGrader(mcqPooledTestExam(), mgr, runner, time.Second)
+	g.Grade()
+	waitForGraded(t, mgr)
+
+	raw, gradeErr, _ := mgr.Results()
+	if gradeErr != "" {
+		t.Fatalf("gradeError = %q, want empty", gradeErr)
+	}
+	if !strings.Contains(string(raw), `"total":2`) {
+		t.Errorf("results JSON = %s, want total 2 (only the drawn q01+q03; q02 excluded)", raw)
+	}
+	if !strings.Contains(string(raw), `"percent":100`) {
+		t.Errorf("results JSON = %s, want percent 100 (both drawn questions answered correctly)", raw)
+	}
+	if strings.Contains(string(raw), `"id":"q02"`) {
+		t.Errorf("results JSON = %s, must not mention q02 — it was outside the drawn subset", raw)
+	}
+}
+
 // TestPracticeGradeMCQ pins training mode's "score my work": pure,
 // instant, never persisted, no ssh.
 func TestPracticeGradeMCQ(t *testing.T) {

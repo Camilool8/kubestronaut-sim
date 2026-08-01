@@ -125,7 +125,7 @@ func (g *grader) PracticeGrade() (json.RawMessage, error) {
 // downstream of this call is engine-agnostic.
 func (g *grader) evaluateResults() *evaluate.Results {
 	if g.ex.Type == exam.TypeMCQ {
-		return mcqgrade.Grade(g.ex, g.bank, g.mgr.Answers())
+		return mcqgrade.Grade(g.ex, g.bank, g.mgr.Answers(), g.mgr.QuestionIDs())
 	}
 	return evaluate.Grade(g.ex, g.bank, g.runner, g.timeout)
 }

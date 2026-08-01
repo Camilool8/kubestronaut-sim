@@ -1,0 +1,1 @@
+A team migrates a database workload from a Deployment to a StatefulSet so each replica keeps its own persistent identity and storage across restarts. Which StatefulSet field is what actually gives each replica its own PersistentVolumeClaim, distinct from its Pod template's storage?

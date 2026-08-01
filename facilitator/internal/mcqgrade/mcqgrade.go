@@ -26,14 +26,33 @@ const checkName = "answer"
 // session.Manager.Answers returns them) against ex's key. Scoring is
 // all-or-nothing per question: earned = weight iff the selected set
 // equals the correct set. An unanswered question earns zero.
-func Grade(ex *exam.Exam, bank string, answers map[string][]int) *evaluate.Results {
+//
+// questionIDs is the attempt's drawn subset (session.Manager.QuestionIDs)
+// — a pooled mcq attempt is graded on exactly those questions, in that
+// order, never the full pool. Empty means "no pooling": every question
+// in ex.Questions, exactly as this package graded before pooling existed.
+func Grade(ex *exam.Exam, bank string, answers map[string][]int, questionIDs []string) *evaluate.Results {
 	res := &evaluate.Results{
 		Bank:         bank,
 		GradedAt:     time.Now(),
 		PassingScore: ex.PassingScore,
 	}
 
-	for _, q := range ex.Questions {
+	questions := ex.Questions
+	if len(questionIDs) > 0 {
+		byID := make(map[string]exam.Question, len(ex.Questions))
+		for _, q := range ex.Questions {
+			byID[q.ID] = q
+		}
+		questions = make([]exam.Question, 0, len(questionIDs))
+		for _, id := range questionIDs {
+			if q, ok := byID[id]; ok {
+				questions = append(questions, q)
+			}
+		}
+	}
+
+	for _, q := range questions {
 		selected := answers[q.ID]
 		passed := len(selected) > 0 && equal(selected, q.Correct)
 
