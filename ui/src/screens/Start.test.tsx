@@ -61,6 +61,47 @@ describe("Start catalog refresh", () => {
   });
 });
 
+describe("Start composition", () => {
+  test("the card reads start-first: the catalog follows the Start button", async () => {
+    mockApi(ckadExam, banksFor("ckad"));
+    const noop = () => {};
+    render(
+      <Start catalogVersion={0} onSessionChange={noop} onControlStart={noop} onBanksLoaded={noop} />,
+    );
+
+    // The hero names what the h1 is; the catalog is the secondary act.
+    expect(await screen.findByText("Active exam")).toBeInTheDocument();
+    const start = screen.getByRole("button", { name: "Start Exam" });
+    const catalog = await screen.findByRole("heading", { name: "Switch exam" });
+    // eslint-disable-next-line no-bitwise
+    expect(start.compareDocumentPosition(catalog) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  test("a bank's description is visible on its card, not hidden in a tooltip", async () => {
+    mockApi(ckadExam, {
+      active: "ckad",
+      banks: [
+        { id: "ckad", title: "CKAD", examType: "performance", available: true },
+        {
+          id: "kcna",
+          title: "KCNA",
+          examType: "mcq",
+          available: true,
+          description: "Multiple choice in the real exam's shape.",
+        },
+      ],
+    });
+    const noop = () => {};
+    render(
+      <Start catalogVersion={0} onSessionChange={noop} onControlStart={noop} onBanksLoaded={noop} />,
+    );
+
+    expect(
+      await screen.findByText("Multiple choice in the real exam's shape."),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("Start catalog failures", () => {
   // Reproduced 2026-07-25 by stopping the conductor: GET /api/control/banks
   // returns 502, the catch left the catalog null, and the entire "CHOOSE

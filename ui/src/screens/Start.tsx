@@ -147,63 +147,15 @@ export function Start({
   return (
     <div className="start-screen">
       <div className="start-card">
-        <h1>{exam?.title ?? strings.start.fallbackTitle}</h1>
+        {/* The card reads top to bottom as one decision: this exam, these
+            numbers, this mode, Start. Switching exams is real but
+            secondary, so the catalog follows the primary act instead of
+            standing between the title and the button. */}
+        <header className="start-hero">
+          <p className="start-eyebrow">{strings.lobby.activeExam}</p>
+          <h1>{exam?.title ?? strings.start.fallbackTitle}</h1>
+        </header>
         {examState.error && <p className="error-text">{strings.start.examFailed(examState.error)}</p>}
-
-        <Async
-          state={banksState}
-          loading={<p className="catalog-loading">{strings.app.working}</p>}
-          error={(message, reload) => (
-            <div className="catalog-error" role="alert">
-              <p className="catalog-error-title">{strings.start.catalogErrorTitle}</p>
-              <p className="catalog-error-body">{strings.start.catalogErrorBody(message)}</p>
-              <button type="button" className="btn" onClick={reload}>
-                {strings.start.catalogRetry}
-              </button>
-            </div>
-          )}
-        >
-          {(banks) =>
-            banks.banks.length > 0 && (
-              <div className="bank-catalog">
-                <h2>{strings.lobby.chooseExam}</h2>
-                <ul className="bank-list">
-                  {banks.banks.map((b) => {
-                    const isActive = b.id === banks.active;
-                    const badge = bankBadge(b, banks);
-                    return (
-                      <li key={b.id}>
-                        <button
-                          className={`bank-card${isActive ? " bank-active" : ""}`}
-                          disabled={!b.available || isActive}
-                          onClick={() => setConfirmBank(b)}
-                          title={b.note ?? b.description ?? ""}
-                        >
-                          <span className="bank-title">
-                            {b.title}
-                            {badge && <span className="bank-badge">{badge}</span>}
-                          </span>
-                          <span className="bank-meta">
-                            {b.certification}
-                            {b.questionCount
-                              ? ` · ${strings.lobby.questions(b.questionCount)}`
-                              : ""}
-                            {b.durationSeconds
-                              ? ` · ${formatDuration(b.durationSeconds)}`
-                              : ""}
-                          </span>
-                          {b.note && !b.available && (
-                            <span className="bank-note">{b.note}</span>
-                          )}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )
-          }
-        </Async>
 
         {/* The stats box reserves its own height whether or not the numbers
             have landed, so the card does not jump when they do. */}
@@ -240,12 +192,6 @@ export function Start({
             </div>
           </div>
         )}
-
-        <ul className="start-tips">
-          {(isMcq ? strings.start.tipsMcq : strings.start.tips).map((tip) => (
-            <li key={tip}>{tip}</li>
-          ))}
-        </ul>
 
         {/* The picker sits directly above the button that acts on it, so
             the choice and its consequence are one glance apart. */}
@@ -297,6 +243,72 @@ export function Start({
               worth browsing on a phone, starting an exam is not. */}
           {examBlocked && <p className="start-blocked">{strings.mobile.startDisabled}</p>}
         </div>
+
+        {/* Fine print for the attempt ahead, after the act it qualifies. */}
+        <ul className="start-tips">
+          {(isMcq ? strings.start.tipsMcq : strings.start.tips).map((tip) => (
+            <li key={tip}>{tip}</li>
+          ))}
+        </ul>
+
+        <Async
+          state={banksState}
+          loading={<p className="catalog-loading">{strings.app.working}</p>}
+          error={(message, reload) => (
+            <div className="catalog-error" role="alert">
+              <p className="catalog-error-title">{strings.start.catalogErrorTitle}</p>
+              <p className="catalog-error-body">{strings.start.catalogErrorBody(message)}</p>
+              <button type="button" className="btn" onClick={reload}>
+                {strings.start.catalogRetry}
+              </button>
+            </div>
+          )}
+        >
+          {(banks) =>
+            banks.banks.length > 0 && (
+              <div className="bank-catalog">
+                <h2>{strings.lobby.switchExam}</h2>
+                <ul className="bank-list">
+                  {banks.banks.map((b) => {
+                    const isActive = b.id === banks.active;
+                    const badge = bankBadge(b, banks);
+                    return (
+                      <li key={b.id}>
+                        <button
+                          className={`bank-card${isActive ? " bank-active" : ""}`}
+                          disabled={!b.available || isActive}
+                          onClick={() => setConfirmBank(b)}
+                        >
+                          <span className="bank-title">
+                            {b.title}
+                            {badge && <span className="bank-badge">{badge}</span>}
+                          </span>
+                          <span className="bank-meta">
+                            {b.certification}
+                            {b.questionCount
+                              ? ` · ${strings.lobby.questions(b.questionCount)}`
+                              : ""}
+                            {b.durationSeconds
+                              ? ` · ${formatDuration(b.durationSeconds)}`
+                              : ""}
+                          </span>
+                          {/* The pitch used to hide in a title= tooltip,
+                              which touch devices never see. */}
+                          {b.description && (
+                            <span className="bank-desc">{b.description}</span>
+                          )}
+                          {b.note && !b.available && (
+                            <span className="bank-note">{b.note}</span>
+                          )}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )
+          }
+        </Async>
 
         <p className="start-footer">{strings.info.footerLine}</p>
       </div>

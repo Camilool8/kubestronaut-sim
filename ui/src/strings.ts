@@ -233,7 +233,13 @@ export const strings = {
   },
 
   lobby: {
-    chooseExam: "Choose your exam",
+    // Names what the card's h1 is, now that the catalog lives at the
+    // bottom of the card: this exam is loaded and Start acts on it.
+    activeExam: "Active exam",
+    // The catalog's heading. "Choose your exam" read as the card's
+    // primary act; switching is the secondary one, and an exam is
+    // already chosen the moment the lobby renders.
+    switchExam: "Switch exam",
     active: "Active",
     comingSoon: "Coming soon",
     unavailable: "Unavailable",
