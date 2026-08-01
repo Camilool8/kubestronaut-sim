@@ -105,8 +105,44 @@ func (c *Controller) wipeCandidateState(ctx context.Context, jobID string) error
 	return c.execChecked(ctx, jobID, "wipe-instances", c.Registry, registryWipeCmd)
 }
 
+// bankIsMCQ reports whether bank grades in the facilitator rather than
+// against the cluster. Unknown banks, a missing catalog, or an empty id
+// all answer false: when in doubt, run the full sequence — a needless
+// rebuild wastes minutes, a skipped one corrupts an attempt.
+func (c *Controller) bankIsMCQ(bank string) bool {
+	if c.Catalog == nil || bank == "" {
+		return false
+	}
+	entry, ok := c.Catalog.Get(bank)
+	return ok && entry.ExamType == "mcq"
+}
+
+// activeBank reads the runtime bank pointer, or "" when unset/unreadable.
+func (c *Controller) activeBank() string {
+	if c.BankFile == "" {
+		return ""
+	}
+	raw, err := os.ReadFile(c.BankFile)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(raw))
+}
+
 // resetPhases is the checklist a reset job walks through, in order.
-func resetPhases() []job.PhaseSpec {
+//
+// An mcq bank has no state outside the session — no cluster to restore,
+// no instance work to wipe — so its reset is just the session deletion
+// plus a health check. Without this branch, "New attempt" after a
+// multiple-choice exam cost the same 2-4 minute rebuild as a hands-on
+// one, for a cluster the exam never touches.
+func resetPhases(mcq bool) []job.PhaseSpec {
+	if mcq {
+		return []job.PhaseSpec{
+			{ID: "end-session", Label: "End session and clear answers"},
+			{ID: "verify", Label: "Verify environment"},
+		}
+	}
 	return []job.PhaseSpec{
 		{ID: "end-session", Label: "End session and lock desktop"},
 		{ID: "wipe-instances", Label: "Wipe instance work directories"},
@@ -119,18 +155,19 @@ func resetPhases() []job.PhaseSpec {
 // StartReset begins an asynchronous reset job, returning the job record
 // or job.ErrBusy if another operation is in flight.
 func (c *Controller) StartReset() (job.Job, error) {
-	j, err := c.Store.Begin("reset", "", resetPhases())
+	mcq := c.bankIsMCQ(c.activeBank())
+	j, err := c.Store.Begin("reset", "", resetPhases(mcq))
 	if err != nil {
 		return job.Job{}, err
 	}
-	go c.runReset(j.ID)
+	go c.runReset(j.ID, mcq)
 	return j, nil
 }
 
 // runReset walks the reset sequence, failing the job at the first phase
 // that errors. Context: each docker call gets a generous fixed timeout;
 // the overall job is bounded by the sum of its phases.
-func (c *Controller) runReset(jobID string) {
+func (c *Controller) runReset(jobID string, mcq bool) {
 	ctx := context.Background()
 
 	c.Store.StartPhase(jobID, "end-session")
@@ -139,23 +176,25 @@ func (c *Controller) runReset(jobID string) {
 		return
 	}
 
-	c.Store.StartPhase(jobID, "wipe-instances")
-	if err := c.wipeCandidateState(ctx, jobID); err != nil {
-		c.Store.Fail(jobID, err.Error())
-		return
-	}
-
-	c.Store.StartPhase(jobID, "recreate-cluster")
-	if err := c.execChecked(ctx, jobID, "recreate-cluster", "k8s-env", bootstrapCmd); err != nil {
-		c.Store.Fail(jobID, err.Error())
-		return
-	}
-
-	c.Store.StartPhase(jobID, "restart-instances")
-	for _, inst := range c.Instances {
-		if err := c.restart(ctx, inst); err != nil {
+	if !mcq {
+		c.Store.StartPhase(jobID, "wipe-instances")
+		if err := c.wipeCandidateState(ctx, jobID); err != nil {
 			c.Store.Fail(jobID, err.Error())
 			return
+		}
+
+		c.Store.StartPhase(jobID, "recreate-cluster")
+		if err := c.execChecked(ctx, jobID, "recreate-cluster", "k8s-env", bootstrapCmd); err != nil {
+			c.Store.Fail(jobID, err.Error())
+			return
+		}
+
+		c.Store.StartPhase(jobID, "restart-instances")
+		for _, inst := range c.Instances {
+			if err := c.restart(ctx, inst); err != nil {
+				c.Store.Fail(jobID, err.Error())
+				return
+			}
 		}
 	}
 
@@ -169,7 +208,23 @@ func (c *Controller) runReset(jobID string) {
 }
 
 // switchPhases is the checklist a switch job walks through, in order.
-func switchPhases() []job.PhaseSpec {
+//
+// A switch TO an mcq bank keeps the wipe (leaving the outgoing bank's
+// candidate work behind is what every switch promises to clean up) but
+// skips the cluster rebuild and instance restarts: the incoming exam
+// never touches either, and the rebuild is the whole 2-4 minute wait.
+// The cluster keeps the outgoing bank's state until the next hands-on
+// switch rebuilds it — nothing reads it in between.
+func switchPhases(mcq bool) []job.PhaseSpec {
+	if mcq {
+		return []job.PhaseSpec{
+			{ID: "end-session", Label: "End session and lock desktop"},
+			{ID: "wipe-instances", Label: "Wipe instance work directories"},
+			{ID: "write-bank", Label: "Activate the new exam bank"},
+			{ID: "restart-facilitator", Label: "Restart exam services"},
+			{ID: "verify", Label: "Verify the new exam is live"},
+		}
+	}
 	return []job.PhaseSpec{
 		{ID: "end-session", Label: "End session and lock desktop"},
 		{ID: "wipe-instances", Label: "Wipe instance work directories"},
@@ -203,11 +258,12 @@ func (c *Controller) StartSwitch(bank string) (job.Job, error) {
 		return job.Job{}, ErrSessionRunning
 	}
 
-	j, err := c.Store.Begin("switch", bank, switchPhases())
+	mcq := c.bankIsMCQ(bank)
+	j, err := c.Store.Begin("switch", bank, switchPhases(mcq))
 	if err != nil {
 		return job.Job{}, err
 	}
-	go c.runSwitch(j.ID, bank)
+	go c.runSwitch(j.ID, bank, mcq)
 	return j, nil
 }
 
@@ -216,7 +272,7 @@ func (c *Controller) StartSwitch(bank string) (job.Job, error) {
 // and the bank-reading services restart after the instances, the
 // facilitator last (its entrypoint re-derives EXAM_JSON; its restart
 // also triggers the session manager's cross-bank discard).
-func (c *Controller) runSwitch(jobID, bank string) {
+func (c *Controller) runSwitch(jobID, bank string, mcq bool) {
 	ctx := context.Background()
 
 	c.Store.StartPhase(jobID, "end-session")
@@ -237,17 +293,19 @@ func (c *Controller) runSwitch(jobID, bank string) {
 		return
 	}
 
-	c.Store.StartPhase(jobID, "recreate-cluster")
-	if err := c.execChecked(ctx, jobID, "recreate-cluster", "k8s-env", bootstrapCmd); err != nil {
-		c.Store.Fail(jobID, err.Error())
-		return
-	}
-
-	c.Store.StartPhase(jobID, "restart-instances")
-	for _, inst := range c.Instances {
-		if err := c.restart(ctx, inst); err != nil {
+	if !mcq {
+		c.Store.StartPhase(jobID, "recreate-cluster")
+		if err := c.execChecked(ctx, jobID, "recreate-cluster", "k8s-env", bootstrapCmd); err != nil {
 			c.Store.Fail(jobID, err.Error())
 			return
+		}
+
+		c.Store.StartPhase(jobID, "restart-instances")
+		for _, inst := range c.Instances {
+			if err := c.restart(ctx, inst); err != nil {
+				c.Store.Fail(jobID, err.Error())
+				return
+			}
 		}
 	}
 

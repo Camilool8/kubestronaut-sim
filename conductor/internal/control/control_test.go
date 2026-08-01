@@ -335,6 +335,153 @@ func TestSwitchRunsFullSequenceAndWritesBankFile(t *testing.T) {
 	}
 }
 
+// testCatalogWithMCQ is testCatalogForSwitch plus a runnable mcq bank.
+func testCatalogWithMCQ(t *testing.T) *catalog.Catalog {
+	t.Helper()
+	dir := t.TempDir()
+	handsOn := `{"metadata":{"name":"cka-mock-01","title":"CKA"},"spec":{"duration":"120m",
+	  "instances":[{"name":"instance-1"},{"name":"instance-2"}],
+	  "questions":[{"id":"q01"}]}}`
+	mcq := `{"metadata":{"name":"kcna-mock","title":"KCNA"},"spec":{"examType":"mcq","duration":"90m",
+	  "questions":[{"id":"q01","domain":"D","options":["a","b","c"],"correct":[0]}]}}`
+	for name, doc := range map[string]string{"cka-mock-01.json": handsOn, "kcna-mock.json": mcq} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(doc), 0o644); err != nil {
+			t.Fatalf("write: %v", err)
+		}
+	}
+	c, err := catalog.Load(dir)
+	if err != nil {
+		t.Fatalf("catalog.Load: %v", err)
+	}
+	return c
+}
+
+// Switching TO an mcq bank must not rebuild the cluster or restart the
+// instances — the incoming exam touches neither, and the rebuild is the
+// whole 2-4 minute wait this fast path exists to remove. The wipe still
+// runs (leaving the outgoing bank's work behind is what every switch
+// cleans up), the bank file is written, and the facilitator restarts.
+func TestSwitchToMCQBankSkipsClusterRebuild(t *testing.T) {
+	examName := "kcna-mock"
+	facilitator := switchFacilitator(t, "idle", &examName)
+	defer facilitator.Close()
+
+	eng := &fakeEngine{}
+	c := newTestController(t, eng, facilitator.URL)
+	c.Catalog = testCatalogWithMCQ(t)
+	c.BankFile = filepath.Join(t.TempDir(), "bank")
+	c.RestartExtra = []string{"docs-proxy", "facilitator"}
+
+	j, err := c.StartSwitch("kcna-mock")
+	if err != nil {
+		t.Fatalf("StartSwitch: %v", err)
+	}
+	for _, p := range j.Phases {
+		if p.ID == "recreate-cluster" || p.ID == "restart-instances" {
+			t.Errorf("mcq switch job advertises phase %q, want it absent", p.ID)
+		}
+	}
+
+	snap := waitIdle(t, c.Store)
+	if snap.LastJob == nil || snap.LastJob.Error != "" {
+		t.Fatalf("switch job = %+v, want clean completion", snap.LastJob)
+	}
+
+	wrote, err := os.ReadFile(c.BankFile)
+	if err != nil || string(wrote) != "kcna-mock" {
+		t.Fatalf("bank file = %q, %v; want kcna-mock", wrote, err)
+	}
+
+	calls := strings.Join(eng.recorded(), "\n")
+	if strings.Contains(calls, "exec:k8s-env") {
+		t.Errorf("mcq switch ran the cluster rebuild:\n%s", calls)
+	}
+	if strings.Contains(calls, "restart:instance-") {
+		t.Errorf("mcq switch restarted instances:\n%s", calls)
+	}
+	for _, needle := range []string{wipeShell, "restart:docs-proxy", "restart:facilitator"} {
+		if !strings.Contains(calls, needle) {
+			t.Errorf("engine calls missing %q:\n%s", needle, calls)
+		}
+	}
+}
+
+// "New attempt" after a multiple-choice exam is a session deletion, not
+// an environment rebuild: the attempt's only state is the session file.
+func TestResetOnMCQBankSkipsEverythingButTheSession(t *testing.T) {
+	var deletes int
+	var mu sync.Mutex
+	facilitator := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodDelete && r.URL.Path == "/api/session":
+			mu.Lock()
+			deletes++
+			mu.Unlock()
+			w.WriteHeader(http.StatusNoContent)
+		case r.URL.Path == "/healthz":
+			fmt.Fprint(w, "ok")
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer facilitator.Close()
+
+	eng := &fakeEngine{}
+	c := newTestController(t, eng, facilitator.URL)
+	c.Catalog = testCatalogWithMCQ(t)
+	c.BankFile = filepath.Join(t.TempDir(), "bank")
+	if err := os.WriteFile(c.BankFile, []byte("kcna-mock\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	j, err := c.StartReset()
+	if err != nil {
+		t.Fatalf("StartReset: %v", err)
+	}
+	if len(j.Phases) != 2 {
+		t.Errorf("mcq reset phases = %+v, want end-session + verify only", j.Phases)
+	}
+
+	snap := waitIdle(t, c.Store)
+	if snap.LastJob == nil || snap.LastJob.Error != "" {
+		t.Fatalf("reset job = %+v, want clean completion", snap.LastJob)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if deletes != 1 {
+		t.Errorf("session deletions = %d, want 1", deletes)
+	}
+	if calls := strings.Join(eng.recorded(), "\n"); calls != "" {
+		t.Errorf("mcq reset touched the engine:\n%s", calls)
+	}
+}
+
+// A hands-on bank keeps the full reset sequence even when a catalog and
+// bank file are wired — the fast path must never leak past mcq.
+func TestResetOnHandsOnBankStillRebuilds(t *testing.T) {
+	facilitator := healthyFacilitator(t)
+	defer facilitator.Close()
+
+	eng := &fakeEngine{}
+	c := newTestController(t, eng, facilitator.URL)
+	c.Catalog = testCatalogWithMCQ(t)
+	c.BankFile = filepath.Join(t.TempDir(), "bank")
+	if err := os.WriteFile(c.BankFile, []byte("cka-mock-01\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := c.StartReset(); err != nil {
+		t.Fatalf("StartReset: %v", err)
+	}
+	snap := waitIdle(t, c.Store)
+	if snap.LastJob == nil || snap.LastJob.Error != "" {
+		t.Fatalf("reset job = %+v, want clean completion", snap.LastJob)
+	}
+	if calls := strings.Join(eng.recorded(), "\n"); !strings.Contains(calls, "exec:k8s-env") {
+		t.Errorf("hands-on reset skipped the cluster rebuild:\n%s", calls)
+	}
+}
+
 // The facilitator restart takes the browser's only server down for a
 // few seconds. It gets its own phase so the UI can say "reconnecting"
 // instead of appearing to freeze — and it must come after the instances.
