@@ -9,9 +9,9 @@ import { strings } from "../strings";
 // carries `status`/`results` gets double-wrapped and Score crashes before
 // rendering anything.
 const results = {
-  percent: 0,
+  percent: 40,
   passed: false,
-  earned: 0,
+  earned: 2,
   total: 5,
   passingScore: 66,
   questions: [
@@ -21,9 +21,16 @@ const results = {
       title: "Namespaces & quotas",
       instance: "instance-1",
       domain: "Application Environment",
-      earned: 0,
+      earned: 2,
       total: 5,
-      checks: [],
+      // All three outcomes a check can have. The skipped one never ran —
+      // malformed points header in the bank — and must not read as a
+      // failure the candidate should study.
+      checks: [
+        { name: "10_ns.sh", desc: "Namespace exists", points: 2, earned: 2, passed: true, message: "" },
+        { name: "20_quota.sh", desc: "Quota applied", points: 3, earned: 0, passed: false, message: "quota missing" },
+        { name: "30_broken.sh", desc: "Labels match", points: 0, earned: 0, passed: false, message: "", skipped: true },
+      ],
     },
   ],
 };
@@ -212,6 +219,21 @@ describe("Score review rows", () => {
     await screen.findByText("q01");
     expect(screen.getByText("Namespaces & quotas")).toBeInTheDocument();
   });
+
+  test("a skipped check says it never ran instead of posing as a failure", async () => {
+    const user = userEvent.setup();
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+    await user.click(await screen.findByText("q01"));
+
+    const skippedRow = screen.getByText("Labels match").closest("tr");
+    expect(skippedRow).not.toBeNull();
+    expect(skippedRow).toHaveTextContent(/not graded/i);
+    expect(skippedRow).toHaveTextContent("Skipped:");
+    // The failed check keeps its own reading — the two must not blur.
+    const failedRow = screen.getByText("Quota applied").closest("tr");
+    expect(failedRow).toHaveTextContent("Failed:");
+    expect(failedRow).toHaveTextContent("quota missing");
+  });
 });
 
 describe("Score heading", () => {
@@ -224,7 +246,7 @@ describe("Score heading", () => {
     // Named, because the grading state's own h1 is on screen until the
     // first poll lands and would satisfy a bare level-1 query.
     const heading = await screen.findByRole("heading", { level: 1, name: /your score/i });
-    expect(heading).toHaveTextContent("0%");
+    expect(heading).toHaveTextContent("40%");
   });
 
   // Promoting the verdict too would put two headings on one banner and

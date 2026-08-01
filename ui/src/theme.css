@@ -1310,6 +1310,17 @@
   color: var(--danger);
 }
 
+/* Never ran, so neither verdict colour: the mark is the same muted "·"
+   the phase checklist uses for pending, and the message column carries
+   the words. Colour is the third channel here, not the first. */
+.check-skip .check-mark {
+  color: var(--text-muted);
+}
+
+.check-skip .check-message {
+  font-style: italic;
+}
+
 .check-points {
   font-family: var(--font-mono);
   white-space: nowrap;

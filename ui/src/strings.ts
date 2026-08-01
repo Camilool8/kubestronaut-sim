@@ -495,6 +495,11 @@ export const strings = {
     checkMessage: "Detail",
     checkPassed: "Passed:",
     checkFailed: "Failed:",
+    checkSkipped: "Skipped:",
+    // A skipped check never ran — its "# points:" header is malformed in
+    // the bank — so rendering it like a failure would send the candidate
+    // to study something the grader never measured. Say whose fault it is.
+    checkSkippedMessage: "Not graded: this check's points header is malformed in the bank.",
     showSolution: "Show solution",
     reseed: "Reset this question",
     reseeding: "Resetting…",

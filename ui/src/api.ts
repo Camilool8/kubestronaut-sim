@@ -98,6 +98,11 @@ export interface CheckResult {
   earned: number;
   passed: boolean;
   message: string;
+  /**
+   * True when the check never ran because its "# points:" header is
+   * malformed in the bank. Rendered as "not graded", never as a failure.
+   */
+  skipped?: boolean;
 }
 
 export interface QuestionResult {

@@ -137,12 +137,13 @@ type CheckResult struct {
 	Passed  bool   `json:"passed"`
 	Message string `json:"message"`
 
-	// skip marks a check whose "# points:" header was invalid
-	// (exam.Check.Skip): it was never run, and Scoreboard prints it as
-	// [SKIP] rather than [PASS]/[FAIL]. It is deliberately unexported —
-	// the score-page API's schema has no field for exam-authoring
-	// mistakes, only grade.sh's plain-text Scoreboard output does.
-	skip bool
+	// Skipped marks a check whose "# points:" header was invalid
+	// (exam.Check.Skip): it was never run. Scoreboard prints it as
+	// [SKIP], and the score page renders it as "not graded" — without
+	// this field a skipped check reached the client as passed:false,
+	// points 0, message "", indistinguishable from a failure the
+	// candidate should study.
+	Skipped bool `json:"skipped,omitempty"`
 }
 
 // Grade runs every check in ex against r, scoping each to checkTimeout,
@@ -162,7 +163,7 @@ func Grade(ex *exam.Exam, bank string, r Runner, checkTimeout time.Duration) *Re
 
 		for _, c := range q.Checks {
 			if c.Skip {
-				qr.Checks = append(qr.Checks, CheckResult{Name: c.Name, Desc: c.Desc, skip: true})
+				qr.Checks = append(qr.Checks, CheckResult{Name: c.Name, Desc: c.Desc, Skipped: true})
 				continue
 			}
 			cr := gradeCheck(r, bank, q, c, checkTimeout)
@@ -238,7 +239,7 @@ func (r *Results) Scoreboard() string {
 		}
 		for _, c := range q.Checks {
 			switch {
-			case c.skip:
+			case c.Skipped:
 				fmt.Fprintf(&b, "  [SKIP] %s: bad '# points:' header\n", c.Name)
 			case c.Passed:
 				fmt.Fprintf(&b, "  [PASS] %s (%d pts) — %s\n", c.Desc, c.Points, c.Message)
