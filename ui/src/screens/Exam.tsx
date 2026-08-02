@@ -1,5 +1,22 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
-import { endSession, getExam, practiceGrade, type Results, type SessionSnapshot } from "../api";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import {
+  endSession,
+  getExam,
+  practiceGrade,
+  putFocus,
+  type ExamQuestionInfo,
+  type Results,
+  type SessionSnapshot,
+} from "../api";
 import { useAsync } from "../lib/useAsync";
 import { TimerBar } from "../components/TimerBar";
 import { QuestionPanel } from "../components/QuestionPanel";
@@ -221,6 +238,21 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
   // that was always a function of two things already on hand.
   const selectedId = pickedId ?? exam?.questions[0]?.id ?? null;
 
+  // Tell the server which task is on screen, so per-task time can be
+  // accrued server-side (the client reports a question id and nothing
+  // else; PUT /api/session/focus owns the arithmetic).
+  //
+  // Failure is a no-op in every direction: a facilitator too old to have
+  // the route 404s, an ended attempt 409s, and a dropped request throws.
+  // None of them may interrupt an attempt — this is telemetry, and a
+  // candidate under a running clock must never be shown a toast about it.
+  useEffect(() => {
+    if (!selectedId) return;
+    const controller = new AbortController();
+    void putFocus(selectedId, controller.signal).catch(() => {});
+    return () => controller.abort();
+  }, [selectedId]);
+
   // Computed when the confirm dialog opens, not subscribed: the marks
   // store is only read here, and re-rendering the whole exam screen on
   // every mark toggle would be a lot of work for a list nobody is
@@ -249,6 +281,16 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
 
   // Desktop connection health surfaces as toasts: sticky warning while
   // reconnecting, brief confirmation when it comes back.
+  // The topbar's environment line. Both halves are server facts: the
+  // cluster's Kubernetes version, and the boxes the DRAWN tasks name —
+  // read off the questions rather than the bank's instance list, so a
+  // drawn attempt advertises only the hosts it can actually send you to.
+  const hosts = useMemo(() => {
+    const seen = new Set<string>();
+    for (const q of exam?.questions ?? []) if (q.instance) seen.add(q.instance);
+    return [...seen].sort().join(", ");
+  }, [exam]);
+
   const desktopDownRef = useRef(false);
   const handleDesktopState = useCallback((state: string) => {
     if (state === "disconnected") {
@@ -277,6 +319,12 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
         onEndClick={() => setConfirmOpen(true)}
         extras={
           <>
+            {exam && (
+              <span className="exam-env">
+                {strings.exam.environment(exam.kubernetesVersion, hosts)}
+              </span>
+            )}
+            {exam && exam.questions.length > 0 && <ExamProgress questions={exam.questions} />}
             <button
               className="info-button"
               onClick={() => setClipboardOpen((v) => !v)}
@@ -435,6 +483,36 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
         </Dialog>
       )}
       {introOpen && <ExamIntro onClose={() => setIntroOpen(false)} />}
+    </div>
+  );
+}
+
+// How far through the tasks the attempt is, in the topbar.
+//
+// Its own component so it can subscribe to the marks store without
+// re-rendering the exam screen — and with it the RFB viewport — on every
+// flag. That was the reason the old code read the store only while the
+// submit dialog was open; the reading is now on screen all the time, so
+// the subscription moved down here instead of up there.
+//
+// "Opened" is the only word this screen is allowed: it knows it rendered
+// a task's text, never that the work was done (components/marksStore.ts).
+// The bar is aria-hidden — the sentence beside it already says the same
+// thing, and a second voice reading a percentage adds nothing.
+function ExamProgress({ questions }: { questions: ExamQuestionInfo[] }) {
+  useSyncExternalStore(marksStore.subscribe, marksStore.getVersion);
+
+  const total = questions.length;
+  const opened = questions.filter((q) => marksStore.isViewed(q.id)).length;
+  const flagged = questions.filter((q) => marksStore.isMarked(q.id)).length;
+  const pct = total > 0 ? Math.round((opened / total) * 100) : 0;
+
+  return (
+    <div className="exam-progress">
+      <span className="exam-progress-text">{strings.exam.progress(opened, total, flagged)}</span>
+      <div className="exam-progress-track" aria-hidden="true">
+        <div className="exam-progress-bar" style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }

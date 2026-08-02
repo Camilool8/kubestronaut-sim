@@ -287,6 +287,135 @@ describe("QuestionPanel review marks", () => {
   });
 });
 
+// The identity block above the task text: which task this is, what it is
+// called, and the four facts that place it. Every one of the four is
+// optional at the source, and two of them (`targetSeconds`,
+// `targetDerived`) arrive only from a facilitator new enough to send them.
+describe("QuestionPanel task header", () => {
+  test("the counter is zero-padded to the width of the total", async () => {
+    renderNav("q02");
+    // "TASK 02 / 3" would jump a pixel between 9 and 10 under a running
+    // clock; the padding is to the total's own width, so a 3-task attempt
+    // pads to one digit and a 20-task one to two.
+    expect(await screen.findByText("Task 2 / 3")).toBeInTheDocument();
+  });
+
+  test("the chips place the task: domain, share of the points, host", async () => {
+    renderNav("q01");
+    expect(await screen.findByText("Config")).toBeInTheDocument();
+    // 5 of the fixture's 21 points, rounded. Computed over the DRAWN
+    // questions, so a random draw reports its own arithmetic.
+    expect(screen.getByText("Weight 24%")).toBeInTheDocument();
+    expect(screen.getByText("instance-1")).toBeInTheDocument();
+  });
+
+  test("no target time is sent, so no pacing chip is drawn", async () => {
+    renderNav("q01");
+    await screen.findByText("Config");
+    // An older facilitator sends no targetSeconds at all. The chip is
+    // absent rather than empty, zero, or a guess.
+    expect(screen.queryByText(/^Target/)).not.toBeInTheDocument();
+  });
+
+  test("a target time is a budget, and a derived one says it is derived", async () => {
+    const timed: ExamQuestionInfo[] = [
+      { ...bank[0], targetSeconds: 360 },
+      { ...bank[1], targetSeconds: 420, targetDerived: true },
+      bank[2],
+    ];
+    const { rerender } = render(
+      <QuestionPanel questions={timed} selectedId="q01" onSelect={() => {}} />,
+    );
+
+    // Authored in the bank: a plain figure, and nothing anywhere may
+    // suggest running over it costs anything, because it does not.
+    const authored = await screen.findByText("Target 6m");
+    expect(authored).toHaveAttribute("title", expect.stringMatching(/budget, not a limit/i));
+    // The one thing this copy may never do is imply a cost. It says "not
+    // a limit" out loud; what it must not contain is a penalty at all.
+    expect(authored).toHaveTextContent(/not a limit/i);
+    expect(authored.textContent).not.toMatch(/penal|deduct|overdue|deadline|too slow/i);
+
+    rerender(<QuestionPanel questions={timed} selectedId="q02" onSelect={() => {}} />);
+
+    // Derived: arithmetic about weights, not a judgement of how long the
+    // work takes, and it has to say so where it is read.
+    const derived = await screen.findByText("Target ≈7m");
+    expect(derived).toHaveAttribute("title", expect.stringMatching(/derived/i));
+    expect(derived).toHaveTextContent(/derived from this task's share of the exam clock/i);
+  });
+
+  test("time is about the pane being open, never about effort", async () => {
+    const timed: ExamQuestionInfo[] = [{ ...bank[0], targetSeconds: 360 }, bank[1], bank[2]];
+    const { container } = render(
+      <QuestionPanel questions={timed} selectedId="q01" onSelect={() => {}} />,
+    );
+    await screen.findByText("Target 6m");
+
+    // Per-task time measures a pane being on screen. "Spent" and "worked"
+    // both claim to have measured attention, which nothing here can.
+    expect(container.textContent).not.toMatch(/\bspent\b|\bworked\b|\beffort\b/i);
+  });
+
+  test("F flags the task you are reading, not just the tile you are on", async () => {
+    marksStore.setScope("2026-07-27T10:00:00Z");
+    renderNav("q02");
+    const mark = await screen.findByRole("button", { name: /mark for review/i });
+    expect(mark).toHaveAttribute("aria-pressed", "false");
+
+    await userEvent.keyboard("f");
+
+    expect(mark).toHaveAttribute("aria-pressed", "true");
+    expect(marksStore.isMarked("q02")).toBe(true);
+  });
+
+  test("F stays out of the way while the terminal has focus", async () => {
+    marksStore.setScope("2026-07-27T10:00:00Z");
+    const { container } = renderNav("q02");
+    await screen.findByRole("button", { name: /mark for review/i });
+
+    const desktop = document.createElement("div");
+    desktop.className = "desktop-pane";
+    const target = document.createElement("button");
+    desktop.appendChild(target);
+    container.appendChild(desktop);
+    target.focus();
+
+    await userEvent.keyboard("f");
+
+    // "f" is a character in a shell, not a shortcut.
+    expect(marksStore.isMarked("q02")).toBe(false);
+  });
+});
+
+// The machine block and the graded-on card, the two things the task pane
+// says that the bank's markdown does not.
+describe("QuestionPanel work-from block", () => {
+  test("the ssh command is on screen and copyable in one click", async () => {
+    const pasted: string[] = [];
+    desktopClipboard.connect({ clipboardPasteFrom: (t) => void pasted.push(t) });
+
+    renderNav("q02");
+    const copy = await screen.findByRole("button", { name: /copy ssh instance-2/i });
+    // The visible label is "Copy"; the accessible name says what gets
+    // copied and contains the visible word (WCAG 2.5.3).
+    expect(copy).toHaveTextContent("Copy");
+    await userEvent.click(copy);
+
+    expect(pasted).toEqual(["ssh instance-2"]);
+  });
+
+  test("what the grader will look at is stated, without claiming to know the checks", async () => {
+    renderNav("q02");
+    const card = await screen.findByRole("region", { name: /graded on/i });
+    // The bank does not publish its check descriptions before grading, so
+    // this says what is true of every task rather than inventing a
+    // per-task summary — including that typing is not what is read.
+    expect(card).toHaveTextContent(/not the commands you typed/i);
+    expect(card).toHaveTextContent(/7 pts/);
+  });
+});
+
 describe("QuestionPanel failure and pending states", () => {
   test("a question that will not load says so, and offers a way back", async () => {
     vi.stubGlobal(

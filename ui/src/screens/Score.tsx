@@ -1,19 +1,10 @@
-import { useEffect, useRef, useState, type SyntheticEvent } from "react";
-import {
-  endSession,
-  getResults,
-  getSolution,
-  type QuestionResult,
-  type ResultsResponse,
-  type SolutionDetail,
-  type SessionMode,
-} from "../api";
-import { CheckList } from "../components/CheckList";
+import { useEffect, useRef, useState } from "react";
+import { endSession, getResults, type Results, type ResultsResponse, type SessionMode } from "../api";
 import { DomainBreakdown } from "../components/DomainBreakdown";
-import { McqAnswerReview } from "../components/McqAnswerReview";
-import { Icon } from "../components/Icon";
-import { Markdown } from "../components/Markdown";
 import { PendingBar } from "../components/Pending";
+import { ResultsBanner } from "../components/ResultsBanner";
+import { rollupDomains } from "../components/resultsModel";
+import { TaskVerdicts } from "../components/TaskVerdicts";
 import { formatElapsed } from "../lib/format";
 import { useTick } from "../lib/useTick";
 import { strings } from "../strings";
@@ -30,9 +21,10 @@ interface ScoreProps {
 // Score screen: while /api/results is 202 ("grading"), poll every 3s;
 // on 500 (gradeError persisted), show the error with a Retry button
 // that re-POSTs /api/session/end (the API re-grades an ended session
-// without results — see §3); once 200, render the scoreboard with a
-// "New attempt" action that drives the conductor's reset (same code
-// path as ./sim reset).
+// without results — see §3); once 200, render the results — an ink
+// banner carrying the verdict, a sidebar carrying the domain breakdown,
+// and the per-task verdicts beside it — with a "New attempt" action that
+// drives the conductor's reset (same code path as ./sim reset).
 export function Score({ onNewAttempt, endReason, mode }: ScoreProps) {
   // Released by this screen unmounting when the reset job flips the session
   // back to idle; a refused job leaves it set only until the toast App
@@ -56,24 +48,30 @@ export function Score({ onNewAttempt, endReason, mode }: ScoreProps) {
     }
   };
 
-  const load = async () => {
-    try {
-      const r = await getResults();
-      setPollError(null);
-      setResponse(r);
-      if (r.status === "ready" || r.status === "error") {
-        clearPoll();
-      }
-    } catch (err) {
+  // Written as a promise chain rather than async/await on purpose. Every
+  // setState here happens inside a callback the fetch resolves, which is
+  // what an effect is allowed to do; `await` put the same calls in the
+  // function's own body, where the compiler's set-state-in-effect rule
+  // (correctly, from where it stands) could not tell them apart from a
+  // synchronous cascade.
+  const load = () =>
+    getResults()
+      .then((r) => {
+        setPollError(null);
+        setResponse(r);
+        if (r.status === "ready" || r.status === "error") {
+          clearPoll();
+        }
+      })
       // getResults() throws for any unexpected status, and the fetch
       // itself rejects while the facilitator restarts — which App treats
       // as a normal occurrence. Neither may render as "still grading" and
       // nothing else: the wait would be indistinguishable from progress.
       // The poll keeps running, so this clears itself when the server is
       // back; that is why it does not tear the poll down.
-      setPollError(String(err));
-    }
-  };
+      .catch((err: unknown) => {
+        setPollError(String(err));
+      });
 
   useEffect(() => {
     load();
@@ -132,33 +130,21 @@ export function Score({ onNewAttempt, endReason, mode }: ScoreProps) {
 
   return (
     <div className="score-screen">
-      <div className={`score-banner ${results.passed ? "pass" : "fail"}`}>
-        <h1 className="score-percent">
-          <span className="sr-only">{strings.score.scoreLabel}: </span>
-          {results.percent}%
-        </h1>
-        <div className="score-verdict">{results.passed ? strings.score.pass : strings.score.fail}</div>
-        <div className="score-detail">
-          {strings.score.pointsDetail(results.earned, results.total, results.passingScore)}
+      <div className="results-card">
+        <ResultsBanner results={results} mode={mode} endReason={endReason} />
+
+        <div className="results-body">
+          <aside className="results-aside">
+            <DomainBreakdown
+              questions={results.questions}
+              domains={results.domains}
+              passingScore={results.passingScore}
+            />
+            <NextSession results={results} />
+          </aside>
+
+          <TaskVerdicts questions={results.questions} />
         </div>
-        {endReason && (
-          <div className="score-end-reason">{strings.score.endReason(endReason)}</div>
-        )}
-        {/* A training attempt is untimed and had hints and solutions on
-            tap; a mastery attempt ran on half the clock. Neither is a
-            comparable result, and the banner is the one place a
-            candidate will screenshot. */}
-        {mode && mode !== "exam" && (
-          <div className="score-mode">{strings.score.modeNote(strings.modes[mode].label)}</div>
-        )}
-      </div>
-
-      <DomainBreakdown questions={results.questions} />
-
-      <div className="score-questions">
-        {results.questions.map((q, i) => (
-          <QuestionResultDetails key={q.id} question={q} index={i} />
-        ))}
       </div>
 
       <div className="score-actions">
@@ -170,6 +156,36 @@ export function Score({ onNewAttempt, endReason, mode }: ScoreProps) {
         </button>
         <p className="score-actions-hint">{strings.control.newAttemptHint}</p>
       </div>
+    </div>
+  );
+}
+
+/**
+ * What to do before the next attempt. Prose, NOT a control.
+ *
+ * The brief draws a "Drill weak domains" button here. `StartOptions`
+ * already carries a `domains` filter and the server honours it, but
+ * nothing in the UI sends one (Mode.tsx starts every attempt with a bare
+ * mode), so that button would start an ordinary full-curriculum run —
+ * a control that goes nowhere, which is worse than no control. Mode.tsx's
+ * draw panel made the same call for the same reason.
+ */
+function NextSession({ results }: { results: Results }) {
+  const rows = rollupDomains(results.questions, results.domains);
+  if (rows.length === 0) return null;
+
+  // Worst-first already, so the first two are the two that matter. More
+  // than two "priorities" is no priority at all.
+  const weak = rows.filter((r) => r.percent < results.passingScore).slice(0, 2);
+
+  return (
+    <div className="results-next">
+      <h3>{strings.score.nextTitle}</h3>
+      <p>
+        {weak.length > 0
+          ? strings.score.nextWeak(weak.map((r) => r.domain).join(strings.score.listSeparator))
+          : strings.score.nextSolid}
+      </p>
     </div>
   );
 }
@@ -204,65 +220,5 @@ function Grading({ startedAt, pollError }: { startedAt: number; pollError: strin
         </p>
       )}
     </div>
-  );
-}
-
-function QuestionResultDetails({ question, index }: { question: QuestionResult; index: number }) {
-  const [solution, setSolution] = useState<SolutionDetail | null>(null);
-  const [solutionError, setSolutionError] = useState<string | null>(null);
-  const [loadingSolution, setLoadingSolution] = useState(false);
-  const [fetched, setFetched] = useState(false);
-
-  const handleToggle = (event: SyntheticEvent<HTMLDetailsElement>) => {
-    if (!event.currentTarget.open || fetched) return;
-    setFetched(true);
-    setLoadingSolution(true);
-    getSolution(question.id)
-      .then((r) => {
-        if (r.ok) {
-          setSolution(r.solution);
-        } else {
-          setSolutionError(r.error);
-        }
-      })
-      .catch((err) => setSolutionError(String(err)))
-      .finally(() => setLoadingSolution(false));
-  };
-
-  // mcq results carry the option texts; hands-on results never do. That
-  // presence is the branch — no examType prop needed, the results
-  // themselves say which engine graded them.
-  const isMcq = question.options !== undefined;
-  // results.questions is in the same order the candidate answered them
-  // in (mcqgrade.Grade iterates the session's drawn subset, in draw
-  // order), so index+1 is the exact Q-number the exam screen showed —
-  // the bank id (question.id) is meaningless here for the same reason
-  // it was during the attempt: an artifact of the pool a random draw
-  // sampled from, not something the candidate ever saw as "the id".
-  // Hands-on ids are the real ssh-able question directories, unaffected.
-  const label = isMcq ? strings.mcq.questionNumber(index + 1) : question.id;
-
-  return (
-    <details className="question-result">
-      <summary>
-        <Icon name="chevron-down" className="disclosure-chevron" />
-        <span className="qr-id">{label}</span>
-        {question.title && <span className="qr-title">{question.title}</span>}
-        <span className="qr-domain">{question.domain}</span>
-        <span className="qr-points">
-          {question.earned}/{question.total}
-        </span>
-      </summary>
-      {isMcq ? <McqAnswerReview question={question} /> : <CheckList checks={question.checks} />}
-      <details className="solution-details" onToggle={handleToggle}>
-        <summary>
-          <Icon name="chevron-down" className="disclosure-chevron" />
-          {isMcq ? strings.mcq.explanation : strings.score.showSolution}
-        </summary>
-        {loadingSolution && <p>{strings.score.loadingSolution}</p>}
-        {solutionError && <p className="error-text">{solutionError}</p>}
-        {solution && <Markdown>{solution.markdown}</Markdown>}
-      </details>
-    </details>
   );
 }

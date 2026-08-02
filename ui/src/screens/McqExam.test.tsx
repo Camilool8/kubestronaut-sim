@@ -62,7 +62,16 @@ interface FetchLogEntry {
 // Stubs every endpoint the screen touches and logs writes, so tests can
 // assert exactly what was PUT where. Answer PUTs echo the selection
 // back sorted, matching the real handler.
-function stubFetch(stored: Record<string, number[]> = {}, failPut = false) {
+//
+// The screen PUTs to two endpoints now — the answer, and the focus report
+// that tells the server which question is on screen — so assertions about
+// "what was saved" filter to /answer rather than to the method. A test
+// that counts every PUT counts the timing traffic too.
+function stubFetch(
+  stored: Record<string, number[]> = {},
+  failPut = false,
+  focusStatus = 200,
+) {
   const log: FetchLogEntry[] = [];
   vi.stubGlobal(
     "fetch",
@@ -71,6 +80,12 @@ function stubFetch(stored: Record<string, number[]> = {}, failPut = false) {
       const method = init?.method ?? "GET";
       const body = init?.body ? JSON.parse(String(init.body)) : undefined;
       log.push({ url, method, body });
+
+      if (url.includes("/api/session/focus")) {
+        return new Response(focusStatus === 200 ? "{}" : JSON.stringify({ error: "no route" }), {
+          status: focusStatus,
+        });
+      }
 
       if (method === "PUT" && url.includes("/answer")) {
         if (failPut) {
@@ -103,6 +118,11 @@ afterEach(() => {
   vi.unstubAllGlobals();
   toastStore.clear();
   marksStore.reset();
+  // reset() drops the in-memory sets; the marks also live in
+  // sessionStorage, keyed by the attempt's startedAt — which every test
+  // here shares. Without this, one test's opened questions are the next
+  // test's, and anything counting unseen reads the previous run's state.
+  window.sessionStorage.clear();
 });
 
 describe("McqExam answering", () => {
@@ -114,7 +134,7 @@ describe("McqExam answering", () => {
     await user.click(await screen.findByRole("checkbox", { name: /etcd/ }));
 
     await waitFor(() => {
-      const put = log.find((e) => e.method === "PUT");
+      const put = log.find((e) => e.method === "PUT" && e.url.endsWith("/answer"));
       expect(put?.url).toBe("/api/questions/q01/answer");
       expect(put?.body).toEqual({ selected: [1] });
     });
@@ -130,7 +150,7 @@ describe("McqExam answering", () => {
     await user.click(screen.getByRole("checkbox", { name: /kube-proxy/ }));
 
     await waitFor(() => {
-      const puts = log.filter((e) => e.method === "PUT");
+      const puts = log.filter((e) => e.method === "PUT" && e.url.endsWith("/answer"));
       expect(puts).toHaveLength(2);
       expect(puts[1].body).toEqual({ selected: [2] });
     });
@@ -148,7 +168,7 @@ describe("McqExam answering", () => {
     await user.click(option);
 
     await waitFor(() => {
-      const put = log.find((e) => e.method === "PUT");
+      const put = log.find((e) => e.method === "PUT" && e.url.endsWith("/answer"));
       expect(put?.body).toEqual({ selected: [] });
     });
     expect(option).not.toBeChecked();
@@ -166,7 +186,7 @@ describe("McqExam answering", () => {
     await user.click(screen.getByRole("checkbox", { name: /CNI/ }));
 
     await waitFor(() => {
-      const puts = log.filter((e) => e.method === "PUT");
+      const puts = log.filter((e) => e.method === "PUT" && e.url.endsWith("/answer"));
       expect(puts).toHaveLength(2);
       expect(puts[1].url).toBe("/api/questions/q02/answer");
       expect(puts[1].body).toEqual({ selected: [0, 2] });
@@ -231,6 +251,67 @@ describe("McqExam answering", () => {
   });
 });
 
+// The topbar tally, the flag key, and the focus report. The tally is the
+// one place this screen states the whole attempt at once, and it can say
+// all three numbers honestly: answers are server state, flags and
+// first-opens are the attempt's own marks.
+describe("McqExam attempt state", () => {
+  test("the topbar counts answered, flagged and unseen", async () => {
+    stubFetch({ q01: [1] });
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+
+    // Q1 is answered and on screen (so seen); Q2 is neither.
+    await waitFor(() =>
+      expect(screen.getByText(/Answered 1 · Flagged 0 · Unseen 1/)).toBeInTheDocument(),
+    );
+  });
+
+  test("F flags the question on screen and the tally follows", async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+    await screen.findByText("Which component persists cluster state?");
+
+    await user.keyboard("f");
+
+    expect(screen.getByRole("button", { name: /mark for review/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByText(/Flagged 1/)).toBeInTheDocument();
+  });
+
+  test("the question on screen is reported for the server's timing", async () => {
+    const log = stubFetch();
+    const user = userEvent.setup();
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+    await screen.findByText("Which component persists cluster state?");
+
+    await waitFor(() => {
+      const focus = log.filter((e) => e.url === "/api/session/focus");
+      expect(focus[focus.length - 1]?.body).toEqual({ question: "q01" });
+    });
+
+    await user.click(screen.getByRole("button", { name: /next question/i }));
+
+    await waitFor(() => {
+      const focus = log.filter((e) => e.url === "/api/session/focus");
+      expect(focus[focus.length - 1]?.body).toEqual({ question: "q02" });
+    });
+  });
+
+  test("a facilitator with no focus route is a no-op, not a warning", async () => {
+    // 404 is what an older facilitator answers. Nothing about timing may
+    // interrupt an attempt — no toast, no error region.
+    stubFetch({}, false, 404);
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+
+    await screen.findByText("Which component persists cluster state?");
+    expect(toastStore.list()).toHaveLength(0);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+});
+
 describe("McqExam navigator", () => {
   async function openNavigator(stored: Record<string, number[]> = {}) {
     stubFetch(stored);
@@ -282,6 +363,10 @@ describe("McqExam navigator", () => {
   });
 });
 
+// The footer is the whole of this screen's navigation now: the header
+// carries no steppers, so "Previous question" and "Next question" name
+// exactly one control each. The visible label is the short word, and the
+// accessible name is the longer one that contains it (WCAG 2.5.3).
 describe("McqExam footer navigation", () => {
   test("Previous is disabled on the first question and steps back from later ones", async () => {
     stubFetch();
@@ -289,12 +374,12 @@ describe("McqExam footer navigation", () => {
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
     await screen.findByText("Which component persists cluster state?");
-    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /previous question/i })).toBeDisabled();
 
-    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: /next question/i }));
     await screen.findByText("Which are container interface standards? Choose all that apply.");
 
-    await user.click(screen.getByRole("button", { name: "Previous" }));
+    await user.click(screen.getByRole("button", { name: /previous question/i }));
     await screen.findByText("Which component persists cluster state?");
   });
 
@@ -304,18 +389,30 @@ describe("McqExam footer navigation", () => {
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
     await screen.findByText("Which component persists cluster state?");
-    expect(screen.getByRole("button", { name: "Next" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /next question/i })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: /next question/i }));
     await screen.findByText("Which are container interface standards? Choose all that apply.");
 
     // No more "Next" in the footer — the exam's last question replaces
     // it with the same End Exam control the header carries throughout.
-    expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /next question/i })).not.toBeInTheDocument();
     const endExamButtons = screen.getAllByRole("button", { name: /end exam/i });
     expect(endExamButtons).toHaveLength(2);
 
     await user.click(endExamButtons[1]);
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  });
+
+  test("the reassurance line is on screen, not buried in a dialog", async () => {
+    stubFetch();
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+
+    // Both halves matter and both are load-bearing: a candidate who does
+    // not know the click already saved either re-clicks or hesitates, and
+    // one who thinks it has been marked reads the screen as a verdict.
+    expect(
+      await screen.findByText(/answers save as you go · nothing is graded until submit/i),
+    ).toBeInTheDocument();
   });
 });

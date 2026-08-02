@@ -14,6 +14,7 @@ import {
   getSolution,
   practiceGrade,
   putAnswer,
+  putFocus,
   type ExamQuestionInfo,
   type Results,
   type SessionSnapshot,
@@ -108,6 +109,17 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
 
   useEffect(() => {
     if (selectedId) marksStore.markViewed(selectedId);
+  }, [selectedId]);
+
+  // Which question is on screen, reported for the server's per-question
+  // timing. Identical wiring to the hands-on screen, including that every
+  // failure is a no-op: an older facilitator has no route to call, and
+  // timing may never interrupt an attempt.
+  useEffect(() => {
+    if (!selectedId) return;
+    const controller = new AbortController();
+    void putFocus(selectedId, controller.signal).catch(() => {});
+    return () => controller.abort();
   }, [selectedId]);
 
   // [ and ] step between questions, exactly like the hands-on panel —
@@ -233,6 +245,9 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
         onEndClick={() => setConfirmOpen(true)}
         extras={
           <>
+            {questions.length > 0 && (
+              <McqTally questions={questions} answeredCount={answeredCount} />
+            )}
             {session.mode === "training" && (
               <button
                 className="btn"
@@ -246,6 +261,18 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
           </>
         }
       />
+      {/* The determinate rail under the topbar: answered out of the
+          attempt's own length. aria-hidden, because the topbar tally
+          beside it says the same three numbers in words — a bar that
+          announces "37 percent" adds a second voice for one fact. */}
+      <div className="mcq-rail" aria-hidden="true">
+        <div
+          className="mcq-rail-bar"
+          style={{
+            width: `${questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0}%`,
+          }}
+        />
+      </div>
       <div className="mcq-body">
         {examState.status === "error" && (
           <div className="pane-error" role="alert">
@@ -274,7 +301,6 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
             next={next}
             onSelect={setPickedId}
             onAnswer={applySelection}
-            answeredCount={answeredCount}
             onEndExam={() => setConfirmOpen(true)}
           />
         )}
@@ -369,12 +395,11 @@ interface McqQuestionProps {
   next?: ExamQuestionInfo;
   onSelect: (id: string) => void;
   onAnswer: (qid: string, selection: number[]) => void;
-  answeredCount: number;
   onEndExam: () => void;
 }
 
-// One question: nav row, stem, options. Keyed by question id from the
-// parent, so per-question state (the training reveal) resets on step.
+// One question: head row, stem, options, footer. Keyed by question id from
+// the parent, so per-question state (the training reveal) resets on step.
 function McqQuestion({
   info,
   index,
@@ -387,7 +412,6 @@ function McqQuestion({
   next,
   onSelect,
   onAnswer,
-  answeredCount,
   onEndExam,
 }: McqQuestionProps) {
   const [jumpOpen, setJumpOpen] = useState(false);
@@ -421,89 +445,58 @@ function McqQuestion({
     if (returnFocus) jumpTriggerRef.current?.focus();
   };
 
-  // G opens and closes the navigator, the same binding the hands-on panel
-  // carries — minus its desktop-canvas guard, which has no counterpart
-  // here, exactly like the [ and ] handler in the parent.
+  // G opens and closes the navigator and F flags the question on screen,
+  // the same two bindings the hands-on panel carries — minus its
+  // desktop-canvas guard, which has no counterpart here, exactly like the
+  // [ and ] handler in the parent.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "g" && event.key !== "G") return;
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       const target = event.target as HTMLElement | null;
       if (target?.closest("input, textarea, [contenteditable]")) return;
       if (document.querySelector('[role="dialog"]')) return;
-      event.preventDefault();
-      setJumpOpen((open) => {
-        if (open) jumpTriggerRef.current?.focus();
-        return !open;
-      });
+      if (event.key === "g" || event.key === "G") {
+        event.preventDefault();
+        setJumpOpen((open) => {
+          if (open) jumpTriggerRef.current?.focus();
+          return !open;
+        });
+        return;
+      }
+      // While the navigator is open it owns F, for the tile under the
+      // cursor rather than the question behind it.
+      if ((event.key === "f" || event.key === "F") && !jumpOpen) {
+        event.preventDefault();
+        marksStore.toggleMark(info.id);
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [info.id, jumpOpen]);
 
   return (
     <section className="mcq-question" aria-label={strings.mcq.regionLabel}>
-      <header className="question-nav">
-        <div className="question-nav-row">
-          <button
-            className="question-nav-step"
-            onClick={() => prev && onSelect(prev.id)}
-            disabled={!prev}
-            aria-label={strings.questionPanel.prev}
-          >
-            <Icon name="chevron-left" />
-          </button>
-          <button
-            ref={jumpTriggerRef}
-            className="question-nav-current"
-            onClick={() => setJumpOpen((v) => !v)}
-            aria-expanded={jumpOpen}
-            aria-controls={jumpOpen ? "mcq-jump" : undefined}
-          >
-            <span className="question-id">
-              {strings.mcq.questionNumber(index + 1)}
-            </span>
-            <span className="question-points">
-              {strings.questionPanel.points(info.totalPoints)}
-            </span>
-            <Icon name="chevron-down" className="disclosure-chevron" />
-            <span className="sr-only">
-              {strings.navigator.position(index + 1, total)}
-            </span>
-          </button>
-          <button
-            className="question-nav-step"
-            onClick={() => next && onSelect(next.id)}
-            disabled={!next}
-            aria-label={strings.questionPanel.next}
-          >
-            <Icon name="chevron-right" />
-          </button>
-        </div>
-        <div className="question-nav-tools">
-          {info.title && <span className="question-nav-title">{info.title}</span>}
-          {/* The domain, where the hands-on screen shows the ssh chip —
-              the one per-question fact an mcq candidate can use. */}
-          <span className="instance-chip">{info.domain}</span>
-          {/* Position, not answered count: this sits directly under the
-              nav row's own position badge, and a DIFFERENT number here
-              (the old answered-count) read as a second, conflicting
-              "which question am I on" — most confusing right after
-              stepping back to an earlier question. Answered-count still
-              lives in the footer, away from anything claiming to be a
-              position. */}
-          <span className="mcq-progress" aria-hidden="true">
-            {index + 1} / {total}
-          </span>
-          <button
-            className="question-mark"
-            onClick={() => marksStore.toggleMark(info.id)}
-            aria-pressed={marked}
-          >
-            <Icon name={marked ? "flag-filled" : "flag"} />
-            {strings.questionPanel.mark}
-          </button>
-        </div>
+      {/* One row above the stem: where you are, what it is about, and the
+          flag. Navigation is not here — it is the footer's, at the end of
+          the reading, where the answer has just been picked. */}
+      <header className="mcq-head">
+        <span className="mcq-counter">
+          {strings.mcq.questionCounter(index + 1, total)}
+        </span>
+        {/* The domain: the one per-question fact an mcq candidate can use,
+            where the hands-on screen shows the ssh host. */}
+        <span className="mcq-domain">{info.domain}</span>
+        <button
+          className="question-mark"
+          onClick={() => marksStore.toggleMark(info.id)}
+          aria-pressed={marked}
+        >
+          <Icon name={marked ? "flag-filled" : "flag"} />
+          {strings.questionPanel.mark}
+          <kbd className="key-hint" aria-hidden="true">
+            {strings.questionPanel.markKey}
+          </kbd>
+        </button>
       </header>
 
       <div className="mcq-pane" aria-busy={question.status === "loading"}>
@@ -565,34 +558,56 @@ function McqQuestion({
         </Async>
       </div>
 
-      {/* A labelled Previous/Next/End Exam row, distinct from the header's
-          compact icon steppers: those exist for a quick keyboard-adjacent
-          nudge, this is the discoverable, exam-shaped control a candidate
-          expects at the foot of a question. End Exam here opens the same
-          confirm dialog as the header button — the unanswered/marked
-          review lives there once, not twice. */}
+      {/* Previous / the reassurance line / navigator + next. The middle
+          span is not decoration: this is the one engine where the answer
+          is saved the instant it is clicked and nothing is marked until
+          submit, and a candidate who does not know that either re-clicks
+          or hesitates. End Exam replaces Next on the last question and
+          opens the same confirm dialog the topbar's does — the
+          unanswered/marked review lives there once, not twice. */}
       <footer className="mcq-footer">
         <button
           className="btn"
           onClick={() => prev && onSelect(prev.id)}
           disabled={!prev}
+          aria-label={strings.questionPanel.prev}
         >
           <Icon name="chevron-left" />
-          {strings.mcq.previous}
+          {strings.questionPanel.prevShort}
         </button>
-        <span className="mcq-progress" aria-hidden="true">
-          {strings.mcq.answeredCount(answeredCount, total)}
-        </span>
-        {next ? (
-          <button className="btn" onClick={() => onSelect(next.id)}>
-            {strings.mcq.next}
-            <Icon name="chevron-right" />
+        <span className="mcq-save-note">{strings.mcq.saveNote}</span>
+        <div className="mcq-footer-end">
+          <button
+            ref={jumpTriggerRef}
+            className="btn mcq-jump-trigger"
+            onClick={() => setJumpOpen((v) => !v)}
+            aria-expanded={jumpOpen}
+            aria-controls={jumpOpen ? "mcq-jump" : undefined}
+          >
+            <Icon name="chevron-down" className="disclosure-chevron" />
+            {strings.mcq.navigator}
+            <kbd className="key-hint" aria-hidden="true">
+              {strings.navigator.keyGridKey}
+            </kbd>
+            <span className="sr-only">
+              {strings.navigator.position(index + 1, total)}
+            </span>
           </button>
-        ) : (
-          <button className="btn btn-primary" onClick={onEndExam}>
-            {strings.exam.endAttempt(mode)}
-          </button>
-        )}
+          {next ? (
+            <button
+              className="btn btn-primary"
+              onClick={() => onSelect(next.id)}
+              aria-label={strings.questionPanel.next}
+            >
+              {strings.questionPanel.nextShort}
+              <Icon name="chevron-right" />
+            </button>
+          ) : (
+            <button className="btn btn-primary" onClick={onEndExam}>
+              {strings.exam.endAttempt(mode)}
+            </button>
+          )}
+        </div>
       </footer>
 
       {jumpOpen && (
@@ -611,6 +626,32 @@ function McqQuestion({
         />
       )}
     </section>
+  );
+}
+
+// The attempt's state in three numbers, in the topbar.
+//
+// Its own component so the marks subscription lives here rather than on
+// the screen: flagging a question would otherwise re-render the whole
+// engine, including the question fetch's Async wrapper. Answered is a
+// server fact the parent already holds; flagged and unseen are this
+// attempt's own scratch marks.
+function McqTally({
+  questions,
+  answeredCount,
+}: {
+  questions: ExamQuestionInfo[];
+  answeredCount: number;
+}) {
+  useSyncExternalStore(marksStore.subscribe, marksStore.getVersion);
+
+  const flagged = questions.filter((q) => marksStore.isMarked(q.id)).length;
+  const unseen = questions.filter((q) => !marksStore.isViewed(q.id)).length;
+
+  return (
+    <span className="mcq-tally">
+      {strings.mcq.tally(answeredCount, flagged, unseen)}
+    </span>
   );
 }
 

@@ -1,81 +1,84 @@
-import type { QuestionResult } from "../api";
+import type { DomainResult, QuestionResult } from "../api";
+import { rollupDomains } from "./resultsModel";
 import { strings } from "../strings";
 
 interface DomainBreakdownProps {
   questions: QuestionResult[];
-}
-
-interface DomainRow {
-  domain: string;
-  earned: number;
-  total: number;
-  percent: number;
+  /**
+   * The server's rollup, which is the only place the curriculum weight
+   * lives. Absent on a result graded before it existed — persisted
+   * verbatim in the session file and served back unchanged after an
+   * upgrade — so its absence is a normal case, not an error, and the
+   * component falls back to computing the same shape from `questions`.
+   */
+  domains?: DomainResult[];
+  /** Marks the rows under the threshold. Omitted, no row is marked. */
+  passingScore?: number;
 }
 
 /**
- * Score per curriculum domain.
+ * Score per curriculum domain — the results sidebar's first block.
  *
- * Every ingredient already existed — `QuestionResult.Domain` comes back
- * on every result and the bank's points are derived from
- * `spec.domainWeights` — and nothing rendered it. A percentage tells a
- * candidate whether they passed; this tells them what to study, which is
- * the only thing a practice exam is actually for.
+ * A percentage tells a candidate whether they passed; this tells them
+ * what to study, which is the only thing a practice exam is actually for.
  *
- * Ordered worst-first, deliberately. Alphabetical would bury the one row
- * that should change what they do next.
+ * Two sources, one shape. `results.domains` carries the server's
+ * curriculum weighting and is preferred; without it the rollup is
+ * recomputed from the questions, exactly as this component has always
+ * done, and the copy drops its claim to be weighted rather than making
+ * one it cannot back.
  */
-export function DomainBreakdown({ questions }: DomainBreakdownProps) {
-  const byDomain = new Map<string, DomainRow>();
-  for (const q of questions) {
-    const domain = q.domain || strings.score.domainUnknown;
-    const row = byDomain.get(domain) ?? { domain, earned: 0, total: 0, percent: 0 };
-    row.earned += q.earned;
-    row.total += q.total;
-    byDomain.set(domain, row);
-  }
-
-  const rows = [...byDomain.values()]
-    .map((r) => ({ ...r, percent: r.total === 0 ? 0 : Math.round((r.earned / r.total) * 100) }))
-    .sort((a, b) => a.percent - b.percent || a.domain.localeCompare(b.domain));
+export function DomainBreakdown({ questions, domains, passingScore }: DomainBreakdownProps) {
+  const rows = rollupDomains(questions, domains);
+  const weighted = rows.some((r) => r.weightPct !== undefined);
 
   if (rows.length === 0) return null;
+
+  // The denominator of "1 of 4 tasks". The graded questions are the
+  // authority; the rollup's own counts stand in for the (server
+  // impossible, cheaply handled) case of a rollup with no questions
+  // beside it.
+  const taskTotal = questions.length || rows.reduce((sum, r) => sum + r.questionCount, 0);
 
   return (
     <section className="domain-breakdown">
       <h2>{strings.score.domainTitle}</h2>
-      <p className="control-hint">{strings.score.domainHint}</p>
-      <table className="domain-table">
-        <thead>
-          <tr>
-            <th>{strings.score.domainColumn}</th>
-            <th>{strings.score.domainScore}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.domain}>
-              <th scope="row">{r.domain}</th>
-              <td>
-                {/* The flex row is this wrapper, not the <td>. A flex table
-                    cell leaves the table layout model and stops matching the
-                    row height, which put this cell's border-bottom 2px above
-                    the domain cell's and stepped every divider. */}
-                <div className="domain-score">
-                  {/* The bar is decorative; the numbers beside it carry the
-                      value, so this reads identically with CSS off and
-                      under reduced motion. */}
-                  <span className="domain-bar" aria-hidden="true">
-                    <span className="domain-bar-fill" style={{ width: `${r.percent}%` }} />
-                  </span>
-                  <span className="domain-figure">
-                    {r.percent}% ({r.earned}/{r.total})
-                  </span>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <p className="domain-hint">
+        {weighted ? strings.score.domainHint : strings.score.domainHintUnweighted}
+      </p>
+      <ul className="domain-rows">
+        {rows.map((r) => {
+          // Colour is the SECOND signal here. The word under the bar is
+          // the first, so a row reads the same in greyscale.
+          const below = passingScore !== undefined && r.percent < passingScore;
+          return (
+            <li key={r.domain} className={below ? "domain-row is-below" : "domain-row"}>
+              <div className="domain-row-head">
+                <span className="domain-name">{r.domain}</span>
+                <span className="domain-figure">{strings.score.percentValue(r.percent)}</span>
+              </div>
+              {/* Decorative: the figure above it and the meta below it
+                  both carry the value, so this reads identically with CSS
+                  off and needs no motion to be legible. */}
+              <span className="domain-bar" aria-hidden="true">
+                <span className="domain-bar-fill" style={{ width: `${r.percent}%` }} />
+              </span>
+              <span className="domain-meta">
+                {r.weightPct === undefined
+                  ? strings.score.domainMeta(r.questionCount, taskTotal, r.earned, r.total)
+                  : strings.score.domainMetaWeighted(
+                      Math.round(r.weightPct),
+                      r.questionCount,
+                      taskTotal,
+                      r.earned,
+                      r.total,
+                    )}
+                {below && <span className="domain-below">{strings.score.domainBelow}</span>}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }

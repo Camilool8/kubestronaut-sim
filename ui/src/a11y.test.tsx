@@ -334,9 +334,13 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
+  // The verdict is the screen's h1 now ("Passed — 70% against a 66%
+  // threshold"), not a "PASS" badge under a bare percentage. Waiting on
+  // the heading by name is also what keeps the scan off the grading
+  // state, whose own h1 is on screen until the first poll lands.
   test("score screen with results", async () => {
     const { container } = render(<Score onNewAttempt={() => {}} endReason="submitted" />);
-    await screen.findByText("PASS");
+    await screen.findByRole("heading", { level: 1, name: /passed/i });
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
@@ -351,7 +355,7 @@ describe("axe: no WCAG violations", () => {
   test("score screen with an open solution", async () => {
     const user = userEvent.setup();
     const { container } = render(<Score onNewAttempt={() => {}} endReason="submitted" />);
-    await screen.findByText("PASS");
+    await screen.findByRole("heading", { level: 1, name: /passed/i });
 
     await user.click(screen.getByText("q01"));
     await user.click(screen.getByText(/show solution/i));

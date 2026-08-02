@@ -108,16 +108,30 @@ h3 {
    current question and a marked question are all indistinguishable
    rectangles. */
 @media (forced-colors: active) {
-  .question-tile[aria-current="true"],
+  /* .navigator-tile, not the .question-tile this rule named until the
+     navigator replaced the jump grid. The selector went stale silently,
+     and forced colors is exactly where that costs the most: the current
+     tile is drawn everywhere else with --accent-soft, an accent border
+     and an inset shadow, and forced colors overrides all three and drops
+     box-shadow entirely. This outline was the only channel left, and it
+     was matching nothing. */
+  .navigator-tile[aria-current="true"],
   .mode-card-on,
   .question-mark[aria-pressed="true"] {
     outline: 2px solid Highlight;
     outline-offset: -3px;
   }
 
+  /* Answered reads as a fill and a stronger border, both of which forced
+     colors overrides away, leaving it identical to unanswered. Width is
+     geometry rather than colour, so it survives. The flagged state needs
+     no twin: it carries an icon. */
+  .navigator-tile.is-done {
+    border-width: 3px;
+  }
+
   /* --text-disabled is overridden away; GrayText is the system's own. */
-  .btn:disabled,
-  .question-nav-step:disabled {
+  .btn:disabled {
     color: GrayText;
   }
 

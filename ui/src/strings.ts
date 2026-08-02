@@ -189,6 +189,22 @@ export const strings = {
     // Training counts up: there is no deadline, and a frozen 00:00 would
     // read as an attempt that had already run out.
     timeElapsed: (span: string) => `Time elapsed: ${span}`,
+    // The topbar's environment line: what machine the tasks are graded on
+    // and what cluster is behind it. Both halves are facts the server
+    // already sends (`kubernetesVersion`, and the instances the drawn
+    // questions name) — an attempt with no ssh hosts (an mcq bank) drops
+    // the second clause rather than printing an empty list.
+    environment: (version: string, hosts: string) =>
+      hosts
+        ? `Kubernetes ${version} · ${hosts} reachable over ssh`
+        : `Kubernetes ${version}`,
+    // "opened", never "done" or "answered": this screen knows it rendered
+    // the task's text and nothing more (components/marksStore.ts). The
+    // bar beside it draws the same fraction and is aria-hidden.
+    progress: (opened: number, total: number, flagged: number) =>
+      flagged > 0
+        ? `${opened} of ${total} opened · ${flagged} flagged`
+        : `${opened} of ${total} opened`,
   },
 
   questionPanel: {
@@ -214,6 +230,59 @@ export const strings = {
     copiedToDesktop: (value: string, chord: string) => `Copied ${value}. Paste with ${chord}`,
     copied: (value: string) => `Copied ${value}`,
     copyFailed: "Could not copy that value.",
+
+    // ---- the task pane's identity block ----
+    // Zero-padded to the width of the total, so the counter does not
+    // change width between task 9 and task 10 under a running clock.
+    taskCounter: (n: number, total: number) =>
+      `Task ${String(n).padStart(String(total).length, "0")} / ${total}`,
+    // The chord that flags the task you are reading. Drawn beside the
+    // control it belongs to, the way the navigator's foot draws its own.
+    markKey: "F",
+    // This task's share of the exam's points, computed from the drawn
+    // questions' weights — so on a randomly drawn attempt it is that
+    // attempt's arithmetic, not the whole pool's. Rounded, with a floor
+    // that never claims a graded task is worth nothing.
+    weightShare: (pct: number) => `Weight ${pct < 1 ? "<1" : Math.round(pct)}%`,
+    weightShareNote: (pct: number) =>
+      `This task is worth ${pct < 1 ? "under 1" : Math.round(pct)}% of the exam's points.`,
+    // A BUDGET, never a limit: nothing enforces it and running over costs
+    // no points, so no wording here may imply a penalty. The clock it is
+    // measured against is the attempt's, not the candidate's attention.
+    targetTime: (span: string) => `Target ${span}`,
+    targetTimeNote:
+      "A pacing budget, not a limit. Nothing enforces it and running over costs no points.",
+    // `targetDerived` means the figure is this task's weight's share of
+    // the exam clock — arithmetic about weights, not anyone's judgement
+    // of how long the work takes — and it has to say so.
+    targetTimeDerived: (span: string) => `Target ≈${span}`,
+    targetTimeDerivedNote:
+      "Derived from this task's share of the exam clock, not a measured time. A pacing budget, not a limit — running over costs no points.",
+
+    // ---- the machine block ----
+    // The one surface in the task pane drawn in the --machine-* palette,
+    // because it is literally a computer: the command, and where to run it.
+    workFrom: "Work from",
+    workFromNote:
+      "kubectl on each instance already points at this cluster — there is no context to switch.",
+    copyShort: "Copy",
+
+    // ---- what the grader will look at ----
+    gradedOn: "Graded on",
+    gradedOnBody: (points: string, instance: string) =>
+      `What the checks find on the cluster and on ${instance} when grading runs — the state you leave behind, not the commands you typed. Worth ${points}.`,
+    // Same sentence for an attempt whose bank names no instance.
+    gradedOnBodyNoHost: (points: string) =>
+      `What the checks find on the cluster when grading runs — the state you leave behind, not the commands you typed. Worth ${points}.`,
+
+    // ---- the footer nav ----
+    // Short labels, because the row draws an arrow beside each. The full
+    // "Previous question" / "Next question" above stays the accessible
+    // name, which is allowed to be longer than the visible text as long as
+    // it contains it (WCAG 2.5.3).
+    prevShort: "Previous",
+    nextShort: "Next",
+    allTasks: "All tasks",
   },
 
   // The question navigator, shared by both exam engines — the hands-on
@@ -435,12 +504,6 @@ export const strings = {
     regionLabel: "Question",
     selectOne: "Select one answer",
     selectAll: "Select all that apply",
-    // Footer nav labels: short pagination wording, deliberately not the
-    // header stepper's fuller "Previous/Next question" aria-labels — the
-    // two controls do the same thing, and matching text would give a
-    // screen reader (and a test query) two identically-named buttons.
-    previous: "Previous",
-    next: "Next",
     // The candidate's own sequence position (1-65), never the bank's
     // internal question id (q61, q28, ...) — that id is an artifact of
     // a 97-question pool a random draw samples from, meaningless (and
@@ -477,11 +540,23 @@ export const strings = {
     optionCorrectSelected: "correct, and you selected it",
     optionCorrectMissed: "correct, and you did not select it",
     optionWrongSelected: "your selection, incorrect",
-    // The footer's running tally. Deliberately "completed", not a
-    // position — the position badge lives in the header, and two
-    // different numbers both claiming to locate the candidate was the
-    // confusion this footer used to cause.
-    answeredCount: (n: number, total: number) => `${n} / ${total} completed`,
+
+    // ---- the one-question screen ----
+    // The counter above the stem. Zero-padding is deliberately absent
+    // here: this column is 720px wide and nothing sits beside the counter
+    // that a one-character width change would push around.
+    questionCounter: (n: number, total: number) => `Question ${n} / ${total}`,
+    // The topbar's running state of the whole attempt. Three numbers
+    // because this screen genuinely knows all three: answers are server
+    // state, flags and first-opens are this attempt's own scratch marks.
+    tally: (answered: number, flagged: number, unseen: number) =>
+      `Answered ${answered} · Flagged ${flagged} · Unseen ${unseen}`,
+    // The footer's reassurance line. Both halves matter: every click is
+    // already saved, and none of it has been marked yet.
+    saveNote: "Answers save as you go · nothing is graded until submit",
+    // The navigator trigger's short label; its accessible name is the
+    // navigator's own "Question n of m. Show all questions."
+    navigator: "Navigator",
   },
 
   practice: {
@@ -552,7 +627,7 @@ export const strings = {
       ["G", "Show or hide the question grid"],
       ["Arrows", "Move between tiles, in the grid"],
       ["1 – 9", "Jump to a tile, in the grid"],
-      ["F", "Flag the tile you are on, in the grid"],
+      ["F", "Flag this question, or the tile you are on"],
       ["?", "This list"],
       ["Esc", "Close a panel or dialog"],
       ["← / →", "Resize the question panel (when the divider has focus)"],
@@ -690,21 +765,143 @@ export const strings = {
     // again underneath this, so the copy names the likely check.
     retryFailed: (detail: string) =>
       `Couldn't ask the facilitator to grade again (${detail}). Check the stack is up with \`docker compose ps\`, then retry.`,
-    // The percentage is the score screen's heading — the one thing the
-    // candidate came for. It reads as a bare number without this prefix,
-    // which is only ever announced, never drawn.
-    scoreLabel: "Your score",
-    pass: "PASS",
-    fail: "FAIL",
+    // ---- the ink banner ----
+
+    // The attempt's identity in one mono line: which bank, how it was run,
+    // when it was graded, and the seed the draw came from. Everything
+    // after the bank is optional, because a result graded before a field
+    // existed is persisted verbatim and served back unchanged after an
+    // upgrade — so the line is assembled from whatever actually arrived
+    // rather than from a fixed shape with holes in it.
+    eyebrowSeparator: " · ",
+    listSeparator: ", ",
+    runLabel: (mode: string) => `${mode} run`,
+    // Split from its value because the eyebrow is set in caps and the seed
+    // is not: the API's contract is six LOWERCASE hex digits, and a seed
+    // shouted back in capitals is a seed a replay field can reject.
+    drawSeedLabel: "draw seed",
+
+    // The verdict is the headline, in words, with the threshold in it.
+    // It used to be a bare percentage with PASS underneath — two halves of
+    // one sentence in two type sizes, and the number the verdict was
+    // measured against was nowhere on the banner at all.
+    headlinePass: (percent: number, passing: number) =>
+      `Passed — ${percent}% against a ${passing}% threshold`,
+    headlineFail: (percent: number, passing: number) =>
+      `Not passed — ${percent}% against a ${passing}% threshold`,
+    // A draw narrowed to some domains did not cover the curriculum, so it
+    // cannot be reported as a certification-style verdict however well it
+    // went. Say what was drawn instead of implying a result it cannot
+    // support.
+    headlineFiltered: (percent: number) => `${percent}% on a filtered draw`,
+    filteredNote: (domains: string) =>
+      `This run drew only from ${domains}. It measures those domains, not the certification, so there is no pass or fail here.`,
+
+    // The prose summary. Every sentence is conditional on the field it
+    // reads being present; the paragraph is whatever survives.
+    summaryTasks: (correct: number, partial: number, total: number) =>
+      partial > 0
+        ? `${correct} of ${total} tasks fully correct, ${partial} partially credited.`
+        : `${correct} of ${total} tasks fully correct.`,
+    summaryTimeLeft: (left: string, clock: string) =>
+      `You finished with ${left} left on a ${clock} clock.`,
+    summaryTimeAll: (clock: string) => `You used the whole ${clock}.`,
+    summaryUntimed: "This attempt ran without a clock.",
+    summaryWeakOne: (domain: string, passing: number) =>
+      `${domain} is the only domain below ${passing}%.`,
+    summaryWeakMany: (count: number, passing: number) =>
+      `${count} domains came in below ${passing}%; the breakdown lists them weakest first.`,
+    summaryWeakNone: (passing: number) => `Every domain cleared ${passing}%.`,
+
+    // The two-figure stat block beside the headline.
+    statScore: "Weighted score",
+    statTimeUsed: (clock: string) => `of ${clock} used`,
+    statTimeOpen: "On the clock",
+    statPoints: "Points earned",
+
+    // The full-width bar and its scale. "pass 66%" is TEXT beside the gold
+    // marker on purpose: the marker is a decorative token (--warn-marker
+    // is below AA) and may never be the only thing carrying the threshold.
+    meterFloor: "0%",
+    meterCeiling: "100%",
+    meterPass: (passing: number) => `pass ${passing}%`,
+
     pointsDetail: (earned: number, total: number, passingScore: number) =>
       `${earned}/${total} points (passing score ${passingScore}%)`,
-    domainTitle: "By curriculum domain",
+    // Two percentages that differ with no explanation reads as a bug. The
+    // weighted one decides the verdict; the raw one is what they scored.
+    weightedNote: (raw: number) =>
+      `Raw points come to ${raw}%. The weighted score counts each domain at its published curriculum share, and that is the figure the threshold is applied to.`,
+
+    // ---- the sidebar ----
+
+    domainTitle: "Domain breakdown",
     // The reason this section exists at all: a percentage says whether
     // you passed, this says what to study.
-    domainHint: "Weakest first. This is where the next hour of study pays most.",
-    domainColumn: "Domain",
-    domainScore: "Score",
+    domainHint:
+      "Weighted to the published curriculum, weakest first — this is where the next hour of study pays most.",
+    // The same section without a server-side rollup to weight it: an old
+    // result, computed here from the questions alone. It must not claim a
+    // weighting it did not do.
+    domainHintUnweighted:
+      "Weakest first, by points. This is where the next hour of study pays most.",
+    domainMeta: (count: number, total: number, earned: number, points: number) =>
+      `${count} of ${total} tasks · ${earned}/${points} pts`,
+    domainMetaWeighted: (
+      weight: number,
+      count: number,
+      total: number,
+      earned: number,
+      points: number,
+    ) => `${weight}% of exam · ${count} of ${total} tasks · ${earned}/${points} pts`,
+    // The non-colour carrier for a domain under the threshold. The tint
+    // beside it is the second signal, never the first.
+    domainBelow: "below threshold",
     domainUnknown: "Unclassified",
+
+    // The card under the breakdown. It is prose, NOT a control: the draw
+    // is not configurable yet (StartOptions.domains exists on the API and
+    // nothing in the UI sends it), and a "Drill weak domains" button that
+    // starts an ordinary full-curriculum run would be a lie.
+    nextTitle: "Next session",
+    nextWeak: (domains: string) =>
+      `Put the next study hour into ${domains}, then draw a fresh set.`,
+    nextSolid: "Nothing fell below the threshold. Draw a fresh set and hold this pace.",
+
+    // ---- the task verdicts table ----
+
+    verdictsTitle: "Task verdicts",
+    verdictsHint: "Open a row for the grader's checks and the reference solution.",
+    filterLabel: "Filter task verdicts",
+    filterAll: "All",
+    filterFailed: "Failed",
+    filterPartial: "Partial",
+    filterFlagged: "Flagged",
+    filterEmpty: "Nothing matches that filter.",
+    colNum: "#",
+    colTask: "Task",
+    colDomain: "Domain",
+    colWeight: "Weight",
+    colTime: "Time",
+    colVerdict: "Verdict",
+    // The visible column strip is aria-hidden: this is a list of
+    // disclosures, not a table, so nothing associates a header with a
+    // cell. Each cell names itself instead.
+    srWeight: "Weight",
+    // "open", never "spent" or "worked" — the figure measures how long the
+    // task pane was on screen and nothing more (api.ts).
+    srTime: "Task pane open",
+    srOverTarget: (over: string, target: string) => `${over} over the ${target} target`,
+    overTarget: (over: string) => `+${over}`,
+    verdictCorrect: "CORRECT",
+    verdictPartial: "PARTIAL",
+    verdictFailed: "FAILED",
+    percentValue: (pct: number) => `${pct}%`,
+    // A result graded before per-task timing existed has no time at all.
+    // The column only appears when at least one row can fill it, so this
+    // covers the mixed case, not the empty one.
+    notRecorded: "—",
+    notRecordedLabel: "not recorded",
     modeNote: (mode: string) => `${mode} attempt: not a comparable exam result.`,
     endReason: (reason: string) =>
       reason === "expired"

@@ -904,6 +904,64 @@
   white-space: nowrap;
 }
 
+/* The environment line: which cluster is behind the desktop, and which
+   boxes the drawn tasks are graded on. A second grower beside the title so
+   the two share the row's slack and both ellipse rather than pushing the
+   clock off the edge — it is context, and the first thing that should give
+   way when the row runs out of room (it is hidden outright below 900px,
+   where the panel becomes a drawer). */
+.exam-env {
+  flex: 1 1 8rem;
+  min-width: 0;
+  font-size: var(--text-s);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* How far through the tasks the attempt is. The sentence carries it; the
+   bar is aria-hidden reinforcement, and it is cyan rather than blue —
+   progress is the one thing in this product that moves, and the Rare
+   Accent Rule keeps blue for things you can act on. */
+.exam-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.exam-progress-text {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.exam-progress-track {
+  width: 130px;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+
+.exam-progress-bar {
+  height: 100%;
+  background: var(--progress);
+  border-radius: inherit;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* A determinate bar that jumps between discrete steps needs the step to
+     be legible as a movement — the same reasoning, and the same token, as
+     the global progress bar's. */
+  .exam-progress-bar,
+  .mcq-rail-bar {
+    transition: width var(--dur-progress) var(--ease-out);
+  }
+}
+
 .timer {
   font-family: var(--font-mono);
   font-size: var(--text-l);
@@ -962,8 +1020,8 @@
                          the 15px base is about 75ch — the top of a
                          comfortable line. 700px would be ~90ch, a worse
                          read than the 360px default.
-       280px             is where the nav row (a mono `ssh instance-1`, a
-                         points pill and two 28px steps) stops fitting.
+       280px             is where the footer nav stops fitting on one row
+                         (Previous, All tasks and Next, labelled).
                          The navigator halves to five columns just above
                          it, at a 320px container — measured, because ten
                          22px tiles clip a three-character label.
@@ -974,9 +1032,11 @@
   width: clamp(280px, var(--panel-width, 360px), min(600px, 50vw));
   flex-shrink: 0;
   position: relative;
-  /* The prev/next step buttons' box, declared once here so the
-     coarse-pointer bump below can raise it in one place. */
-  --control-size: 28px;
+  /* --control-size lived here for the header's 28px icon steppers, which
+     the footer nav replaced. It is gone rather than kept "in case": the
+     coarse-pointer block that raised it to 44px had nothing left to
+     raise, and a variable no rule reads is a rule nobody can see is
+     dead. The footer's own touch targets are set above. */
   /* The collapse is instant on purpose. This used to ease the panel's
      own width over 150ms, which is neither compositor-only nor authored
      inside prefers-reduced-motion — and animating a layout property for
@@ -987,119 +1047,171 @@
 }
 
 /* ---- question navigator ----
-   One bordered header above the scroll region: prev / current / next on
-   the first row, instance chip and review mark on the second. The panel
-   toggle is absolutely positioned in the top-right corner, so the header
-   reserves its column rather than letting the row run underneath it —
-   which is what the old list's 3rem top padding was paying for, inside a
-   45% cap that the task text had to live under. */
-.question-nav {
+   The task pane's three bands: the identity header, the machine block and
+   graded-on card inside the scroll region, and the footer nav.
+
+   Navigation used to be a compact stepper row at the top of this header,
+   beside the current question's id. It is now the labelled footer row at
+   the foot of the reading — the same three moves, discoverable without a
+   keyboard, and the header is free to be what the task IS rather than
+   where it sits in a list.
+
+   Nothing in here declares a fixed column count or a fixed width. The
+   candidate DRAGS this pane between 280px and 600px (.panel-resizer), and
+   no media query can observe that — so every row here wraps intrinsically
+   instead, which is the one behaviour that cannot be wrong at a width
+   nobody tested. */
+.task-head {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border);
 }
 
-.question-nav-row {
+.task-head-row {
   display: flex;
   align-items: center;
   gap: var(--space-2);
 }
 
-.question-nav-step {
-  flex-shrink: 0;
-  width: var(--control-size);
-  height: var(--control-size);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface-raised);
-  color: var(--text);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-s);
-  cursor: pointer;
-}
-
-.question-nav-step:hover:not(:disabled) {
-  background: var(--raised-hover);
-  color: var(--accent-strong);
-}
-
-.question-nav-step:active:not(:disabled) {
-  background: var(--raised-hover);
-  transform: translateY(1px);
-}
-
-.question-nav-step:disabled {
-  color: var(--text-disabled);
-  border-color: var(--border);
-  cursor: not-allowed;
-}
-
-.question-nav-current {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  text-align: left;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-s);
-  padding: 0.3em 0.5em;
-  cursor: pointer;
-}
-
-.question-nav-current:hover:not(:disabled) {
-  background: var(--surface-hover);
-}
-
-.question-nav-current:active:not(:disabled) {
-  background: var(--surface-hover);
-  transform: translateY(1px);
-}
-
-/* Expanded is a disclosure state, not a currency state, so it never takes
-   the accent. It used to, and its rule body was byte-identical to the
-   current question tile's forty pixels below it. The rotating chevron
-   carries the open/closed reading now. */
-.question-nav-current[aria-expanded="true"] {
-  background: var(--surface-raised);
-  border-color: var(--border-strong);
-}
-
-.question-nav-count {
-  margin-left: auto;
+/* "TASK 04 / 20" — a mono eyebrow, uppercased here rather than in the
+   copy so the string stays a sentence for anything that reads it aloud.
+   Tabular figures because the counter changes under a running clock and
+   nothing beside it should move when it does. */
+.task-counter {
   font-family: var(--font-mono);
-  font-size: var(--text-s);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
-.question-nav-tools {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+/* The bank's own name for the task. Wraps rather than ellipses: this is
+   the one line on the screen a candidate uses to decide whether they know
+   how to do it, and half a title is no use at 280px. */
+.task-title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: var(--tracking-tight);
+  text-wrap: pretty;
 }
 
-/* The bank's short label for the current question. The one flex item in
-   this row allowed to shrink below its content (min-width: 0), so at
-   narrow panel widths the title ellipses while the instance chip — the
-   most load-bearing fact in the header — stays whole. */
-.question-nav-title {
-  font-size: var(--text-s);
+/* Domain, share of the points, pacing budget, host. A wrapping list, not
+   a grid: the pane's width is dragged, and a fixed track count clips a
+   label at the narrow end without anything failing loudly enough to
+   notice. */
+.task-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.task-chip {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
   color: var(--text-muted);
-  min-width: 0;
+  background: var(--surface-raised);
+  border-radius: var(--radius-xs);
+  padding: 0.25em 0.6em;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+/* The host chip keeps the accent treatment it has always had — which box
+   to ssh into is the single most load-bearing fact per task, and it is the
+   one accent object this header is allowed. `.instance-chip` carries the
+   colours (see the navigator section); this only sets the shape it takes
+   in the row. */
+.task-chip.instance-chip {
+  align-self: auto;
+  background: var(--accent-soft);
+  border-radius: var(--radius-pill);
+  padding: 0.2em 0.7em;
+}
+
+/* Previous / all tasks / next. Wraps at narrow pane widths rather than
+   compressing: the jump button gives up its place on the row first,
+   because the two steppers are the moves under the clock. */
+.task-nav {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+.task-nav .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  font-size: var(--text-s);
+  padding: 0.5em 0.9em;
+}
+
+/* Navigation is a footer row of .btn in both engines now, and .btn is not
+   in the coarse-pointer touch-target list further down this file (that
+   list names the icon-scale controls). Keyed to pointer type, not width,
+   like that block: a mouse sees none of it. */
+@media (any-pointer: coarse) {
+  .task-nav .btn,
+  .mcq-footer .btn {
+    min-height: 44px;
+  }
+}
+
+.task-nav-step {
+  flex-shrink: 0;
+}
+
+/* The one button state the shared rules do not cover. `.btn:disabled`
+   outranks `.btn-primary` for colour and border but not for background,
+   which would leave --text-disabled sitting on the accent fill at about
+   2:1. The last task disables Next rather than growing a second submit —
+   the topbar carries the only one — so this state is reached on every
+   attempt, not in some edge case. */
+.task-nav .btn-primary:disabled {
+  background: var(--surface-raised);
+  border-color: var(--border);
+  color: var(--text-disabled);
+}
+
+/* The navigator trigger. Expanded is a disclosure state, not a currency
+   state, so it never takes the accent — the rotating chevron carries the
+   open/closed reading. */
+.task-nav-jump[aria-expanded="true"] {
+  background: var(--raised-hover);
+  border-color: var(--border-strong);
+}
+
+/* A drawn chord, beside the control it belongs to. aria-hidden in the
+   markup: it is a reminder for the eye, and the shortcut reference (?) is
+   where it is said out loud. */
+.key-hint {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 0.05em 0.35em;
+  line-height: 1.6;
 }
 
 /* The review mark is a candidate's own scratch note, not a reading from
    the grader, so it stays muted at rest and never takes the accent — the
-   instance chip beside it is the one accent object this header is allowed. */
+   host chip below it is the one accent object this header is allowed. */
 .question-mark {
   margin-left: auto;
   display: inline-flex;
@@ -1135,20 +1247,112 @@
   border-color: var(--border-strong);
 }
 
-.question-id {
-  font-family: var(--font-mono);
-  font-weight: 700;
+/* THE MACHINE IS NOT THE APP. This block is the one part of the task pane
+   drawn in the --machine-* family — the dark palette that is identical in
+   both themes — because it is literally a computer: the command, and where
+   to run it. tokens.css is explicit that nothing may reach for these to
+   "look technical", so the rest of the pane stays on app surfaces.
+
+   The label and the note take --machine-faint (5.41:1) rather than the
+   --machine-dim the brief draws them in: dim is documented as decorative,
+   for pictures of terminal output, and this is real text. */
+.work-from {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  margin-bottom: var(--space-4);
+  background: var(--machine-bg);
+  border-radius: var(--radius-m);
 }
 
-.question-points {
+.work-from-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.work-from-label {
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--machine-faint);
+}
+
+/* --machine-dim on the edge, not --machine-border-strong: the brief's
+   #2a3546 is 1.55:1 against this fill, and a control's boundary owes
+   3:1 (1.4.11). This clears it at 3.79:1 on the lightest machine fill. */
+.work-from-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--machine-faint);
+  background: transparent;
+  border: 1px solid var(--machine-dim);
+  border-radius: var(--radius-xs);
+  padding: 0.3em 0.6em;
+  cursor: pointer;
+}
+
+.work-from-copy:hover {
+  background: var(--machine-raised);
+  color: var(--machine-text);
+}
+
+.work-from-copy:active {
+  transform: translateY(1px);
+}
+
+.work-from-command {
+  font-family: var(--font-mono);
+  font-size: var(--text-m);
+  color: var(--machine-green-soft);
+  word-break: break-word;
+}
+
+.work-from-note {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: 1.5;
+  color: var(--machine-faint);
+}
+
+/* What the grader will look at, at the foot of the task text. An inset
+   card rather than a callout: it is a summary of the task above it, so it
+   takes the quiet left rule the brief draws and none of the verdict
+   colours — nothing has been graded yet. */
+.graded-on {
+  display: block;
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  background: var(--surface-raised);
   border: 1px solid var(--border);
-  background: var(--bg);
-  border-radius: var(--radius-pill);
-  padding: 0.1em 0.55em;
-  white-space: nowrap;
+  border-left: 3px solid var(--border-strong);
+  border-radius: 0 var(--radius-s) var(--radius-s) 0;
+}
+
+.graded-on-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: var(--space-1);
+}
+
+.graded-on-body {
+  margin: 0;
+  font-size: var(--text-s);
+  line-height: 1.6;
+  color: var(--text-secondary);
 }
 
 /* ---- navigator ----
@@ -1436,8 +1640,9 @@
 }
 
 /* Ten 30px tiles do not survive a thumb, and the mcq exam is the one
-   this product runs on a phone. Keyed to pointer type rather than width,
-   like the panel's own --control-size bump. */
+   this product runs on a phone. Keyed to pointer type rather than
+   width: a tile is hard to hit because of the finger, not the viewport,
+   and a mouse at the same width should keep the dense grid. */
 @media (any-pointer: coarse) {
   .navigator-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1846,7 +2051,7 @@
 .score-screen {
   min-height: 100%;
   padding: var(--space-6) var(--space-4);
-  max-width: 820px;
+  max-width: var(--page-max);
   margin: 0 auto;
 }
 
@@ -1868,130 +2073,492 @@
   height: 100%;
 }
 
-.score-banner {
-  text-align: center;
-  padding: var(--space-6);
-  border-radius: var(--radius-l);
+/* One card: the ink band on top, the two-column body under it. The
+   radius has to be clipped or the band's square corners sit proud of the
+   card's rounded ones. */
+.results-card {
   border: 1px solid var(--border);
+  border-radius: var(--radius-l);
   background: var(--surface);
   box-shadow: var(--shadow-1);
-  margin-bottom: var(--space-6);
+  overflow: hidden;
 }
 
-.score-banner.pass {
-  border-color: var(--success);
+/* --ink is a near-black band used INSIDE light mode, and a raised band
+   above --bg in dark. It is NOT --machine-*: that family is reserved for
+   things that are literally a computer (the terminal, the VNC desktop),
+   and a results banner is the product raising its voice, not a machine
+   talking. */
+.results-banner {
+  padding: var(--space-7) var(--space-6) var(--space-6);
+  background: var(--ink);
+  color: var(--ink-text);
 }
 
-.score-banner.fail {
-  border-color: var(--danger);
+.results-banner-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-6);
+  flex-wrap: wrap;
 }
 
-/* This is the score screen's <h1>. It already declares its own display
-   size, so only the browser's 0.67em h1 margin has to be neutralised —
-   the banner owns the spacing around this number. */
-.score-percent {
+/* The basis matters more than the grow factor. Without one the lead's
+   base size is its max-content — a 66ch paragraph — so the stat block
+   wrapped onto its own line at widths where both fit comfortably. */
+.results-banner-lead {
+  display: flex;
+  flex: 1 1 24rem;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.results-eyebrow {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-accent);
+}
+
+/* The eyebrow is set in caps and the seed is not: the API's contract is
+   six LOWERCASE hex digits, and a seed shouted back in capitals is a
+   seed a replay field can reject. */
+.results-seed {
+  text-transform: lowercase;
+}
+
+/* The screen's <h1>, and the whole verdict: "Passed — 74% against a 66%
+   threshold". It used to be a bare percentage with PASS underneath,
+   which split one sentence across two type sizes and left the number the
+   verdict was measured against off the banner entirely. */
+.results-headline {
+  margin: 0;
+  font-size: var(--text-5xl);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: var(--tracking-tight);
+  color: var(--ink-text);
+}
+
+.results-summary {
+  margin: 0;
+  max-width: 66ch;
+  font-size: var(--text-m);
+  line-height: 1.65;
+  color: var(--ink-muted);
+}
+
+.results-stats {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-6);
+  padding: var(--space-5) var(--space-5);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--radius-l);
+  background: var(--ink-raised);
+}
+
+.results-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* --ink-text, not a verdict tint. There is no success-on-ink token: plain
+   --success measures 3.98:1 on light --ink, which clears 1.4.3 only
+   because this figure is large, and the palette's contrast ledger has no
+   entry for the pairing. The verdict is in the headline above and in the
+   bar below; this figure does not need to repeat it in colour. */
+.results-stat-figure {
   font-family: var(--font-mono);
   font-size: var(--text-6xl);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.1;
+  letter-spacing: var(--tracking-tight);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-text);
+}
+
+.results-stat-label {
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.results-stat-rule {
+  width: 1px;
+  background: var(--ink-border);
+}
+
+.results-meter {
+  margin-top: var(--space-5);
+}
+
+/* Deliberately NOT overflow: hidden. The threshold marker stands proud of
+   the track top and bottom so it reads as a gate rather than as a notch
+   in the fill, and clipping the track would cut it back to 10px. The fill
+   carries its own radius instead. */
+.results-meter-track {
+  position: relative;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--ink-border);
+}
+
+.results-meter-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--ink-accent);
+}
+
+.results-banner.pass .results-meter-fill {
+  background: var(--success);
+}
+
+.results-banner.fail .results-meter-fill {
+  background: var(--danger);
+}
+
+/* The pass threshold. --warn-marker is a DECORATIVE token (1.68:1 on
+   --surface) and is permitted here for exactly the reason tokens.css
+   gives: it is drawn on --ink, where it reads 10.5:1, and it never
+   carries the threshold alone — "pass 66%" is spelled out underneath it
+   in the same colour, as text. */
+.results-meter-mark {
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  width: 2px;
+  background: var(--warn-marker);
+}
+
+.results-meter-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--ink-faint);
+}
+
+.results-meter-pass {
+  color: var(--warn-marker);
+}
+
+.results-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-4);
+}
+
+.results-notes p {
   margin: 0;
+  font-size: var(--text-s);
+  color: var(--ink-muted);
 }
 
-.score-verdict {
+/* 340px is the brief's measure, and --results-sidebar is where it lives.
+   minmax(0, 1fr) rather than 1fr: a grid track's default min-content
+   floor lets a long task title push the whole table wider than the card
+   and take the page's horizontal scrollbar with it. */
+.results-body {
+  display: grid;
+  grid-template-columns: var(--results-sidebar) minmax(0, 1fr);
+}
+
+.results-aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-4);
+  border-right: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+/* Pinned to the bottom of the sidebar, under whatever the breakdown
+   needed. Prose, not a control — see NextSession in Score.tsx. */
+.results-next {
+  margin-top: auto;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+}
+
+.results-next h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-l);
+}
+
+.results-next p {
+  margin: 0;
+  font-size: var(--text-s);
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+/* ---- score: task verdicts ---- */
+
+.task-verdicts {
+  padding: var(--space-5);
+  min-width: 0;
+}
+
+.task-verdicts-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.task-verdicts-head h2 {
+  margin: 0;
   font-size: var(--text-2xl);
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  margin: var(--space-2) 0;
 }
 
-/* The verdict word is text, so it takes the -strong tier. Plain
-   --success is the graphics tier (3:1) and is correct for the check
-   icons and tile marks, which all carry an sr-only text equivalent. */
-.score-banner.pass .score-verdict {
-  color: var(--success-strong);
+.tv-filters {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
-.score-banner.fail .score-verdict {
-  color: var(--danger);
+.tv-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  cursor: pointer;
 }
 
-.score-detail,
-.score-end-reason {
+.tv-chip:hover {
+  background: var(--surface-hover);
+}
+
+.tv-chip[aria-pressed="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--ink-text);
+}
+
+.tv-chip-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.verdict-table {
+  /* One template, four shapes. WEIGHT and TIME are both absent on a
+     result graded before they existed, and a column of dashes costs
+     width to say nothing. */
+  --tv-cols: 44px minmax(0, 1fr) 150px 96px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  overflow: hidden;
+}
+
+.verdict-table.has-weight {
+  --tv-cols: 44px minmax(0, 1fr) 150px 74px 96px;
+}
+
+.verdict-table.has-time {
+  --tv-cols: 44px minmax(0, 1fr) 150px 116px 96px;
+}
+
+.verdict-table.has-weight.has-time {
+  --tv-cols: 44px minmax(0, 1fr) 150px 74px 116px 96px;
+}
+
+.tv-head {
+  display: grid;
+  grid-template-columns: var(--tv-cols);
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
   color: var(--text-muted);
 }
 
-.score-questions {
-  display: flex;
-  flex-direction: column;
+/* A row is a <details>, not a <tr>: it has to disclose its grader checks
+   in place, and a <details> cannot be a table row. The brief opens a
+   full-screen deep dive from here instead; that screen does not exist
+   yet, and a row that looks like a link and goes nowhere is worse than
+   one that expands. */
+.tv-row {
+  border-bottom: 1px solid var(--border);
+  padding: 0 var(--space-4) 0;
+}
+
+.tv-row:last-child {
+  border-bottom: 0;
+}
+
+.tv-row > summary {
+  display: grid;
+  grid-template-columns: var(--tv-cols);
   gap: var(--space-3);
-}
-
-.question-result {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-s);
-  padding: var(--space-3) var(--space-4);
-}
-
-/* display:flex suppresses the native marker in Chromium and WebKit, so
-   this disclosure had no trigger glyph at all while the solution one
-   nested inside it kept the browser's. Both now carry the same chevron,
-   and both take a hover fill — they were two of the ten controls in the
-   product that rested with no border and no background whatsoever.
-
-   The negative margin is INLINE ONLY, and that is the whole lesson here.
-   Both summaries first shipped with a uniform `margin: -space-2`, so the
-   hover band bled upward as well as sideways — and .solution-details sits
-   only a small gap below the check list, so the nested band landed
-   directly on it with no breathing room at all. Inline padding matches
-   the card's own so the text does not shift and the band reaches the
-   border; vertical spacing is left to the container, which is the only
-   thing that knows what is above. */
-.question-result summary {
-  display: flex;
   align-items: center;
-  gap: var(--space-3);
-  cursor: pointer;
-  font-weight: 600;
-  padding: var(--space-1) var(--space-4);
+  padding: var(--space-3) var(--space-4);
   margin-inline: calc(var(--space-4) * -1);
-  border-radius: var(--radius-s);
+  cursor: pointer;
   list-style: none;
 }
 
-.question-result summary::-webkit-details-marker,
+.tv-row > summary::-webkit-details-marker,
 .solution-details summary::-webkit-details-marker {
   display: none;
 }
 
-.question-result summary:hover,
+.tv-row > summary:hover,
 .solution-details summary:hover {
   background: var(--surface-hover);
 }
 
-.qr-id {
-  font-family: var(--font-mono);
-  font-weight: 700;
+/* A tinted row, never a tinted row ALONE: the verdict word in the last
+   cell is what says which state this is. Only `failed` is tinted —
+   --danger-row is the palette's one row tint, and washing `partial` in
+   the same colour would say the two outcomes are the same. */
+.tv-row.is-failed > summary {
+  background: var(--danger-row);
 }
 
-/* The question's name, when the bank ships one. Inherits the summary's
-   600 weight — the row's readable identity — while the domain stays the
-   muted, flexible filler beside it. */
-.qr-title {
+.tv-num {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-s);
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tv-task {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
   min-width: 0;
+  font-weight: 500;
+}
+
+.tv-task-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The hands-on id is the real ssh-able question directory, so it stays
+   on screen beside the bank's title rather than being replaced by it. */
+.tv-task-id {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+}
+
+.tv-flag {
+  flex: none;
+  color: var(--warn-strong);
+}
+
+.tv-domain,
+.tv-weight,
+.tv-time {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.qr-domain {
-  flex: 1;
-  color: var(--text-muted);
-  font-weight: 400;
+.tv-weight,
+.tv-time {
+  font-variant-numeric: tabular-nums;
 }
 
-.qr-points {
+/* Over the pacing budget. The tint is the second signal; the "+2m 15s"
+   printed beside the figure is the first. */
+.tv-time.is-over {
+  color: var(--warn-strong);
+}
+
+.tv-over {
+  margin-left: var(--space-1);
+}
+
+.tv-verdict {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-xs);
   font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-align: center;
+  background: var(--neutral-soft);
+  color: var(--text-secondary);
+}
+
+.tv-verdict.is-correct {
+  background: var(--success-soft);
+  color: var(--success-strong);
+}
+
+.tv-verdict.is-partial {
+  background: var(--warn-soft);
+  color: var(--warn-strong);
+}
+
+.tv-verdict.is-failed {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.tv-points {
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.tv-empty,
+.tv-hint {
+  color: var(--text-muted);
+  font-size: var(--text-s);
+}
+
+.tv-empty {
+  margin: 0;
+  padding: var(--space-4);
+}
+
+.tv-hint {
+  margin: var(--space-3) 0 0;
+}
+
+/* An open row's disclosed content is inset to the row's own gutters, so
+   the check list lines up with the TASK column rather than with the
+   card's edge. The bottom padding only exists while the row is open. */
+.tv-row[open] {
+  padding-bottom: var(--space-4);
 }
 
 .check-list {
@@ -2098,60 +2665,64 @@
 
 /* ---- score: per-domain breakdown ---- */
 
-.domain-breakdown {
-  margin: var(--space-6) 0;
-}
-
+/* A stacked list, not a table. At --results-sidebar (340px) a two-column
+   table gives the domain name about twelve characters before it wraps,
+   and every row in this bank has a name longer than that. */
 .domain-breakdown h2 {
-  margin-bottom: var(--space-1);
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-l);
 }
 
-.domain-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: var(--space-3);
-}
-
-.domain-table th {
-  text-align: left;
-  font-weight: 600;
-}
-
-.domain-table thead th {
-  font-size: var(--text-s);
+.domain-hint {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.5;
   color: var(--text-muted);
-  border-bottom: 1px solid var(--border);
-  padding-bottom: var(--space-1);
 }
 
-.domain-table tbody th,
-.domain-table td {
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--border);
-  vertical-align: middle;
-}
-
-/* The flex lives on an inner wrapper, NOT on the cell.
-   `display: flex` on a <td> takes it out of the table layout model, so it
-   stops stretching to the row height: the score cell measured 38px against
-   the domain cell's 40px, putting the two border-bottoms 2px apart and
-   leaving a visible step in every row divider at the column boundary. */
-.domain-score {
+.domain-rows {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  justify-content: flex-end;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
-/* Decorative: the figure beside it carries the value, so this reads the
-   same with CSS off and needs no motion to be legible. */
+.domain-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.domain-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.domain-name {
+  font-size: var(--text-s);
+  font-weight: 500;
+  color: var(--text-body);
+}
+
+.domain-figure {
+  font-family: var(--font-mono);
+  font-size: var(--text-s);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Decorative: the figure above it and the meta below it both carry the
+   value, so this reads the same with CSS off and needs no motion to be
+   legible. */
 .domain-bar {
-  flex: 1;
-  min-width: 4rem;
-  max-width: 16rem;
-  height: 8px;
+  height: 7px;
   border-radius: var(--radius-pill);
-  background: var(--surface-raised);
+  background: var(--muted-soft);
   overflow: hidden;
 }
 
@@ -2161,22 +2732,83 @@
   background: var(--accent);
 }
 
-.domain-figure {
-  font-variant-numeric: tabular-nums;
-  font-size: var(--text-s);
-  white-space: nowrap;
+.domain-row.is-below .domain-bar-fill {
+  background: var(--danger-bar);
 }
 
-@media (max-width: 600px) {
-  .domain-table tbody th,
-  .domain-table td {
-    display: block;
-    border-bottom: 0;
+.domain-row.is-below .domain-figure {
+  color: var(--danger);
+}
+
+.domain-meta {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* The non-colour carrier for a domain under the threshold. --danger is
+   the text tier (4.53:1 worst), not --danger-bar beside it. */
+.domain-below {
+  margin-left: var(--space-2);
+  color: var(--danger);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+}
+
+/* The results card stacks below the brief's two-column measure: 340px of
+   sidebar plus a six-column table needs the width it asks for, and
+   squeezing either is worse than putting one under the other. */
+@media (max-width: 900px) {
+  .results-body {
+    grid-template-columns: minmax(0, 1fr);
   }
-  .domain-table tbody tr {
-    display: block;
+
+  .results-aside {
+    border-right: 0;
     border-bottom: 1px solid var(--border);
-    padding: var(--space-2) 0;
+  }
+
+  .results-banner-top {
+    gap: var(--space-4);
+  }
+
+  .results-stats {
+    width: 100%;
+  }
+}
+
+/* Below this the six-column strip is unreadable however it is squeezed,
+   so the row becomes a stacked block: the column headings go, and each
+   cell carries its own label instead. */
+@media (max-width: 640px) {
+  .results-banner {
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .task-verdicts {
+    padding: var(--space-4) var(--space-3);
+  }
+
+  .tv-head {
+    display: none;
+  }
+
+  .tv-row > summary {
+    grid-template-columns: 44px minmax(0, 1fr);
+    row-gap: var(--space-2);
+  }
+
+  .tv-domain,
+  .tv-weight,
+  .tv-time,
+  .tv-verdict {
+    grid-column: 2;
+  }
+
+  .tv-verdict {
+    justify-content: flex-start;
+    align-self: flex-start;
   }
 }
 
@@ -2634,6 +3266,14 @@
     margin-left: 36px;
   }
 
+  /* The first thing the topbar gives up. Below this width the row is
+     already wrapping to fit the clock and the submit button, and the
+     environment line is context rather than something you act on — the
+     same facts are on the mode screen and in the About drawer. The
+     progress readout stays: it is the attempt's own state. */
+  .exam-env {
+    display: none;
+  }
 }
 
 /* ---- toast layer ---- */
@@ -3095,21 +3735,6 @@
     padding: var(--space-4) var(--space-3);
   }
 
-  .score-banner {
-    padding: var(--space-4);
-  }
-
-  /* Four flex columns in one row squeeze the domain to nothing on a
-     phone; let it take its own line under the id and points. */
-  .question-result summary {
-    flex-wrap: wrap;
-  }
-
-  .qr-domain {
-    flex-basis: 100%;
-    order: 3;
-  }
-
   .score-actions .btn {
     width: 100%;
   }
@@ -3134,17 +3759,11 @@
    and .code-block-copy are the other two icon-scale controls reachable
    on a phone. */
 @media (any-pointer: coarse) {
-  /* Raising the panel's control size here moves the nav steps with it. */
-  .question-panel {
-    --control-size: 44px;
-  }
-
   .info-button,
   .theme-toggle,
   .toast-dismiss,
   .drawer-close,
   .code-block-copy,
-  .question-nav-step,
   .question-mark {
     min-width: 44px;
     min-height: 44px;
@@ -3362,8 +3981,6 @@
   .btn,
   .theme-toggle,
   .info-button,
-  .question-nav-step,
-  .question-nav-current,
   .question-mark,
   .job-chip,
   .code-block-copy,
@@ -3626,16 +4243,44 @@
 
 /* ===== Multiple-choice exam screen =====
 
-   One centred column: nav row, stem, options. Reuses the hands-on
-   panel's .question-nav family and the shared .navigator so the two
-   exam types read as one product; everything mcq-specific is
-   namespaced .mcq-*. Mobile-first — this is the one exam type with no
-   desktop requirement, so the column simply narrows on a phone. */
+   One question, centred at --mcq-measure, everything else out of the way:
+   a determinate rail under the topbar, one head row, the stem, the
+   options, and a footer. It shares the topbar, the review mark and the
+   .navigator with the hands-on engine so the two read as one product;
+   everything else is namespaced .mcq-*. Mobile-first — this is the one
+   exam type with no desktop requirement, so the column simply narrows on
+   a phone. */
 
 .mcq-layout {
   height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+/* The attempt's state in the topbar, pushed to the right of the title.
+   Three numbers this screen genuinely knows: answers are server state,
+   flags and first-opens are the attempt's own scratch marks. */
+.mcq-tally {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 5px under the topbar, edge to edge. Cyan, not blue: progress is the
+   thing that moves, and the Rare Accent Rule keeps blue for what you can
+   act on. aria-hidden in the markup — the tally above says it in words. */
+.mcq-rail {
+  flex-shrink: 0;
+  height: 5px;
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+
+.mcq-rail-bar {
+  height: 100%;
+  background: var(--progress);
 }
 
 /* overflow: hidden, not auto — the column below owns its own scroll
@@ -3649,7 +4294,8 @@
   overflow: hidden;
   display: flex;
   justify-content: center;
-  padding: var(--space-4) var(--space-3);
+  padding: var(--space-6) var(--space-3) var(--space-5);
+  background: var(--bg);
 }
 
 /* position: relative is load-bearing: .navigator is absolutely
@@ -3661,38 +4307,100 @@
 .mcq-question {
   position: relative;
   width: 100%;
-  max-width: 760px;
+  max-width: var(--mcq-measure);
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+/* Where you are, what it is about, and the flag. One row, and the only
+   thing in it that can shrink is the domain — the counter and the mark
+   are fixed reference points. */
+.mcq-head {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.mcq-counter {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The domain chip takes the progress cyan rather than the action blue:
+   it is a label, not something to act on, and this screen's one accent
+   object is the selected option. */
+.mcq-domain {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--progress-strong);
+  background: var(--progress-soft);
+  border-radius: var(--radius-xs);
+  padding: 0.25em 0.6em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mcq-pane {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--space-3) 0;
+  padding: var(--space-4) 0;
 }
 
-/* Previous / progress / Next-or-End Exam, pinned to the foot of the
-   column. Exactly one primary button on screen at a time: End Exam only
-   replaces Next once there is no next question to go to. */
+/* Previous / the reassurance line / navigator + Next-or-End Exam, pinned
+   to the foot of the column. Exactly one primary button on screen at a
+   time: End Exam only replaces Next once there is no next question to go
+   to. Wraps on a phone, where three controls and a sentence do not fit on
+   one line. */
 .mcq-footer {
   flex-shrink: 0;
   margin-top: auto;
-  padding-top: var(--space-3);
+  padding-top: var(--space-4);
   border-top: 1px solid var(--border);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-2) var(--space-3);
 }
 
-.mcq-progress {
+.mcq-footer .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+}
+
+.mcq-footer-end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mcq-jump-trigger[aria-expanded="true"] {
+  background: var(--raised-hover);
+  border-color: var(--border-strong);
+}
+
+/* Both halves of this sentence are load-bearing: every click is already
+   saved, and none of it has been marked. It is the middle of the row on a
+   desktop and its own line on a phone. */
+.mcq-save-note {
   font-family: var(--font-mono);
-  font-size: var(--text-s);
+  font-size: var(--text-xs);
   color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
+  text-align: center;
+  flex: 1 1 12rem;
+  min-width: 0;
 }
 
 /* --text-m is 15px because the hands-on question panel shares the
@@ -3706,6 +4414,19 @@
 .mcq-question .md blockquote {
   font-size: var(--text-l);
   line-height: 1.65;
+}
+
+/* The stem itself is the largest type on the screen, because it is the
+   only thing on the screen. Scoped with child combinators all the way
+   down so it cannot reach the training reveal's prose, which is a second
+   `.md` nested inside .mcq-check-answer — same specificity as the rule
+   above, so it has to sit after it to win. */
+.mcq-question .mcq-pane > .md > p {
+  font-size: var(--text-2xl);
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: var(--tracking-tight);
+  text-wrap: pretty;
 }
 
 .mcq-options {
@@ -3774,6 +4495,34 @@
   color: var(--accent-strong);
 }
 
+/* The live exam draws the letter as a circle — how people talk about mcq
+   items ("the answer is C") given a shape of its own. Scoped to this
+   screen: the score review's letters stay at its own compact scale, and
+   that surface is another component's.
+
+   The circle is a FOURTH channel on top of the row's edge, wash and inset
+   bar, not a replacement for any of them, and the native checkbox beside
+   it stays visible and focusable — it is the input, and its focus ring is
+   the keyboard affordance. The brief draws the row without one; a fill
+   that only a sighted mouse user can read is not a control. */
+.mcq-question .mcq-option-letter {
+  width: 24px;
+  height: 24px;
+  font-size: var(--text-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  line-height: 1;
+}
+
+.mcq-question .mcq-option-on .mcq-option-letter {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
 .mcq-option-text {
   min-width: 0;
 }
@@ -3786,9 +4535,6 @@
   line-height: 1.5;
 }
 
-.mcq-question .mcq-option-letter {
-  font-size: var(--text-xs);
-}
 
 .mcq-check-answer {
   margin-top: var(--space-4);
@@ -3864,7 +4610,26 @@
 
 @media (max-width: 640px) {
   .mcq-body {
-    padding: var(--space-3) var(--space-2);
+    padding: var(--space-4) var(--space-2) var(--space-3);
+  }
+
+  /* A phone gets the controls on one row and the reassurance line under
+     them, rather than three items squeezed into a third of the width
+     each. `order` is safe here because the line is not focusable, so the
+     visual order and the tab order cannot disagree (WCAG 1.3.2 / 2.4.3).
+     This is a real media query and not a container one: the column is the
+     viewport here, and nothing drags its width the way .panel-resizer
+     drags the task pane's. */
+  .mcq-save-note {
+    order: 1;
+    flex-basis: 100%;
+    text-align: center;
+  }
+
+  /* The stem steps back down: --text-2xl in a 340px measure is four words
+     to a line. */
+  .mcq-question .mcq-pane > .md > p {
+    font-size: var(--text-xl);
   }
 
   .mcq-review-option {

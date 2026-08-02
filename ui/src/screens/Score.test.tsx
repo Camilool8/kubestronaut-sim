@@ -1,14 +1,24 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Score } from "./Score";
+import { marksStore } from "../components/marksStore";
 import { strings } from "../strings";
 
 // The BARE Results object. getResults() (api.ts:171-186) wraps a 200 body
 // as {status: "ready", results: <body>} itself, so a fixture that already
 // carries `status`/`results` gets double-wrapped and Score crashes before
 // rendering anything.
+//
+// This one is deliberately OLD-SHAPED: no domains, no verdicts, no
+// weights, no timings, no seed, no mode. That is the payload a result
+// graded before those fields existed serves back verbatim after an
+// upgrade, and it is the path a real upgrade hits — so it is the default
+// every test here runs against unless it is specifically about a new
+// field.
 const results = {
+  bank: "ckad-mock-01",
+  gradedAt: "2026-08-01T09:00:00Z",
   percent: 40,
   passed: false,
   earned: 2,
@@ -35,13 +45,66 @@ const results = {
   ],
 };
 
-beforeEach(() => {
+// The same attempt as a current server grades it: weighted score, domain
+// rollup, per-question verdicts and weights, timings, seed and mode.
+const modernResults = {
+  ...results,
+  percent: 74,
+  pointsPercent: 71,
+  passed: true,
+  earned: 12,
+  total: 17,
+  mode: "speed",
+  seed: "7f3a91",
+  durationSeconds: 3600,
+  elapsedSeconds: 2592,
+  domains: [
+    {
+      domain: "Application Environment",
+      earned: 2,
+      total: 5,
+      weightPct: 25,
+      questionCount: 1,
+    },
+    {
+      domain: "Services and Networking",
+      earned: 10,
+      total: 12,
+      weightPct: 75,
+      questionCount: 1,
+    },
+  ],
+  questions: [
+    {
+      ...results.questions[0],
+      weightPct: 25,
+      verdict: "partial",
+      timeSpentSeconds: 521,
+      targetSeconds: 360,
+    },
+    {
+      id: "q02",
+      title: "Expose a Deployment",
+      instance: "instance-1",
+      domain: "Services and Networking",
+      earned: 10,
+      total: 12,
+      checks: [],
+      weightPct: 75,
+      verdict: "partial",
+      timeSpentSeconds: 200,
+      targetSeconds: 360,
+    },
+  ],
+};
+
+function stubResults(body: unknown) {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith("/api/results"))
-        return new Response(JSON.stringify(results), { status: 200 });
+        return new Response(JSON.stringify(body), { status: 200 });
       if (url.includes("/solution"))
         return new Response(
           JSON.stringify({ id: "q01", markdown: "```yaml\nkind: Pod\n```" }),
@@ -50,6 +113,11 @@ beforeEach(() => {
       return new Response(JSON.stringify({}), { status: 200 });
     }),
   );
+}
+
+beforeEach(() => {
+  marksStore.reset();
+  stubResults(results);
 });
 
 afterEach(() => {
@@ -214,7 +282,7 @@ describe("Score results poll", () => {
 });
 
 describe("Score review rows", () => {
-  test("a question's bank title shows beside its id", async () => {
+  test("a question's bank title shows beside its ssh-able id", async () => {
     render(<Score onNewAttempt={() => {}} endReason="submitted" />);
     await screen.findByText("q01");
     expect(screen.getByText("Namespaces & quotas")).toBeInTheDocument();
@@ -237,40 +305,133 @@ describe("Score review rows", () => {
 });
 
 describe("Score heading", () => {
-  // The scored state was two anonymous divs: the one number the candidate
-  // came for had no heading to navigate to, and announced as a bare
-  // percentage with nothing naming it.
-  test("the percentage is the screen's h1 and says what the number is", async () => {
+  // The scored state was two anonymous divs, then a bare percentage with
+  // PASS underneath it — one sentence split across two type sizes, with
+  // the threshold it was measured against nowhere on the banner.
+  test("the verdict is the screen's h1 and carries the threshold it was measured against", async () => {
     render(<Score onNewAttempt={() => {}} endReason="submitted" />);
 
     // Named, because the grading state's own h1 is on screen until the
     // first poll lands and would satisfy a bare level-1 query.
-    const heading = await screen.findByRole("heading", { level: 1, name: /your score/i });
+    const heading = await screen.findByRole("heading", { level: 1, name: /not passed/i });
     expect(heading).toHaveTextContent("40%");
+    expect(heading).toHaveTextContent("66% threshold");
   });
 
-  // Promoting the verdict too would put two headings on one banner and
-  // announce PASS/FAIL twice; it already follows the heading immediately.
-  test("the verdict stays out of the heading structure", async () => {
+  test("there is exactly one h1 on the scored screen", async () => {
     render(<Score onNewAttempt={() => {}} endReason="submitted" />);
-
-    expect(await screen.findByText("FAIL")).toBeInTheDocument();
+    await screen.findByRole("heading", { level: 1, name: /not passed/i });
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 });
 
-describe("Score solutions", () => {
-  // Solutions used to render through a bare <ReactMarkdown> with no
-  // components override and no styles, so a long yaml line pushed the whole
-  // page sideways and inline values were not copyable.
-  test("renders solution markdown through the shared renderer", async () => {
-    const user = userEvent.setup();
+describe("Score banner", () => {
+  test("names the run, the date and the seed the draw came from", async () => {
+    stubResults(modernResults);
     render(<Score onNewAttempt={() => {}} endReason="submitted" />);
 
-    await user.click(await screen.findByText("q01"));
-    await user.click(screen.getByText(/show solution/i));
+    const eyebrow = await screen.findByText(/ckad-mock-01/);
+    expect(eyebrow).toHaveTextContent("Mastery run");
+    // UTC, deliberately: gradedAt is an instant, and the reader's zone
+    // would move the printed day across a midnight for no benefit.
+    expect(eyebrow).toHaveTextContent("1 Aug 2026");
+    expect(eyebrow).toHaveTextContent("draw seed 7f3a91");
+  });
 
-    // The shared renderer's code-block chrome, which the bare one lacked.
-    expect(await screen.findByText("yaml")).toBeInTheDocument();
+  // The path a real upgrade hits. An old result has no seed, no mode and
+  // no clock, and the banner still has to render.
+  test("renders without a seed, a mode or a clock", async () => {
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+
+    const eyebrow = await screen.findByText(/ckad-mock-01/);
+    expect(eyebrow).not.toHaveTextContent("draw seed");
+    expect(eyebrow).not.toHaveTextContent("run");
+    // With no clock recorded the second stat falls back to the one figure
+    // every result has ever carried.
+    const stat = screen.getByText(strings.score.statPoints).closest(".results-stat");
+    expect(stat).toHaveTextContent("2/5");
+  });
+
+  test("reports the clock as used-of-total when the attempt recorded one", async () => {
+    stubResults(modernResults);
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+
+    await screen.findByRole("heading", { level: 1, name: /passed/i });
+    // 2592s of 3600s, printed without formatClock's leading "0:".
+    expect(screen.getByText("43:12")).toBeInTheDocument();
+    expect(screen.getByText("of 1:00:00 used")).toBeInTheDocument();
+    expect(screen.getByText(/16:48 left on a 1:00:00 clock/)).toBeInTheDocument();
+  });
+
+  // Two percentages that differ with no explanation reads as a bug.
+  test("explains the weighted score when it differs from the raw one", async () => {
+    stubResults(modernResults);
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+    expect(await screen.findByText(/raw points come to 71%/i)).toBeInTheDocument();
+  });
+
+  test("says nothing about raw points when the two figures agree", async () => {
+    stubResults({ ...modernResults, pointsPercent: 74 });
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+    await screen.findByRole("heading", { level: 1, name: /passed/i });
+    expect(screen.queryByText(/raw points come to/i)).toBeNull();
+  });
+
+  // A draw narrowed to some domains covered part of the curriculum. It
+  // cannot be reported as a pass however well it went.
+  test("a filtered draw is never presented as a pass", async () => {
+    stubResults({
+      ...modernResults,
+      domainFilter: ["Services and Networking", "Observability"],
+    });
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+
+    const heading = await screen.findByRole("heading", { level: 1, name: /filtered draw/i });
+    expect(heading).toHaveTextContent("74% on a filtered draw");
+    expect(heading).not.toHaveTextContent(/passed/i);
+    expect(
+      screen.getByText(/drew only from Services and Networking, Observability/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/no pass or fail here/)).toBeInTheDocument();
+  });
+
+  test("a mastery attempt says it is not a comparable exam result", async () => {
+    stubResults(modernResults);
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+    expect(await screen.findByText(/Mastery attempt: not a comparable/)).toBeInTheDocument();
+  });
+
+  // The threshold marker is a decorative token by contrast (--warn-marker
+  // is 1.68:1 on --surface). It may never be the only thing saying where
+  // the threshold is.
+  test("the pass threshold is spelled out, not only drawn", async () => {
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+    expect(await screen.findByText("pass 66%")).toBeInTheDocument();
+  });
+});
+
+describe("Score sidebar", () => {
+  test("names the weak domains to study next, without offering a control that does nothing", async () => {
+    stubResults(modernResults);
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+
+    const next = (await screen.findByText(strings.score.nextTitle)).closest("div");
+    expect(next).toHaveTextContent("Application Environment");
+    // The draw is not configurable from the UI yet (Mode.tsx starts every
+    // attempt with a bare mode), so a "Drill weak domains" button would
+    // start an ordinary full-curriculum run.
+    expect(within(next!).queryByRole("button")).toBeNull();
+    expect(within(next!).queryByRole("link")).toBeNull();
+  });
+
+  test("says so when nothing fell below the threshold", async () => {
+    stubResults({
+      ...modernResults,
+      passingScore: 20,
+      questions: [{ ...modernResults.questions[1] }],
+      domains: undefined,
+    });
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+    expect(await screen.findByText(/nothing fell below the threshold/i)).toBeInTheDocument();
   });
 });
