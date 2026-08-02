@@ -635,7 +635,7 @@ describe("axe: no WCAG violations", () => {
       <McqExam session={mcqSession} fetchedAt={Date.now()} onSessionChange={() => {}} />,
     );
     await screen.findByText("Which component persists cluster state?");
-    await user.click(screen.getByRole("button", { name: /end exam/i }));
+    await user.click(screen.getByRole("button", { name: /submit exam/i }));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText(/1 question is unanswered/)).toBeInTheDocument();
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();

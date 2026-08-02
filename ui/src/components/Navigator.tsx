@@ -114,7 +114,7 @@ export function Navigator({
 
   // A non-modal disclosure, so useFocusTrap is the wrong tool despite
   // being right next door: it cycles Tab inside the container, which would
-  // strand a keyboard user who wanted to reach the timer or End Exam.
+  // strand a keyboard user who wanted to reach the timer or Submit exam.
   // Focus opens on the question you are on, so the grid arrives already
   // pointing at your place.
   useEffect(() => {

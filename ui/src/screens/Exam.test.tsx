@@ -29,7 +29,7 @@ afterEach(() => {
 // stranded without a way to submit" — the only submit affordance a phone
 // has while the server-side clock keeps running. It had no catch, and it
 // discarded {ok:false} without assignment, so both failure modes ended
-// with the button flicking back to "End Exam" and nothing said: exactly
+// with the button flicking back to "Submit exam" and nothing said: exactly
 // the dead-button symptom this milestone exists to remove.
 describe("ExamGateControls submit failures", () => {
   test("says why when the submit request cannot reach the facilitator", async () => {
@@ -50,12 +50,12 @@ describe("ExamGateControls submit failures", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "End Exam" }));
+    await user.click(screen.getByRole("button", { name: "Submit exam" }));
 
     expect(await screen.findByText(/couldn't submit the exam/i)).toBeInTheDocument();
     expect(onSessionChange).not.toHaveBeenCalled();
     // The button is live again, so the message is actionable.
-    expect(screen.getByRole("button", { name: "End Exam" })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "Submit exam" })).not.toBeDisabled();
   });
 
   test("says why when the facilitator refuses the submit", async () => {
@@ -78,7 +78,7 @@ describe("ExamGateControls submit failures", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "End Exam" }));
+    await user.click(screen.getByRole("button", { name: "Submit exam" }));
 
     // The facilitator's own reason survives into the message, not just a
     // generic failure.

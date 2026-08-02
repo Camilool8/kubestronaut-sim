@@ -86,7 +86,7 @@ export function ExamGateControls({ session, fetchedAt, onSessionChange }: ExamPr
 
   // This is the only submit control a phone has. A discarded {ok:false}
   // (409) or a rejected fetch used to leave the button flicking back to
-  // "End Exam" with nothing said, which reads exactly like a button that
+  // "Submit exam" with nothing said, which reads exactly like a button that
   // does nothing — while the server-side clock keeps running.
   const end = async () => {
     setEnding(true);

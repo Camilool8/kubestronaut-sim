@@ -565,7 +565,7 @@ function McqQuestion({
           span is not decoration: this is the one engine where the answer
           is saved the instant it is clicked and nothing is marked until
           submit, and a candidate who does not know that either re-clicks
-          or hesitates. End Exam replaces Next on the last question and
+          or hesitates. Submit exam replaces Next on the last question and
           opens the same confirm dialog the topbar's does — the
           unanswered/marked review lives there once, not twice. */}
       <footer className="mcq-footer">

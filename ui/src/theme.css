@@ -888,7 +888,7 @@
 }
 
 /* Wraps rather than compressing: the row packs a title, two icon
-   buttons, the countdown and End Exam, and below ~500px the countdown
+   buttons, the countdown and Submit exam, and below ~500px the countdown
    and the button were being squeezed off the edge. */
 .topbar {
   display: flex;
@@ -4398,9 +4398,9 @@
   padding: var(--space-4) 0;
 }
 
-/* Previous / the reassurance line / navigator + Next-or-End Exam, pinned
+/* Previous / the reassurance line / navigator + Next-or-Submit, pinned
    to the foot of the column. Exactly one primary button on screen at a
-   time: End Exam only replaces Next once there is no next question to go
+   time: Submit exam only replaces Next once there is no next question to go
    to. Wraps on a phone, where three controls and a sentence do not fit on
    one line. */
 .mcq-footer {

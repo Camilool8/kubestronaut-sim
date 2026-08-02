@@ -154,17 +154,26 @@ export const strings = {
     // that the parts the clock depends on did not.
     questionsFailed: (detail: string) =>
       `Couldn't load the question list (${detail}). The timer and the exam desktop are unaffected. The questions are served by the facilitator, so check it is up with \`docker compose ps facilitator\`.`,
-    // Mode-aware: Training's end control must not wear exam urgency.
-    // Ending is equally final in both modes (one attempt record), but
-    // what ends is different — an exam, or a practice session (#22).
-    endAttempt: (mode: string) => (mode === "training" ? "End Training" : "End Exam"),
+    // "Submit", not "End", per the design: ending describes only stopping,
+    // where submitting describes what actually happens — the work goes for
+    // grading and the desktop locks. The distinction matters most to the
+    // candidate who thinks the button just pauses.
+    //
+    // Still mode-aware, which the design does not contradict so much as
+    // never draw: it only ever shows an exam. Training's control must not
+    // wear exam urgency, and calling a practice session an exam would be
+    // the same lie in the other direction (#22).
+    endAttempt: (mode: string) => (mode === "training" ? "Submit session" : "Submit exam"),
     ending: "Ending…",
     // Submitting is the one control that must never fail silently: the
     // server-side clock keeps running whatever the button looks like.
     endFailed: (detail: string) =>
       `Couldn't submit the exam (${detail}). The session is still running; try again, or submit from a desktop.`,
+    // Same verb as the button that opened it. A dialog that asks "End the
+    // exam?" after a click on "Submit exam" reads as a second, different
+    // question.
     confirmTitle: (mode: string) =>
-      mode === "training" ? "End this training session?" : "End the exam?",
+      mode === "training" ? "Submit this training session?" : "Submit the exam?",
     reviewMarked: (n: number) =>
       n === 1 ? "1 question is marked for review:" : `${n} questions are marked for review:`,
     // "Never opened" rather than "unanswered": the UI knows it rendered
@@ -358,11 +367,11 @@ export const strings = {
     // The schematic is decorative to a sighted reader and load-bearing to
     // a screen reader, so it carries the same four regions in prose.
     schematicAlt:
-      "Layout of the exam screen: a question panel on the left, the exam desktop filling the rest, and a bar across the top holding the countdown and the End Exam button.",
+      "Layout of the exam screen: a question panel on the left, the exam desktop filling the rest, and a bar across the top holding the countdown and the Submit exam button.",
     diagramQuestions: "Questions",
     diagramDesktop: "Exam desktop",
     diagramTimer: "1:59:58",
-    diagramEnd: "End Exam",
+    diagramEnd: "Submit exam",
     legend: [
       {
         title: "Questions",
@@ -378,7 +387,7 @@ export const strings = {
       },
       {
         title: "Finishing",
-        body: "Done early? End the exam here. The desktop locks immediately and your score appears once grading completes.",
+        body: "Done early? Submit here. The desktop locks immediately and your score appears once grading completes.",
       },
     ] as { title: string; body: string }[],
   },

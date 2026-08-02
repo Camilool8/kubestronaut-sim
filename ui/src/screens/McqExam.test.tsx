@@ -222,10 +222,10 @@ describe("McqExam answering", () => {
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
     await screen.findByText("Which component persists cluster state?");
-    // On the last question the footer's End Exam button joins the
+    // On the last question the footer's Submit exam button joins the
     // header's — same action, same label, two locations. Either
     // opens the identical dialog; the header's is first in the DOM.
-    await user.click(screen.getAllByRole("button", { name: /end exam/i })[0]);
+    await user.click(screen.getAllByRole("button", { name: /submit exam/i })[0]);
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText(/1 question is unanswered/)).toBeInTheDocument();
@@ -235,7 +235,7 @@ describe("McqExam answering", () => {
     expect(screen.queryByText("q02", { selector: ".submit-review-ids" })).not.toBeInTheDocument();
   });
 
-  test("a training attempt ends Training, not an Exam", async () => {
+  test("a training attempt submits a session, not an exam", async () => {
     stubFetch();
     const user = userEvent.setup();
     const training: SessionSnapshot = { ...session, mode: "training", untimed: true };
@@ -244,8 +244,8 @@ describe("McqExam answering", () => {
     await screen.findByText("Which component persists cluster state?");
     // The educational mode must not wear exam urgency at the moment of
     // commitment: label, dialog title and confirm all say Training.
-    expect(screen.queryByRole("button", { name: /end exam/i })).not.toBeInTheDocument();
-    await user.click(screen.getAllByRole("button", { name: /end training/i })[0]);
+    expect(screen.queryByRole("button", { name: /submit exam/i })).not.toBeInTheDocument();
+    await user.click(screen.getAllByRole("button", { name: /submit session/i })[0]);
     expect(await screen.findByRole("dialog")).toHaveAccessibleName(/training/i);
     expect(screen.queryByText(/cannot be undone/i)).not.toBeInTheDocument();
   });
@@ -402,7 +402,7 @@ describe("McqExam footer navigation", () => {
     await screen.findByText("Which component persists cluster state?");
   });
 
-  test("the last question's footer shows End Exam instead of Next, and it opens the confirm dialog", async () => {
+  test("the last question's footer shows Submit exam instead of Next, and it opens the confirm dialog", async () => {
     stubFetch();
     const user = userEvent.setup();
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
@@ -414,12 +414,12 @@ describe("McqExam footer navigation", () => {
     await screen.findByText("Which are container interface standards? Choose all that apply.");
 
     // No more "Next" in the footer — the exam's last question replaces
-    // it with the same End Exam control the header carries throughout.
+    // it with the same Submit exam control the header carries throughout.
     expect(screen.queryByRole("button", { name: /next question/i })).not.toBeInTheDocument();
-    const endExamButtons = screen.getAllByRole("button", { name: /end exam/i });
-    expect(endExamButtons).toHaveLength(2);
+    const submitButtons = screen.getAllByRole("button", { name: /submit exam/i });
+    expect(submitButtons).toHaveLength(2);
 
-    await user.click(endExamButtons[1]);
+    await user.click(submitButtons[1]);
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
