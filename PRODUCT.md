@@ -41,6 +41,15 @@ environment must score 0, the reference solutions must score 100%, and
 each domain's share of the points must track the published curriculum
 weights within 2 percentage points.
 
+The grader also applies those weights directly, rather than relying on
+that gate to make raw points come out right. The gate reads the authored
+bank, so it certifies the bank; it says nothing about a *draw* taken
+from one. Once an attempt can be a subset — a pooled bank, or a
+candidate narrowing to two domains — the points a draw happens to
+contain no longer carry the curriculum's shape, and only weighting the
+result restores it. The raw earned-over-total figure is still reported
+beside the weighted one, because a candidate is owed both.
+
 ## Operating Context
 
 Run locally with `./sim up`, then the browser. See
