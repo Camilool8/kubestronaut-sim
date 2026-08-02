@@ -12,18 +12,46 @@ afterEach(() => {
 
 describe("parseRoute", () => {
   test("splits a normal route into segments", () => {
-    expect(parseRoute("#/exams/ckad/mode")).toEqual({
-      path: "/exams/ckad/mode",
-      segments: ["exams", "ckad", "mode"],
-    });
+    const route = parseRoute("#/exams/ckad/mode");
+    expect(route.path).toBe("/exams/ckad/mode");
+    expect(route.segments).toEqual(["exams", "ckad", "mode"]);
+    expect([...route.query]).toEqual([]);
   });
 
   // "" and not "/": a caller has to be able to tell "the fragment is
   // empty, use my default" apart from "the candidate asked for /".
-  test("an empty fragment is an empty path, not a root path", () => {
-    expect(parseRoute("")).toEqual({ path: "", segments: [] });
-    expect(parseRoute("#")).toEqual({ path: "", segments: [] });
-    expect(parseRoute("#/")).toEqual({ path: "", segments: [] });
+  test.each(["", "#", "#/"])(
+    "%s is an empty path, not a root path",
+    (hash) => {
+      const route = parseRoute(hash);
+      expect(route.path).toBe("");
+      expect(route.segments).toEqual([]);
+    },
+  );
+
+  // The point of splitting the query off FIRST: every screen matches on
+  // segments, and a parameter on the last one must not change what that
+  // segment is.
+  test("a query does not leak into the last segment", () => {
+    const route = parseRoute("#/exams/ckad/mode?domain=Services");
+    expect(route.path).toBe("/exams/ckad/mode");
+    expect(route.segments).toEqual(["exams", "ckad", "mode"]);
+    expect(route.query.get("domain")).toBe("Services");
+  });
+
+  // The reason `query` is a URLSearchParams and not a flat object. CKAD
+  // ships a domain with a comma in its name; packed into one comma-joined
+  // value it would come back as three domains that do not exist.
+  test("a repeated key carries a list whose items may contain a comma", () => {
+    const names = ["Application Environment, Configuration and Security", "Services & Networking"];
+    const params = new URLSearchParams();
+    for (const name of names) params.append("domain", name);
+    const { query } = parseRoute(`#/exams/ckad/mode?${params.toString()}`);
+    expect(query.getAll("domain")).toEqual(names);
+  });
+
+  test("an empty query carries no keys", () => {
+    expect([...parseRoute("#/progress?").query]).toEqual([]);
   });
 
   // A hand-typed fragment is where the odd shapes come from.

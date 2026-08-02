@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Score } from "./Score";
 import { marksStore } from "../components/marksStore";
@@ -122,6 +122,9 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  // jsdom keeps one location for the whole file. A fragment left behind
+  // by a routing test would put every test after it on the deep dive.
+  window.location.hash = "";
 });
 
 
@@ -411,17 +414,37 @@ describe("Score banner", () => {
 });
 
 describe("Score sidebar", () => {
-  test("names the weak domains to study next, without offering a control that does nothing", async () => {
+  test("names the weak domains to study next", async () => {
     stubResults(modernResults);
     render(<Score onNewAttempt={() => {}} endReason="submitted" />);
 
     const next = (await screen.findByText(strings.score.nextTitle)).closest("div");
     expect(next).toHaveTextContent("Application Environment");
-    // The draw is not configurable from the UI yet (Mode.tsx starts every
-    // attempt with a bare mode), so a "Drill weak domains" button would
-    // start an ordinary full-curriculum run.
-    expect(within(next!).queryByRole("button")).toBeNull();
-    expect(within(next!).queryByRole("link")).toBeNull();
+  });
+
+  // The two halves have to happen in this order and both have to happen.
+  // An ended session cannot start anything, so the route is written first
+  // and waits; the reset is what eventually lets App read it.
+  test("the drill control writes the route, then asks for the rebuild", async () => {
+    const user = userEvent.setup();
+    stubResults(modernResults);
+    let reset = 0;
+    render(<Score onNewAttempt={() => (reset += 1)} endReason="submitted" />);
+
+    await user.click(await screen.findByRole("button", { name: strings.score.nextDrill }));
+    expect(window.location.hash).toContain("/mode?domain=");
+    expect(window.location.hash).toContain("Application+Environment");
+    expect(reset).toBe(1);
+  });
+
+  // Narrowing a narrowed run compounds a thin signal. The dashboard reads
+  // every attempt and is the right place to pick the next drill.
+  test("offers no drill on a run that was already filtered", async () => {
+    stubResults({ ...modernResults, domainFilter: ["Application Environment, Configuration and Security"] });
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+
+    await screen.findByText(strings.score.nextTitle);
+    expect(screen.queryByRole("button", { name: strings.score.nextDrill })).toBeNull();
   });
 
   test("says so when nothing fell below the threshold", async () => {
@@ -433,5 +456,67 @@ describe("Score sidebar", () => {
     });
     render(<Score onNewAttempt={() => {}} endReason="submitted" />);
     expect(await screen.findByText(/nothing fell below the threshold/i)).toBeInTheDocument();
+  });
+});
+
+// This screen owns #/results/<id>, the explanation deep dive (1j).
+// App.tsx does not change and does not need to: the visible screen is a
+// function of session.state first, and this route only chooses between
+// views INSIDE `ended` — the same arrangement #/exams/<id>/mode uses
+// inside `idle`.
+describe("Score routing to the deep dive", () => {
+  test("#/results/<id> opens that task in full instead of the verdicts table", async () => {
+    window.location.hash = "#/results/q01";
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: /namespaces & quotas/i }),
+    ).toBeInTheDocument();
+    // The table it was opened from is gone, and so is the banner's own h1
+    // — one screen, one first-level heading.
+    expect(screen.queryByText(strings.score.verdictsTitle)).toBeNull();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  // The screen was deep-linked to a question from an earlier draw. It
+  // must not blank, and it must not fall back to a different task's
+  // explanation either.
+  test("an id that is not in this attempt says so rather than blanking", async () => {
+    window.location.hash = "#/results/q99";
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+    expect(await screen.findByText(strings.explain.unknownTask)).toBeInTheDocument();
+  });
+
+  test("the bare #/results fragment is the verdicts table, as it always was", async () => {
+    window.location.hash = "#/results";
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+    expect(await screen.findByText(strings.score.verdictsTitle)).toBeInTheDocument();
+  });
+
+  // Any fragment that is not results/... behaves exactly as it did before
+  // this screen existed — including a stale one left over from the lobby.
+  test("an unrelated fragment renders the results body unchanged", async () => {
+    window.location.hash = "#/exams";
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+    expect(await screen.findByText(strings.score.verdictsTitle)).toBeInTheDocument();
+    expect(screen.queryByText(strings.explain.unknownTask)).toBeNull();
+  });
+
+  // The whole loop, through real anchors: a fragment link needs no click
+  // handler and no router import, so the browser's own navigation is what
+  // is being asserted here.
+  test("a row's link opens the deep dive, and the deep dive gets back", async () => {
+    const user = userEvent.setup();
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+
+    await user.click(await screen.findByText("q01"));
+    await user.click(screen.getByRole("link", { name: /full explanation/i }));
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: /namespaces & quotas/i }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("link", { name: strings.explain.backToResults }));
+    expect(await screen.findByText(strings.score.verdictsTitle)).toBeInTheDocument();
   });
 });

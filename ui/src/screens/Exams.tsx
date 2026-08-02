@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  getBanks,
+  getCatalog,
   startControlSwitch,
   type BankEntry,
-  type BanksResponse,
+  type CatalogExam,
   type ControlActionResponse,
+  type BanksResponse,
 } from "../api";
 import { Async } from "../components/Async";
 import { Dialog } from "../components/Dialog";
+import { pathStatus } from "../lib/attemptHistory";
 import { formatDuration } from "../lib/format";
 import { navigate } from "../lib/useHashRoute";
 import { useAsync } from "../lib/useAsync";
@@ -99,7 +101,45 @@ function ExamAvatar({ bank }: { bank: BankEntry }) {
   );
 }
 
-function ExamCard({ bank, onChoose }: { bank: BankEntry; onChoose: () => void }) {
+/**
+ * How this exam has actually gone, in the slot the bank's pitch holds
+ * until there is something to put there.
+ *
+ * `bestPercent` and `passed` come from COUNTED attempts only — a
+ * domain-filtered or short draw is real practice and is kept, but it is
+ * not a sitting, so it can never fill this bar (see `AttemptRecord.counted`
+ * in api.ts). That is also why the label has a third reading: an exam whose
+ * every attempt was a drill would otherwise print a count beside a dash.
+ */
+function ExamAttempts({ exam }: { exam: CatalogExam }) {
+  const { progress } = exam;
+  const label = progress.passed
+    ? strings.exams.bestPassed(progress.counted)
+    : progress.counted > 0
+      ? strings.exams.bestLabel(progress.counted)
+      : strings.exams.bestDrills(progress.attempts);
+  const best = progress.bestPercent;
+
+  return (
+    <div className="exam-attempts">
+      <div className="exam-attempts-head">
+        <span>{label}</span>
+        <span className="exam-attempts-figure">
+          {best === undefined ? strings.exams.bestNoScore : `${Math.round(best)}%`}
+        </span>
+      </div>
+      {/* Decorative: the figure directly above it is the same number, so
+          the card reads identically with CSS off. A card with no counted
+          attempt still draws the empty track — the row keeps its height,
+          and an absent bar would be a fourth thing to interpret. */}
+      <span className="exam-attempts-bar" aria-hidden="true" data-passed={progress.passed}>
+        <span className="exam-attempts-fill" style={{ width: `${best ?? 0}%` }} />
+      </span>
+    </div>
+  );
+}
+
+function ExamCard({ bank, onChoose }: { bank: CatalogExam; onChoose: () => void }) {
   return (
     <li>
       <article className="exam-card" data-engine={engineTint(bank)}>
@@ -124,11 +164,16 @@ function ExamCard({ bank, onChoose }: { bank: BankEntry; onChoose: () => void })
           ))}
         </dl>
 
-        {/* Where the brief draws a best-attempt bar. Nothing records an
-            attempt yet, so this holds the bank's own one-line pitch —
-            which was previously buried in a title= tooltip — rather than
-            a number the product cannot know. */}
-        {bank.description && <p className="exam-desc">{bank.description}</p>}
+        {/* The brief's best-attempt bar, once there is one to draw. Before
+            the first attempt the same slot holds the bank's own one-line
+            pitch — which was previously buried in a title= tooltip — so
+            the card never has a hole in it and never shows a number the
+            product cannot know. */}
+        {bank.progress.attempts > 0 ? (
+          <ExamAttempts exam={bank} />
+        ) : (
+          bank.description && <p className="exam-desc">{bank.description}</p>
+        )}
 
         <div className="exam-card-actions">
           <button type="button" className="btn btn-primary" onClick={onChoose}>
@@ -173,6 +218,11 @@ interface ExamsProps {
   // Lifts the catalog to App, which needs it to name the exam a switch
   // targets and to fill the mode screen's header. Reported from here
   // rather than refetched so there is one request.
+  //
+  // Still shaped as a BanksResponse: `CatalogExam extends BankEntry`, so
+  // the joined rows satisfy it as they are, and App wants the bank fields
+  // and nothing else. Widening its prop to carry progress it does not read
+  // would be a change to App for this screen's convenience.
   onBanksLoaded: (banks: BanksResponse) => void;
 }
 
@@ -188,7 +238,7 @@ interface ExamsProps {
  * through a confirmation first.
  */
 export function Exams({ catalogVersion, onControlStart, onBanksLoaded }: ExamsProps) {
-  const [confirm, setConfirm] = useState<BankEntry | null>(null);
+  const [confirm, setConfirm] = useState<CatalogExam | null>(null);
   const [switching, setSwitching] = useState(false);
   // The bank a switch was started FOR, so the mode screen it was meant
   // to reach opens by itself when the rebuild lands. A failed job leaves
@@ -200,12 +250,18 @@ export function Exams({ catalogVersion, onControlStart, onBanksLoaded }: ExamsPr
   // is the catalog refetch App triggers when the job finishes.
   const pendingMode = useRef<string | null>(null);
 
-  const banksState = useAsync((signal) => getBanks(signal), [catalogVersion]);
-  const active = banksState.data?.active;
+  // GET /api/catalog, not GET /api/control/banks: the same bank fields,
+  // joined to attempt history and served by the facilitator rather than
+  // the conductor. That split is deliberate on the server side — LOOKING
+  // at the exam list must never be able to trigger a rebuild — and it is
+  // what lets this screen show how each exam has gone.
+  const catalogState = useAsync((signal) => getCatalog(signal), [catalogVersion]);
+  const active = catalogState.data?.active;
+  const catalog = catalogState.data;
 
   useEffect(() => {
-    if (banksState.data) onBanksLoaded(banksState.data);
-  }, [banksState.data, onBanksLoaded]);
+    if (catalog) onBanksLoaded({ active: catalog.active, banks: catalog.exams });
+  }, [catalog, onBanksLoaded]);
 
   useEffect(() => {
     if (!pendingMode.current || active !== pendingMode.current) return;
@@ -214,7 +270,7 @@ export function Exams({ catalogVersion, onControlStart, onBanksLoaded }: ExamsPr
     navigate(`/exams/${target}/mode`);
   }, [active]);
 
-  const chooseMode = (bank: BankEntry) => {
+  const chooseMode = (bank: CatalogExam) => {
     if (bank.id === active) {
       navigate(`/exams/${bank.id}/mode`);
       return;
@@ -246,7 +302,7 @@ export function Exams({ catalogVersion, onControlStart, onBanksLoaded }: ExamsPr
   return (
     <div className="page exams-screen">
       <Async
-        state={banksState}
+        state={catalogState}
         loading={<p className="page-loading">{strings.app.working}</p>}
         error={(message, reload) => (
           <div className="catalog-error" role="alert">
@@ -258,9 +314,9 @@ export function Exams({ catalogVersion, onControlStart, onBanksLoaded }: ExamsPr
           </div>
         )}
       >
-        {(banks) => {
-          const live = banks.banks.filter((b) => b.available);
-          const soon = banks.banks.filter((b) => !b.available);
+        {(loaded) => {
+          const live = loaded.exams.filter((b) => b.available);
+          const soon = loaded.exams.filter((b) => !b.available);
           return (
             <>
               <header className="page-head">
@@ -268,30 +324,33 @@ export function Exams({ catalogVersion, onControlStart, onBanksLoaded }: ExamsPr
                   <h1>{strings.exams.title}</h1>
                   <p className="page-lead">{strings.exams.lead}</p>
                 </div>
-                {banks.banks.length > 0 && (
+                {loaded.exams.length > 0 && (
                   <div className="coverage">
                     <div className="coverage-figure">
                       <span className="coverage-label">{strings.exams.coverageLabel}</span>
                       <span className="coverage-value">
-                        {strings.exams.coverage(live.length, banks.banks.length)}
+                        {strings.exams.coverage(
+                          loaded.summary.passedCount,
+                          loaded.summary.trackCount,
+                        )}
                       </span>
                     </div>
-                    {/* One segment per card below, tinted like its card.
-                        Decorative: the figure beside it already says the
-                        same thing in words, and empty list items announce
-                        as nothing at all. In a later milestone the fill
-                        rule becomes pass state; the five segments are the
-                        same five exams either way. */}
+                    {/* One segment per card below, now carrying PASS state
+                        rather than the engine hue: the figure beside it
+                        counts passes, and a bar counting something else
+                        would be two readings of one capsule. Decorative —
+                        the figure says the same thing in words, and empty
+                        list items announce as nothing at all. */}
                     <span className="coverage-bar" aria-hidden="true">
-                      {banks.banks.map((b) => (
-                        <span key={b.id} data-engine={engineTint(b)} />
+                      {loaded.exams.map((b) => (
+                        <span key={b.id} data-state={pathStatus(b)} />
                       ))}
                     </span>
                   </div>
                 )}
               </header>
 
-              {banks.banks.length === 0 && <p className="page-empty">{strings.exams.empty}</p>}
+              {loaded.exams.length === 0 && <p className="page-empty">{strings.exams.empty}</p>}
 
               {live.length > 0 && (
                 <ul className="exam-grid" aria-label={strings.exams.liveListLabel}>

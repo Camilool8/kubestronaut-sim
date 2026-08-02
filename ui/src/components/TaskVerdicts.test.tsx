@@ -53,9 +53,12 @@ describe("TaskVerdicts rows", () => {
     expect(screen.getByText("q07")).toBeInTheDocument();
   });
 
-  // The row is a disclosure rather than a link: the brief's explanation
-  // deep dive does not exist yet, and a row that looks like it routes
-  // somewhere and does not is worse than one that expands.
+  // The row still expands now that screens/Explain.tsx exists, and the
+  // reason changed with it: this table is a SCANNING surface — twenty
+  // rows read against each other — and the deep dive is a reading surface
+  // for one task. A candidate comparing why check 2 failed across three
+  // tasks should not have to make three navigations and lose the table
+  // each time. The link into the deep dive is the test below.
   test("a row opens its grader checks in place", async () => {
     const user = userEvent.setup();
     render(
@@ -81,6 +84,33 @@ describe("TaskVerdicts rows", () => {
 
     expect(row).toHaveAttribute("open");
     expect(screen.getByText("Namespace exists")).toBeInTheDocument();
+  });
+
+  // The link lives INSIDE the disclosure, not on the row itself: a
+  // <summary> is an interactive element, so an <a> in one is nested
+  // interactive content — an axe violation and an ambiguous click target.
+  test("an opened row links into that task's full explanation", () => {
+    render(<TaskVerdicts questions={graded} />);
+
+    const row = screen.getByText("Ingress").closest("details");
+    const link = within(row!).getByRole("link", { name: /full explanation/i });
+    expect(link).toHaveAttribute("href", "#/results/q02");
+    // Outside the summary, which is what keeps the row's own toggle
+    // unambiguous.
+    expect(link.closest("summary")).toBeNull();
+  });
+
+  // Twenty rows produce twenty of these. Twenty links sharing one
+  // accessible name is a list a screen-reader user cannot navigate, so
+  // each is numbered by the position its row already shows.
+  test("names each explanation link by the task it opens", () => {
+    render(<TaskVerdicts questions={graded} />);
+    const names = screen
+      .getAllByRole("link", { name: /full explanation/i })
+      .map((a) => a.textContent);
+    expect(new Set(names).size).toBe(3);
+    expect(names[0]).toMatch(/task 1/i);
+    expect(names[2]).toMatch(/task 3/i);
   });
 });
 

@@ -104,8 +104,17 @@ export function ControlProgress({
   }, [failed]);
 
   const target = bankTitle || job.bank;
+  // A seed prepares the cluster for an attempt that has already been
+  // drawn; it destroys nothing and the clock has not started. Titled as
+  // itself rather than falling through to the reset's wording, which
+  // would tell a candidate waiting to begin that their environment is
+  // being wiped.
   const title =
-    job.op === "switch" ? strings.control.switchTitle(target) : strings.control.resetTitle;
+    job.op === "switch"
+      ? strings.control.switchTitle(target)
+      : job.op === "seed"
+        ? strings.control.seedTitle
+        : strings.control.resetTitle;
   const running = job.phases.find((p) => p.state === "running");
   const reconnecting = running?.id === BLACKOUT_PHASE;
 
@@ -266,16 +275,34 @@ export function ControlProgress({
               {/* A failed job freezes its own clock, so without this the
                   dialog was entirely static from the click until the new
                   job's first poll — the one moment the user most needs to
-                  know the button did something. */}
-              <button className="btn btn-primary" onClick={handleRetry} disabled={retrying}>
-                {retrying ? strings.control.starting : strings.control.retry}
-              </button>
+                  know the button did something.
+
+                  Not offered for a seed. Retry here means "run this job
+                  again", and every other job on this screen is a cluster
+                  rebuild, so that is what the handler does — for a failed
+                  seed it would tear down the environment the candidate
+                  still has, to recover from an attempt that never
+                  started. Dismissing lands them back on the mode screen,
+                  where pressing Start again is the retry. */}
+              {job.op !== "seed" && (
+                <button className="btn btn-primary" onClick={handleRetry} disabled={retrying}>
+                  {retrying ? strings.control.starting : strings.control.retry}
+                </button>
+              )}
             </div>
           </>
         ) : (
           <>
             <p className="control-hint">
-              {hasClusterRebuild ? strings.control.hint : strings.control.hintFast}
+              {/* A seed has neither shape: no cluster is rebuilt, but it
+                  runs one setup script per drawn question against a live
+                  cluster, so "usually a few seconds" would be a promise it
+                  cannot keep on a sixteen-task draw. */}
+              {job.op === "seed"
+                ? strings.control.hintSeed
+                : hasClusterRebuild
+                  ? strings.control.hint
+                  : strings.control.hintFast}
               {totalElapsed && (
                 <span className="control-elapsed" aria-hidden="true">
                   {strings.control.elapsed(totalElapsed)}

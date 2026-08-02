@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Exams } from "./Exams";
-import type { BanksResponse } from "../api";
+import type { CatalogResponse, ExamProgress } from "../api";
+
+/** No attempt has ever been graded against this exam. */
+const untouched: ExamProgress = { attempts: 0, counted: 0, passed: false, weakDomains: [] };
 
 const ckad = {
   id: "ckad-mock-01",
@@ -15,6 +18,7 @@ const ckad = {
   questionCount: 22,
   poolCount: 22,
   available: true,
+  progress: untouched,
 };
 
 // Pooled: the two counts differ, which is the only case the card prints
@@ -29,6 +33,7 @@ const kcna = {
   questionCount: 65,
   poolCount: 97,
   available: true,
+  progress: untouched,
 };
 
 const cks = {
@@ -39,12 +44,21 @@ const cks = {
   available: false,
   comingSoon: true,
   note: "Requires security add-ons not in the kind environment yet",
+  progress: untouched,
 };
 
-const catalog = (active: string, banks = [ckad, kcna, cks]): BanksResponse =>
-  ({ active, banks }) as BanksResponse;
+const catalog = (
+  active: string,
+  exams = [ckad, kcna, cks],
+  summary: Partial<CatalogResponse["summary"]> = {},
+): CatalogResponse =>
+  ({
+    active,
+    exams,
+    summary: { attempts: 0, passedCount: 0, trackCount: 5, weakDomains: [], ...summary },
+  }) as CatalogResponse;
 
-let banks: BanksResponse = catalog("ckad-mock-01");
+let banks: CatalogResponse = catalog("ckad-mock-01");
 let switchCalls: string[] = [];
 
 function mockApi() {
@@ -52,7 +66,7 @@ function mockApi() {
     "fetch",
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url.endsWith("/api/control/banks")) {
+      if (url.endsWith("/api/catalog")) {
         return new Response(JSON.stringify(banks), { status: 200 });
       }
       if (url.endsWith("/api/control/switch") && init?.method === "POST") {
@@ -132,6 +146,83 @@ describe("the catalog", () => {
       within(card).getByText("Requires security add-ons not in the kind environment yet"),
     ).toBeInTheDocument();
     expect(within(card).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  // The capsule used to count what could be SAT today, because nothing
+  // recorded an attempt. History exists now, so it counts what has been
+  // passed — a figure only the server can compute, since a path card's
+  // pass state ignores every uncounted drill.
+  test("the capsule counts certifications passed, out of the whole path", async () => {
+    banks = catalog("ckad-mock-01", [ckad, kcna, cks], { passedCount: 1, trackCount: 5 });
+    renderExams();
+    expect(await screen.findByText("1 of 5 passed")).toBeInTheDocument();
+    expect(screen.getByText("Progress")).toBeInTheDocument();
+  });
+
+  test("an exam with no attempts keeps its description instead of an empty bar", async () => {
+    renderExams();
+    await screen.findByRole("heading", { name: "CKAD" });
+    const card = cardFor("CKAD");
+
+    expect(
+      within(card).getByText("Twenty-two hands-on tasks in the real exam's shape."),
+    ).toBeInTheDocument();
+    expect(within(card).queryByText(/Best attempt/)).not.toBeInTheDocument();
+  });
+
+  test("an exam with counted attempts shows its best score in place of the pitch", async () => {
+    banks = catalog("ckad-mock-01", [
+      {
+        ...ckad,
+        progress: { attempts: 3, counted: 3, bestPercent: 71, passed: false, weakDomains: [] },
+      },
+      kcna,
+      cks,
+    ]);
+    renderExams();
+    await screen.findByRole("heading", { name: "CKAD" });
+    const card = cardFor("CKAD");
+
+    expect(within(card).getByText("Best attempt · 3 sessions")).toBeInTheDocument();
+    expect(card.querySelector(".exam-attempts-figure")?.textContent).toBe("71%");
+    // The slot is the description's, so only one of them is ever in it.
+    expect(within(card).queryByText(/Twenty-two hands-on tasks/)).not.toBeInTheDocument();
+  });
+
+  // The rule the whole `counted` flag exists for: 100% on a one-domain
+  // drill is a good session and it is not a CKAD result. The card must
+  // neither hide the work nor let it fill the bar.
+  test("attempts that none of them counted show as drills with no best score", async () => {
+    banks = catalog("ckad-mock-01", [
+      { ...ckad, progress: { attempts: 4, counted: 0, passed: false, weakDomains: [] } },
+      kcna,
+      cks,
+    ]);
+    renderExams();
+    await screen.findByRole("heading", { name: "CKAD" });
+    const card = cardFor("CKAD");
+
+    expect(within(card).getByText("4 drills · none counted")).toBeInTheDocument();
+    // Read off the figure itself rather than the card: "To pass 66%" is
+    // also a percentage on this card, and a loose query would pass on it.
+    expect(card.querySelector(".exam-attempts-figure")?.textContent).toBe("—");
+  });
+
+  // App names the exam a switch targets and fills the mode screen's
+  // header from this. The catalog's rows are a superset of the bank
+  // fields, so the shape App already reads has to survive the move.
+  test("reports the catalog up in the shape App reads", async () => {
+    const onBanksLoaded = vi.fn();
+    render(
+      <Exams catalogVersion={0} onControlStart={noop as never} onBanksLoaded={onBanksLoaded} />,
+    );
+    await screen.findByRole("heading", { name: "CKAD" });
+
+    expect(onBanksLoaded).toHaveBeenCalledWith(
+      expect.objectContaining({ active: "ckad-mock-01" }),
+    );
+    const reported = onBanksLoaded.mock.calls[0][0] as { banks: { id: string }[] };
+    expect(reported.banks.map((b) => b.id)).toEqual(["ckad-mock-01", "kcna-mock", "cks-mock"]);
   });
 
   test("says so when the catalog is empty, rather than rendering a bare page", async () => {

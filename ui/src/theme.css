@@ -378,9 +378,12 @@
 
 /* ---- exam selector (the exam catalog) ---- */
 
-/* How much of the path is playable. The bar is one segment per card in
-   the grid below, tinted like its card, so the capsule doubles as the
-   grid's legend. */
+/* How much of the path is DONE. The bar is one segment per card in the
+   grid below, carrying that exam's pass state — which is what the figure
+   beside it counts, so the two halves of the capsule read as one
+   sentence. It used to carry the engine hue and double as the grid's
+   legend; a capsule whose figure counted passes and whose bar counted
+   engines was two readings of one object. */
 .coverage {
   display: flex;
   align-items: center;
@@ -418,6 +421,10 @@
   gap: 4px;
 }
 
+/* The resting tone is the track: "not started" and "not built" both mean
+   there is nothing to show, and the card below is where they are told
+   apart. Graphics tokens only — this bar is aria-hidden and carries no
+   text, so the 3:1 tier is the right one. */
 .coverage-bar > span {
   width: 22px;
   height: 6px;
@@ -426,7 +433,15 @@
      (.domain-bar, .pending-bar, .job-chip-bar). A 3px literal only
      stays correct while the height never changes. */
   border-radius: var(--radius-pill);
-  background: var(--exam-tint);
+  background: var(--muted-soft);
+}
+
+.coverage-bar > span[data-state="passed"] {
+  background: var(--success);
+}
+
+.coverage-bar > span[data-state="attempted"] {
+  background: var(--progress);
 }
 
 .exam-grid {
@@ -557,6 +572,53 @@
 
 .exam-stat-engine {
   color: var(--exam-tint);
+}
+
+/* The best-attempt bar, in the slot .exam-desc holds until an attempt has
+   been graded. Same three-part shape as the dashboard's weak rows — a
+   label and a figure over a track — because they answer the same question
+   at two scales. */
+.exam-attempts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.exam-attempts-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-s);
+  color: var(--text-muted);
+}
+
+.exam-attempts-figure {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.exam-attempts-bar {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--neutral-soft);
+  overflow: hidden;
+}
+
+/* Cyan while the score is still moving, green once the exam is passed —
+   the system's two graphics tokens for "in progress" and "done". Not the
+   exam tint, which says which ENGINE grades the card and would make one
+   bar carry two unrelated facts. */
+.exam-attempts-fill {
+  display: block;
+  height: 100%;
+  background: var(--progress);
+}
+
+.exam-attempts-bar[data-passed="true"] .exam-attempts-fill {
+  background: var(--success);
 }
 
 .exam-desc {
@@ -796,10 +858,12 @@
   font-size: var(--text-s);
 }
 
-/* What the exam will ask. A summary, not a configurator: the draw is
-   not yet filterable, so nothing in here wears a control's border,
-   hover or cursor — a chip that looks clickable and is not is worse
-   than a plain tag. */
+/* What the exam will ask, and which parts of it to ask about. The domain
+   list is a real control now — POST /api/session/start takes
+   { mode, domains } — so it wears a control's border, hover and cursor.
+   The read-only tag list below it survives for a bank that publishes no
+   `domains` field: there is nothing honest to filter on there, so nothing
+   is drawn as a control. */
 .draw-panel {
   display: flex;
   flex-wrap: wrap;
@@ -868,6 +932,76 @@
   font-size: var(--text-xs);
   font-weight: 600;
   color: var(--text-muted);
+}
+
+.draw-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* An anchored control, so its edge takes --border-strong (the tier WCAG
+   1.4.11's 3:1 floor applies to) where the read-only tag beside it takes
+   none at all. Hover moves the FILL and never the edge, so a chip under
+   the pointer is never mistaken for a chip that is chosen. */
+.draw-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  color: var(--text-body);
+  font-family: inherit;
+  font-size: var(--text-s);
+  cursor: pointer;
+}
+
+.draw-chip:hover {
+  background: var(--raised-hover);
+  color: var(--accent-strong);
+}
+
+.draw-chip:active {
+  transform: translateY(1px);
+}
+
+/* Drawn on every chip and REVEALED by selection rather than inserted by
+   it — visibility, not display, so the box it reserves never changes and
+   the label cannot move out from under the pointer between mousedown and
+   mouseup. */
+.draw-chip-mark {
+  visibility: hidden;
+  color: var(--accent);
+}
+
+/* Three channels for one state: the accent edge, the accent wash, and the
+   tick. aria-pressed is the fourth, and the only one a screen reader
+   gets. */
+.draw-chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.draw-chip[aria-pressed="true"] .draw-chip-mark {
+  visibility: visible;
+}
+
+.draw-chip[aria-pressed="true"] .domain-count {
+  color: var(--accent);
+}
+
+/* What a narrowed draw actually is, said before the attempt rather than
+   after the result. --warn-strong is the TEXT tier of the flag hue; the
+   base --warn is measured for graphics at 3:1. Specificity has to beat
+   `.draw-panel p`, which sets the muted body colour for the lead. */
+.draw-panel .draw-note {
+  margin: var(--space-4) 0 0;
+  color: var(--warn-strong);
+  font-size: var(--text-s);
+  line-height: 1.6;
 }
 
 .mode-fine {
@@ -2300,6 +2434,23 @@
   color: var(--text-secondary);
 }
 
+/* Full width, because it is the one act this card recommends and a button
+   hugging its own label in a 340px sidebar reads as an aside. */
+.results-next-drill {
+  width: 100%;
+  margin-top: var(--space-3);
+}
+
+/* The consequence, stated before the click rather than discovered after
+   it: this control rebuilds the environment. Smaller than the advice it
+   follows — it qualifies the button, it is not a second recommendation. */
+.results-next-hint {
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
 /* ---- score: task verdicts ---- */
 
 .task-verdicts {
@@ -2394,10 +2545,10 @@
 }
 
 /* A row is a <details>, not a <tr>: it has to disclose its grader checks
-   in place, and a <details> cannot be a table row. The brief opens a
-   full-screen deep dive from here instead; that screen does not exist
-   yet, and a row that looks like a link and goes nowhere is worse than
-   one that expands. */
+   in place, and a <details> cannot be a table row. It still expands now
+   that the deep dive exists — this table is the scanning surface and
+   screens/Explain.tsx is the reading one — and the link into the deep
+   dive lives inside the disclosure, as .tv-open below. */
 .tv-row {
   border-bottom: 1px solid var(--border);
   padding: 0 var(--space-4) 0;
@@ -2558,6 +2709,30 @@
    card's edge. The bottom padding only exists while the row is open. */
 .tv-row[open] {
   padding-bottom: var(--space-4);
+}
+
+/* The way out of the table and into the deep dive (screens/Explain.tsx),
+   drawn first inside an opened row. A link, not a button: it navigates,
+   and the fragment router means it can be an ordinary anchor. */
+.tv-more {
+  margin: var(--space-3) 0 0;
+}
+
+.tv-open {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-s);
+  font-weight: 600;
+  color: var(--accent-strong);
+  text-decoration: none;
+}
+
+/* Underline on hover rather than at rest. The row above it is already a
+   pointer target, and a permanently underlined line inside a disclosure
+   that is itself clickable reads as two controls stacked. */
+.tv-open:hover {
+  text-decoration: underline;
 }
 
 .check-list {
@@ -4659,5 +4834,784 @@
   .mcq-review-state {
     width: 100%;
     justify-content: flex-end;
+  }
+}
+
+/* ===== Progress dashboard (1k) =====
+   Owned by the progress screen alone. It is a PAGE, so it inherits
+   .page from the shell section above and only adds what the path cards,
+   the attempt table and the weak-domain panel need. */
+
+/* The header closes up because a hint line follows it, and that line —
+   where the record lives, what Import does to it — is part of the same
+   block of prose the lead started. */
+.progress-screen .page-head {
+  margin-bottom: var(--space-3);
+}
+
+.progress-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Export is an <a> wearing .btn: a browser gives an anchor neither a
+   button's centring nor its line box, so one control in a row of four
+   would sit a pixel proud of the others without this. */
+.progress-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+/* The export and import hints used to live here, as one paragraph under
+   the lead. Two sentences about two different buttons, set a column away
+   from both of them, read as a single claim that described neither — so
+   each now travels on its own control and this rule is gone. */
+
+/* What the last import or erase did, next to the list it changed rather
+   than in a toast over the corner of the screen. */
+.progress-notice {
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-s);
+}
+
+.progress-notice[role="alert"] {
+  color: var(--danger);
+}
+
+/* ---- the five path cards ---- */
+
+.path-cards {
+  list-style: none;
+  margin: 0 0 var(--space-6);
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+
+/* Tone and a hairline, no shadow: five small cards in a row are a legend
+   for the page below them, not five things floating over it. Every one
+   keeps the --surface fill whatever its state — the status word, the
+   badge's own wash and the bar carry that, and a tinted card would leave
+   its badge sitting on a fill of the same hue. */
+.path-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+}
+
+/* The same language the coming-soon exam card speaks: dashed on the page
+   fill, because an exam nobody can sit is not work the candidate has
+   failed to do. */
+.path-card[data-status="soon"] {
+  background: var(--bg);
+  border-style: dashed;
+}
+
+.path-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.path-card-id {
+  font-family: var(--font-mono);
+  font-size: var(--text-s);
+  font-weight: 600;
+}
+
+.path-badge {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  padding: 0.3em 0.6em;
+  border-radius: var(--radius-xs);
+  background: var(--muted-soft);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Both are text on a soft fill, so both take the -strong tier (--accent
+   needs no substitution: it clears 4.5:1 on every fill in the product). */
+.path-card[data-status="passed"] .path-badge {
+  background: var(--success-soft);
+  color: var(--success-strong);
+}
+
+.path-card[data-status="attempted"] .path-badge {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.path-card-score {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  font-variant-numeric: tabular-nums;
+}
+
+.path-card[data-status="soon"] .path-card-id,
+.path-card[data-status="soon"] .path-card-score {
+  color: var(--text-muted);
+}
+
+/* auto pins the bottom pair, so the bar and the meta line up across five
+   cards whose heads are different heights. */
+.path-bar {
+  margin-top: auto;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--neutral-soft);
+  overflow: hidden;
+}
+
+.path-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--progress);
+}
+
+.path-card[data-status="passed"] .path-bar-fill {
+  background: var(--success);
+}
+
+.path-card-meta {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* ---- the attempt table and the weak-domain panel ---- */
+
+/* 1.4fr / 1fr, as the brief draws it: the table needs the width and the
+   panel beside it is a column of short rows. */
+.progress-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: stretch;
+}
+
+.history-panel,
+.weak-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  padding: var(--space-5);
+}
+
+.history-panel h2 {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-l);
+  font-weight: 600;
+}
+
+/* Scroll-Inside: five columns of mono do not compress, so the wrapper
+   takes the overflow and the page never scrolls sideways for a table. */
+.history-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-s);
+}
+
+/* The Table-Cell rule: no display:flex on a th or a td. The cell would
+   leave the table layout model, stop stretching to the row height, and
+   step its border-bottom off its neighbours'. */
+.history-table th,
+.history-table td {
+  padding: var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
+
+.history-table thead th {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.history-table tbody tr:last-child th,
+.history-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.history-exam {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+/* The one cell allowed to wrap. A mode plus a list of domain names is by
+   far the longest thing in the row, and holding it on one line would make
+   the table scroll for it alone. */
+.history-table .history-mode {
+  white-space: normal;
+  min-width: 13rem;
+  color: var(--text-secondary);
+}
+
+.history-date,
+.history-time {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.history-table .history-score {
+  text-align: right;
+}
+
+.history-figure {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The word carries the state and the tint repeats it. Three tints and no
+   words would be three tints — and the threshold a percentage is measured
+   against differs per exam, so the number alone cannot say. */
+.history-mark {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.history-mark[data-verdict="pass"] {
+  color: var(--success-strong);
+}
+
+.history-mark[data-verdict="fail"] {
+  color: var(--danger);
+}
+
+.history-footnote {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.weak-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.weak-panel h2 {
+  margin: 0;
+  font-size: var(--text-l);
+  font-weight: 600;
+}
+
+.weak-hint {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.weak-rows {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.weak-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.weak-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.weak-name {
+  font-size: var(--text-s);
+  font-weight: 500;
+  color: var(--text-body);
+}
+
+.weak-figure {
+  font-family: var(--font-mono);
+  font-size: var(--text-s);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Not the brief's red. This panel ranks a candidate's domains against
+   each other, so the weakest of five good scores is still a good score,
+   and a bar that reddened 92% because it happened to sort last would be
+   telling them something untrue. --accent is what the score screen's
+   .domain-bar-fill already uses for the same shape; weakest-first
+   ordering and the heading are what say "weakest". */
+.weak-bar {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--neutral-soft);
+  overflow: hidden;
+}
+
+.weak-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.weak-meta {
+  display: flex;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+}
+
+/* Marks a row the drill below cannot include, because its domain belongs
+   to a certification this environment has not loaded. Only drawn when the
+   list is genuinely mixed — a note on every row when none of them can be
+   drilled would say nothing, and that case has its own sentence. */
+.weak-elsewhere {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-xs);
+  background: var(--surface-raised);
+  color: var(--text-subtle);
+}
+
+/* Pinned to the foot of the panel however short the list above it is, so
+   it lands on the table's last row the way the brief draws it. */
+.weak-drill,
+.weak-unavailable {
+  margin-top: auto;
+}
+
+.weak-unavailable {
+  margin-bottom: 0;
+  font-size: var(--text-s);
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* The two-column body is the brief's measure, and below it the table
+   would get about nine characters of domain name. One column under the
+   other, table first: it is the thing that was asked for. */
+@media (max-width: 900px) {
+  .progress-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .weak-drill,
+  .weak-unavailable {
+    margin-top: var(--space-2);
+  }
+}
+
+/* ===== Explanation deep dive (1j) =====
+   The one screen where the machine surfaces appear outside the VNC
+   canvas: both document panes are --machine-*, because what they show
+   is the cluster, not the app.
+
+   It renders INSIDE .score-screen (screens/Score.tsx owns the route),
+   which is what gives it the page-scroll override every long results
+   surface needs. Everything below only narrows that and fills it. */
+
+/* 960px is the brief's card, and it is a measure decision as much as a
+   copy of the mock: it is the widest this screen can be before the why
+   card's prose runs past ~90ch, and the narrowest the two document panes
+   can sit side by side without either falling under about 45 mono
+   columns. The score screen's own --page-max (1160px) fails the first
+   test; anything under ~900px fails the second, which is what the
+   stacking query near the foot of this section is for. */
+.explain-screen {
+  max-width: 960px;
+}
+
+.explain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* The way back to the table, deliberately OUTSIDE the card. It is not
+   part of the task being explained, and a card whose first line is a
+   link out reads as though the link belongs to the content. */
+.explain-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-s);
+  font-weight: 600;
+  color: var(--accent-strong);
+  text-decoration: none;
+}
+
+.explain-back:hover {
+  text-decoration: underline;
+}
+
+/* Same card as .results-card, and for the same reason: this is one
+   object about one task, and its internal divisions are hairlines rather
+   than gaps between floating boxes. */
+.explain-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.explain-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.explain-head-lead {
+  display: flex;
+  flex: 1 1 22rem;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.explain-eyebrow {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* --text-3xl and not the --text-4xl DESIGN.md gives screen titles: this
+   h1 is a bank-authored sentence ("Expose a Deployment through an
+   Ingress with a path rewrite"), not a two-word screen name, and 26px
+   takes three lines of it in a 960px column under a mono eyebrow. One
+   step up from the task pane's own --text-2xl title says "the same task,
+   read rather than worked" without shouting. */
+.explain-title {
+  margin: 0;
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+}
+
+.explain-pills {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+/* The same treatment .tv-verdict takes in the row this screen was opened
+   from, at the same tokens. A verdict that changed colour between the
+   table and the detail would read as a different verdict. */
+.explain-verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  background: var(--neutral-soft);
+  color: var(--text-secondary);
+}
+
+.explain-verdict.is-correct {
+  background: var(--success-soft);
+  color: var(--success-strong);
+}
+
+.explain-verdict.is-partial {
+  background: var(--warn-soft);
+  color: var(--warn-strong);
+}
+
+.explain-verdict.is-failed {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.explain-points {
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.explain-timing {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-xs);
+  background: var(--neutral-soft);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Right-aligned as a group, so the pair does not shift when the first or
+   last task drops one half of it. */
+.explain-nav {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+/* .btn carries the fill, the edge and the hover; this only undoes what
+   an <a> brings with it and sets the icon beside the label. A link
+   wearing a button's clothes is deliberate here — these two step through
+   the attempt exactly as the task pane's footer steppers do, and the
+   candidate should not have to learn that one pair is a control and the
+   other a navigation. */
+.explain-step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-s);
+  text-decoration: none;
+}
+
+.explain-section {
+  padding: var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.explain-section:last-child {
+  border-bottom: 0;
+}
+
+.explain-section-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-2xl);
+}
+
+.explain-note {
+  margin: 0;
+  max-width: 72ch;
+  font-size: var(--text-m);
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+/* A note is the whole of a section when there is no evidence to show, and
+   a trailing note under the panes when there is. Both want air above them
+   only in the second case. */
+.explain-panes + .explain-note,
+.explain-note + .explain-note {
+  margin-top: var(--space-3);
+}
+
+/* Mono eyebrows label ARTIFACTS on this screen — the captured document,
+   the check that captured it. Sans headings label SECTIONS. Keeping the
+   two apart is what lets a check's own description sit as an <h2>
+   without reading like a column header. */
+.explain-evidence-eyebrow {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* minmax(0, 1fr), not 1fr: a grid track's default min-content floor is
+   the widest unbreakable line in the pane, so one long YAML line would
+   push the card wider than the page and take the document's horizontal
+   scrollbar with it. The panes scroll inside themselves instead. */
+.explain-panes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.explain-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  min-width: 0;
+}
+
+.explain-pane-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* The artifact's own `lang`. It is the one honest use of that field here:
+   the pane is not syntax-highlighted, because its single colour channel
+   is spent on the comparison. */
+.explain-pane-lang {
+  font-weight: 400;
+  color: var(--text-subtle);
+}
+
+/* The machine, in both themes. --text-xs matches .control-log-pane, the
+   product's other pane of retained machine output.
+
+   The horizontal padding is on the LINE and not on the pane, which is
+   what lets a marked line's wash reach both edges. Padding here instead
+   would inset every wash by 16px, and a negative margin to claw it back
+   would put content outside the scroll container's left edge, where it
+   is unreachable rather than merely invisible. */
+.explain-pane-body {
+  margin: 0;
+  padding: var(--space-3) 0;
+  border-radius: var(--radius-m);
+  background: var(--machine-bg);
+  color: var(--machine-text);
+  font-size: var(--text-xs);
+  line-height: 1.8;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+/* base.css sets 0.92em on code, pre AND kbd, which compounds through the
+   <pre><code> pairing and lands the pane two steps below the size set
+   above it. inline-block + min-width: 100% is the other half: the lines
+   are block-level so their wash can span the row, and a block child of an
+   overflowing box is otherwise only as wide as the VISIBLE box, which
+   would cut every wash off at the scroll edge. */
+.explain-pane-body code {
+  display: inline-block;
+  min-width: 100%;
+  font-size: 1em;
+}
+
+.explain-line {
+  display: block;
+  padding-inline: var(--space-4);
+}
+
+/* Two channels on every marked line and never one: the "-"/"+" in the
+   gutter is the first and survives greyscale, monochrome and every form
+   of colour blindness; the wash is the second. The legend under the
+   panes names the glyphs, so neither channel depends on the reader
+   already knowing diff conventions. */
+.explain-line.is-removed {
+  background: var(--diff-del-bg);
+  color: var(--diff-del-fg);
+}
+
+.explain-line.is-added {
+  background: var(--diff-add-bg);
+  color: var(--diff-add-fg);
+}
+
+/* user-select: none so a candidate copying the expected YAML out of the
+   pane gets YAML and not diff output. Fixed width, so the text of every
+   line starts at the same column whether or not it is marked. */
+.explain-line-mark {
+  display: inline-block;
+  width: 1.5ch;
+  user-select: none;
+}
+
+/* --bg, not --surface: this is a panel inset WITHIN a card, and the page
+   tone is darker than the card in light and lighter in dark, so the
+   inversion reads correctly in both. */
+.explain-why {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--bg);
+}
+
+.explain-why-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-l);
+}
+
+/* pre-line: show_why takes free text and a bank author may well write two
+   sentences on two lines. Their line breaks are kept; their indentation
+   is not, because the string arrives out of a shell heredoc. */
+.explain-why-body {
+  margin: 0;
+  max-width: 72ch;
+  font-size: var(--text-m);
+  line-height: 1.75;
+  color: var(--text-body);
+  white-space: pre-line;
+}
+
+.explain-unknown {
+  padding: var(--space-6) var(--space-5);
+}
+
+/* Two dark panes side by side stop being a comparison and start being two
+   columns of scrollbars somewhere around here: at 1100px the card is at
+   its 960px maximum and each pane is ~450px, which is about 55 columns of
+   mono at --text-xs. Below that they stack, in reading order — your
+   state, then what was expected — and each keeps the title that says
+   which it is, so nothing is carried by position alone. */
+@media (max-width: 1100px) {
+  .explain-panes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .explain-head,
+  .explain-section {
+    padding: var(--space-4);
+  }
+
+  /* The steppers stop competing with the title for the top-right corner
+     and take a row of their own under it. */
+  .explain-nav {
+    margin-left: 0;
   }
 }

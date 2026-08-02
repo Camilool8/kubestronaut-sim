@@ -5,9 +5,12 @@ import { PendingBar } from "../components/Pending";
 import { ResultsBanner } from "../components/ResultsBanner";
 import { rollupDomains } from "../components/resultsModel";
 import { TaskVerdicts } from "../components/TaskVerdicts";
+import { drillHref } from "../lib/attemptHistory";
 import { formatElapsed } from "../lib/format";
+import { navigate, useRoute } from "../lib/useHashRoute";
 import { useTick } from "../lib/useTick";
 import { strings } from "../strings";
+import { Explain } from "./Explain";
 
 const GRADING_POLL_MS = 3000;
 
@@ -40,6 +43,14 @@ export function Score({ onNewAttempt, endReason, mode }: ScoreProps) {
   const intervalRef = useRef<number | null>(null);
   // Anchored at mount, which is when the session ended and grading began.
   const [startedAt] = useState(() => Date.now());
+  // This screen owns `#/results/<id>`, the explanation deep dive (1j).
+  //
+  // App.tsx does not change and does not need to: the visible screen is
+  // still a function of session.state first, and this route only chooses
+  // between views INSIDE `ended` — exactly as `#/exams/<id>/mode` chooses
+  // between views inside `idle`. Read unconditionally, above every early
+  // return, because it is a hook.
+  const route = useRoute();
 
   const clearPoll = () => {
     if (intervalRef.current !== null) {
@@ -128,6 +139,29 @@ export function Score({ onNewAttempt, endReason, mode }: ScoreProps) {
 
   const { results } = response;
 
+  // Only `results/<something>` diverts. Any other fragment — none, a
+  // stale `#/exams`, the bare `#/results` the deep dive's back link
+  // writes — renders the results body exactly as it always has. An id
+  // that names no question in this attempt is Explain's problem, not a
+  // reason to blank the screen here.
+  const explainId =
+    route.segments[0] === "results" && route.segments.length > 1 ? route.segments[1] : null;
+
+  if (explainId !== null) {
+    return (
+      // .score-screen carries the page-scroll override this screen needs
+      // (`.screen:has(> .score-screen)`); .explain-screen narrows the
+      // measure over it.
+      <div className="score-screen explain-screen">
+        {/* Keyed by the id: stepping to the next task is a fresh mount,
+            so the previous task's reference solution can never be on
+            screen under the next task's title while its fetch is still
+            in flight. */}
+        <Explain key={explainId} results={results} questionId={explainId} />
+      </div>
+    );
+  }
+
   return (
     <div className="score-screen">
       <div className="results-card">
@@ -140,7 +174,11 @@ export function Score({ onNewAttempt, endReason, mode }: ScoreProps) {
               domains={results.domains}
               passingScore={results.passingScore}
             />
-            <NextSession results={results} />
+            <NextSession
+              results={results}
+              starting={starting}
+              onDrill={handleNewAttempt}
+            />
           </aside>
 
           <TaskVerdicts questions={results.questions} />
@@ -161,31 +199,75 @@ export function Score({ onNewAttempt, endReason, mode }: ScoreProps) {
 }
 
 /**
- * What to do before the next attempt. Prose, NOT a control.
+ * What to do before the next attempt — and, when there is something worth
+ * drilling, the control that starts it.
  *
- * The brief draws a "Drill weak domains" button here. `StartOptions`
- * already carries a `domains` filter and the server honours it, but
- * nothing in the UI sends one (Mode.tsx starts every attempt with a bare
- * mode), so that button would start an ordinary full-curriculum run —
- * a control that goes nowhere, which is worse than no control. Mode.tsx's
- * draw panel made the same call for the same reason.
+ * This card was prose for two milestones because the button the brief
+ * draws would have gone nowhere: nothing in the UI could send a domain
+ * filter, so "drill these" started an ordinary full-curriculum run. The
+ * mode screen's chips changed that, and the control is honest now.
+ *
+ * How it gets there is worth stating, because it looks like a missing
+ * step. An ended session cannot start anything — `session.state` is the
+ * outer switch, so navigating to the mode screen from here would render
+ * this same screen — and the way back to `idle` is the conductor's reset,
+ * which takes minutes. So the button does both: it writes the drill route
+ * into the fragment and *then* asks for the reset. The route simply waits
+ * there. When the session flips to idle, App reads the fragment it was
+ * already carrying and opens the mode screen with these domains already
+ * picked. Nothing has to be remembered across the rebuild, because the URL
+ * is the thing remembering.
+ *
+ * If the reset is refused, the fragment is stale and harmless: this screen
+ * ignores any route that is not `results/...`.
  */
-function NextSession({ results }: { results: Results }) {
+function NextSession({
+  results,
+  starting,
+  onDrill,
+}: {
+  results: Results;
+  starting: boolean;
+  onDrill: () => void;
+}) {
   const rows = rollupDomains(results.questions, results.domains);
   if (rows.length === 0) return null;
 
   // Worst-first already, so the first two are the two that matter. More
   // than two "priorities" is no priority at all.
   const weak = rows.filter((r) => r.percent < results.passingScore).slice(0, 2);
+  const names = weak.map((r) => r.domain);
+
+  // A run already narrowed to some domains is not a base to narrow
+  // further from: the weakest of two drilled domains is a thin signal, and
+  // the dashboard — which reads every attempt — is the right place to
+  // decide what to drill next.
+  const filtered = (results.domainFilter?.length ?? 0) > 0;
+
+  const drill = () => {
+    navigate(drillHref(results.bank, names));
+    onDrill();
+  };
 
   return (
     <div className="results-next">
       <h3>{strings.score.nextTitle}</h3>
       <p>
-        {weak.length > 0
-          ? strings.score.nextWeak(weak.map((r) => r.domain).join(strings.score.listSeparator))
+        {names.length > 0
+          ? strings.score.nextWeak(names.join(strings.score.listSeparator))
           : strings.score.nextSolid}
       </p>
+      {names.length > 0 && !filtered && (
+        <>
+          <button type="button" className="btn results-next-drill" onClick={drill} disabled={starting}>
+            {starting ? strings.control.starting : strings.score.nextDrill}
+          </button>
+          {/* The button rebuilds the environment before it can draw
+              anything. Saying so here is the difference between a wait
+              that was announced and one that just happened. */}
+          <p className="results-next-hint">{strings.score.nextDrillHint}</p>
+        </>
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
 import { Exams } from "./screens/Exams";
 import { Mode } from "./screens/Mode";
+import { Progress } from "./screens/Progress";
 import { Score } from "./screens/Score";
 import { ControlProgress } from "./components/ControlProgress";
 import { BootProgress } from "./screens/BootProgress";
@@ -82,9 +83,12 @@ const examJSON = {
   ],
 };
 
-const banksJSON = {
+// GET /api/catalog — the bank list joined to attempt history. The CKAD
+// row carries a counted, passing attempt so the scan covers the card's
+// best-attempt bar as well as its empty state; the CKA row has none.
+const catalogJSON = {
   active: "ckad-mock-01",
-  banks: [
+  exams: [
     {
       id: "ckad-mock-01",
       title: "CKAD Mock Exam 01",
@@ -93,6 +97,14 @@ const banksJSON = {
       durationSeconds: 7200,
       questionCount: 3,
       available: true,
+      progress: {
+        attempts: 2,
+        counted: 2,
+        bestPercent: 74,
+        passed: true,
+        lastAttemptAt: "2026-07-30T18:00:00Z",
+        weakDomains: [],
+      },
     },
     {
       id: "cka-mock-01",
@@ -102,6 +114,7 @@ const banksJSON = {
       durationSeconds: 7200,
       questionCount: 2,
       available: true,
+      progress: { attempts: 0, counted: 0, passed: false, weakDomains: [] },
     },
     {
       id: "kcna-mock",
@@ -111,8 +124,59 @@ const banksJSON = {
       available: false,
       comingSoon: true,
       note: "Multiple-choice engine not built yet",
+      progress: { attempts: 0, counted: 0, passed: false, weakDomains: [] },
     },
   ],
+  summary: {
+    attempts: 2,
+    passedCount: 1,
+    trackCount: 5,
+    weakDomains: [{ domain: "Config", earned: 4, total: 10, percent: 40, attempts: 2 }],
+  },
+};
+
+const historyJSON = {
+  attempts: [
+    {
+      id: "a1",
+      bank: "ckad-mock-01",
+      certification: "CKAD",
+      examTitle: "CKAD Mock Exam 01",
+      examType: "hands-on",
+      mode: "exam",
+      startedAt: "2026-07-30T16:00:00Z",
+      gradedAt: "2026-07-30T18:00:00Z",
+      durationSeconds: 7200,
+      elapsedSeconds: 5400,
+      questionCount: 3,
+      earned: 12,
+      total: 17,
+      percent: 74,
+      passingScore: 66,
+      passed: true,
+      counted: true,
+    },
+    // The uncounted row: a drill, which must render with its mark rather
+    // than be hidden.
+    {
+      id: "a2",
+      bank: "ckad-mock-01",
+      certification: "CKAD",
+      examType: "hands-on",
+      mode: "training",
+      startedAt: "2026-07-28T16:00:00Z",
+      gradedAt: "2026-07-28T17:00:00Z",
+      questionCount: 1,
+      earned: 2,
+      total: 5,
+      percent: 40,
+      passingScore: 66,
+      passed: false,
+      counted: false,
+      domainFilter: ["Config"],
+    },
+  ],
+  summary: catalogJSON.summary,
 };
 
 const resultsJSON = {
@@ -175,15 +239,17 @@ function stubFetch() {
       const url = String(input);
       const body = url.includes("/api/exam")
         ? examJSON
-        : url.includes("/api/control/banks")
-          ? banksJSON
-          : url.includes("/api/results")
-            ? resultsJSON
-            : url.includes("/solution")
-              ? solutionJSON
-              : url.includes("/api/questions/")
-                ? questionJSON
-                : {};
+        : url.includes("/api/catalog")
+          ? catalogJSON
+          : url.includes("/api/history")
+            ? historyJSON
+            : url.includes("/api/results")
+              ? resultsJSON
+              : url.includes("/solution")
+                ? solutionJSON
+                : url.includes("/api/questions/")
+                  ? questionJSON
+                  : {};
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -289,6 +355,16 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
+  // The dashboard is the one screen in the product with a real <table>
+  // and a real <input>, which are the two things axe has the most to say
+  // about: a header cell with no scope and a file picker with no label
+  // are both silent on screen and both fatal to a screen reader.
+  test("progress dashboard", async () => {
+    const { container } = render(<Progress catalogVersion={0} />);
+    await screen.findByRole("table");
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
   // The switch-confirm used to be hand-rolled divs with no role, no
   // aria-modal and no focus trap, and this suite never caught it because
   // the selector scan never opened it. Scan it open.
@@ -308,17 +384,19 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // A 502 from /api/control/banks used to leave the lobby blank — see
+  // A 502 from the catalog endpoint used to leave the lobby blank — see
   // Async's comment on why its error prop is mandatory. This suite never
   // scanned that state, so the role="alert" card's name/role/value
-  // (title, body, dynamic Retry button) never had an axe pass.
+  // (title, body, dynamic Retry button) never had an axe pass. (The lobby
+  // reads GET /api/catalog now rather than the conductor's
+  // /api/control/banks; the failure mode it guards is the same one.)
   test("exam selector catalog error card", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
-        if (url.includes("/api/control/banks")) {
-          return new Response(JSON.stringify({ error: "banks unavailable" }), { status: 502 });
+        if (url.includes("/api/catalog")) {
+          return new Response(JSON.stringify({ error: "catalog unavailable" }), { status: 502 });
         }
         const body = url.includes("/api/exam") ? examJSON : {};
         return new Response(JSON.stringify(body), { status: 200 });

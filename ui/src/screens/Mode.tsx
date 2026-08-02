@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   getExam,
   getSession,
@@ -12,8 +12,9 @@ import { Async } from "../components/Async";
 import { useDesktopGate } from "../components/DesktopRequired";
 import { ExamIntro, markIntroSeen } from "../components/ExamIntro";
 import { Icon } from "../components/Icon";
+import { parseDomainsParam } from "../lib/attemptHistory";
 import { formatDuration } from "../lib/format";
-import { navigate } from "../lib/useHashRoute";
+import { navigate, useRoute } from "../lib/useHashRoute";
 import { useAsync } from "../lib/useAsync";
 import { strings } from "../strings";
 
@@ -73,10 +74,17 @@ interface ModeCardProps {
   fullSeconds: number;
   starting: boolean;
   disabled: boolean;
+  /**
+   * The draw has been narrowed, so this button starts a drill rather than
+   * a sitting. It changes the verb because the chips that did the
+   * narrowing are further down the page than the button is, and the fact
+   * has to travel to the point of the act.
+   */
+  filtered: boolean;
   onStart: () => void;
 }
 
-function ModeCard({ mode, fullSeconds, starting, disabled, onStart }: ModeCardProps) {
+function ModeCard({ mode, fullSeconds, starting, disabled, filtered, onStart }: ModeCardProps) {
   const copy = strings.modes[mode.id];
   const minutes = Math.round(mode.durationSeconds / 60);
   const shortened = !mode.untimed && fullSeconds > 0 && mode.durationSeconds < fullSeconds;
@@ -123,7 +131,11 @@ function ModeCard({ mode, fullSeconds, starting, disabled, onStart }: ModeCardPr
           onClick={onStart}
           disabled={disabled || starting}
         >
-          {starting ? strings.mode.starting : strings.mode.start(copy.label)}
+          {starting
+            ? strings.mode.starting
+            : filtered
+              ? strings.mode.startFiltered(copy.label)
+              : strings.mode.start(copy.label)}
         </button>
       </article>
     </li>
@@ -131,39 +143,162 @@ function ModeCard({ mode, fullSeconds, starting, disabled, onStart }: ModeCardPr
 }
 
 /**
- * What this exam will ask. The domain list is a summary, not a filter:
- * the draw is not yet configurable, so nothing here is drawn as a
- * control that would do nothing.
+ * The read-only summary, for a bank that publishes no `domains`.
+ *
+ * Counted off `exam.questions`, which is the ONE thing the doc comment on
+ * `ExamInfo.domains` says not to do — and it is right: once an attempt has
+ * drawn its subset, `questions` is that subset, so these counts describe
+ * the last draw rather than the curriculum. That is tolerable for tags
+ * nobody can act on and would not be tolerable for chips that configure
+ * the next draw, which is exactly why this branch renders tags. A bank
+ * this old cannot be filtered honestly, so it is not offered.
  */
-function DrawPanel({ exam }: { exam: ExamInfo }) {
-  const pool = exam.questions.length;
-  const drawn = exam.questionCount || pool;
-  const pooled = pool > drawn;
-
+function DrawTags({ exam, pooled }: { exam: ExamInfo; pooled: boolean }) {
   const counts = new Map<string, number>();
   for (const q of exam.questions) {
     const domain = q.domain || strings.score.domainUnknown;
     counts.set(domain, (counts.get(domain) ?? 0) + 1);
   }
   const domains = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  if (domains.length === 0) return null;
+
+  return (
+    <div className="draw-panel-domains">
+      <h3>{pooled ? strings.mode.domainsPool : strings.mode.domainsExam}</h3>
+      <ul>
+        {domains.map(([name, n]) => (
+          <li key={name}>
+            {name}
+            <span className="domain-count">{n}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+interface DrawPanelProps {
+  exam: ExamInfo;
+  /** Empty means the whole curriculum, which is what the server means too. */
+  selected: string[];
+  onSelect: (domains: string[]) => void;
+}
+
+/**
+ * What this exam will ask, and which parts of it to ask about.
+ *
+ * The domain list is a real control now: POST /api/session/start accepts
+ * `{ mode, domains }` and the facilitator has honoured it since the
+ * seeded-draw phase. The chips are built from `ExamInfo.domains` — the
+ * bank's declared curriculum — and never from counting `exam.questions`,
+ * which is the drawn subset once an attempt exists.
+ *
+ * There is deliberately no length control beside them. `exam.DrawOptions`
+ * has a `Length` server-side, but it is mcq-only today and `StartOptions`
+ * carries no such field, so a control for it would be one the server
+ * ignores.
+ */
+function DrawPanel({ exam, selected, onSelect }: DrawPanelProps) {
+  const domains = exam.domains ?? [];
+  const chosen = new Set(selected);
+
+  // The pool is every authored question, which is what `questions` is
+  // before an attempt has drawn. Deliberately NOT the sum of the declared
+  // domains: the server builds those counts by bucketing questions into
+  // spec.domainWeights, so a question whose domain is not declared there
+  // is counted in no bucket at all, and a pool figure derived that way
+  // would silently under-report the bank. The filtered figure below is a
+  // sum over domains because there it is exactly right — a domain the
+  // curriculum does not name is a domain no chip can select.
+  const pool = exam.questions.length;
+  const declared = exam.questionCount || pool;
+  const pooled = pool > declared;
+
+  // How many questions the narrowed draw will actually contain. Mirrors
+  // exam.Draw: the filter decides what is in scope, and the bank's
+  // declared length only bites when it is SMALLER than that — which is
+  // why a filtered draw off a pooled bank is usually the whole of the
+  // domains picked rather than a sample of them.
+  //
+  // Without this the panel kept saying "All 22, every attempt" beside a
+  // chip row that had just narrowed the draw to four, which is the one
+  // claim on this screen a candidate would carry into the exam.
+  const inScope = selected.length
+    ? domains
+        .filter((d) => chosen.has(d.name))
+        .reduce((sum, d) => sum + d.questionCount, 0)
+    : pool;
+  const drawn = Math.min(declared, inScope);
+
+  const toggle = (name: string) => {
+    onSelect(chosen.has(name) ? selected.filter((d) => d !== name) : [...selected, name]);
+  };
 
   return (
     <section className="draw-panel">
       <div className="draw-panel-lead">
         <h2>{strings.mode.drawTitle}</h2>
-        <p>{pooled ? strings.mode.drawPooled(drawn, pool) : strings.mode.drawAll(drawn)}</p>
+        <p>
+          {selected.length > 0
+            ? strings.mode.drawNarrowed(drawn, pool, selected.length)
+            : pooled
+              ? strings.mode.drawPooled(drawn, pool)
+              : strings.mode.drawAll(drawn)}
+        </p>
       </div>
-      {domains.length > 0 && (
+
+      {domains.length === 0 ? (
+        <DrawTags exam={exam} pooled={pooled} />
+      ) : (
         <div className="draw-panel-domains">
-          <h3>{pooled ? strings.mode.domainsPool : strings.mode.domainsExam}</h3>
-          <ul>
-            {domains.map(([name, n]) => (
-              <li key={name}>
-                {name}
-                <span className="domain-count">{n}</span>
-              </li>
+          <h3>{strings.mode.chipsTitle}</h3>
+          {/* A group of buttons, not a list of them. `.draw-panel-domains
+              li` is the read-only tag's own rule — a pill with a fill of
+              its own — so wrapping these chips in list items would draw a
+              pill inside a pill. A row of toggles is a group either way. */}
+          <div className="draw-chips" role="group" aria-label={strings.mode.chipsLabel}>
+            {/* The default, drawn as a chip rather than as the absence of
+                one: "no filter" is a choice the candidate can make ON
+                PURPOSE after making the other one, and it needs somewhere
+                to click. Pressed exactly when nothing else is. */}
+            <button
+              type="button"
+              className="draw-chip"
+              aria-pressed={selected.length === 0}
+              onClick={() => onSelect([])}
+            >
+              <Icon name="check" className="draw-chip-mark" />
+              {strings.mode.allDomains}
+            </button>
+            {domains.map((d) => (
+              <button
+                key={d.name}
+                type="button"
+                className="draw-chip"
+                aria-pressed={chosen.has(d.name)}
+                onClick={() => toggle(d.name)}
+              >
+                {/* The tick is the third channel behind aria-pressed and
+                    the accent fill, and it is drawn on every chip rather
+                    than only the pressed ones: revealing it would move the
+                    label out from under the pointer mid-click. Hidden by
+                    construction (Icon), so it never speaks over the
+                    pressed state. */}
+                <Icon name="check" className="draw-chip-mark" />
+                {d.name}
+                <span className="domain-count">{d.questionCount}</span>
+              </button>
             ))}
-          </ul>
+          </div>
+          {/* Said before the attempt, not after the result. The server will
+              mark this record `counted: false` and the results banner will
+              refuse to call it a pass; a candidate should know both of
+              those while they can still change their mind. */}
+          {selected.length > 0 && (
+            <p className="draw-note">
+              {strings.mode.filteredNote(selected.length, domains.length)}
+            </p>
+          )}
         </div>
       )}
     </section>
@@ -187,6 +322,11 @@ interface ModeProps {
  * the exam begin) is answered by refetching the authoritative session
  * state rather than showing an error — App then routes to whatever that
  * state implies.
+ *
+ * The screen configures two things now, not one: which clock, and which
+ * curriculum domains the questions are drawn from. The second is optional
+ * and its absence is the honest default — an unfiltered start posts the
+ * bare mode, exactly as every other caller does.
  */
 export function Mode({ bankId, catalogVersion, onSessionChange }: ModeProps) {
   const [starting, setStarting] = useState<SessionMode | null>(null);
@@ -196,6 +336,25 @@ export function Mode({ bankId, catalogVersion, onSessionChange }: ModeProps) {
   const examState = useAsync((signal) => getExam(signal), [catalogVersion]);
   const exam = examState.data;
   const isMcq = exam?.examType === "mcq";
+
+  // "Build a drill from these" on the dashboard lands here with the weak
+  // domains in the fragment. It rides the URL rather than a module store
+  // so a reload keeps it and the link can be shared — and it is a
+  // PRESELECTION, not state: the moment the candidate touches a chip,
+  // `picked` takes over and the route stops being consulted.
+  //
+  // Memoised on the query's STRING form, not on the parsed object:
+  // `useRoute()` re-parses the fragment on every render, so the
+  // URLSearchParams it hands back is a fresh identity each time and a memo
+  // keyed on it would recompute always — and `presetDomains` is itself a
+  // dependency further down.
+  const query = useRoute().query;
+  const queryKey = query.toString();
+  const presetDomains = useMemo(
+    () => parseDomainsParam(new URLSearchParams(queryKey)),
+    [queryKey],
+  );
+  const [picked, setPicked] = useState<string[] | null>(null);
 
   // A phone can browse the catalog; it cannot run a hands-on exam. An
   // mcq exam it CAN run — the gate is about the terminal-and-desktop
@@ -211,12 +370,23 @@ export function Mode({ bankId, catalogVersion, onSessionChange }: ModeProps) {
     if (wrongExam) navigate("/exams", { replace: true });
   }, [wrongExam]);
 
-  const handleStart = async (mode: Exclude<SessionMode, "">) => {
+  const handleStart = async (mode: Exclude<SessionMode, "">, domains: string[]) => {
     setStarting(mode);
     setStartError(null);
     try {
-      const result = await startSession(mode);
-      if (result.ok) {
+      // The bare-mode form for a full-curriculum draw, deliberately: it is
+      // the honest call when there is nothing to configure, and it keeps
+      // an unfiltered start byte-identical to what every other caller
+      // sends.
+      const result = await startSession(domains.length > 0 ? { mode, domains } : mode);
+      // Three outcomes, and two of them are answered the same way. A 202
+      // means the attempt was drawn but its cluster is still being
+      // prepared, so there is no session to route on yet; a 409 means the
+      // server's idea of the session is not ours. Both are settled by
+      // asking the server what the session IS, which is also what arms
+      // App's preparation poller — it watches `preparing` on the snapshot,
+      // not the result of this call.
+      if (result.ok && "session" in result) {
         onSessionChange(result.session);
       } else {
         onSessionChange(await getSession());
@@ -257,6 +427,14 @@ export function Mode({ bankId, catalogVersion, onSessionChange }: ModeProps) {
           const fullSeconds =
             modes.find((m) => m.id === "exam")?.durationSeconds ?? loaded.durationSeconds;
 
+          // Intersected with what this bank actually declares, because a
+          // preselection can arrive from anywhere: a bookmark, a link
+          // shared after a bank switch, a domain the loaded exam has never
+          // heard of. A name the server would not recognise must not reach
+          // it as a filter — it would narrow the draw to nothing.
+          const available = new Set((loaded.domains ?? []).map((d) => d.name));
+          const selected = (picked ?? presetDomains).filter((d) => available.has(d));
+
           return (
             <>
               <ul className="mode-grid">
@@ -267,7 +445,8 @@ export function Mode({ bankId, catalogVersion, onSessionChange }: ModeProps) {
                     fullSeconds={fullSeconds}
                     starting={starting === m.id}
                     disabled={blocked || (starting !== null && starting !== m.id)}
-                    onStart={() => handleStart(m.id)}
+                    filtered={selected.length > 0}
+                    onStart={() => handleStart(m.id, selected)}
                   />
                 ))}
               </ul>
@@ -278,7 +457,7 @@ export function Mode({ bankId, catalogVersion, onSessionChange }: ModeProps) {
                   is not. */}
               {blocked && <p className="mode-blocked">{strings.mobile.startDisabled}</p>}
 
-              <DrawPanel exam={loaded} />
+              <DrawPanel exam={loaded} selected={selected} onSelect={setPicked} />
 
               <div className="mode-fine">
                 <ul className="page-tips">

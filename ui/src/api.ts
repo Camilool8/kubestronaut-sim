@@ -49,6 +49,42 @@ export interface SessionSnapshot {
    * full-coverage attempt, the only kind a "passed" claim can rest on.
    */
   domainFilter?: string[];
+  /**
+   * An attempt that has been DRAWN but whose clock has not started,
+   * because its cluster is still being prepared for the questions it drew.
+   *
+   * Only a pooled hands-on bank ever produces one: that bank's boot skips
+   * the seed loop, so the drawn subset has to be seeded before the
+   * candidate can be let in. `state` stays "idle" throughout — deliberately
+   * not a fourth state, so a client that has never heard of pooling still
+   * reads a truthful snapshot, and DELETE /api/session still cancels.
+   *
+   * **This field, not `controlStatus.busy`, is the terminal condition.**
+   * The seed job settles in the conductor up to a poll before the clock
+   * starts; a watcher keyed on the job going idle sees `idle` in that
+   * window and flashes the lobby. The server starts the session first and
+   * clears this second, so a reader watching this never sees neither.
+   */
+  preparing?: PreparingAttempt;
+  /**
+   * Why the last preparation did not produce an attempt. Set with
+   * `preparing` absent and `state` still "idle"; absent when the
+   * preparation was cancelled rather than failed, which is not an error
+   * and must not be shown as one.
+   */
+  prepareError?: string;
+}
+
+/** An attempt between its draw and its clock. See `SessionSnapshot.preparing`. */
+export interface PreparingAttempt {
+  /** The conductor job doing the seeding; the overlay renders it as-is. */
+  jobId: string;
+  mode: SessionMode;
+  /** How many questions are being seeded, and so how many the attempt has. */
+  questionCount: number;
+  startedAt: string;
+  seed?: string;
+  poolDigest?: string;
 }
 
 export interface ExamQuestionInfo {
@@ -462,11 +498,19 @@ export interface StartOptions {
 
 export type StartSessionResponse =
   | { ok: true; session: SessionSnapshot; poolChanged: boolean }
+  /**
+   * 202: drawn, not started. The cluster is being prepared for the drawn
+   * questions and the clock has not begun. The caller does NOT have a
+   * session to route on — it hands over to the session poller, which
+   * watches `preparing` and routes when it clears.
+   */
+  | { ok: true; preparing: PreparingAttempt; poolChanged: boolean }
   | { ok: false; error: string };
 
-// POST /api/session/start: 200 with the new session snapshot, or 409
-// (already running/ended) surfaced as {ok:false} for the caller to
-// handle by refetching the authoritative session state.
+// POST /api/session/start: 200 with the new session snapshot, 202 with a
+// preparation to watch, or 409 (already running/ended, or a preparation
+// already in flight) surfaced as {ok:false} for the caller to handle by
+// refetching the authoritative session state.
 export async function startSession(
   options: StartOptions | Exclude<SessionMode, ""> = "exam",
   signal?: AbortSignal,
@@ -487,6 +531,36 @@ export async function startSession(
   }
   if (!res.ok) {
     throw new Error(await readError(res));
+  }
+  // Branched on the STATUS, not on the body's shape. 202 also passes
+  // `res.ok`, and its body is a preparation rather than a session — read
+  // as one it would look like an attempt in state "preparing" with a zero
+  // clock, which is exactly the sort of thing that routes a candidate
+  // into an exam that has not been set up.
+  if (res.status === 202) {
+    const body = (await res.json()) as {
+      jobId: string;
+      mode: SessionMode;
+      questionCount: number;
+      seed?: string;
+      poolDigest?: string;
+      poolChanged?: boolean;
+    };
+    return {
+      ok: true,
+      preparing: {
+        jobId: body.jobId,
+        mode: body.mode,
+        questionCount: body.questionCount,
+        // The 202 does not carry one; the session's own `preparing` does,
+        // and that is what every display reads. Stamped here only so the
+        // shape is whole.
+        startedAt: "",
+        seed: body.seed,
+        poolDigest: body.poolDigest,
+      },
+      poolChanged: body.poolChanged === true,
+    };
   }
   const session = (await res.json()) as SessionSnapshot & { poolChanged?: boolean };
   return { ok: true, session, poolChanged: session.poolChanged === true };
@@ -667,7 +741,13 @@ export interface ControlPhase {
 
 export interface ControlJob {
   id: string;
-  op: "reset" | "switch";
+  /**
+   * "seed" prepares the cluster for an attempt that has been drawn but
+   * not started — only ever a pooled hands-on bank, whose boot skips the
+   * seed loop precisely because the draw decides what to seed. It renders
+   * through the same overlay as the other two, which is why it is a job.
+   */
+  op: "reset" | "switch" | "seed";
   bank: string;
   startedAt: string;
   /** RFC3339Nano; absent while the job is in flight. */
@@ -747,17 +827,25 @@ export interface BankEntry {
   note?: string;
 }
 
+/**
+ * The bank list without any attempt history attached.
+ *
+ * This is the shape of `GET /api/control/banks`, which the UI no longer
+ * calls — the exam selector reads `GET /api/catalog` instead, so that
+ * every card can carry how that exam has actually gone. The endpoint is
+ * still live and still the conductor's own answer (`./sim` and the smoke
+ * tests use it); what was removed is the client wrapper, because a
+ * plausible-looking `getBanks()` sitting beside `getCatalog()` is an
+ * invitation to fetch the list that knows nothing.
+ *
+ * The type stays because App still asks for one: it keeps a bank id →
+ * title map so the rebuild overlay can name the exam a switch is heading
+ * to, and `CatalogExam extends BankEntry`, so the catalog narrows to this
+ * without a second request.
+ */
 export interface BanksResponse {
   active: string;
   banks: BankEntry[];
-}
-
-export async function getBanks(signal?: AbortSignal): Promise<BanksResponse> {
-  const res = await request("/api/control/banks", { signal });
-  if (!res.ok) {
-    throw new Error(await readError(res));
-  }
-  return (await res.json()) as BanksResponse;
 }
 
 export async function startControlSwitch(

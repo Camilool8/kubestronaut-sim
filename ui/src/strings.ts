@@ -25,19 +25,26 @@ export const strings = {
     // uses, so the header reads as one sentence with the page below it.
     crumbLobby: "Choose an exam",
     crumbResults: "Results",
+    crumbProgress: "Your path",
+    // The header nav. Two entries, because there are two places to be
+    // before an attempt starts and the dashboard is otherwise reachable
+    // from nowhere.
+    navExams: "Exams",
+    navProgress: "Progress",
   },
 
   // 1b, the exam selector. The screen a candidate lands on.
   exams: {
     title: "Path to Kubestronaut",
     lead: "Five certifications. Pick one to drill, or resume where you stopped.",
-    // The capsule beside the title. It counts what you can SIT today, not
-    // what you have passed — passing needs the attempt history, which
-    // does not exist yet. When it does, the number changes meaning and
-    // this label changes with it; the five segments are the same five
-    // exams either way.
-    coverageLabel: "Exams",
-    coverage: (live: number, total: number) => `${live} of ${total} live`,
+    // The capsule beside the title. It counts certifications PASSED out of
+    // the five on the path — `summary.passedCount` / `summary.trackCount`
+    // from GET /api/catalog, the same pair the dashboard's path cards add
+    // up to. It used to count what you could sit today, because nothing
+    // recorded an attempt; the five segments are the same five exams
+    // either way, and now they carry pass state rather than engine hue.
+    coverageLabel: "Progress",
+    coverage: (passed: number, total: number) => `${passed} of ${total} passed`,
     live: "Live",
     soon: "Soon",
     unavailable: "Unavailable",
@@ -59,6 +66,25 @@ export const strings = {
     // MCQ is also what the rest of this product calls it.
     engineMcq: "MCQ",
     engineUnknown: "Not built",
+    // The best-attempt bar, in the slot the bank's one-line pitch holds
+    // until there is something to put there. Three readings rather than
+    // one, because the middle case is the one that would look broken: a
+    // card with three attempts none of which COUNTED (every one a drill or
+    // a short draw) would otherwise print "3 attempts" beside a dash.
+    bestLabel: (counted: number) =>
+      counted === 1 ? "Best attempt · 1 session" : `Best attempt · ${counted} sessions`,
+    // No date here, deliberately. `ExamProgress.lastAttemptAt` is the LAST
+    // attempt, which on a passed exam need not be the one that passed —
+    // printing it beside the word "Passed" would read as the pass date.
+    // The dashboard's path card carries the date, where it means what it
+    // says.
+    bestPassed: (counted: number) =>
+      counted === 1 ? "Passed · 1 session" : `Passed · ${counted} sessions`,
+    bestDrills: (attempts: number) =>
+      attempts === 1 ? "1 drill · none counted" : `${attempts} drills · none counted`,
+    // A card with attempts but no counted one has no best score, and a
+    // dash says that where 0% would claim a result.
+    bestNoScore: "—",
     // The card's primary action, on both the loaded exam and the others.
     // Deliberately identical wording: picking an exam is one act, and the
     // rebuild it may cost is the dialog's job to disclose, not a
@@ -108,15 +134,40 @@ export const strings = {
     capNo: "No:",
     capListLabel: "What this mode allows",
     start: (label: string) => `Start ${label}`,
+    // The same button once the draw has been narrowed. One extra word,
+    // carried at the point of the act rather than only in the panel below
+    // — the chips are further down the page than the button is.
+    startFiltered: (label: string) => `Start ${label} drill`,
     starting: "Starting…",
-    // The draw panel. It describes the questions this exam asks; the
-    // domain list is a summary today and becomes a filter in a later
-    // milestone, so nothing in here is drawn as a control.
+    // The draw panel. It describes the questions this exam asks, and its
+    // domain list is now a real filter: POST /api/session/start takes
+    // { mode, domains }, which the server has honoured since the
+    // seeded-draw phase.
     drawTitle: "What you'll be asked",
     drawPooled: (drawn: number, pool: number) =>
       `${drawn} drawn at random from ${pool}, weighted to the published domain split. A different set every attempt.`,
     drawAll: (n: number) =>
       `All ${n}, every attempt. This bank has no larger pool behind it yet, so the set does not change between sessions.`,
+    // The same sentence once the chips have narrowed it. Both of the
+    // unfiltered readings above become false the moment a chip is pressed:
+    // the count is no longer the whole bank, and "the set does not change
+    // between sessions" is a claim about a draw nobody is taking.
+    drawNarrowed: (drawn: number, pool: number, domains: number) =>
+      `${drawn} of ${pool}, from the ${domains === 1 ? "domain" : `${domains} domains`} you picked.`,
+    // The chip row's own heading, and the chip that clears the filter.
+    chipsTitle: "Narrow the draw",
+    chipsLabel: "Curriculum domains to draw from",
+    allDomains: "All domains",
+    // Said before the candidate starts, not after they see the result.
+    // Two separate facts, and the second is the one that surprises people:
+    // the run IS graded and IS kept, it just cannot be a pass. The results
+    // banner refuses the word too (score.headlineFiltered), and the server
+    // marks the record `counted: false`.
+    filteredNote: (chosen: number, total: number) =>
+      `Drawing from ${chosen} of ${total} domains. A narrowed draw is practice, not a sitting: it is graded and kept in your history, but it is never reported as a pass and it does not count toward your path.`,
+    // The bank predates GET /api/exam's `domains`, so there is no honest
+    // list to build chips from — counting `questions` would show whatever
+    // the last draw happened to include as if it were the curriculum.
     domainsPool: "Domains in the pool",
     domainsExam: "Domains in this exam",
     examFailed: (detail: string) =>
@@ -712,7 +763,14 @@ export const strings = {
     // Takes the exam's catalog title ("CKA Mock Exam 01"), never the
     // bank slug — the slug is an implementation detail.
     switchTitle: (exam: string) => `Switching to ${exam}`,
-    failedTitle: (op: string) => (op === "switch" ? "Switch failed" : "Reset failed"),
+    // A pooled bank seeds only the questions the draw picked, so this runs
+    // between pressing Start and the clock beginning. It destroys nothing,
+    // and the wording has to say what is happening rather than borrow the
+    // reset's — the candidate is waiting to sit an exam, not watching
+    // their work be wiped.
+    seedTitle: "Setting up your tasks",
+    failedTitle: (op: string) =>
+      op === "switch" ? "Switch failed" : op === "seed" ? "Setup failed" : "Reset failed",
     // The measured cluster rebuild is 90–240s. Promising "1–2 minutes"
     // and then blowing past it turns a normal wait into a perceived hang.
     hint: "Rebuilding the Kubernetes cluster. Usually about 2-4 minutes. You can leave this tab open.",
@@ -720,6 +778,11 @@ export const strings = {
     // multiple-choice bank): promising minutes for a seconds-long job is
     // the same mistake in the other direction.
     hintFast: "Restarting the exam services. Usually a few seconds.",
+    // The one thing worth saying while this runs: the clock is not going.
+    // It is the question a candidate staring at a progress bar between
+    // pressing Start and sitting the exam is actually asking.
+    hintSeed:
+      "Preparing the cluster for the tasks you drew. Your clock has not started and will not start until this finishes.",
     stepOf: (step: number, total: number, label: string) =>
       `Step ${step} of ${total}: ${label}`,
     elapsed: (span: string) => `Elapsed ${span}`,
@@ -747,6 +810,12 @@ export const strings = {
     newAttempt: "New attempt",
     newAttemptHint:
       "Wipes all cluster and instance state and returns you to the lobby, where you can retry this exam or pick a different one.",
+    // A pooled bank prepares its cluster for the questions the draw
+    // picked, and that can fail. The clock never started, so nothing was
+    // lost — say that first, because a failure notice after pressing
+    // Start otherwise reads as a lost attempt.
+    prepareFailed: (detail: string) =>
+      `The exam environment couldn't be set up, so the attempt never started and no time was used (${detail}). Try starting it again.`,
   },
 
   mobile: {
@@ -883,19 +952,31 @@ export const strings = {
     domainBelow: "below threshold",
     domainUnknown: "Unclassified",
 
-    // The card under the breakdown. It is prose, NOT a control: the draw
-    // is not configurable yet (StartOptions.domains exists on the API and
-    // nothing in the UI sends it), and a "Drill weak domains" button that
-    // starts an ordinary full-curriculum run would be a lie.
+    // The card under the breakdown. It was prose for two milestones,
+    // because a "drill these" button could only have started an ordinary
+    // full-curriculum run — nothing in the UI could send a domain filter.
+    // The mode screen's chips changed that, so the control is real now.
     nextTitle: "Next session",
     nextWeak: (domains: string) =>
       `Put the next study hour into ${domains}, then draw a fresh set.`,
     nextSolid: "Nothing fell below the threshold. Draw a fresh set and hold this pace.",
+    nextDrill: "Drill these domains",
+    // The wait is announced before it starts, not discovered during it: an
+    // ended attempt has to be cleared before another can begin, and that
+    // is a full environment rebuild.
+    nextDrillHint:
+      "Rebuilds the environment first, then opens the mode screen with these domains picked. A drill is not a sitting — it will not set a best score.",
 
     // ---- the task verdicts table ----
 
     verdictsTitle: "Task verdicts",
-    verdictsHint: "Open a row for the grader's checks and the reference solution.",
+    verdictsHint:
+      "Open a row for the grader's checks and the reference solution. Each row also opens in full, with whatever state its checks captured.",
+    // The link out of an opened row and into the deep dive (1j). Numbered
+    // rather than a bare "Open the full explanation" because twenty rows
+    // produce twenty of these, and twenty links sharing one accessible
+    // name is a list a screen-reader user cannot navigate.
+    openExplain: (n: number) => `Open task ${n}'s full explanation`,
     filterLabel: "Filter task verdicts",
     filterAll: "All",
     filterFailed: "Failed",
@@ -944,5 +1025,237 @@ export const strings = {
     checkSkippedMessage: "Not graded: this check's points header is malformed in the bank.",
     showSolution: "Show solution",
     loadingSolution: "Loading solution…",
+  },
+
+  // 1j, the explanation deep dive: one task, opened from a verdict row.
+  //
+  // Its centrepiece — two machine-surfaced documents side by side — is
+  // the exception rather than the rule, and the copy has to hold up
+  // without them. A check emits evidence only if its script asked to
+  // (banks/_lib/checks.sh: show_actual / show_expected / show_why), and
+  // today two of the twenty-two CKAD questions do. Every other task
+  // arrives here with its check messages and its reference solution,
+  // which is still more than the results row could show.
+  explain: {
+    // The mono eyebrow: position, domain and weight, in that order.
+    eyebrowSeparator: " · ",
+    // Zero-padded to the width of the total, for the same reason
+    // questionPanel.taskCounter is: stepping from task 9 to task 10 must
+    // not move the title underneath it.
+    taskLabel: (n: number, total: number) =>
+      `Task ${String(n).padStart(String(total).length, "0")}`,
+    // The floor is questionPanel.weightShare's, and for its reason: a
+    // graded task is never worth 0% of the exam, and rounding one down to
+    // zero tells the candidate not to bother with it.
+    weight: (pct: number) => `weight ${pct < 1 ? "<1" : Math.round(pct)}%`,
+    // The two pills under the title. The verdict pill reuses
+    // score.verdict*; this is the one beside it. "on this task" and never
+    // "spent": the figure measures how long the task pane was open
+    // (api.ts), which is not the same as attention.
+    timing: (open: string) => `${open} on this task`,
+    timingTarget: (open: string, target: string) => `${open} · target ${target}`,
+    pointsLabel: "Points",
+    // Prev/next move through the ATTEMPT's order, which is the order the
+    // candidate sat them in — never bank order.
+    prevTask: (n: number) => `Task ${n}`,
+    nextTask: (n: number) => `Task ${n}`,
+    prevLabel: "Previous task",
+    nextLabel: "Next task",
+    navLabel: "Step between tasks",
+    backToResults: "All task verdicts",
+
+    checksTitle: "Grader checks",
+    // An mcq question has no validate.d checks at all; what it has is the
+    // answer key beside what was selected.
+    answerTitle: "Your answer",
+    // A question the grader recorded with no checks — an empty validate.d,
+    // or a result whose checks were dropped. The row above it already
+    // showed the points; this says why there is nothing under them.
+    checksNone: "The grader recorded no checks for this task.",
+
+    // Each evidence block is headed by the check that captured it: two
+    // checks on one task capture two different objects, and stacking
+    // their panes under one heading would invite reading them as one.
+    evidenceEyebrow: "What this check saw",
+    // The panes. Titled as the brief titles them, because the distinction
+    // they draw is the whole point: one is what the cluster had, the
+    // other is what the check wanted.
+    actualTitle: "Your cluster state",
+    expectedTitle: "Expected",
+    whyTitle: "Why this scored what it did",
+    // The markers are ASCII "-" and "+" and not the typographic − and +:
+    // @fontsource declares a unicode-range per face, and a codepoint
+    // outside every range never reaches the woff2 (the same reason the
+    // flag is drawn rather than typed). This legend is also the reason
+    // the marks can carry the change on their own — the tint beside them
+    // is the second channel, never the first.
+    diffLegend:
+      "Lines marked - are in your state and not in the expected document; lines marked + are in the expected document and not in yours.",
+    // Announced before a marked line, so the reading is not carried by a
+    // gutter glyph a screen reader may skip as punctuation.
+    lineChanged: "Differs:",
+    // The two documents matched line for line. Worth saying: a check that
+    // failed against an identical capture failed on something the capture
+    // does not contain — a live endpoint, a status field k8s_clean strips.
+    diffIdentical:
+      "These two documents match line for line. Whatever the check measured is not visible in what it captured — the message above names it.",
+    // The comparison was refused rather than attempted. See MAX_LINES in
+    // lib/explainDiff.ts.
+    diffTooLong:
+      "These documents are too long to compare line by line, so neither pane is marked up. Both are shown in full.",
+    // A single artifact with no counterpart — a check that showed what it
+    // found but has no authored expected document, which is the common
+    // shape.
+    actualOnlyNote:
+      "This is what the check read off the cluster. It has no authored counterpart to sit beside, so compare it against the reference solution below.",
+
+    // The task passed. There is genuinely nothing to explain, and
+    // inventing a section for it would be worse than saying so.
+    correctTitle: "Full marks on this task",
+    correctBody:
+      "Every check passed. The reference solution below is still worth a look — it is one way to get here, not the only one, and the grader scored the state you left rather than the route you took.",
+
+    // No artifacts at all, which is most tasks today. Not an error and not
+    // a gap in the result: it is what the bank's checks chose to emit.
+    // The copy has to do two things at once — say that the absence is
+    // normal, and point at what the candidate should read instead.
+    noEvidenceTitle: "No captured state for this task",
+    noEvidenceBody:
+      "These checks report what they measured without keeping a copy of what they read, so there is nothing to set side by side. The messages above are the evidence — each one names the field it looked at and what it found there — and the reference solution below is the shape they were looking for.",
+
+    solutionTitle: "Reference solution",
+    solutionLoading: "Loading the reference solution…",
+    solutionFailed: (detail: string) => `Couldn't load the reference solution (${detail}).`,
+    // The screen was deep-linked to a question that is not in this
+    // attempt — a bookmark from an earlier draw, most likely. It is the
+    // screen's h1, so it is written as a whole sentence.
+    unknownTask: "That task isn't part of this attempt.",
+  },
+
+  // 1k, the progress dashboard. The first screen in this product that
+  // looks across attempts rather than within one.
+  progress: {
+    title: "Your path",
+    // The brief says "stored in this browser". It is not: history lives
+    // server-side in the environment's state volume, which is why it
+    // survives a reset, a bank switch and `./sim purge`. Saying where it
+    // really is also says how to lose it.
+    // No backticks: this is a plain string rendered as text, not markdown,
+    // so a pair of them arrives on screen as a pair of them.
+    lead: "Every attempt this environment has graded. Kept in its own volume rather than in this browser, so a reset, a bank switch and a purge all leave it where it is.",
+    export: "Export",
+    // Both hints describe a button, so both belong ON the button rather
+    // than in the page flow. Rendered on this screen as the accessible
+    // description of their control: as body copy they landed as one
+    // run-on paragraph under the lead, a column away from either button,
+    // reading as a single sentence that was true of neither.
+    exportHint: "Downloads every attempt as a JSON file.",
+    import: "Import",
+    importHint: "Merges a previous export back in. Attempts already here are left alone.",
+    importBusy: "Importing…",
+    // The file picker itself. It is the one form control on this screen and
+    // it is never the visible one: the button beside it opens it, so the
+    // screen's control vocabulary stays buttons. The label is what a
+    // screen reader announces for the input all the same.
+    importPick: "Choose an exported history file",
+    importDone: (imported: number, skipped: number) =>
+      skipped > 0
+        ? `Imported ${imported}; ${skipped} were already here.`
+        : `Imported ${imported}.`,
+    importFailed: (detail: string) => `Couldn't import that file (${detail}).`,
+    erase: "Erase history",
+    eraseConfirmTitle: "Erase every attempt?",
+    eraseConfirmBody:
+      "This deletes the whole record — every certification, every score. There is no undo and no server-side backup. Export first if you want one.",
+    eraseConfirm: "Erase everything",
+    eraseBusy: "Erasing…",
+    eraseFailed: (detail: string) => `Couldn't erase the history (${detail}).`,
+    eraseDone: "History erased.",
+    // The brief's primary action. Here it goes to the exam selector rather
+    // than starting anything: an attempt begins on the mode screen, behind
+    // a choice of exam and a choice of clock, and a button on the
+    // dashboard that skipped both would be starting a session the
+    // candidate never configured.
+    newSession: "New session",
+
+    // ---- the five path cards ----
+
+    pathLabel: "Certification path",
+    statusPassed: "Passed",
+    statusAttempted: "In progress",
+    statusUntouched: "Not started",
+    statusSoon: "Not built",
+    // The big figure on a card. A certification with no counted attempt
+    // has no best score, and a dash says that better than 0%.
+    noScore: "—",
+    // What that figure IS. The card draws it as a bare number under an
+    // acronym, which is legible on screen and says nothing at all read
+    // aloud; this rides with it as .sr-only.
+    cardScoreLabel: "Best score",
+    cardMeta: (attempts: number, last: string) =>
+      attempts === 1 ? `1 attempt · ${last}` : `${attempts} attempts · ${last}`,
+    cardMetaNone: "No attempts yet",
+    // Attempts that exist but none of which count toward the path —
+    // every one was a drill or a short draw. The card would otherwise
+    // read "3 attempts" beside a dash and look broken.
+    cardMetaDrills: (attempts: number) =>
+      attempts === 1 ? "1 drill · none counted" : `${attempts} drills · none counted`,
+
+    // ---- the attempt table ----
+
+    historyTitle: "Attempt history",
+    historyEmpty:
+      "Nothing graded yet. Finish an attempt in Mastery or Exam mode and it lands here — Training runs are not recorded.",
+    colExam: "Exam",
+    colMode: "Mode",
+    colDate: "Date",
+    colTime: "Time",
+    colScore: "Score",
+    // The mode cell: how it was run, and what it was run over. The domain
+    // half is what separates two rows that would otherwise be identical —
+    // a full sitting and a drill of one domain on the same day.
+    modeAllDomains: (mode: string) => `${mode} · all domains`,
+    modeDomains: (mode: string, domains: string) => `${mode} · ${domains}`,
+    domainSeparator: ", ",
+    percent: (n: number) => `${n}%`,
+    // The marker under each row's figure. Colour is the second signal
+    // here and never the first: a percentage on its own cannot say
+    // whether it cleared a threshold that differs per exam, and three
+    // tints with no words would be three tints.
+    rowPassed: "pass",
+    rowFailed: "no pass",
+    // A drill or a short draw: real practice, but not a sitting. Marked
+    // in the row rather than hidden, because hiding it would make the
+    // week's work vanish.
+    uncounted: "drill",
+    // The footnote under the table, shown only when a row wears the mark.
+    // A sentence under the table rather than a title= tooltip, which a
+    // touch device never shows at all.
+    uncountedTitle: "A filtered or short draw. It shows here but does not count toward the path.",
+    untimed: "untimed",
+
+    // ---- the weak-domain panel ----
+
+    weakTitle: "Weakest domains across all attempts",
+    weakHint: "Points earned over points available, drills included — a domain drill is the best evidence you have about a weak domain.",
+    weakEmpty: "Nothing to rank yet.",
+    weakMeta: (attempts: number) =>
+      attempts === 1 ? "from 1 attempt" : `from ${attempts} attempts`,
+    // The deep link into the mode screen with these domains preselected.
+    // It only appears when it can actually do something: the domains have
+    // to exist in the LOADED bank, because that is the only exam this
+    // environment can start.
+    drill: "Build a drill from these",
+    // The rollup spans every certification attempted; only the loaded bank
+    // can be drawn from. When the list above is a mix, the button counts
+    // what it will actually take rather than claiming "these".
+    drillSome: (n: number) => `Build a drill from ${n} of these`,
+    weakNotHere: "not in the loaded exam",
+    drillUnavailable: (exam: string) =>
+      `These domains come from other exams. Load ${exam} to drill them.`,
+
+    loadFailed: (detail: string) =>
+      `Couldn't load your history (${detail}). It is served by the facilitator from its state volume; check it with \`docker compose ps facilitator\`.`,
+    retry: "Retry",
   },
 } as const;

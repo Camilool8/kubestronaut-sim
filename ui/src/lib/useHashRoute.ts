@@ -33,6 +33,28 @@ export interface Route {
   path: string;
   /** `path` split on "/", with empty segments dropped. */
   segments: string[];
+  /**
+   * Everything after a "?" in the fragment.
+   *
+   * Split off BEFORE `path` and `segments` are computed, so a screen that
+   * takes a parameter cannot break the matching every other screen does:
+   * "#/exams/ckad/mode?domain=a&domain=b" still has "mode" as its third
+   * segment. Always present; empty when the fragment carries no query.
+   *
+   * A URLSearchParams rather than a flattened object, and the difference
+   * is load-bearing: `getAll` is the only way to carry a LIST whose items
+   * may themselves contain the separator. A curriculum domain is free text
+   * a bank author writes, and CKAD really does ship one with a comma in it
+   * ("Application Environment, Configuration and Security") — packed into
+   * one comma-joined value, that name arrives as three domains the bank
+   * does not have. Repeated keys have no such ambiguity, and each value
+   * needs exactly one round of percent-encoding.
+   *
+   * This is for a preselection carried across a navigation — the weak
+   * domains a drill starts from — not for state. It is in the URL rather
+   * than a module store so a reload keeps it and the link can be shared.
+   */
+  query: URLSearchParams;
 }
 
 function subscribe(onChange: () => void): () => void {
@@ -72,8 +94,14 @@ export function parseRoute(hash: string): Route {
   // and "#//exams/" all name the same route, and a hand-typed fragment
   // is the most likely source of the odd ones.
   const raw = hash.replace(/^#/, "");
-  const segments = raw.split("/").filter((s) => s !== "");
-  return { path: segments.length ? "/" + segments.join("/") : "", segments };
+  const cut = raw.indexOf("?");
+  const pathPart = cut === -1 ? raw : raw.slice(0, cut);
+  // URLSearchParams rather than a hand-rolled split: it is the same
+  // decoder the browser uses, so a value carrying a "&", a "," or a space
+  // round-trips through encodeURIComponent unharmed.
+  const query = new URLSearchParams(cut === -1 ? "" : raw.slice(cut + 1));
+  const segments = pathPart.split("/").filter((s) => s !== "");
+  return { path: segments.length ? "/" + segments.join("/") : "", segments, query };
 }
 
 /**

@@ -23,11 +23,23 @@ interface Row {
  * Every graded task in one strip: number, task, domain, weight, time and
  * verdict, filtered by what went wrong.
  *
- * Each row is a disclosure rather than a link. The brief opens a
- * full-screen explanation deep-dive from here, and that screen does not
- * exist yet — so the row keeps expanding in place, which is a control
- * that does something, instead of pretending to route somewhere that
- * would 404. When the deep dive lands, this is the element it replaces.
+ * A row is BOTH a disclosure and a way into the deep dive, which is a
+ * change from what this comment used to say. It used to record that the
+ * row expands because screens/Explain.tsx did not exist and a row that
+ * looked like a link and went nowhere was worse than one that opened.
+ * Explain.tsx exists now, and the row still expands, for a different
+ * reason: this table is a SCANNING surface — twenty rows, read against
+ * each other — and the deep dive is a reading surface for one task. A
+ * candidate comparing why check 2 failed on three tasks should not have
+ * to make three navigations and lose the table each time. So the checks
+ * stay in place and each opened row carries a link into its own full
+ * explanation, which is where the captured cluster state, the grader's
+ * "why", and the roomy reference solution live.
+ *
+ * The link is inside the disclosure and not on the row itself because a
+ * <summary> is an interactive element: an <a> inside one is nested
+ * interactive content, which is both an axe violation and a genuinely
+ * ambiguous click target.
  *
  * It is deliberately NOT a <table>: a row has to be a <details> to
  * disclose its checks, and a <details> cannot be a <tr>. The visible
@@ -157,7 +169,8 @@ function Chip({ on, count, onPick, children }: ChipProps) {
   );
 }
 
-const VERDICT_WORD: Record<Verdict, string> = {
+/** Exported for the deep dive, whose verdict pill must read identically. */
+export const VERDICT_WORD: Record<Verdict, string> = {
   correct: strings.score.verdictCorrect,
   partial: strings.score.verdictPartial,
   failed: strings.score.verdictFailed,
@@ -232,6 +245,18 @@ function TaskRow({ row, weighted, timed }: { row: Row; weighted: boolean; timed:
           </span>
         </span>
       </summary>
+      {/* First inside the disclosure, not last: once a row is open this is
+          the row's primary action, and a link buried under a check list
+          and a solution disclosure is a link nobody finds. It is a real
+          anchor rather than a click handler — the route is a fragment, so
+          the browser's own navigation, middle-click and back button all
+          work without this component importing a router. */}
+      <p className="tv-more">
+        <a className="tv-open" href={`#/results/${question.id}`}>
+          {strings.score.openExplain(n)}
+          <Icon name="chevron-right" />
+        </a>
+      </p>
       {isMcq ? <McqAnswerReview question={question} /> : <CheckList checks={question.checks} />}
       <details className="solution-details" onToggle={handleToggle}>
         <summary>

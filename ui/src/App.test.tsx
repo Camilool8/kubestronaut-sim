@@ -39,12 +39,29 @@ const exam = {
   questions: [],
 };
 
-const banks = {
+// GET /api/catalog: the conductor's bank list joined to attempt history,
+// which is what the exam selector reads now. `progress` is required on
+// every row — the card branches on it before it branches on anything else.
+const noProgress = { attempts: 0, counted: 0, passed: false, weakDomains: [] };
+const catalog = {
   active: "ckad-mock-01",
-  banks: [
-    { id: "ckad-mock-01", title: "CKAD Mock Exam 01", examType: "hands-on", available: true },
-    { id: "cka-mock-01", title: "CKA Mock Exam 01", examType: "hands-on", available: true },
+  exams: [
+    {
+      id: "ckad-mock-01",
+      title: "CKAD Mock Exam 01",
+      examType: "hands-on",
+      available: true,
+      progress: noProgress,
+    },
+    {
+      id: "cka-mock-01",
+      title: "CKA Mock Exam 01",
+      examType: "hands-on",
+      available: true,
+      progress: noProgress,
+    },
   ],
+  summary: { attempts: 0, passedCount: 0, trackCount: 5, weakDomains: [] },
 };
 
 // The job POST /api/control/switch returns: freshly begun, so every
@@ -108,7 +125,7 @@ function stubFetch() {
       if (url.endsWith("/api/boot")) return json(readyBoot);
       if (url.endsWith("/api/session")) return json(idleSession);
       if (url.endsWith("/api/exam")) return json(exam);
-      if (url.endsWith("/api/control/banks")) return json(banks);
+      if (url.endsWith("/api/catalog")) return json(catalog);
       return json({});
     }),
   );
@@ -211,7 +228,7 @@ describe("App control failures", () => {
         if (url.endsWith("/api/session")) return json(endedSession);
         if (url.endsWith("/api/results")) return json(results);
         if (url.endsWith("/api/exam")) return json(exam);
-        if (url.endsWith("/api/control/banks")) return json(banks);
+        if (url.endsWith("/api/catalog")) return json(catalog);
         return json({});
       }),
     );
@@ -248,7 +265,7 @@ describe("App control failures", () => {
         if (url.endsWith("/api/session")) return json(endedSession);
         if (url.endsWith("/api/results")) return json(results);
         if (url.endsWith("/api/exam")) return json(exam);
-        if (url.endsWith("/api/control/banks")) return json(banks);
+        if (url.endsWith("/api/catalog")) return json(catalog);
         return json({});
       }),
     );
@@ -282,7 +299,7 @@ describe("App control failures", () => {
         if (url.endsWith("/api/boot")) return json(readyBoot);
         if (url.endsWith("/api/session")) return json(idleSession);
         if (url.endsWith("/api/exam")) return json(exam);
-        if (url.endsWith("/api/control/banks")) return json(banks);
+        if (url.endsWith("/api/catalog")) return json(catalog);
         return json({});
       }),
     );
@@ -322,7 +339,7 @@ describe("App session polling", () => {
         }
         if (url.endsWith("/api/control/status")) return json({ busy: false });
         if (url.endsWith("/api/exam")) return json(exam);
-        if (url.endsWith("/api/control/banks")) return json(banks);
+        if (url.endsWith("/api/catalog")) return json(catalog);
         return json({});
       }),
     );
@@ -403,7 +420,7 @@ describe("App control retry", () => {
         if (url.endsWith("/api/boot")) return json(readyBoot);
         if (url.endsWith("/api/session")) return json(idleSession);
         if (url.endsWith("/api/exam")) return json(exam);
-        if (url.endsWith("/api/control/banks")) return json(banks);
+        if (url.endsWith("/api/catalog")) return json(catalog);
         return json({});
       }),
     );
@@ -442,7 +459,7 @@ describe("App boot gate", () => {
         if (url.endsWith("/api/session")) return json(session);
         if (url.endsWith("/api/exam")) return json(exam);
         if (url.endsWith("/api/control/status")) return json({ busy: false });
-        if (url.endsWith("/api/control/banks")) return json(banks);
+        if (url.endsWith("/api/catalog")) return json(catalog);
         return json({});
       }),
     );
@@ -505,5 +522,129 @@ describe("App boot gate", () => {
     // also role="alert", so an unqualified byRole is ambiguous.
     expect(screen.getByText(/calico\.yaml/)).toHaveClass("error-text");
     expect(screen.getByRole("button", { name: "Try building again" })).toBeInTheDocument();
+  });
+});
+
+// A pooled hands-on bank draws its questions first and seeds the cluster
+// for them second, so an attempt exists — with a seed and a question
+// count — before its clock starts. `session.state` stays "idle" for the
+// whole of it, which is what makes this a client concern: nothing in the
+// three-way state switch says an exam is about to begin.
+describe("App preparing an attempt", () => {
+  const preparingSession: SessionSnapshot = {
+    ...idleSession,
+    preparing: {
+      jobId: "job-7",
+      mode: "exam",
+      questionCount: 16,
+      startedAt: "2026-08-02T10:14:03Z",
+      seed: "a1b2c3",
+    },
+  };
+
+  const runningSession: SessionSnapshot = {
+    ...idleSession,
+    state: "running",
+    startedAt: "2026-08-02T10:16:00Z",
+    remainingSeconds: 7200,
+  };
+
+  const seedJob: ControlJob = {
+    id: "job-7",
+    op: "seed",
+    bank: "ckad-mock-01",
+    startedAt: "2026-08-02T10:14:03Z",
+    phase: "seed-questions",
+    phases: [
+      {
+        id: "seed-questions",
+        label: "Set up the exam questions",
+        state: "running",
+        detail: "question 3 of 16",
+        startedAt: "2026-08-02T10:14:03Z",
+      },
+    ],
+  };
+
+  // Sessions are served in order, so the test can hand back "still
+  // preparing" and then "running" and watch the screen follow.
+  function stubSessions(queue: SessionSnapshot[]) {
+    let served = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        const json = (body: unknown, status = 200) =>
+          new Response(JSON.stringify(body), { status });
+        if (url.endsWith("/api/control/status")) return json(controlStatus);
+        if (url.endsWith("/api/boot")) return json(readyBoot);
+        if (url.endsWith("/api/session")) {
+          const next = queue[Math.min(served, queue.length - 1)];
+          served++;
+          return json(next);
+        }
+        if (url.endsWith("/api/exam")) return json(exam);
+        if (url.endsWith("/api/catalog")) return json(catalog);
+        return json({});
+      }),
+    );
+  }
+
+  // The seed is a control job, so the overlay that already exists renders
+  // it — but it must not borrow the reset's words. A candidate waiting to
+  // start an exam being told their environment is being rebuilt would
+  // reasonably think they had lost something.
+  test("names the seed for what it is, and says the clock is not running", async () => {
+    controlStatus = { busy: true, job: seedJob };
+    stubSessions([preparingSession]);
+    render(<App />);
+
+    await screen.findByText("Setting up your tasks");
+    expect(screen.getByText(/clock has not started/)).toBeInTheDocument();
+    expect(screen.queryByText("Rebuilding your exam environment")).not.toBeInTheDocument();
+  });
+
+  // The terminal condition is `preparing` disappearing, NOT the job going
+  // idle: the job settles in the conductor before the facilitator starts
+  // the session, and a watcher keyed on `busy` sees "idle" in that window.
+  test("routes into the exam when the preparation clears", async () => {
+    // jsdom has no ResizeObserver, and noVNC's RFB constructor makes one
+    // the moment the exam screen mounts its desktop. Shimmed here rather
+    // than globally: this is the only test that drives App all the way
+    // into a running hands-on attempt.
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    controlStatus = { busy: true, job: seedJob };
+    stubSessions([preparingSession, preparingSession, runningSession]);
+    render(<App />);
+
+    await screen.findByText("Setting up your tasks");
+    // The assertion is that the ATTEMPT is up, not that the overlay is
+    // gone: the seed job legitimately still reports busy for a poll or so
+    // after the facilitator starts the session, and the overlay follows
+    // the job. What must not happen is the lobby sitting there with an
+    // exam running behind it — which is what the 10s session poll alone
+    // would give, for most of an interval.
+    expect(
+      await screen.findByRole("button", { name: "Submit exam" }, { timeout: 4000 }),
+    ).toBeInTheDocument();
+  });
+
+  // The clock never started, so nothing was lost. That has to be the
+  // first thing said — a failure notice after pressing Start otherwise
+  // reads as a forfeited attempt.
+  test("says a failed preparation cost no time", async () => {
+    controlStatus = { busy: false };
+    stubSessions([{ ...idleSession, prepareError: "seeding q03 failed (exit 1)" }]);
+    render(<App />);
+
+    expect(await screen.findByText(/no time was used/)).toBeInTheDocument();
+    expect(screen.getByText(/seeding q03 failed/)).toBeInTheDocument();
   });
 });
