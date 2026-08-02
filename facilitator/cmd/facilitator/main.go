@@ -215,9 +215,16 @@ func runServer() error {
 	// not the reverse proxy above: GET /api/catalog is answered HERE
 	// because the conductor cannot see /state, and because looking at the
 	// exam list must never be able to trigger a rebuild.
+	// WithSeeder is the other server-side call to the conductor, and the
+	// only one that starts work: a pooled hands-on bank boots with an
+	// empty cluster on purpose, so the questions one attempt drew have to
+	// be created before its clock may start. Wired unconditionally, like
+	// the proxy above — whether it is USED is decided per bank by
+	// exam.Pooled, and no bank in the tree opts in yet.
 	handler := api.New(ex, cfg.bankDir, mgr, g.Grade, desktopHandler, controlProxy, web.FS(), boot, g.PracticeGrade,
 		api.WithHistory(hist),
 		api.WithBanks(newBanksFetcher(conductorURL)),
+		api.WithSeeder(newConductorSeeder(conductorURL)),
 	)
 
 	srv := &http.Server{

@@ -319,7 +319,7 @@ func historyRows(h *history.Store) []history.Record {
 // which is right for "Question 1 of N" and wrong for a catalog card
 // describing the bank itself.
 func bankLength(ex *exam.Exam) int {
-	if ex.ExamLength > 0 && ex.ExamLength < len(ex.Questions) {
+	if exam.Pooled(ex) {
 		return ex.ExamLength
 	}
 	return len(ex.Questions)

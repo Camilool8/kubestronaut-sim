@@ -70,11 +70,29 @@ type Exam struct {
 	// an ordered list — so no consumer has to re-derive the order from
 	// Questions, and none of them can accidentally range over a Go map.
 	Domains []Domain
-	// ExamLength is spec.examLength: how many questions a pooled mcq
-	// attempt draws from Questions. Zero (or >= len(Questions)) means no
-	// pooling — Draw returns every question, in bank order, exactly
-	// as every mcq bank behaved before this field existed.
+	// ExamLength is spec.examLength: how many questions a pooled attempt
+	// draws from Questions. Zero (or >= len(Questions)) means no pooling —
+	// Draw returns every question, in bank order, exactly as every bank
+	// behaved before this field existed.
+	//
+	// Read by both engines. It began mcq-only because a hands-on cluster
+	// was seeded with the whole bank at boot, which made a subset draw a
+	// pure loss; a hands-on bank that declares this now opts its boot out
+	// of that loop instead and has the drawn subset seeded at the start of
+	// the attempt. See Draw and images/k8s-env/bootstrap.sh.
 	ExamLength int
+}
+
+// Pooled reports whether ex draws a strict subset of its questions —
+// spec.examLength set, and smaller than the pool behind it.
+//
+// The one definition of "this bank pools", because every consumer of the
+// answer does something different with it and they must not disagree:
+// Draw stratifies, the exam and catalog responses advertise ExamLength
+// instead of the pool size, and the start handler seeds the drawn subset
+// before the clock runs rather than trusting boot to have done it.
+func Pooled(ex *Exam) bool {
+	return ex.ExamLength > 0 && ex.ExamLength < len(ex.Questions)
 }
 
 // Domain is one curriculum domain of a bank: its name and the percentage
@@ -240,7 +258,17 @@ func Load(examJSONPath, bankDir string) (*Exam, error) {
 		e.Questions = append(e.Questions, question)
 	}
 
-	if examType == TypeMCQ && e.ExamLength > len(e.Questions) {
+	// Checked for both engines, not just mcq: a hands-on bank can pool
+	// too, and a declared length its pool cannot satisfy is an authoring
+	// bug the offline gates should catch — never a runtime surprise a
+	// candidate discovers when Draw refuses to produce their exam.
+	// A negative length was previously ignored (it fails Draw's `length
+	// <= 0` test and silently means "no pooling"); it is now the same
+	// authoring bug said louder, because nobody types -5 on purpose.
+	if e.ExamLength < 0 {
+		return nil, fmt.Errorf("exam: spec.examLength %d is negative", e.ExamLength)
+	}
+	if e.ExamLength > len(e.Questions) {
 		return nil, fmt.Errorf("exam: spec.examLength %d exceeds the pool of %d questions", e.ExamLength, len(e.Questions))
 	}
 
@@ -275,8 +303,8 @@ func domainOrder(questions []Question) []string {
 
 // Subset returns the questions ids names, in ids' order, skipping any id
 // ex does not declare. Empty ids means "no subset was drawn" and returns
-// every question in bank order — which is what a hands-on attempt, an
-// unpooled mcq bank and the pre-pooling behaviour of both all rely on.
+// every question in bank order — which is what an unpooled bank of
+// either engine, and the pre-pooling behaviour of both, rely on.
 //
 // This is what scopes grading to the attempt: the session records the
 // drawn ids, and every grader routes its question list through here so a
@@ -460,9 +488,15 @@ type DrawOptions struct {
 	// (wrapped in ErrDrawRequest), not a silent empty draw.
 	Domains []string
 	// Length overrides ex.ExamLength for this draw. Zero means "the
-	// bank's own". Length pooling is mcq-only; a hands-on attempt always
-	// contains every in-scope question, because its cluster was seeded
-	// with all of them at boot regardless.
+	// bank's own", which is what every caller in the tree passes; the
+	// override exists for tests.
+	//
+	// It does NOT make a hands-on bank pooled. Whether a cluster was
+	// seeded at boot is decided by the BANK (Pooled, read identically by
+	// images/k8s-env/bootstrap.sh and by the start handler), so overriding
+	// the length here on an unpooled hands-on bank would draw a subset out
+	// of a cluster that holds every question — harmless, but not an
+	// attempt anyone should ship.
 	Length int
 }
 
@@ -499,11 +533,19 @@ var ErrDrawRequest = errors.New("exam: invalid draw request")
 var seedPattern = regexp.MustCompile(`^[0-9a-f]{6}$`)
 
 // Draw returns the questions for one attempt: a domain-stratified subset
-// sized to the exam's declared length when an mcq bank has opted into
-// pooling (ExamLength set and smaller than the pool), or every in-scope
-// question in bank order otherwise — a hands-on exam, an mcq bank with
-// no ExamLength, and the hidden smoke-mcq fixture all take that path, so
-// pooling stays additive and never a default a bank falls into.
+// sized to the exam's declared length when the bank has opted into
+// pooling (Pooled — ExamLength set and smaller than the pool), or every
+// in-scope question in bank order otherwise. Every bank in the repo
+// except kcna-mock takes the second path, so pooling stays additive and
+// never a default a bank falls into.
+//
+// Pooling used to be refused outright for hands-on banks, and the reason
+// was never about drawing: a hands-on cluster was seeded with every
+// question in the bank at boot, so a subset draw bought nothing and cost
+// the candidate the questions it left out. A hands-on bank that declares
+// spec.examLength now opts its BOOT out of that loop
+// (images/k8s-env/bootstrap.sh) and has the drawn subset seeded when the
+// attempt starts. Nothing about the arithmetic below changed.
 //
 // Each domain contributes a fixed target count (domainTargets' largest-
 // remainder rounding of ex.DomainWeights against the draw length) rather
@@ -537,10 +579,13 @@ func Draw(ex *Exam, opts DrawOptions) (DrawResult, error) {
 
 	res := DrawResult{Seed: seed, Domains: filter, PoolDigest: PoolDigest(ex)}
 
-	// The filter applies to BOTH engines. Narrowing which questions an
-	// attempt contains is free for hands-on too: bootstrap.sh seeds every
-	// question in the bank into the cluster at boot whatever the draw is,
-	// so the cluster state a filtered attempt sees is identical.
+	// The filter applies to BOTH engines. On an unpooled hands-on bank
+	// narrowing is free: bootstrap.sh seeds every question in the bank
+	// into the cluster at boot whatever the draw is, so the cluster state
+	// a filtered attempt sees is identical. On a pooled one it is not
+	// free — nothing is seeded at boot — but it is still correct, because
+	// the caller seeds exactly the ids this returns before the attempt's
+	// clock starts.
 	inScope := ex.Questions
 	if len(filter) > 0 {
 		keep := make(map[string]bool, len(filter))
@@ -559,7 +604,7 @@ func Draw(ex *Exam, opts DrawOptions) (DrawResult, error) {
 	if length <= 0 {
 		length = ex.ExamLength
 	}
-	if ex.Type != TypeMCQ || length <= 0 || length >= len(inScope) {
+	if length <= 0 || length >= len(inScope) {
 		res.IDs = questionIDs(inScope)
 		return res, nil
 	}
@@ -746,7 +791,7 @@ func attemptWeight(ex *Exam) float64 {
 		total += q.Weight
 	}
 	draw := n
-	if ex.ExamLength > 0 && ex.ExamLength < n {
+	if Pooled(ex) {
 		draw = ex.ExamLength
 	}
 	return float64(total) * float64(draw) / float64(n)

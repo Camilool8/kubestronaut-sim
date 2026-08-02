@@ -20,7 +20,7 @@
 #      of the points is within TOLERANCE percentage points of its
 #      spec.domainWeights entry — the whole pool IS the exam every
 #      attempt, so its own composition has to match the curriculum.
-#      WITH a smaller spec.examLength: exam.DrawMCQ stratifies every
+#      WITH a smaller spec.examLength: exam.Draw stratifies every
 #      draw to hit each domain's target count exactly regardless of the
 #      pool's own ratio (see facilitator/internal/exam/exam.go), so what
 #      this gate checks instead is that every domain's pool is at LEAST
@@ -91,7 +91,7 @@ def exam_length(text):
 
 def domain_targets(weights, order, n):
     """Largest-remainder rounding of n across order's domains, in the
-    ratios weights declares — the exact algorithm exam.DrawMCQ uses
+    ratios weights declares — the exact algorithm exam.Draw uses
     (facilitator/internal/exam/exam.go), so this gate checks pool depth
     against the same numbers a real draw will ask for."""
     raw = {d: weights[d] * n / 100 for d in order}

@@ -88,9 +88,11 @@ type bankDoc struct {
 		Duration          string `json:"duration"`
 		PassingScore      int    `json:"passingScore"`
 		KubernetesVersion string `json:"kubernetesVersion"`
-		// ExamLength is a pooled mcq bank's declared draw size — see
+		// ExamLength is a pooled bank's declared draw size — see
 		// docs/bank-spec.md. The catalog card must show this, not the
-		// size of the full authored pool behind it.
+		// size of the full authored pool behind it. Read for both engines:
+		// a hands-on bank that declares it seeds the drawn subset when the
+		// attempt starts rather than the whole pool at boot.
 		ExamLength int `json:"examLength"`
 		Instances  []struct {
 			Name string `json:"name"`
@@ -166,9 +168,9 @@ func (c *Catalog) mergeComingSoon(path string, raw []byte) {
 }
 
 // declaredQuestionCount mirrors the facilitator's own
-// (*server).declaredQuestionCount: a pooled mcq bank's card shows its
-// draw size, not the full authored pool behind it. examLength <= 0 or
-// >= poolSize means no pooling, exactly as exam.DrawMCQ treats it.
+// (*server).declaredQuestionCount: a pooled bank's card shows its draw
+// size, not the full authored pool behind it. examLength <= 0 or >=
+// poolSize means no pooling, exactly as exam.Pooled treats it.
 func declaredQuestionCount(examLength, poolSize int) int {
 	if examLength > 0 && examLength < poolSize {
 		return examLength

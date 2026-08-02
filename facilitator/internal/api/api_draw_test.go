@@ -19,6 +19,20 @@ type sessionBody struct {
 	PoolDigest       string   `json:"poolDigest"`
 	DomainFilter     []string `json:"domainFilter"`
 	PoolChanged      bool     `json:"poolChanged"`
+	// The preparation fields GET /api/session carries for a pooled
+	// hands-on bank, whose cluster is seeded between the draw and the
+	// clock. Absent on every other bank — see api_handson_pool_test.go.
+	PrepareError string         `json:"prepareError"`
+	Preparing    *preparingBody `json:"preparing"`
+}
+
+// preparingBody is the `preparing` object on GET /api/session.
+type preparingBody struct {
+	JobID         string `json:"jobId"`
+	Mode          string `json:"mode"`
+	QuestionCount int    `json:"questionCount"`
+	StartedAt     string `json:"startedAt"`
+	Seed          string `json:"seed"`
 }
 
 type errorBody struct {

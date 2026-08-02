@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"kubestronaut-sim/facilitator/internal/bootstate"
@@ -53,6 +54,17 @@ type server struct {
 	// run that predates them.
 	hist  *history.Store
 	banks BanksFetcher
+
+	// seeder prepares the exam cluster for a pooled hands-on bank's drawn
+	// questions, and is nil everywhere else — see WithSeeder in
+	// prepare.go. prep/prepError/prepGen are the in-flight preparation
+	// that seeder is running, guarded by prepMu; they are the only mutable
+	// state this server holds, and they are deliberately not persisted.
+	seeder    Seeder
+	prepMu    sync.Mutex
+	prep      *prep
+	prepError string
+	prepGen   uint64
 }
 
 // New builds the facilitator's complete HTTP handler: the /api/*
@@ -72,9 +84,9 @@ type server struct {
 // about boot from having to construct one.
 //
 // Everything that arrived after the original nine parameters comes in as
-// an Option instead (WithHistory, WithBanks). A tenth and eleventh
-// positional argument would have made every existing call site — five
-// test files and main — restate two nils they do not care about.
+// an Option instead (WithHistory, WithBanks, WithSeeder). A tenth and
+// eleventh positional argument would have made every existing call site
+// — five test files and main — restate nils they do not care about.
 func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desktop, control http.Handler, ui fs.FS, boot *bootstate.Reader, practice PracticeGrader, opts ...Option) http.Handler {
 	s := &server{ex: ex, bankDir: bankDir, mgr: mgr, grade: grade, desktop: desktop, ui: ui, boot: boot, practice: practice}
 	for _, opt := range opts {
@@ -161,7 +173,7 @@ type examResponse struct {
 	PassingScore      int    `json:"passingScore"`
 	KubernetesVersion string `json:"kubernetesVersion"`
 	// QuestionCount is the exam's declared length — ex.ExamLength for a
-	// pooled mcq bank, otherwise len(Questions) — and is what the lobby
+	// pooled bank, otherwise len(Questions) — and is what the lobby
 	// and the bank-switch cards must show. It is deliberately NOT always
 	// len(Questions) below: before an attempt exists there is nothing
 	// drawn yet, so Questions still lists the full pool, which for a
@@ -336,7 +348,7 @@ func (s *server) domainInfo() []domainInfo {
 
 // declaredQuestionCount is the exam's length as the candidate is meant
 // to see it BEFORE an attempt exists to draw one from: ex.ExamLength for
-// a pooled mcq bank, otherwise the size of the whole pool. Every display
+// a pooled bank, otherwise the size of the whole pool. Every display
 // site (the lobby stat, the bank-switch cards) wants this, never
 // len(s.ex.Questions) directly — that would show the pool's full size on
 // a bank where a candidate never sees more than ExamLength of it.
@@ -351,7 +363,7 @@ func (s *server) declaredQuestionCount() int {
 	if ids := s.mgr.QuestionIDs(); len(ids) > 0 {
 		return len(ids)
 	}
-	if s.ex.ExamLength > 0 && s.ex.ExamLength < len(s.ex.Questions) {
+	if exam.Pooled(s.ex) {
 		return s.ex.ExamLength
 	}
 	return len(s.ex.Questions)
@@ -359,10 +371,10 @@ func (s *server) declaredQuestionCount() int {
 
 // questionsForExamResponse is what GET /api/exam lists under
 // "questions": the current attempt's drawn subset, in draw order, once a
-// pooled mcq attempt has started (or ended — the score screen's own
-// getExam call, if any, sees the same attempt) — and the full pool
-// otherwise, which for hands-on, an unpooled mcq bank, and the idle
-// window before any attempt has been started is exactly the previous,
+// pooled attempt has started (or ended — the score screen's own getExam
+// call, if any, sees the same attempt) — and the full pool otherwise,
+// which for an unpooled bank of either engine and for the idle window
+// before any attempt has been started is exactly the previous,
 // pre-pooling behaviour.
 func (s *server) questionsForExamResponse() []exam.Question {
 	ids := s.mgr.QuestionIDs()
@@ -379,9 +391,9 @@ func (s *server) questionsForExamResponse() []exam.Question {
 }
 
 // findQuestion looks up a question by id in exam order, restricted to
-// the current attempt's drawn subset when one exists (a pooled mcq bank
-// once StartMCQ has run) — otherwise (hands-on; an mcq bank with no
-// pooling; the idle window before any attempt) the full pool, exactly as
+// the current attempt's drawn subset when one exists (a pooled bank once
+// an attempt has started) — otherwise (an unpooled bank of either
+// engine; the idle window before any attempt) the full pool, exactly as
 // before pooling existed. Every endpoint that reads or writes a single
 // question by id (GET /api/questions/{id}, its solution and hints, and
 // the answer PUT) goes through this, so none of them can be used to
@@ -689,6 +701,15 @@ type sessionResponse struct {
 	Seed         string   `json:"seed,omitempty"`
 	PoolDigest   string   `json:"poolDigest,omitempty"`
 	DomainFilter []string `json:"domainFilter,omitempty"`
+	// Preparing describes an attempt that has been drawn but whose
+	// cluster is still being seeded — see handleSessionGet. Absent
+	// entirely on every bank that seeds at boot, which is all of them
+	// today, and on every mcq bank forever.
+	Preparing *preparingInfo `json:"preparing,omitempty"`
+	// PrepareError is why the last preparation did not produce an
+	// attempt. Set only after a failure, cleared by the next start or by
+	// DELETE /api/session.
+	PrepareError string `json:"prepareError,omitempty"`
 }
 
 func toSessionResponse(snap session.Snapshot) sessionResponse {
@@ -753,11 +774,11 @@ func (s *server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Every attempt draws, on both engines. A pooled mcq bank draws a
-	// fresh subset (Reset having cleared the last one, so "New attempt"
-	// means a new draw rather than a replay); everything else draws every
-	// in-scope question in bank order, which without a domain filter is
-	// the whole bank exactly as before. See exam.Draw.
+	// Every attempt draws, on both engines. A pooled bank draws a fresh
+	// subset (Reset having cleared the last one, so "New attempt" means a
+	// new draw rather than a replay); everything else draws every in-scope
+	// question in bank order, which without a domain filter is the whole
+	// bank exactly as before. See exam.Draw.
 	drawn, err := exam.Draw(s.ex, exam.DrawOptions{Seed: body.Seed, Domains: body.Domains})
 	if err != nil {
 		// A malformed seed or an unknown domain is the caller's mistake;
@@ -779,12 +800,25 @@ func (s *server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 	// nothing at all rather than with a comparable attempt and a warning.
 	poolChanged := body.PoolDigest != "" && body.PoolDigest != drawn.PoolDigest
 
-	snap, err := s.mgr.StartDraw(body.Mode, s.durationFor(body.Mode), session.Draw{
+	draw := session.Draw{
 		QuestionIDs:  drawn.IDs,
 		Seed:         drawn.Seed,
 		PoolDigest:   drawn.PoolDigest,
 		DomainFilter: drawn.Domains,
-	})
+	}
+
+	// A pooled hands-on bank's cluster holds nothing yet: its boot skipped
+	// the seed loop precisely so that this draw could decide what to seed
+	// (images/k8s-env/bootstrap.sh). The questions have to be created
+	// before the attempt is worth sitting, and the clock must not be
+	// running while that happens — so the response here is 202 and a job
+	// to watch, not a session.
+	if s.seedRequired() {
+		s.startPrepared(w, r, body.Mode, draw, poolChanged)
+		return
+	}
+
+	snap, err := s.mgr.StartDraw(body.Mode, s.durationFor(body.Mode), draw)
 	if err != nil {
 		writeJSONError(w, http.StatusConflict, err.Error())
 		return
@@ -792,6 +826,55 @@ func (s *server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, startResponse{
 		sessionResponse: toSessionResponse(snap),
 		PoolChanged:     poolChanged,
+	})
+}
+
+// startPrepared answers POST /api/session/start for a pooled hands-on
+// bank: it hands the draw to the conductor to seed and replies 202 with
+// the job to watch. Nothing here starts a clock — see watchPrepare,
+// which does, once and only once the seeding has succeeded.
+func (s *server) startPrepared(w http.ResponseWriter, r *http.Request, mode string, draw session.Draw, poolChanged bool) {
+	if s.seeder == nil {
+		// A build with no route to the conductor cannot prepare this bank's
+		// cluster, and starting anyway would hand the candidate a timed
+		// attempt against questions that do not exist. Saying so beats
+		// scoring them zero for it.
+		writeJSONError(w, http.StatusServiceUnavailable,
+			"this exam prepares its questions when an attempt starts, and the environment service is not reachable")
+		return
+	}
+	// Checked here as well as inside StartDraw, because on this path
+	// StartDraw does not run for another few minutes: without it a start
+	// against a running attempt would seed over that attempt's cluster
+	// before discovering the conflict.
+	if state := s.mgr.Snapshot().State; state != "idle" {
+		writeJSONError(w, http.StatusConflict, "session: start: invalid state transition")
+		return
+	}
+
+	p, err := s.beginPrepare(r.Context(), mode, s.durationFor(mode), draw)
+	if err != nil {
+		if errors.Is(err, errPreparing) || errors.Is(err, errPreparingCancelled) {
+			writeJSONError(w, http.StatusConflict, err.Error())
+			return
+		}
+		// The conductor refused (a control job in flight, a session it can
+		// see running) or could not be reached. Either way no attempt has
+		// begun and the candidate must be told why.
+		writeJSONError(w, http.StatusConflict, "the exam environment could not be prepared: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, prepareResponse{
+		State:         "preparing",
+		Bank:          s.mgr.Snapshot().Bank,
+		Mode:          p.mode,
+		JobID:         p.jobID,
+		QuestionCount: len(p.draw.QuestionIDs),
+		Seed:          p.draw.Seed,
+		PoolDigest:    p.draw.PoolDigest,
+		DomainFilter:  p.draw.DomainFilter,
+		PoolChanged:   poolChanged,
 	})
 }
 
@@ -868,8 +951,21 @@ func (s *server) handleBoot(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.bootState())
 }
 
+// handleSessionGet is the poll every client already runs, and is where
+// an attempt waiting on its cluster is reported.
+//
+// `preparing` is attached HERE and on no other endpoint, because this is
+// the one a client polls: the terminal condition for a 202 from
+// /api/session/start is `preparing` disappearing from this response, at
+// which point `state` is "running" (it worked) or "idle" with
+// `prepareError` set (it did not). Deliberately not a fourth `state`
+// value — the session genuinely is idle until the clock starts, and
+// every client that has never heard of pooling keeps reading a response
+// that is true.
 func (s *server) handleSessionGet(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, toSessionResponse(s.mgr.Snapshot()))
+	resp := toSessionResponse(s.mgr.Snapshot())
+	resp.Preparing, resp.PrepareError = s.prepSnapshot()
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (s *server) handleSessionEnd(w http.ResponseWriter, r *http.Request) {
@@ -883,7 +979,13 @@ func (s *server) handleSessionEnd(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, toSessionResponse(s.mgr.Snapshot()))
 }
 
+// handleSessionDelete returns the session to idle from any state — and
+// abandons any preparation in flight, which is the same statement about
+// an attempt that has not started its clock yet. Without that, a reset
+// during preparation would be followed minutes later by the watcher
+// starting the very attempt the reset just cancelled.
 func (s *server) handleSessionDelete(w http.ResponseWriter, r *http.Request) {
+	s.cancelPrep()
 	if err := s.mgr.Reset(); err != nil {
 		writeJSONError(w, http.StatusInternalServerError, err.Error())
 		return

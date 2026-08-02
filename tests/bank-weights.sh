@@ -7,11 +7,22 @@
 # Four invariants, per bank (see docs/bank-spec.md):
 #
 #   1. spec.domainWeights sums to 100;
-#   2. each domain's share of the points is within TOLERANCE percentage
-#      points of its spec.domainWeights entry;
+#   2. WITHOUT spec.examLength (or one >= the pool): each domain's share
+#      of the points is within TOLERANCE percentage points of its
+#      spec.domainWeights entry — the whole bank IS the exam every
+#      attempt, so its own composition has to match the curriculum.
+#      WITH a smaller spec.examLength the bank pools: exam.Draw
+#      stratifies every draw to hit each domain's target COUNT exactly
+#      regardless of the pool's own ratio, so what is checked instead is
+#      that every domain's pool is at least as deep as that target — a
+#      draw must always be possible. This is bank-mcq.sh's invariant (5),
+#      applied here because pooling stopped being mcq-only;
 #   3. a question's `weight:` equals the sum of its `# points:` headers;
 #   4. the questions in exam.yaml and the q*/ directories on disk are
-#      the same set.
+#      the same set;
+#   5. spec.examLength, when present, is positive and no larger than the
+#      pool — the same refusal facilitator/internal/exam.Load makes at
+#      boot, made here in seconds instead.
 #
 # A bank with no spec.domainWeights is skipped for (1) and (2) —
 # smoke-01, the hidden switch-test fixture, has no curriculum mapping —
@@ -94,6 +105,42 @@ def domain_weights(text):
     return out or None
 
 
+def exam_length(text):
+    """Parse spec.examLength: N, or None when absent. Same parser as
+    tests/bank-mcq.sh, widened to match a negative so a typo is caught
+    here rather than read as 'absent'."""
+    m = re.search(r"^\s*examLength:\s*(-?\d+)\s*$", text, re.M)
+    return int(m.group(1)) if m else None
+
+
+def domain_targets(weights, order, n):
+    """Largest-remainder rounding of n across order's domains, in the
+    ratios weights declares — the exact algorithm exam.Draw uses
+    (facilitator/internal/exam/exam.go domainTargets), so this gate
+    checks pool depth against the same numbers a real draw will ask for.
+    Copied from tests/bank-mcq.sh rather than shared: these two gates
+    are standalone scripts on purpose, and the algorithm is eight lines
+    that the Go implementation is the authority for anyway."""
+    raw = {d: weights[d] * n / 100 for d in order}
+    targets = {d: int(raw[d]) for d in order}
+    leftover = n - sum(targets.values())
+    remainders = sorted(order, key=lambda d: (-(raw[d] - targets[d]), order.index(d)))
+    for d in remainders[:leftover]:
+        targets[d] += 1
+    return targets
+
+
+def domain_order(questions):
+    """Each distinct domain once, in first-appearance order — what
+    exam.go's domainOrder produces, and what the largest-remainder
+    tie-break above depends on."""
+    order = []
+    for q in questions:
+        if q["domain"] not in order:
+            order.append(q["domain"])
+    return order
+
+
 for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
     bank_dir = os.path.dirname(exam_path)
     bank = os.path.basename(bank_dir)
@@ -144,6 +191,16 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
         if total != int(q["weight"]):
             fail(bank, f"{q['id']} weight is {q['weight']} but its checks total {total}")
 
+    # (5) — checked before anything reads the value.
+    length = exam_length(text)
+    if length is not None and length < 0:
+        fail(bank, f"spec.examLength is {length}; a length is positive or absent")
+        length = None
+    if length is not None and length > len(questions):
+        fail(bank, f"spec.examLength {length} exceeds the pool of {len(questions)} questions")
+        length = None
+    pooled = length is not None and 0 < length < len(questions)
+
     # (1) and (2)
     weights = domain_weights(text)
     grand = sum(points.values())
@@ -166,6 +223,27 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
         fail(bank, f"domain {d!r} has questions but no spec.domainWeights entry")
     for d in sorted(missing):
         fail(bank, f"spec.domainWeights lists {d!r} but no question uses it")
+
+    # (2), pooled form. A pooled bank's attempt is stratified by COUNT,
+    # so the pool's own point distribution says nothing about what a
+    # candidate gets; what would break an attempt is a domain too shallow
+    # to fill its target, and Draw refuses outright when that happens.
+    # Finding that out here costs a second; finding it out at Start costs
+    # a candidate their attempt.
+    if pooled:
+        order = domain_order(questions)
+        targets = domain_targets(weights, order, length)
+        print(f"{bank}: {len(questions)} questions, {grand} points "
+              f"(pooled — every attempt draws {length})")
+        for d in order:
+            have = sum(1 for q in questions if q["domain"] == d)
+            need = targets[d]
+            mark = "ok " if have >= need else "OFF"
+            print(f"  [{mark}] pool {have:3d}  draw {need:3d}  {d}")
+            if have < need:
+                fail(bank, f"{d} needs {need} questions for a {length}-question draw, "
+                           f"pool has {have}")
+        continue
 
     print(f"{bank}: {len(questions)} questions, {grand} points")
     for d in sorted(by_domain, key=lambda x: -by_domain[x]):

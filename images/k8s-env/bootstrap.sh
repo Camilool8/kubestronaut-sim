@@ -167,11 +167,45 @@ kubectl -n ingress-nginx wait --for=condition=Available \
 # session, so there is nothing to seed and the loop below would crash on
 # the missing scripts.
 exam_type=$(yq -r '.spec.examType // "hands-on"' "${BANK_DIR}/exam.yaml")
+
+# A POOLED bank (spec.examLength smaller than its question pool) skips
+# the seed loop entirely and has the drawn subset seeded when the attempt
+# starts instead — POST /api/session/start, then the conductor's seed job
+# (conductor/internal/control/seed.go). The predicate below and
+# exam.Pooled in the facilitator are the same statement about the same
+# bank, and they must not drift: whichever one is wrong, the candidate
+# gets a cluster that does not match their exam.
+#
+# It is opt-in for a reason. Moving the seed from boot to session start
+# is only a win when the draw is a strict subset; for a bank whose every
+# attempt is the whole pool it would just relocate four minutes from a
+# screen that is already a progress screen to the moment the candidate
+# presses Start.
+exam_length=$(yq -r '.spec.examLength // 0' "${BANK_DIR}/exam.yaml")
+pool_size=$(yq -r '.spec.questions | length' "${BANK_DIR}/exam.yaml")
+pooled=0
+# An `if`, not `[ ... ] && pooled=1`: under `set -e` a trailing test that
+# fails is an aborted boot, and "this bank does not pool" is the normal
+# case for every bank in the tree.
+if [ "$exam_length" -gt 0 ] && [ "$exam_length" -lt "$pool_size" ]; then
+  pooled=1
+fi
+
 phase seed "Setting up the exam questions" 7
 if [ "$exam_type" = "mcq" ]; then
   echo "multiple-choice bank; no cluster seeding needed"
   detail "no cluster seeding for a multiple-choice bank"
-elif [ "$created" = "1" ]; then
+elif [ "$created" != "1" ]; then
+  echo "existing cluster resumed; skipping seed"
+elif [ "$pooled" = "1" ]; then
+  # The images still load here, and deliberately so: pulling them is the
+  # slowest and least reliable part of seeding, it is identical whichever
+  # questions get drawn, and doing it at boot is what keeps the per-
+  # attempt seed down to running scripts against a warm node.
+  preload_bank_images
+  echo "pooled bank (${exam_length} of ${pool_size}); questions are seeded when an attempt starts"
+  detail "questions are set up when an attempt starts"
+else
   preload_bank_images
   qids=$(yq -r '.spec.questions[].id' "${BANK_DIR}/exam.yaml")
   total=$(printf '%s\n' "$qids" | grep -c . || true)
@@ -186,8 +220,6 @@ elif [ "$created" = "1" ]; then
     detail "question ${n} of ${total}"
     bash "${BANK_DIR}/${qid}/setup.sh"
   done
-else
-  echo "existing cluster resumed; skipping seed"
 fi
 
 # regenerate the desktop's login banner for the active bank (consumed by

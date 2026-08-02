@@ -22,11 +22,21 @@ type fakeOps struct {
 	banks     []string
 	reseedErr error
 	reseeded  []string
+	seedErr   error
+	seeded    []string
 }
 
 func (f *fakeOps) Reseed(_ context.Context, qid string) error {
 	f.reseeded = append(f.reseeded, qid)
 	return f.reseedErr
+}
+
+func (f *fakeOps) StartSeed(questions []string) (job.Job, error) {
+	f.seeded = append(f.seeded, questions...)
+	if f.seedErr != nil {
+		return job.Job{}, f.seedErr
+	}
+	return f.store.Begin("seed", "ckad-mock-01", []job.PhaseSpec{{ID: "seed-questions", Label: "Set up the exam questions"}})
 }
 
 func (f *fakeOps) StartReset() (job.Job, error) {

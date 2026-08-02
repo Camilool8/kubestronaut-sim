@@ -25,6 +25,12 @@ type Ops interface {
 	// back a job to poll, because it takes seconds and must not take the
 	// single-job lock a cluster rebuild needs.
 	Reseed(ctx context.Context, qid string) error
+	// StartSeed runs setup.sh for each of a pooled bank's drawn
+	// questions, preparing the cluster for one attempt. Asynchronous, and
+	// deliberately unlike Reseed: this is minutes of work, it is exactly
+	// the kind of thing the single-job lock exists to serialise, and the
+	// candidate must be able to watch it.
+	StartSeed(questions []string) (job.Job, error)
 }
 
 // New returns the conductor's HTTP handler.
@@ -74,6 +80,28 @@ func New(ops Ops, store *job.Store) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	})
 
+	// Seeding a pooled bank's drawn questions. Called by the FACILITATOR,
+	// not by the browser: it is the facilitator that draws, so it is the
+	// facilitator that knows which questions a cluster must be prepared
+	// for, and the attempt it then starts must not be startable by anyone
+	// who can name a list of ids. Every id is still gated here as if it
+	// came from the browser — it did, one hop earlier.
+	mux.HandleFunc("POST /api/control/seed", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Questions []string `json:"questions"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeError(w, http.StatusBadRequest, "body must be JSON with a non-empty \"questions\" array")
+			return
+		}
+		j, err := ops.StartSeed(body.Questions)
+		if err != nil {
+			writeOpError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusAccepted, map[string]any{"job": j})
+	})
+
 	mux.HandleFunc("GET /api/control/banks", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, ops.Banks())
 	})
@@ -113,6 +141,10 @@ func writeOpError(w http.ResponseWriter, err error) {
 	case errors.Is(err, control.ErrNotTraining):
 		writeError(w, http.StatusForbidden, err.Error())
 	case errors.Is(err, control.ErrNoReseed):
+		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, control.ErrNoSeed):
+		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, control.ErrNoSeedTargets):
 		writeError(w, http.StatusBadRequest, err.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, err.Error())

@@ -1,8 +1,8 @@
 // Package job tracks the conductor's single in-flight control operation
-// (a reset or a bank switch) as a sequence of named phases, so the UI
-// can render live progress and a terminal outcome. Exactly one job may
-// run at a time: control operations rebuild cluster state and must never
-// interleave.
+// (a reset, a bank switch, or seeding a pooled bank's drawn questions)
+// as a sequence of named phases, so the UI can render live progress and
+// a terminal outcome. Exactly one job may run at a time: control
+// operations rebuild cluster state and must never interleave.
 package job
 
 import (
@@ -64,8 +64,8 @@ type Phase struct {
 // Status are deep copies — callers can never mutate store state.
 type Job struct {
 	ID         string  `json:"id"`
-	Op         string  `json:"op"`   // "reset" | "switch"
-	Bank       string  `json:"bank"` // target bank for switch, "" for reset
+	Op         string  `json:"op"`   // "reset" | "switch" | "seed"
+	Bank       string  `json:"bank"` // target bank for switch and seed, "" for reset
 	StartedAt  string  `json:"startedAt"`
 	FinishedAt string  `json:"finishedAt,omitempty"`
 	Phase      string  `json:"phase"` // id of the phase currently running ("" before the first)

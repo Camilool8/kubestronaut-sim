@@ -90,7 +90,7 @@ func recordAttempt(store *history.Store, ex *exam.Exam, token string, snap sessi
 // pooled bank, the whole authored pool otherwise. It is what a draw has
 // to match to be a full-length attempt.
 func declaredLength(ex *exam.Exam) int {
-	if ex.ExamLength > 0 && ex.ExamLength < len(ex.Questions) {
+	if exam.Pooled(ex) {
 		return ex.ExamLength
 	}
 	return len(ex.Questions)
