@@ -1,7 +1,3 @@
-# Question 4 | CronJob and Job
-
-*Solve this question on instance: `ssh instance-2`*
-
 Team Vega runs its housekeeping in Namespace `vega`.
 
 1. Create a CronJob named `log-rotate` that runs **every 5 minutes**. Its

@@ -1,7 +1,3 @@
-# Question 12 | Roll out, then roll back
-
-*Solve this question on instance: `ssh instance-2`*
-
 Deployment `payments-api` in Namespace `draco` currently runs
 `nginx:1.27-alpine`.
 

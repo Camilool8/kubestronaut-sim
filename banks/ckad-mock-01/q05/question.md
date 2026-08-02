@@ -1,7 +1,3 @@
-# Question 5 | Init container and native sidecar
-
-*Solve this question on instance: `ssh instance-1`*
-
 Namespace `lyra` already runs a Deployment `feed-source`, exposed by a
 Service of the same name on port `80`.
 

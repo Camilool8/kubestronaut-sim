@@ -1,7 +1,3 @@
-# Question 7 | Lock down a Pod
-
-*Solve this question on instance: `ssh instance-1`*
-
 Namespace `cygnus` needs a hardened workload.
 
 Create a Pod named `vault-agent` in Namespace `cygnus` with a single

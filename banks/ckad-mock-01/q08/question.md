@@ -1,7 +1,3 @@
-# Question 8 | Route two Services with one Ingress
-
-*Solve this question on instance: `ssh instance-2`*
-
 Namespace `helios` runs two Deployments, `storefront` and `checkout`,
 each already exposed by a ClusterIP Service of the same name on port
 `80`.

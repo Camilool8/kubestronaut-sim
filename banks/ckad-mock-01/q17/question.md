@@ -1,7 +1,3 @@
-# Question 17 | Find out why two workloads are broken
-
-*Solve this question on instance: `ssh instance-1`*
-
 Namespace `corvus` has three workloads. One is healthy; two are not, and
 they are broken in different ways.
 

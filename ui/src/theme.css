@@ -1126,6 +1126,19 @@
   white-space: nowrap;
 }
 
+/* The domain is the one chip whose text the bank writes, so it is the one
+   that cannot promise to be short: CKAD ships "Application Environment,
+   Configuration and Security", which is wider than the pane's 280px floor
+   and overflowed it even at the 360px default — nowrap meant the chip
+   never shrank, it just ran past the edge and was clipped. It wraps
+   instead of ellipsing because a truncated domain is a domain you cannot
+   read, and the row already wraps. */
+.task-chip-domain {
+  white-space: normal;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 /* The host chip keeps the accent treatment it has always had — which box
    to ssh into is the single most load-bearing fact per task, and it is the
    one accent object this header is allowed. `.instance-chip` carries the

@@ -1,7 +1,3 @@
-# Question 13 | Kustomize overlay
-
-*Solve this question on instance: `ssh instance-1`*
-
 A Kustomize base lives at `/opt/course/13/base` on `instance-1`, with an
 unfinished overlay at `/opt/course/13/overlays/staging`.
 

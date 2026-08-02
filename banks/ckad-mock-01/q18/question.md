@@ -1,7 +1,3 @@
-# Question 18 | Bring a manifest up to date
-
-*Solve this question on instance: `ssh instance-2`*
-
 `/opt/course/18/legacy.yaml` on `instance-2` holds two resources written
 against Kubernetes API versions that no longer exist. Applying it fails.
 

@@ -442,8 +442,16 @@ Real requirements with no gate behind them. Breaking one ships a broken bank
 that every test passes.
 
 - `setup.sh` re-runs on every reset and bank switch, so write it idempotent.
-- `question.md` must name the instance the candidate works on. Nothing
-  cross-checks it against `spec.questions[].instance`.
+- `question.md` is the task body ONLY. It must not open with a
+  `# Question N | Title` heading or repeat the instance in prose: the task
+  pane renders both from structured data — the title from
+  `spec.questions[].title`, the instance from `spec.questions[].instance`
+  as a chip and as the WORK FROM block — so a bank that also writes them
+  draws the title twice and the ssh host three times. This used to be the
+  opposite rule, back when the markdown was the only channel for either.
+  Naming the instance in prose was also an un-gated way to disagree with
+  `spec.questions[].instance`, which is the field that actually decides
+  where a check runs; there is now nothing to disagree with.
 - Checks must be side-effect free. `check-lint` catches the known brittle
   idioms, not mutation.
 - `# desc:` is parsed ([exam.go:169,192](../facilitator/internal/exam/exam.go))

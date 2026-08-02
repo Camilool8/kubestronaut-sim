@@ -106,3 +106,28 @@ describe("desktop viewport", () => {
     expect(ruleBody(css, ".mcq-question")).toContain("position: relative");
   });
 });
+
+// The chip row is written by the bank, and a bank writes what it likes.
+// `.task-chip` sets `white-space: nowrap`, which is right for "Weight 5%"
+// and wrong for the domain: CKAD ships "Application Environment,
+// Configuration and Security", and nowrap meant that chip never shrank —
+// it ran past the pane's right edge and was clipped, at the 360px default
+// as well as at the resizer's 280px floor. jsdom cannot see this; only the
+// declaration can be checked here, and the widths were measured live.
+describe("the task pane's domain chip", () => {
+  test("overrides nowrap so a long curriculum domain wraps instead of clipping", async () => {
+    const css = await readThemeCss();
+    const chip = ruleBody(css, ".task-chip");
+    const domain = ruleBody(css, ".task-chip-domain");
+
+    expect(chip, ".task-chip was renamed or removed").not.toBeNull();
+    expect(chip, "this test exists because the base chip refuses to wrap").toContain(
+      "white-space: nowrap",
+    );
+    expect(domain, ".task-chip-domain was renamed or removed").not.toBeNull();
+    expect(domain).toContain("white-space: normal");
+    // Without min-width: 0 the chip keeps its max-content width as a flex
+    // item and wrapping the text changes nothing.
+    expect(domain).toContain("min-width: 0");
+  });
+});

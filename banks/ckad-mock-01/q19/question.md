@@ -1,7 +1,3 @@
-# Question 19 | A Service that reaches nothing
-
-*Solve this question on instance: `ssh instance-1`*
-
 Namespace `serpens` runs Deployment `inventory` with 2 replicas. Its
 Service, also named `inventory`, is supposed to expose it on port `80`
 but nothing can reach it. The Deployment is correct — the Service is not,

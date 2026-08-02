@@ -1,7 +1,3 @@
-# Question 10 | Persistent and ephemeral storage
-
-*Solve this question on instance: `ssh instance-2`*
-
 Team Orion needs somewhere to keep its archives, in Namespace `orion`.
 
 1. Create a PersistentVolume named `archive-pv`:

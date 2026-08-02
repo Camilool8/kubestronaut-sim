@@ -334,7 +334,7 @@ function TaskChips({
 
   return (
     <ul className="task-chips">
-      {question.domain && <li className="task-chip">{question.domain}</li>}
+      {question.domain && <li className="task-chip task-chip-domain">{question.domain}</li>}
       {pct !== null && (
         <li className="task-chip" title={strings.questionPanel.weightShareNote(pct)}>
           {strings.questionPanel.weightShare(pct)}

@@ -1,7 +1,3 @@
-# Question 22 | The ambassador pattern
-
-*Solve this question on instance: `ssh instance-2`*
-
 Namespace `dorado` runs a backend, exposed by Service `payments-backend`
 on port `80`. An application needs to reach it, but the team wants the
 application to know nothing about where the backend lives — it should

@@ -1,7 +1,3 @@
-# Question 9 | Build, push and run a container image
-
-*Solve this question on instance: `ssh instance-1`*
-
 > Run every `podman` command with `sudo`. Rootless builds do not work on
 > these instances, and an image built as your own user is invisible to
 > the grader.

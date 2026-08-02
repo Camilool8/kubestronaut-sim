@@ -1,7 +1,3 @@
-# Question 15 | ServiceAccounts and tokens
-
-*Solve this question on instance: `ssh instance-1`*
-
 Everything below happens in Namespace `phoenix`.
 
 1. Create a ServiceAccount named `pipeline-runner`.

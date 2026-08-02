@@ -1,7 +1,3 @@
-# Question 6 | ConfigMaps, as env and as a volume
-
-*Solve this question on instance: `ssh instance-2`*
-
 Team Atlas needs its configuration split between environment variables
 and a mounted file, in Namespace `atlas`.
 

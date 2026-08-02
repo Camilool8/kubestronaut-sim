@@ -1,7 +1,3 @@
-# Question 16 | Health checks
-
-*Solve this question on instance: `ssh instance-2`*
-
 Deployment `orders-api` in Namespace `hydra` runs 2 replicas behind a
 Service of the same name, with no health checking of any kind.
 

@@ -1,7 +1,3 @@
-# Question 14 | Secrets, and a Deployment that cannot read one
-
-*Solve this question on instance: `ssh instance-2`*
-
 Namespace `tucana` holds a Secret `ledger-creds` and a Deployment
 `ledger-api` that is failing to start.
 
