@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -114,7 +115,50 @@ func newHandsOnPoolServer(t *testing.T, seeder api.Seeder, control http.Handler,
 		opts = append(opts, api.WithSeeder(seeder))
 	}
 	h := api.New(ex, handsOnPoolBankDir, mgr, grader.Grade, fakeDesktop, control, fstest.MapFS{}, nil, nil, opts...)
-	return &testServer{handler: h, mgr: mgr, grader: grader, setNow: setNow}, ex
+	ts := &testServer{handler: h, mgr: mgr, grader: grader, setNow: setNow}
+
+	// sessionPath is this function's ARGUMENT, so t.TempDir() has already
+	// run and registered its own cleanup. Cleanups run
+	// last-registered-first, so this one always gets there before the
+	// directory is removed.
+	t.Cleanup(func() { ts.cancelAnyPreparation(t) })
+	return ts, ex
+}
+
+// cancelAnyPreparation abandons a preparation the test left in flight, so
+// its watcher stops instead of outliving the test.
+//
+// A pooled start answers 202 and leaves a watcher goroutine behind it on
+// purpose (see api.watchPrepare): a candidate may reload the page while a
+// four-minute seed runs, so the watcher outlives the request that spawned
+// it and polls on context.Background. Several tests here park one
+// deliberately — the fake seeder stays SeedRunning, which is exactly the
+// state "a start does not start a clock" is about — and without this
+// those watchers poll every 500ms for the rest of the test binary's life.
+//
+// DELETE is what stops them: it clears the preparation, and the watcher's
+// next prepIsCurrent check returns false and it returns. A parked watcher
+// never writes anything, so cancelling is all this can usefully do.
+//
+// What it does NOT close: a preparation whose seed has already settled is
+// inside startPreparedAttempt, which writes the session file, and that
+// write can land after t.TempDir() has begun removing the directory it
+// lives in — surfacing far away as "TempDir RemoveAll cleanup: directory
+// not empty". Cancelling cannot help there, because the write is already
+// under way. A test that lets a preparation settle must therefore wait
+// for it (ts.waitSettled) before returning; every test here that settles
+// one now does.
+func (ts *testServer) cancelAnyPreparation(t *testing.T) {
+	t.Helper()
+	rec := ts.do(t, http.MethodGet, "/api/session")
+	var got sessionBody
+	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &got) != nil {
+		return
+	}
+	if got.Preparing == nil {
+		return
+	}
+	ts.do(t, http.MethodDelete, "/api/session")
 }
 
 // conductorStub answers GET /api/control/status with a fixed job
@@ -594,6 +638,13 @@ func TestHandsOnPoolResetLetsADifferentDrawThrough(t *testing.T) {
 	}
 	if n := seeder.starts(); n != 2 {
 		t.Errorf("seeder started %d times, want 2", n)
+	}
+	// Through means through: the 202 says the guard stood down, and this
+	// says the attempt the guard was blocking actually ran. Waiting also
+	// keeps this test from racing the watcher it just started against its
+	// own temp directory — see drainPreparation.
+	if got := ts.waitSettled(t); got.State != "running" {
+		t.Fatalf("state after the second draw = %q, want running (prepareError=%q)", got.State, got.PrepareError)
 	}
 }
 
