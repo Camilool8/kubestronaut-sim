@@ -56,13 +56,31 @@ type Exam struct {
 	// published percentage share. Historically read by no Go code (only
 	// tests/bank-mcq.sh, a build gate) — DrawMCQ is what made it a
 	// runtime value, since a pooled draw needs it to know each domain's
-	// target question count.
+	// target question count, and the graders now weight the final score
+	// by it.
 	DomainWeights map[string]int
+	// Domains is DomainWeights resolved against the questions that
+	// actually exist: one entry per domain the questions use, in bank
+	// order, carrying that domain's declared weight (0 when the bank
+	// declares none). It is the map turned into the thing scoring needs —
+	// an ordered list — so no consumer has to re-derive the order from
+	// Questions, and none of them can accidentally range over a Go map.
+	Domains []Domain
 	// ExamLength is spec.examLength: how many questions a pooled mcq
 	// attempt draws from Questions. Zero (or >= len(Questions)) means no
 	// pooling — DrawMCQ returns every question, in bank order, exactly
 	// as every mcq bank behaved before this field existed.
 	ExamLength int
+}
+
+// Domain is one curriculum domain of a bank: its name and the percentage
+// share spec.domainWeights publishes for it. WeightPct is 0 for a bank
+// with no spec.domainWeights at all (smoke-01, the hidden switch-test
+// fixture) — the graders read that as "this bank has no curriculum to
+// weight against" and fall back to weighting by points.
+type Domain struct {
+	Name      string
+	WeightPct int
 }
 
 // Question is a single exam question: its identity plus the checks that
@@ -211,7 +229,58 @@ func Load(examJSONPath, bankDir string) (*Exam, error) {
 		return nil, fmt.Errorf("exam: spec.examLength %d exceeds the pool of %d questions", e.ExamLength, len(e.Questions))
 	}
 
+	// Domains follows the questions, not spec.domainWeights: a weight for
+	// a domain no question uses would weight nothing, and tests/
+	// bank-weights.sh already fails a bank that declares one.
+	for _, name := range domainOrder(e.Questions) {
+		e.Domains = append(e.Domains, Domain{Name: name, WeightPct: e.DomainWeights[name]})
+	}
+
 	return e, nil
+}
+
+// domainOrder returns each distinct question domain once, in the order
+// the domain first appears in questions.
+//
+// First appearance, never sorted and never map order: it is the order the
+// bank author wrote the curriculum in (Fundamentals, Orchestration, ...),
+// and both a pooled draw's question order and a score page's domain
+// rollup read better in it than in an alphabet.
+func domainOrder(questions []Question) []string {
+	var order []string
+	seen := map[string]bool{}
+	for _, q := range questions {
+		if !seen[q.Domain] {
+			seen[q.Domain] = true
+			order = append(order, q.Domain)
+		}
+	}
+	return order
+}
+
+// Subset returns the questions ids names, in ids' order, skipping any id
+// ex does not declare. Empty ids means "no subset was drawn" and returns
+// every question in bank order — which is what a hands-on attempt, an
+// unpooled mcq bank and the pre-pooling behaviour of both all rely on.
+//
+// This is what scopes grading to the attempt: the session records the
+// drawn ids, and every grader routes its question list through here so a
+// pool question the candidate never saw cannot land in the score.
+func Subset(ex *Exam, ids []string) []Question {
+	if len(ids) == 0 {
+		return ex.Questions
+	}
+	byID := make(map[string]Question, len(ex.Questions))
+	for _, q := range ex.Questions {
+		byID[q.ID] = q
+	}
+	out := make([]Question, 0, len(ids))
+	for _, id := range ids {
+		if q, ok := byID[id]; ok {
+			out = append(out, q)
+		}
+	}
+	return out
 }
 
 // validateMCQ enforces the answer-key shape documented in
@@ -388,25 +457,22 @@ func DrawMCQ(ex *Exam) ([]string, error) {
 	// DomainWeights (a map, so unordered) — this is what keeps the drawn
 	// exam flowing through the curriculum in the same order the bank was
 	// authored in (Fundamentals, Orchestration, ...), with only the
-	// identity and order WITHIN a domain randomized.
-	var domainOrder []string
+	// identity and order WITHIN a domain randomized. It is read from the
+	// questions here rather than from ex.Domains so a hand-built Exam
+	// that never went through Load still draws.
+	order := domainOrder(ex.Questions)
 	poolByDomain := map[string][]string{}
-	seenDomain := map[string]bool{}
 	for _, q := range ex.Questions {
-		if !seenDomain[q.Domain] {
-			seenDomain[q.Domain] = true
-			domainOrder = append(domainOrder, q.Domain)
-		}
 		poolByDomain[q.Domain] = append(poolByDomain[q.Domain], q.ID)
 	}
 
-	targets, err := domainTargets(ex.DomainWeights, domainOrder, ex.ExamLength)
+	targets, err := domainTargets(ex.DomainWeights, order, ex.ExamLength)
 	if err != nil {
 		return nil, err
 	}
 
 	drawn := make([]string, 0, ex.ExamLength)
-	for _, d := range domainOrder {
+	for _, d := range order {
 		k := targets[d]
 		pool := poolByDomain[d]
 		if k > len(pool) {

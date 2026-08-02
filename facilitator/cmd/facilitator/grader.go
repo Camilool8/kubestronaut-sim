@@ -122,10 +122,11 @@ func (g *grader) PracticeGrade() (json.RawMessage, error) {
 // whichever engine it belongs to: hands-on runs the ssh checks against
 // the cluster; mcq scores the session's stored answers, pure and
 // instant. Both return the same schema, which is why everything
-// downstream of this call is engine-agnostic.
+// downstream of this call is engine-agnostic, and both are scoped to the
+// attempt's drawn question ids rather than to the whole bank.
 func (g *grader) evaluateResults() *evaluate.Results {
 	if g.ex.Type == exam.TypeMCQ {
 		return mcqgrade.Grade(g.ex, g.bank, g.mgr.Answers(), g.mgr.QuestionIDs())
 	}
-	return evaluate.Grade(g.ex, g.bank, g.runner, g.timeout)
+	return evaluate.Grade(g.ex, g.bank, g.runner, g.timeout, g.mgr.QuestionIDs())
 }

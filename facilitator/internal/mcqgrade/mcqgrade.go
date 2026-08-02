@@ -31,6 +31,11 @@ const checkName = "answer"
 // — a pooled mcq attempt is graded on exactly those questions, in that
 // order, never the full pool. Empty means "no pooling": every question
 // in ex.Questions, exactly as this package graded before pooling existed.
+//
+// Percent is curriculum-weighted (evaluate.Results.Finalize), which for a
+// pooled bank is the difference between a domain counting for its
+// published share and it counting for however many of its questions the
+// draw happened to land on.
 func Grade(ex *exam.Exam, bank string, answers map[string][]int, questionIDs []string) *evaluate.Results {
 	res := &evaluate.Results{
 		Bank:         bank,
@@ -38,21 +43,7 @@ func Grade(ex *exam.Exam, bank string, answers map[string][]int, questionIDs []s
 		PassingScore: ex.PassingScore,
 	}
 
-	questions := ex.Questions
-	if len(questionIDs) > 0 {
-		byID := make(map[string]exam.Question, len(ex.Questions))
-		for _, q := range ex.Questions {
-			byID[q.ID] = q
-		}
-		questions = make([]exam.Question, 0, len(questionIDs))
-		for _, id := range questionIDs {
-			if q, ok := byID[id]; ok {
-				questions = append(questions, q)
-			}
-		}
-	}
-
-	for _, q := range questions {
+	for _, q := range exam.Subset(ex, questionIDs) {
 		selected := answers[q.ID]
 		passed := len(selected) > 0 && equal(selected, q.Correct)
 
@@ -81,15 +72,12 @@ func Grade(ex *exam.Exam, bank string, answers map[string][]int, questionIDs []s
 		}
 
 		res.Questions = append(res.Questions, qr)
-		res.Total += qr.Total
-		res.Earned += qr.Earned
 	}
 
-	if res.Total > 0 {
-		res.Percent = res.Earned * 100 / res.Total
-	}
-	res.Passed = res.Percent >= res.PassingScore
-
+	// Totals, verdicts, the domain rollup and the curriculum weighting
+	// all come from the one implementation in evaluate — the whole point
+	// of emitting its Results shape.
+	res.Finalize(ex.Domains)
 	return res
 }
 

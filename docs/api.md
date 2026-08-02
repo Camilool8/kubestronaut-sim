@@ -362,6 +362,7 @@ The graded scoreboard for the ended attempt.
   "earned": 128,
   "total": 180,
   "percent": 71,
+  "pointsPercent": 71,
   "passingScore": 66,
   "passed": true,
   "questions": [
@@ -371,19 +372,66 @@ The graded scoreboard for the ended attempt.
       "domain": "Application Environment, Configuration and Security",
       "earned": 3,
       "total": 9,
+      "weightPct": 5,
+      "verdict": "partial",
       "checks": [
         {"name": "10_list-file.sh", "desc": "/opt/course/1/aurora-namespaces lists team=aurora namespaces, sorted, names only", "points": 3, "earned": 3, "passed": true, "message": ""},
         {"name": "20_namespace.sh", "desc": "Namespace aurora-staging exists with label team=aurora", "points": 2, "earned": 0, "passed": false, "message": "label team=aurora not found"}
       ]
     }
+  ],
+  "domains": [
+    {"domain": "Application Environment, Configuration and Security", "earned": 30, "total": 45, "weightPct": 25, "questionCount": 5}
   ]
 }
 ```
 
-Abridged: `questions` carries every question in the bank and `checks`
-every check in each. `percent` is integer `earned * 100 / total`, and
-`passed` is `percent >= passingScore`
-(`facilitator/internal/evaluate/evaluate.go:169-171`).
+Abridged: `questions` carries every question the attempt was graded on
+and `checks` every check in each. `passed` is `percent >= passingScore`.
+
+### Weighting and the two percentages
+
+`percent` is the **curriculum-weighted** score: each domain contributes
+its `spec.domainWeights` share of the total, whatever the drawn
+questions happened to be worth in points. `pointsPercent` is the raw
+integer `earned * 100 / total` — what `percent` alone meant before
+weighting existed. Both floor rather than round.
+
+The weighting happens at scoring time rather than being baked into a
+bank's point budget because a bank's points are fixed and a draw is not:
+`tests/bank-weights.sh` can promise that ckad-mock-01's 180 points sit
+in the curriculum's ratios, but not that a filtered or partial draw out
+of it does. On a full-bank hands-on attempt the two numbers are
+identical, because that gate holds the points to the same ratios the
+weights declare. On a pooled bank they differ by about a point:
+kcna-mock's 65-question draw is 29 Fundamentals questions, which is
+44.6% of the points against a published weight of 44%.
+
+Two rules keep the weighted number honest:
+
+- Only the domains the attempt actually drew count. Their weights are
+  renormalized to 100, so a draw covering half the curriculum still
+  scores out of 100 rather than capping at 50.
+- A bank that publishes no `spec.domainWeights` (or publishes them for
+  only some of its domains) is weighted by points instead, which makes
+  `percent` and `pointsPercent` equal. A missing weight is never read as
+  a weight of zero.
+
+`domains` is the per-domain rollup over the graded questions, in bank
+order, and is omitted when nothing was graded. `weightPct`, on a domain
+and on a question, is that item's share of `percent` in percentage
+points — a question's is its domain's share split across that domain's
+questions in proportion to their points. Question shares sum to 100.
+Neither is rounded.
+
+`verdict` is exactly `correct`, `partial` or `failed`. A question with
+no scorable points at all (every check's `# points:` header malformed)
+reads as `failed`, not as a free `correct`.
+
+`pointsPercent`, `weightPct`, `verdict` and `domains` are all additive.
+A result graded before they existed is persisted verbatim in the session
+file and served back unchanged after an upgrade, so a client must
+tolerate their absence.
 
 An mcq attempt is graded from the session's stored answers
 (`facilitator/internal/mcqgrade/mcqgrade.go`), all-or-nothing per
@@ -400,6 +448,8 @@ question, into the same schema: each question carries one synthetic
   "checks": [
     {"name": "answer", "desc": "Correct answer selected", "points": 1, "earned": 0, "passed": false, "message": "selected A — correct A, D"}
   ],
+  "weightPct": 1.5555555555555556,
+  "verdict": "failed",
   "selected": [0],
   "correct": [0, 3],
   "options": ["...", "...", "...", "..."],
@@ -409,7 +459,9 @@ question, into the same schema: each question carries one synthetic
 
 `selected` is absent when the question was never answered. This is the
 only place the answer key ever reaches the client
-(`facilitator/internal/evaluate/evaluate.go:119-135`).
+(`facilitator/internal/evaluate/evaluate.go:160-168`). Grading is
+all-or-nothing, so an mcq `verdict` is only ever `correct` or `failed`,
+never `partial`.
 
 ### DELETE /api/session
 

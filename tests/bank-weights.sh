@@ -4,17 +4,39 @@
 # reads banks/ off disk, so it runs in seconds and belongs at the *top*
 # of smoke.sh rather than forty minutes into it.
 #
-# Three invariants, per bank (see docs/bank-spec.md):
+# Four invariants, per bank (see docs/bank-spec.md):
 #
-#   1. each domain's share of the points is within TOLERANCE percentage
+#   1. spec.domainWeights sums to 100;
+#   2. each domain's share of the points is within TOLERANCE percentage
 #      points of its spec.domainWeights entry;
-#   2. a question's `weight:` equals the sum of its `# points:` headers;
-#   3. the questions in exam.yaml and the q*/ directories on disk are
+#   3. a question's `weight:` equals the sum of its `# points:` headers;
+#   4. the questions in exam.yaml and the q*/ directories on disk are
 #      the same set.
 #
-# A bank with no spec.domainWeights is skipped for (1) — smoke-01, the
-# hidden switch-test fixture, has no curriculum mapping — but still
-# checked for (2) and (3).
+# A bank with no spec.domainWeights is skipped for (1) and (2) —
+# smoke-01, the hidden switch-test fixture, has no curriculum mapping —
+# but still checked for (3) and (4).
+#
+# What (2) proves changed when the graders started applying the weights
+# themselves (evaluate.Results.Finalize). It is no longer the thing that
+# makes a score curriculum-weighted: the grader weights every attempt by
+# spec.domainWeights whether or not the points agree, precisely because a
+# filtered or partial draw out of a bank cannot inherit a promise the
+# whole bank makes. What (2) still proves is the other half, which
+# nothing else does:
+#
+#   - the candidate's *effort* is distributed like the curriculum. A
+#     domain worth 25% that is one cheap question is a bad rehearsal
+#     however the score is computed, and this is the only gate that
+#     notices;
+#   - a full-bank attempt's weighted score and its raw points score are
+#     the same number, so `RESULT` in the smoke suite, the score page and
+#     the two bank-honesty gates all still speak about one score.
+#
+# (1) is new here (tests/bank-mcq.sh has always checked it for mcq
+# banks). The weights are now divided by their own sum at scoring time,
+# so a bank whose weights sum to 90 would silently score every domain
+# 11% heavier than it published.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -90,7 +112,7 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
         if os.path.isdir(p)
     )
 
-    # (3) — and the guard that keeps the regex parsing honest.
+    # (4) — and the guard that keeps the regex parsing honest.
     declared = sorted(q["id"] for q in questions)
     if declared != on_disk:
         only_yaml = sorted(set(declared) - set(on_disk))
@@ -105,7 +127,7 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
         fail(bank, "; ".join(detail))
         continue
 
-    # (2)
+    # (3)
     points = {}
     for q in questions:
         total = 0
@@ -122,13 +144,16 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
         if total != int(q["weight"]):
             fail(bank, f"{q['id']} weight is {q['weight']} but its checks total {total}")
 
-    # (1)
+    # (1) and (2)
     weights = domain_weights(text)
     grand = sum(points.values())
     if weights is None:
         print(f"{bank}: {len(questions)} questions, {grand} points "
               f"(no spec.domainWeights — domain balance not checked)")
         continue
+
+    if sum(weights.values()) != 100:
+        fail(bank, f"spec.domainWeights sums to {sum(weights.values())}, want 100")
 
     by_domain = {}
     for q in questions:

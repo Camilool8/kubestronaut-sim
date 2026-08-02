@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -563,5 +564,57 @@ func TestSpeedDurationDefaultsToHalf(t *testing.T) {
 	}
 	if ex.SpeedDuration != ex.Duration/2 {
 		t.Errorf("SpeedDuration = %v, want half of %v", ex.SpeedDuration, ex.Duration)
+	}
+}
+
+// Domains is the ordered form of spec.domainWeights the graders weight
+// with: question order, never map order, and one entry per domain the
+// questions actually use.
+func TestLoadDomains(t *testing.T) {
+	ex, err := Load("testdata/exam-mcq.json", "testdata/bank-mcq")
+	if err != nil {
+		t.Fatalf("Load mcq fixture: %v", err)
+	}
+	want := []Domain{
+		// q01 is Fundamentals and comes first in the file; the weights map
+		// lists Orchestration first, and must not decide the order.
+		{Name: "Kubernetes Fundamentals", WeightPct: 60},
+		{Name: "Container Orchestration", WeightPct: 40},
+	}
+	if !reflect.DeepEqual(ex.Domains, want) {
+		t.Errorf("Domains = %+v, want %+v", ex.Domains, want)
+	}
+}
+
+// A bank with no spec.domainWeights still gets its domains listed, at
+// weight 0 — "this bank publishes no curriculum split", which is what
+// makes the graders fall back to weighting by points.
+func TestLoadDomainsWithoutWeights(t *testing.T) {
+	ex, err := Load(examJSON, bankDir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	want := []Domain{
+		{Name: "Application Deployment"},
+		{Name: "Application Environment, Configuration and Security"},
+	}
+	if !reflect.DeepEqual(ex.Domains, want) {
+		t.Errorf("Domains = %+v, want %+v", ex.Domains, want)
+	}
+}
+
+func TestSubset(t *testing.T) {
+	ex := &Exam{Questions: []Question{{ID: "q01"}, {ID: "q02"}, {ID: "q03"}}}
+
+	// Empty ids means "no subset was drawn": the whole bank, in order.
+	if got := Subset(ex, nil); len(got) != 3 || got[0].ID != "q01" || got[2].ID != "q03" {
+		t.Errorf("Subset(nil) = %+v, want all three in bank order", got)
+	}
+
+	// Draw order wins over bank order, and an id the bank does not
+	// declare is skipped rather than faked into an empty question.
+	got := Subset(ex, []string{"q03", "q99", "q01"})
+	if len(got) != 2 || got[0].ID != "q03" || got[1].ID != "q01" {
+		t.Errorf("Subset([q03 q99 q01]) = %+v, want [q03 q01]", got)
 	}
 }

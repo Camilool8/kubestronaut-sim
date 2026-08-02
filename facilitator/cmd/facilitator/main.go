@@ -82,7 +82,9 @@ func runGrade() error {
 	}
 
 	runner := evaluate.NewSSHRunner(cfg.sshKey)
-	res := evaluate.Grade(ex, ex.Name, runner, checkTimeout)
+	// No session, so no drawn subset: this path grades the whole bank,
+	// which is the only thing it can mean without one.
+	res := evaluate.Grade(ex, ex.Name, runner, checkTimeout, nil)
 	fmt.Print(res.Scoreboard())
 	return nil
 }

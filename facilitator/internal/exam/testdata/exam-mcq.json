@@ -11,6 +11,10 @@
     "speedDuration": "45m",
     "passingScore": 75,
     "kubernetesVersion": "1.35",
+    "domainWeights": {
+      "Container Orchestration": 40,
+      "Kubernetes Fundamentals": 60
+    },
     "questions": [
       {
         "id": "q01",

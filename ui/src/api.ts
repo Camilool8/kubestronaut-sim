@@ -125,6 +125,23 @@ export interface CheckResult {
   skipped?: boolean;
 }
 
+/** The three states a graded question can be in. Server-decided. */
+export type Verdict = "correct" | "partial" | "failed";
+
+/** One curriculum domain's slice of a graded attempt, rolled up server-side. */
+export interface DomainResult {
+  domain: string;
+  earned: number;
+  total: number;
+  /**
+   * The domain's share of `Results.percent`, in percentage points — its
+   * published curriculum weight, renormalized over the domains this
+   * attempt actually covered. Not rounded; format it for display.
+   */
+  weightPct: number;
+  questionCount: number;
+}
+
 export interface QuestionResult {
   id: string;
   /** Optional short label from the bank; absent, displays fall back to the id. */
@@ -134,6 +151,18 @@ export interface QuestionResult {
   earned: number;
   total: number;
   checks: CheckResult[];
+  /**
+   * This question's share of `Results.percent`, in percentage points: its
+   * domain's weight split across that domain's questions by points. Every
+   * question's share sums to 100.
+   *
+   * Optional like every field below it: a result graded before these
+   * existed is persisted verbatim in the session file and served back
+   * unchanged after an upgrade, so a reader cannot assume they are there.
+   */
+  weightPct?: number;
+  /** correct / partial / failed, derived from earned and total by the grader. */
+  verdict?: Verdict;
   /**
    * mcq only (absent on hands-on results): the candidate's selection
    * (absent when unanswered), the answer key, and the option texts —
@@ -150,10 +179,21 @@ export interface Results {
   gradedAt: string;
   earned: number;
   total: number;
+  /**
+   * The score that decides `passed`: curriculum-weighted, so each domain
+   * counts for its published share whatever the drawn questions were
+   * worth. `pointsPercent` is the raw earned/total.
+   */
   percent: number;
+  pointsPercent?: number;
   passingScore: number;
   passed: boolean;
   questions: QuestionResult[];
+  /**
+   * Per-domain rollup over the questions this attempt was graded on, in
+   * bank order. Absent when nothing was graded.
+   */
+  domains?: DomainResult[];
 }
 
 interface ApiErrorBody {
