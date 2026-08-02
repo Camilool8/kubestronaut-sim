@@ -23,6 +23,32 @@ export interface SessionSnapshot {
    * like, and the two must not render the same.
    */
   untimed: boolean;
+  /**
+   * How long this attempt has been running, server-measured. Present for
+   * every attempt including an untimed one, which is the whole reason it
+   * exists: `durationSeconds - remainingSeconds` is the elapsed time of a
+   * TIMED attempt only, and training reports both as 0.
+   */
+  elapsedSeconds?: number;
+  /**
+   * The seed this attempt's questions were drawn from — six lowercase hex
+   * digits. Pass it back to `startSession` to draw the same set again.
+   * Absent on an attempt started before seeding existed.
+   */
+  seed?: string;
+  /**
+   * Fingerprint of the question pool the draw ran against. A seed only
+   * reproduces a draw within one pool: edit the bank and the same seed
+   * yields a different set. Carry this beside the seed so a replay can
+   * say "the bank changed" instead of looking broken.
+   */
+  poolDigest?: string;
+  /**
+   * The curriculum domains this attempt drew from, when the candidate
+   * narrowed the draw. Absent or empty means the whole curriculum — a
+   * full-coverage attempt, the only kind a "passed" claim can rest on.
+   */
+  domainFilter?: string[];
 }
 
 export interface ExamQuestionInfo {
@@ -38,6 +64,35 @@ export interface ExamQuestionInfo {
   hintCount: number;
   /** mcq only: true for a select-all-that-apply question. */
   multi?: boolean;
+  /**
+   * How long this question is meant to take, in seconds — the pacing
+   * figure the task chip prints.
+   *
+   * It is a budget, never a limit: nothing enforces it, and running over
+   * costs no points. Copy must not imply otherwise.
+   */
+  targetSeconds?: number;
+  /**
+   * True when `targetSeconds` was DERIVED (the question's weight's share
+   * of the exam clock) rather than authored in the bank. A derived figure
+   * must be labelled as derived — it is arithmetic about weights, not
+   * anyone's judgement of how long the work takes.
+   */
+  targetDerived?: boolean;
+}
+
+/**
+ * One curriculum domain of the loaded exam, as the bank publishes it.
+ *
+ * `weightPct` is `spec.domainWeights` — what the domain is worth in the
+ * real certification — while `questionCount` is how many questions the
+ * bank has in it. The two are independent: a domain can be worth 44% of
+ * the exam and hold three questions.
+ */
+export interface DomainInfo {
+  name: string;
+  weightPct: number;
+  questionCount: number;
 }
 
 /** Which engine grades the active bank. */
@@ -90,6 +145,15 @@ export interface ExamInfo {
   questions: ExamQuestionInfo[];
   /** Rendered by the lobby's picker, so the modes are the server's list. */
   modes?: ExamMode[];
+  /**
+   * The bank's curriculum domains, in the order it declares them — the
+   * list the draw configurator's chips are built from.
+   *
+   * Read this rather than counting `questions` by domain: once an attempt
+   * has drawn its subset, `questions` is that subset, so counting it would
+   * show the drawn questions as if they were the whole curriculum.
+   */
+  domains?: DomainInfo[];
 }
 
 export interface QuestionDetail {
@@ -164,6 +228,17 @@ export interface QuestionResult {
   /** correct / partial / failed, derived from earned and total by the grader. */
   verdict?: Verdict;
   /**
+   * How long this question was on screen, in seconds.
+   *
+   * It measures the TASK PANE, not attention — a candidate reading the
+   * question while thinking in a terminal accrues time, and one who
+   * walked away accrues (a capped amount of) it too. Every label built
+   * from this must say "open", never "spent" or "worked".
+   */
+  timeSpentSeconds?: number;
+  /** The question's pacing budget, repeated here so the table can compare. */
+  targetSeconds?: number;
+  /**
    * mcq only (absent on hands-on results): the candidate's selection
    * (absent when unanswered), the answer key, and the option texts —
    * everything the score review needs without re-fetching the question.
@@ -194,6 +269,18 @@ export interface Results {
    * bank order. Absent when nothing was graded.
    */
   domains?: DomainResult[];
+  /**
+   * How the attempt was run, copied onto the result so a score can be
+   * read without the session that produced it — which is what history
+   * and the results banner both need.
+   */
+  mode?: SessionMode;
+  seed?: string;
+  /** The domains the draw was narrowed to; absent means the whole curriculum. */
+  domainFilter?: string[];
+  /** The attempt's clock and what was used of it. 0 duration means untimed. */
+  durationSeconds?: number;
+  elapsedSeconds?: number;
 }
 
 interface ApiErrorBody {
@@ -328,17 +415,49 @@ export type SessionActionResponse =
   | { ok: true; session: SessionSnapshot }
   | { ok: false; error: string };
 
+/** How an attempt is configured at the moment it starts. */
+export interface StartOptions {
+  mode: Exclude<SessionMode, "">;
+  /**
+   * Replay a previous draw: six lowercase hex digits. Omitted, the server
+   * mints one — every attempt has a seed, so every attempt is replayable
+   * without the candidate having to ask for it in advance.
+   */
+  seed?: string;
+  /**
+   * Draw only from these curriculum domains. Omitted or empty draws from
+   * the whole curriculum.
+   */
+  domains?: string[];
+  /**
+   * The pool fingerprint the seed came from, when replaying. The server
+   * compares it against the loaded bank's and reports a mismatch back
+   * rather than refusing: the draw is still deterministic, it is just no
+   * longer the same set, and saying so beats a silent surprise.
+   */
+  poolDigest?: string;
+}
+
+export type StartSessionResponse =
+  | { ok: true; session: SessionSnapshot; poolChanged: boolean }
+  | { ok: false; error: string };
+
 // POST /api/session/start: 200 with the new session snapshot, or 409
 // (already running/ended) surfaced as {ok:false} for the caller to
 // handle by refetching the authoritative session state.
 export async function startSession(
-  mode: Exclude<SessionMode, ""> = "exam",
+  options: StartOptions | Exclude<SessionMode, ""> = "exam",
   signal?: AbortSignal,
-): Promise<SessionActionResponse> {
+): Promise<StartSessionResponse> {
+  // The bare-mode form is kept because it is the honest call for every
+  // caller that has nothing to configure, and because `./sim` and
+  // tests/smoke.sh POST with no body at all — a signature that forced an
+  // object would only make those callers write `{ mode: "exam" }`.
+  const body: StartOptions = typeof options === "string" ? { mode: options } : options;
   const res = await request("/api/session/start", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode }),
+    body: JSON.stringify(body),
     signal,
   });
   if (res.status === 409) {
@@ -347,7 +466,42 @@ export async function startSession(
   if (!res.ok) {
     throw new Error(await readError(res));
   }
-  return { ok: true, session: (await res.json()) as SessionSnapshot };
+  const session = (await res.json()) as SessionSnapshot & { poolChanged?: boolean };
+  return { ok: true, session, poolChanged: session.poolChanged === true };
+}
+
+/**
+ * PUT /api/session/focus — tell the server which task is on screen.
+ *
+ * The server owns the clock here exactly as it owns the countdown: the
+ * client reports a question id and nothing else, and per-task time is
+ * accrued between reports. It rides the existing 10s session poller, so
+ * the resolution is coarse by design and a lost report costs at most one
+ * interval.
+ *
+ * A gap contributes at most 90 seconds however long it really was, so a
+ * candidate who closes the tab overnight is credited with a minute and a
+ * half rather than nine hours. The 409 (the attempt ended under us) is a
+ * tagged union rather than a throw for the same reason `putAnswer`'s is:
+ * the poller is about to re-route the screen anyway.
+ */
+export async function putFocus(
+  question: string,
+  signal?: AbortSignal,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await request("/api/session/focus", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question }),
+    signal,
+  });
+  if (res.status === 409 || res.status === 404) {
+    return { ok: false, error: await readError(res) };
+  }
+  if (!res.ok) {
+    throw new Error(await readError(res));
+  }
+  return { ok: true };
 }
 
 // POST /api/session/end: 202 with the ended session snapshot (submit,
