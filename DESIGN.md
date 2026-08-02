@@ -409,7 +409,9 @@ the rest owning their whole viewport.
 | Surface | Width |
 |---|---|
 | Exam and mode pages | `--page-max` (1160px), centred |
-| MCQ question column | `max-width: 760px` |
+| MCQ question column | `--mcq-measure` (720px), centred |
+| Task pane (hands-on) | `--task-pane-width` (420px) as the design's figure; `PanelResizer` writes `--panel-width` and clamps 280–600px, so the candidate's dragged width wins |
+| Results sidebar | `--results-sidebar` (340px) |
 | Score page | `max-width: 820px` |
 | About drawer | `min(480px, 92vw)` |
 | Confirm dialog | `min(440px, 90%)` |
@@ -594,7 +596,8 @@ There is no site nav. What stands in for it:
 | Element | Treatment |
 |---|---|
 | Topbar (exam only) | `--surface` under a hairline bottom border, wrapping rather than compressing, title flexing from an 8rem basis and ellipsing |
-| Question navigator | one header row — prev, the current question's id and points, next — above the pane, with the bank's optional question title (`.question-nav-title`, the one flex item in the row allowed to ellipse), the instance chip and the review-mark toggle on a second row |
+| Task pane header | `TASK n / m` zero-padded to the total's width, the flag pill, an `h2` title, then a wrapping chip row: domain, weight share, target time, instance. It carries no navigation — the header used to hold prev/next steppers as well as the footer, and two sets of the same control on one pane is one too many. Weight is rendered as a *share* because `spec.questions[].weight` is a point budget, not a percentage: it sums to 180 in `ckad-mock-01` |
+| Task pane footer | `← Previous` / `⊞ All tasks (G)` / `Next →`, the pane's only navigation. Minimum 44px for a coarse pointer |
 | Navigator | one component (`.navigator`) for both engines, a full-panel disclosure in three bands: filter chips (`All` / flagged / unseen-or-unanswered), a flat ten-column grid of mono tiles, and a foot naming the four states and the keys. Ten to a row only pays off if row two starts at eleven, so the grid is sequential and the domain travels in each tile's accessible name rather than as a visual grouping. Five columns below a 320px container and for a coarse pointer. Its vocabulary is a prop, not a fork: hands-on says opened/unseen, mcq says answered/unanswered, because `marksStore` may not call a viewed question attempted. No scrim, no `role="dialog"`, no focus trap: dimming a live remote desktop to pick question 12 would read as a fault |
 | App header | `.app-header`, 56px, on every screen that is a PAGE and deliberately not on the exam (which has a topbar carrying a clock and a submit button) or the boot screen. Two variants of one component: `brand` leads with the mark and wordmark, `back` replaces both with a labelled way out for a screen reached FROM another. `flex-shrink: 0` is load-bearing — as a flex item its `height` is only a base size, and a tall page squashed it to its min-content height |
 | Skip link | the `.sr-only` clip idiom, never a transform; on focus it becomes `position: fixed`, so its visible state is anchored to the viewport rather than to the pane it lives in |
@@ -644,10 +647,14 @@ itself once the rebuild lands.
 
 ### The MCQ exam surface
 
-`screens/McqExam.tsx`: a single centred 760px reading column under the
-same topbar, no desktop pane. The nav header reuses the hands-on
-navigator's classes; the instance chip's slot carries the question's
-domain, the one per-question fact an mcq candidate can use. Positions
+`screens/McqExam.tsx`: a single centred `--mcq-measure` reading column
+under the same topbar, no desktop pane, with a 5px determinate rail
+directly beneath the topbar. Its head row is its own (`.mcq-head`) rather
+than the hands-on pane's classes — the two engines diverged when the task
+pane grew a chip row and a footer nav, and sharing a header past that
+point meant each change had to be safe for both. What they still share is
+the `Navigator`. The domain rides the head row as a chip, the one
+per-question fact an mcq candidate can use. Positions
 (`Q7`) are the only question identity the candidate ever sees — the
 bank's pool ids are an artifact of the random draw and never render,
 including in the submit dialog's unanswered list and the practice
@@ -657,7 +664,8 @@ dialog.
 |---|---|
 | `.mcq-option` | an anchored control: `--surface-raised` fill on `--border`, 6px corners, 44px minimum touch target. Hover steps the fill to `--raised-hover` and never moves the edge |
 | `.mcq-option-on` | the full three-channel selection: accent edge, `--accent-soft` wash, 3px inset bar — plus the visible native checkbox as the non-visual channel. The option letter goes `--accent-strong` on the wash |
-| `.mcq-footer` | Previous / answered-tally / Next, with the final question's Next giving way to the one primary button. The tally deliberately counts completion; position lives in the header, and two numbers both claiming to locate the candidate was the confusion this footer used to cause |
+| `.mcq-footer` | Previous / the save reassurance / Navigator + Next, with the final question's Next giving way to the one primary button. The tally that used to sit here moved to the topbar: the footer's job is moving and reassuring, and a completion count competing with the head row's position was two numbers both claiming to locate the candidate |
+| `.mcq-option-letter` | a 24px circle carrying A–F, filling accent when selected. Scoped under `.mcq-question` so the score screen's answer review keeps the flat letter it already had |
 | Answered tile | the navigator's `is-done` tile under `progress="answered"`: `--surface-raised` behind the strong hairline, plus "answered" in the accessible name — server state, not a rendering guess, because mcq answers are saved per click |
 
 ### Result and teaching components
@@ -788,6 +796,14 @@ region rather than a pending one once the pulse is off.
 - **Don't** convey a control's state with `opacity`. It dims the border and
   the focus ring along with the label, and composites to a ratio nobody
   measured. Use `--text-disabled`.
+- **Don't** draw a control for something the product cannot yet do. Say it
+  in prose instead and let the control arrive with the capability. Three
+  places have wanted one and taken prose: the mode screen's domain summary
+  before the draw was configurable, the results screen's "drill your weak
+  domains" card while nothing sends `StartOptions.domains`, and its task
+  rows while the explanation screen does not exist. A control that looks
+  live and does nothing is worse than no control, because the candidate
+  spends their trust before they find out.
 
 ## Enforcement
 
