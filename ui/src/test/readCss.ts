@@ -45,6 +45,11 @@ export function readBaseCss(): Promise<string> {
   return readSrcFile("styles", "base.css");
 }
 
+/** The design tokens (`ui/src/styles/tokens.css`). */
+export function readTokensCss(): Promise<string> {
+  return readSrcFile("styles", "tokens.css");
+}
+
 /**
  * Returns the declaration block of the first rule whose selector list
  * matches `selector` exactly (after whitespace normalisation), or null.

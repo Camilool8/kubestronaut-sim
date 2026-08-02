@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -148,17 +149,25 @@ func TestHealthz(t *testing.T) {
 type examResponse struct {
 	Name              string `json:"name"`
 	Title             string `json:"title"`
+	Certification     string `json:"certification"`
 	DurationSeconds   int    `json:"durationSeconds"`
 	PassingScore      int    `json:"passingScore"`
 	KubernetesVersion string `json:"kubernetesVersion"`
 	QuestionCount     int    `json:"questionCount"`
 	Questions         []struct {
-		ID          string `json:"id"`
-		Instance    string `json:"instance"`
-		Domain      string `json:"domain"`
-		Weight      int    `json:"weight"`
-		TotalPoints int    `json:"totalPoints"`
+		ID            string `json:"id"`
+		Instance      string `json:"instance"`
+		Domain        string `json:"domain"`
+		Weight        int    `json:"weight"`
+		TotalPoints   int    `json:"totalPoints"`
+		TargetSeconds int    `json:"targetSeconds"`
+		TargetDerived bool   `json:"targetDerived"`
 	} `json:"questions"`
+	Domains []struct {
+		Name          string `json:"name"`
+		WeightPct     int    `json:"weightPct"`
+		QuestionCount int    `json:"questionCount"`
+	} `json:"domains"`
 }
 
 func TestExam(t *testing.T) {
@@ -175,6 +184,11 @@ func TestExam(t *testing.T) {
 	}
 	if got.Title != "Test Exam" {
 		t.Errorf("Title = %q, want %q", got.Title, "Test Exam")
+	}
+	// Distinct from Title, and the mode screen's header reads it: a bank
+	// names both the certification it rehearses and its own edition.
+	if got.Certification != "TEST" {
+		t.Errorf("Certification = %q, want %q", got.Certification, "TEST")
 	}
 	if got.DurationSeconds != 600 {
 		t.Errorf("DurationSeconds = %d, want 600", got.DurationSeconds)
@@ -250,6 +264,10 @@ func TestQuestionUnknown(t *testing.T) {
 type solutionResponse struct {
 	ID       string `json:"id"`
 	Markdown string `json:"markdown"`
+	Docs     []struct {
+		Label string `json:"label"`
+		URL   string `json:"url"`
+	} `json:"docs"`
 }
 
 func TestSolutionGatedWhileIdle(t *testing.T) {
@@ -313,6 +331,55 @@ func TestSolutionAvailableAfterEnd(t *testing.T) {
 	rec2 := ts.do(t, http.MethodGet, "/api/questions/q99/solution")
 	if rec2.Code != http.StatusNotFound {
 		t.Errorf("unknown id after ended: status = %d, want 404, body=%s", rec2.Code, rec2.Body.String())
+	}
+}
+
+// The deep dive's footer reading. The fixture's q01 declares two links,
+// one of them unusable, so this covers the whole path at once: the bank
+// loaded despite the bad entry, and only the good one reaches the wire.
+func TestSolutionCarriesDocs(t *testing.T) {
+	ts := newTestServer(t)
+	if _, err := ts.mgr.Start(session.ModeExam, time.Hour); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if err := ts.mgr.End("submitted"); err != nil {
+		t.Fatalf("End: %v", err)
+	}
+
+	rec := ts.do(t, http.MethodGet, "/api/questions/q01/solution")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200, body=%s", rec.Code, rec.Body.String())
+	}
+	got := decodeJSON[solutionResponse](t, rec)
+	if len(got.Docs) != 1 {
+		t.Fatalf("Docs = %+v, want exactly the one usable entry", got.Docs)
+	}
+	if got.Docs[0].Label != "Ingress path types" {
+		t.Errorf("Docs[0].Label = %q, want %q", got.Docs[0].Label, "Ingress path types")
+	}
+	if got.Docs[0].URL != "https://kubernetes.io/docs/concepts/services-networking/ingress/" {
+		t.Errorf("Docs[0].URL = %q, want it served verbatim", got.Docs[0].URL)
+	}
+}
+
+// A question with no docs must omit the key entirely rather than send an
+// empty array: the client's field is optional, and `docs: []` would make
+// "no reading" a thing it has to measure the length of.
+func TestSolutionOmitsDocsWhenThereAreNone(t *testing.T) {
+	ts := newTestServer(t)
+	if _, err := ts.mgr.Start(session.ModeExam, time.Hour); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if err := ts.mgr.End("submitted"); err != nil {
+		t.Fatalf("End: %v", err)
+	}
+
+	rec := ts.do(t, http.MethodGet, "/api/questions/q02/solution")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200, body=%s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); strings.Contains(body, "docs") {
+		t.Errorf("body = %s, want no docs key at all", body)
 	}
 }
 
@@ -684,5 +751,102 @@ func TestHealthzIndependentOfBootState(t *testing.T) {
 	rec := ts.do(t, http.MethodGet, "/healthz")
 	if rec.Code != http.StatusOK {
 		t.Errorf("GET /healthz while booting = %d, want 200", rec.Code)
+	}
+}
+
+// examModes is the "modes" slice of GET /api/exam, decoded on its own so
+// this test does not have to widen the examResponse fixture above.
+type examModesResponse struct {
+	Modes []struct {
+		ID              string `json:"id"`
+		DurationSeconds int    `json:"durationSeconds"`
+		Untimed         bool   `json:"untimed"`
+		HelpAllowed     bool   `json:"helpAllowed"`
+		GradesPerTask   bool   `json:"gradesPerTask"`
+		Recorded        bool   `json:"recorded"`
+		Recommended     bool   `json:"recommended"`
+	} `json:"modes"`
+}
+
+func TestExamModes(t *testing.T) {
+	ts := newTestServer(t)
+	rec := ts.do(t, http.MethodGet, "/api/exam")
+	got := decodeJSON[examModesResponse](t, rec).Modes
+
+	// Order is the order the mode screen offers them: gentlest first.
+	want := []string{session.ModeTraining, session.ModeSpeed, session.ModeExam}
+	if len(got) != len(want) {
+		t.Fatalf("len(Modes) = %d, want %d", len(got), len(want))
+	}
+	for i, id := range want {
+		if got[i].ID != id {
+			t.Errorf("Modes[%d].ID = %q, want %q", i, got[i].ID, id)
+		}
+	}
+
+	// The clocks come from the bank: 600s duration, so a speed run is
+	// half of it, and training has no clock at all.
+	if got[0].DurationSeconds != 0 || !got[0].Untimed {
+		t.Errorf("training = %+v, want durationSeconds=0 untimed=true", got[0])
+	}
+	if got[1].DurationSeconds != 300 || got[1].Untimed {
+		t.Errorf("speed = %+v, want durationSeconds=300 untimed=false", got[1])
+	}
+	if got[2].DurationSeconds != 600 || got[2].Untimed {
+		t.Errorf("exam = %+v, want durationSeconds=600 untimed=false", got[2])
+	}
+
+	// Exactly one card is accented, and it is not the untimed one.
+	accented := ""
+	for _, m := range got {
+		if m.Recommended {
+			if accented != "" {
+				t.Errorf("two recommended modes: %q and %q", accented, m.ID)
+			}
+			accented = m.ID
+		}
+	}
+	if accented != session.ModeSpeed {
+		t.Errorf("recommended mode = %q, want %q", accented, session.ModeSpeed)
+	}
+
+	// Training is practice, not a sitting.
+	if got[0].Recorded {
+		t.Error("training.Recorded = true, want false")
+	}
+	if !got[1].Recorded || !got[2].Recorded {
+		t.Error("speed and exam must both be recorded attempts")
+	}
+}
+
+// TestExamModesMatchEnforcement is the point of describing modes on the
+// server: a card must not be able to promise something the handlers then
+// refuse. It starts an attempt in each advertised mode and checks the
+// two gated endpoints against that mode's own flags.
+func TestExamModesMatchEnforcement(t *testing.T) {
+	ts := newTestServer(t)
+	modes := decodeJSON[examModesResponse](t, ts.do(t, http.MethodGet, "/api/exam")).Modes
+
+	for _, m := range modes {
+		t.Run(m.ID, func(t *testing.T) {
+			// A fresh manager per subtest: Start is a one-way transition.
+			ts := newTestServer(t)
+			if _, err := ts.mgr.Start(m.ID, time.Hour); err != nil {
+				t.Fatalf("Start(%q): %v", m.ID, err)
+			}
+
+			// 403 is the gate's answer specifically. A hintless question
+			// (404) or an absent practice grader (501) means the request
+			// got past the gate, which is what these assert.
+			hint := ts.do(t, http.MethodGet, "/api/questions/q01/hints/1")
+			if forbidden := hint.Code == http.StatusForbidden; forbidden == m.HelpAllowed {
+				t.Errorf("hints: status %d with helpAllowed=%v", hint.Code, m.HelpAllowed)
+			}
+
+			grade := ts.do(t, http.MethodPost, "/api/session/grade")
+			if forbidden := grade.Code == http.StatusForbidden; forbidden == m.GradesPerTask {
+				t.Errorf("grade: status %d with gradesPerTask=%v", grade.Code, m.GradesPerTask)
+			}
+		})
 	}
 }

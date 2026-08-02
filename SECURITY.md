@@ -86,6 +86,30 @@ Neither gate is a security control. They exist for fidelity with the
 real exam, and every `solution.md` sits unencrypted in `banks/` on your
 own disk the whole time.
 
+## The attempt history is unencrypted local data
+
+Every graded attempt is appended to `/state/history.json` in the `state`
+Docker volume: which exams you sat, when, how long you took, your score,
+and your weakest curriculum domains. It is plain JSON, unencrypted, and
+it outlives the session file, a bank switch, `./sim reset` and
+`./sim purge` — that durability is the point of it, and it is also the
+new thing on disk worth knowing about. Nothing is uploaded, and no code
+in this repository sends it anywhere.
+
+It inherits the rest of this document rather than escaping it. Anyone who
+can reach port `8080` can read the whole record over `GET /api/history`,
+download it from `GET /api/history/export`, and erase it with
+`DELETE /api/history` — the same absence of authentication that already
+lets them start your exam and open your desktop. `POST /api/history/import`
+merges a document in rather than replacing, so an import cannot be used to
+silently drop what is already there, but it can add attempts that never
+happened. On a network you do not control, `SIM_BIND=127.0.0.1`.
+
+`./sim purge` now keeps this volume, so a purge no longer erases it and
+`./sim purge --all` is the deliberate way to. Both are destructive
+operations with no undo and no backup: export first if the record matters
+to you.
+
 ## The documentation proxy
 
 The exam desktop has no direct internet access: it is on `examnet`,

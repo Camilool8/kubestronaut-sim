@@ -2,7 +2,7 @@
 
 A bank lives at `banks/<bank-id>/` and holds `exam.yaml` plus one directory
 per question. The conductor scans every `banks/*/exam.yaml` into the catalog
-the lobby renders; [banks/catalog.yaml](../banks/catalog.yaml) adds
+the exam selector renders; [banks/catalog.yaml](../banks/catalog.yaml) adds
 coming-soon entries whose exam engine does not exist yet.
 
 Five gates decide whether a bank ships —
@@ -51,6 +51,7 @@ spec:
     - name: instance-2
   questions:
     - id: q01
+      title: Namespaces & ResourceQuota
       instance: instance-1
       domain: Application Environment, Configuration and Security
       weight: 25
@@ -80,25 +81,104 @@ Keep the `questions:` keys in that order, one per line, with no inline
 comments. [bank-weights.sh](../tests/bank-weights.sh) parses the block with a
 regex, not a YAML library, so a reordered key or a trailing comment hides a
 question from the gate — which then fails the bank for disagreeing with the
-directory listing.
+directory listing. `title:` is the one optional key that goes *inside* that
+run — directly after `id:`, where both gate regexes tolerate it and nowhere
+else. The other two, `targetSeconds:` and `docs:`, go *after* it, below
+`weight:` (hands-on) or `correct:` (mcq), where the regexes have already
+stopped looking.
 
 | Field | Meaning and status |
 |---|---|
 | `metadata.name` | Bank id. Convention: the conductor rejects a mismatch with the directory name only when the field is non-empty ([catalog.go:159](../conductor/internal/catalog/catalog.go)) |
-| `metadata.title`, `.certification`, `.description` | Lobby card title, badge (`CKAD`/`CKA`/`CKS`) and one-line blurb |
-| `metadata.hidden` | Keeps the bank out of the lobby while leaving it a legal `switch` target. Exists for `smoke-01`; a bank worth shipping is worth listing |
+| `metadata.title`, `.certification`, `.description` | The exam card's fallback title, its heading and tinted avatar (`CKAD`/`CKA`/`CKS`), and its one-line blurb. `certification` also reaches `GET /api/exam`, where the mode screen's header reads it |
+| `metadata.hidden` | Keeps the bank out of the exam selector while leaving it a legal `switch` target. Exists for `smoke-01`; a bank worth shipping is worth listing |
 | `spec.examType` | `hands-on` (the default when absent, [catalog.go:164-166](../conductor/internal/catalog/catalog.go)) or `mcq`; any other value lists the bank disabled with a "no engine yet" note |
 | `spec.duration` | The Exam clock. Enforced: the facilitator ends the session at 0:00 |
-| `spec.speedDuration` | The Speed clock, defaulting to half `spec.duration` ([exam.go:105-110](../facilitator/internal/exam/exam.go)). A malformed value fails the load |
+| `spec.speedDuration` | The clock for the `speed` mode — shown to candidates as Mastery — defaulting to half `spec.duration` ([exam.go:105-110](../facilitator/internal/exam/exam.go)). A malformed value fails the load |
 | `spec.passingScore` | Percent. Enforced by the facilitator's `Results.Passed` |
 | `spec.kubernetesVersion` | Informational; shown on the catalog card |
-| `spec.domainWeights` | The certification's published weights. Read by no Go code — only by [bank-weights.sh](../tests/bank-weights.sh) |
+| `spec.domainWeights` | The certification's published weights, and a runtime value in three places: `exam.Load` builds `Exam.Domains` from it, `exam.Draw` stratifies a pooled or filtered draw by it, and both graders weight the final score by it. [bank-weights.sh](../tests/bank-weights.sh) still gates it too. Getting it wrong now moves real scores, not just a build check |
+| `spec.examLength` | Optional, **both engines**. Pools the bank: author more questions than one attempt should ask, set this to the smaller per-attempt count, and `exam.Draw` takes a fresh domain-stratified subset every start. Must be positive and no larger than the pool — `exam.Load` rejects both, because an `examLength` typo that silently turns pooling *off* is worse than one that fails the boot. A pooled bank must declare `spec.domainWeights`; the draw stratifies against them and errors without. Absent or `>=` the pool means no pooling, which is every bank in this repo. **A pooled hands-on bank also changes when its cluster is seeded** — see below |
 | `spec.environment.provider`, `.nodes` | Informational; read by nothing |
 | `spec.environment.allowedDomains` | Domain suffixes the desktop browser may reach through the docs proxy, subdomains included ([proxy/entrypoint.sh](../proxy/entrypoint.sh)). Omit it to inherit `allow.DefaultDomains` ([allow.go](../proxy/internal/allow/allow.go)), the smallest set that leaves the documentation sites usable |
-| `spec.instances` | 1 or 2 entries. Convention: names outside `instance-1`/`instance-2` only mark the bank unavailable in the lobby ([catalog.go:199-210](../conductor/internal/catalog/catalog.go)), and the facilitator's exam loader never parses the block at all |
+| `spec.instances` | 1 or 2 entries. Convention: names outside `instance-1`/`instance-2` only mark the bank unavailable in the exam selector ([catalog.go:218-230](../conductor/internal/catalog/catalog.go)), and the facilitator's exam loader never parses the block at all |
 | `spec.questions[].id`, `.instance` | Question directory name, and the ssh host the grader runs its checks on |
+| `spec.questions[].title` | Optional short label shown in the question navigator, the jump grid and the score review. Absent, the UI falls back to the id (hands-on) or the attempt position (mcq) |
 | `spec.questions[].domain` | Must match a `domainWeights` key |
 | `spec.questions[].weight` | Must equal the sum of this question's `# points:` headers |
+| `spec.questions[].targetSeconds` | Optional pacing budget, in seconds, shown on the task chip. Absent, the facilitator derives one from the question's weight's share of the exam clock ([exam.go](../facilitator/internal/exam/exam.go), `TargetSeconds`) and flags it `targetDerived` on `GET /api/exam`, so a derived figure is never presented as the author's judgement — neither shipped bank sets it. It is a budget, never a limit: nothing enforces it and running over costs no points. Write it below `weight:` (hands-on) or `correct:` (mcq); both gate regexes end there, and a `targetSeconds:` line above them hides the question from the gate |
+| `spec.questions[].docs` | Optional upstream reading: a list of `{label, url}`. Shown in the post-attempt deep dive — see [Documentation links](#documentation-links-specquestionsdocs). Write it below `weight:`/`correct:` for the same reason `targetSeconds` goes there |
+
+## Documentation links: `spec.questions[].docs`
+
+A question may name the upstream pages that explain its subject:
+
+```yaml
+    - id: q08
+      title: Route two Services with one Ingress
+      instance: instance-2
+      domain: Services and Networking
+      weight: 9
+      docs:
+        - label: Ingress
+          url: https://kubernetes.io/docs/concepts/services-networking/ingress/
+```
+
+They reach the client on `GET /api/questions/{id}/solution` and nowhere
+else, so they appear in exactly one place: the footer of the **post-attempt
+deep dive**, read in the candidate's own browser once the attempt is over.
+They are deliberately not attached to the question. During the attempt the
+candidate is on the exam desktop, which browses through the documentation
+allowlist proxy (`spec.environment.allowedDomains`) and never sees this
+field — a link out of an exam is not something an exam offers.
+
+Rules, all enforced by [exam.go](../facilitator/internal/exam/exam.go):
+
+- `label` names the **concept**, not the URL: `Ingress path types`, not
+  `kubernetes.io/docs/…`. The footer is read as a list of things to go
+  and learn.
+- `url` must be `https://` and must parse. **A bad entry is dropped and
+  logged, never fatal** — every other load error refuses the bank because
+  every other one is about the exam, while a mistyped study link must
+  never stop someone sitting one. The rest of the list still loads.
+- Omit the key entirely when there is no single obviously-right page.
+  Absent is the default and the response omits the field, which the UI
+  renders as nothing at all. **A wrong link on a study tool is worse than
+  no link**, so prefer a page-level URL over an anchor you are not certain
+  of, and prefer nothing over a page you have not opened.
+
+## Pooling a bank: `spec.examLength`
+
+Set it and one attempt asks a subset instead of the whole bank, drawn
+fresh each start and stratified so each domain contributes exactly its
+`domainWeights` share (largest-remainder rounding) rather than whatever
+chance produced. The subset is persisted with the session — it survives a
+resume and a facilitator restart — and grading, `GET /api/exam` and every
+single-question endpoint are scoped to it, so a pool question outside the
+draw is a 404 rather than merely ungraded. The same seed against the same
+pool reproduces the same draw; `poolDigest` travels beside it so "same
+seed, different questions" reports as a changed bank rather than a
+mystery.
+
+**For a hands-on bank, pooling also moves when the cluster is seeded, and
+that is the part to understand before opting in.** An unpooled hands-on
+bank seeds every question at boot, inside the long progress screen a cold
+start already shows. A pooled one cannot: the draw has not happened yet at
+boot time, and seeding all of a large pool would be pointless work. So
+[bootstrap.sh](../images/k8s-env/bootstrap.sh) skips its seed loop
+entirely for a pooled bank (it still pre-pulls the bank's images, which is
+the slow, network-fragile half and is identical whatever gets drawn), and
+the drawn questions are seeded when the attempt starts instead:
+`POST /api/session/start` answers **202** with a conductor job to watch,
+and the candidate's clock does not begin until that job succeeds. See
+[api.md](api.md) for the contract.
+
+The consequence for an author: pooling is a good trade when the pool is
+much larger than an attempt, and a bad one when it is not. A bank that
+pools 22 down to 20 has moved four minutes of seeding out of the boot
+screen and into the moment the candidate presses Start, and gained almost
+no variety for it. Neither shipped bank pools its hands-on questions;
+CKAD draws all 22.
 
 ## Points and domain weights
 
@@ -144,6 +224,7 @@ no curriculum, stays green.
 | `question.md` | Statement shown to the candidate. Name the instance and any artifact paths (`/opt/course/<n>/...`) |
 | `setup.sh` | Seeds cluster pre-state. Runs inside `k8s-env` as root with the admin `KUBECONFIG` |
 | `files/` | Optional. Copied into `/opt/course/<n>/` on every instance at start, owned by `candidate` |
+| `expected/` | Optional. Documents a failed check shows beside the candidate's cluster state, read by `show_expected` — see [the artifact protocol](#showing-your-work-the-artifact-protocol). Generated from the reference solution, never hand-written |
 | `hints.md` | Optional two-tier hints, shown in Training mode |
 | `validate.d/NN_name.sh` | One scoring criterion each, run in lexical order |
 | `solution.md` | Full walkthrough, shown after the exam |
@@ -199,27 +280,14 @@ spec:
 
 Differences from the hands-on shape:
 
-- **`spec.examLength` (optional) pools the bank.** Author more questions
-  than a single attempt should ask, set `examLength` to the smaller
-  per-attempt count, and `session.Manager.StartMCQ` draws a fresh,
-  random subset on every `Start` ([exam.go](../facilitator/internal/exam/exam.go),
-  `DrawMCQ`) — stratified so each domain contributes exactly its
-  `domainWeights` share of `examLength` (largest-remainder rounding),
-  never left to chance. Absent, zero, or `>=` the pool's own size means
-  no pooling: every question is served, in bank order, exactly as an
-  mcq bank behaved before this field existed — the hidden `smoke-mcq`
-  fixture and any bank that has not opted in take this path. The drawn
-  subset is persisted with the session (survives a resume or a
-  facilitator restart) and is what grading, `GET /api/exam`, and every
-  single-question endpoint are scoped to for that attempt — a pool
-  question outside the draw is a 404, not merely ungraded.
 - **No `spec.instances`.** Declaring any marks the bank unavailable
   ([catalog.go](../conductor/internal/catalog/catalog.go)) — nothing
   would ever ssh to them.
 - **Question keys are `id / domain / (weight) / multi / options /
-  correct`**, in that order, one per line —
-  [bank-mcq.sh](../tests/bank-mcq.sh) parses the block with a regex kept
-  honest by the same directory cross-check bank-weights.sh uses.
+  correct`**, in that order, one per line (with `docs:` after `correct:`
+  if the question has one) — [bank-mcq.sh](../tests/bank-mcq.sh) parses
+  the block with a regex kept honest by the same directory cross-check
+  bank-weights.sh uses.
 - **`weight` is optional and defaults to 1**, matching the real exam's
   uniform scoring. Domain balance is then question-count share.
 - **`options`** is 3-6 single-line quoted strings (inline markdown such
@@ -254,9 +322,10 @@ of the pool's own points must sit within 2 percentage points of its
 target — the pool IS the exam. With a smaller `examLength`, that
 check instead requires each domain's POOL to be at least as deep as the
 per-domain count a stratified draw of that size would need (the same
-largest-remainder rounding `exam.DrawMCQ` uses) — the pool's own ratio
+largest-remainder rounding `exam.Draw` uses) — the pool's own ratio
 is free to differ, since every draw is stratified to the target
-regardless.
+regardless. [bank-weights.sh](../tests/bank-weights.sh) applies the same
+two modes to a hands-on bank.
 
 One trade-off to know when editing a shipped bank: answers are stored
 by option index, so reordering or editing `options` mid-attempt
@@ -283,10 +352,112 @@ study tool. A heredoc wrapping a manifest (`k apply -f - <<'EOF'` … `EOF`) is 
 - Carries the header comments the grader parses: `# points: <int>` and
   `# desc: <one line>`.
 - Sources `/banks/_lib/checks.sh` and uses its helpers.
-- Exit 0 = criterion met, non-zero = failed, stdout = short message.
+- Exit 0 = criterion met, non-zero = failed, stdout = short message, optionally
+  followed by an [artifact trailer](#showing-your-work-the-artifact-protocol).
 - Never mutates the cluster or the filesystem.
 - Finishes within 30 seconds. The facilitator kills a check that passes its 30s
   deadline and scores it failed with "check timed out".
+
+### Showing your work: the artifact protocol
+
+A failed check that says only *that* the candidate was wrong makes them go and
+look. The explanation screen wants the looking done for them: **YOUR CLUSTER
+STATE** beside **EXPECTED**, and a sentence on why the two differ. A check
+supplies those by appending a trailer to its own stdout.
+
+```
+selector is 'app=inventory-api', want app=inventory
+---8<--- sim:artifact actual yaml
+apiVersion: v1
+kind: Service
+spec:
+  selector:
+    app: inventory-api
+---8<--- sim:artifact why text
+A Service finds its Pods by label, never by name. While spec.selector
+matches no Pod, the Service has no endpoints at all.
+```
+
+Everything before the first sentinel line is the message, unchanged. Each
+sentinel opens a body running to the next sentinel or to EOF. Emit them with
+the [\_lib/checks.sh](../banks/_lib/checks.sh) helpers rather than by hand:
+
+```bash
+[ "$sel" = "app=inventory" ] || {
+  echo "selector is '$sel', want app=inventory"
+  show_actual yaml "$(kubectl -n serpens get svc inventory -o yaml | k8s_clean)"
+  show_expected yaml "/banks/${BANK:-ckad-mock-01}/q19/expected/service.yaml"
+  show_why "A Service finds its Pods by label, never by name."
+  exit 1
+}
+```
+
+Call them **after** the failure message and **before** `exit 1`.
+
+Every check in `ckad-mock-01` now emits at least a `show_why`, so the
+bank itself is the reference. Two are worth reading first:
+[q19/10\_service.sh](../banks/ckad-mock-01/q19/validate.d/10_service.sh)
+shows the full three-artifact shape with an `evidence()` helper reused
+across several failure paths, and
+[q16/10\_probes.sh](../banks/ckad-mock-01/q16/validate.d/10_probes.sh)
+shows a JSON fragment captured with `jq` instead of a whole object.
+
+Prefer a `jq` projection to a whole object where the check is about a few
+fields. It sidesteps the server-side noise entirely, and the pane then
+shows what the check is about rather than everything that happens to sit
+near it.
+
+The rules the grader
+([evaluate/artifact.go](../facilitator/internal/evaluate/artifact.go)) applies:
+
+| | |
+|---|---|
+| `kind` | Exactly `actual`, `expected` or `why`. A closed set: each names a region of the explanation screen, and a fourth value would arrive at a client with nowhere to put it |
+| `lang` | Required in the sentinel, a highlighter tag (`yaml`, `json`, `text`), 1-16 characters of `[A-Za-z0-9_+-]` |
+| Column 0 | The sentinel is recognised only at the start of a line. This is also the escape hatch: a check whose real output must contain that string indents it one space |
+| A malformed sentinel | Discards **that block only** and parses on. Never fails the check — the candidate is mid-exam and a bank bug must not cost them points. The message still ends at the first sentinel-prefixed line, so a typo degrades to "no evidence" rather than pasting a Deployment into a one-line message. `tests/check-lint.sh` is where an author is meant to find out |
+| A check that passed | Loses its artifacts entirely. A correct answer has nothing to explain, and results are persisted in the session file and served back on every `/api/results` |
+| Size | 8 KiB per artifact, 24 KiB per check, 8 artifacts per check. Over any of them the body is cut and a `[truncated by the grader: …]` line is appended — visibly, never silently |
+| A check that emits none | Produces a **byte-identical** message to one written before the protocol existed. All 75 shipped CKAD checks rely on this and none was edited for it (`evaluate/artifact_test.go`) |
+
+Collision is vanishingly unlikely rather than impossible. `---8<---` is the
+conventional cut-here scissors and nothing `kubectl`, `jq` or `yq` emits, and
+YAML indents block-scalar content so an embedded copy is never at column 0 —
+but a check that `cat`s a file quoting this page could produce one, and the
+one-space indent is the answer.
+
+#### Expected documents
+
+`show_expected` reads a file and nothing else, on purpose. Expected documents
+live at `banks/<bank-id>/<qid>/expected/<name>` and are **generated from the
+reference solution, never hand-written** — a hand-written "expected" drifts
+from what `tests/solutions/<bank>/<qid>.sh` actually produces and then teaches
+the candidate something false, which is the same failure as a check that grades
+spelling. Regenerate one by solving the question and re-running the check's own
+`show_actual` pipeline against the result:
+
+```bash
+docker compose exec -T instance-1 su - candidate \
+  -c 'bash /tests/solutions/ckad-mock-01/q19.sh'
+docker compose exec -T instance-1 bash -c '. /banks/_lib/checks.sh
+  kubectl -n serpens get svc inventory -o yaml | k8s_clean | yq "<the check's filter>"' \
+  > banks/ckad-mock-01/q19/expected/service.yaml
+```
+
+Filter both panes identically, and filter out whatever the API server assigns
+rather than the candidate: a `clusterIP` in the EXPECTED pane is an address
+they never had, and showing it teaches them it was part of the answer.
+`k8s_clean` removes the noise every object carries (`managedFields`, `status`,
+`resourceVersion`, `uid`, `generation`, `creationTimestamp`, the
+`last-applied-configuration` annotation); anything else the question is not
+about is the check's own `yq`/`jq` filter to remove.
+
+A question with no `expected/` document is fine — `show_expected` emits
+nothing and the candidate gets the message they always had. Prefer that to
+inventing one. `q19/20_reachable.sh` deliberately has none: an EndpointSlice is
+written by a controller, with a random name suffix and Pod IPs for addresses,
+so an authored "expected" one would only teach a candidate to look for numbers
+that were never going to be theirs.
 
 ### Grade behaviour, not spelling
 
@@ -323,11 +494,34 @@ set -uo pipefail
 | `kubectl-run` | error | `kubectl ... run` |
 | `grep-qx` | error | `grep -qx`, which fails on a trailing space or a CRLF |
 | `unsourced-helper` | error | Calls a `_lib/checks.sh` helper without sourcing the library or defining the function locally |
+| `artifact-sentinel` | error | A hand-written `---8<--- sim:artifact` line that is not exactly `<kind> <lang>` with one space between fields |
+| `artifact-call` | error | `show_actual`/`show_expected` without a literal lang then a body, or `show_why` with no note |
 | `index` | warning | A fixed `[0]` index |
 
 Opt a line out with `# lint: allow-<rule>` where the pattern is genuinely
 correct. Every rule above honours it except `points` and `unsourced-helper`,
 which have no escape hatch, and comment lines are never linted.
+
+The two `artifact-*` rules exist because the protocol degrades silently by
+design: a malformed sentinel costs the candidate nothing at grade time, which
+also means the author gets no signal that their evidence never arrived.
+Offline is the only place it can be noticed.
+
+`get-yaml` has one structural exemption rather than an escape hatch: a
+`-o yaml` piped straight into `k8s_clean` and handed to
+`show_actual`/`show_expected` **on the same line**. Scoring on a serialisation
+grades spelling; showing one is the opposite errand, and there is no other way
+to produce a whole document for the pane. Capture the same pipeline into a
+variable and the rule fires again, because there is then something to compare
+it to.
+
+`diff` gets no such exemption, and the artifact protocol is not a loophole in
+it. **A grader emits what it found and what it wanted; it never emits a
+diff.** The explanation screen's side-by-side is *rendered* client-side from
+the `actual` and `expected` documents, after grading, where being wrong costs
+nothing. The ban is on `diff` deciding a *score*, and that reason is untouched:
+line order and whitespace are not the candidate's answer, and a check that
+scores them fails correct work.
 
 ## What the cluster provides
 
@@ -428,9 +622,9 @@ gated on the attempt being in Training mode.
 
 ## Attempt modes
 
-Every bank runs in three. Exam uses `spec.duration`, Speed uses
-`spec.speedDuration`, and Training has no clock at all — which is also the
-project's answer to WCAG 2.2.1 Timing Adjustable.
+Every bank runs in three. Exam uses `spec.duration`, `speed` (labelled
+Mastery in the UI) uses `spec.speedDuration`, and Training has no clock at
+all — which is also the project's answer to WCAG 2.2.1 Timing Adjustable.
 
 ## Conventions nothing enforces
 
@@ -438,12 +632,20 @@ Real requirements with no gate behind them. Breaking one ships a broken bank
 that every test passes.
 
 - `setup.sh` re-runs on every reset and bank switch, so write it idempotent.
-- `question.md` must name the instance the candidate works on. Nothing
-  cross-checks it against `spec.questions[].instance`.
+- `question.md` is the task body ONLY. It must not open with a
+  `# Question N | Title` heading or repeat the instance in prose: the task
+  pane renders both from structured data — the title from
+  `spec.questions[].title`, the instance from `spec.questions[].instance`
+  as a chip and as the WORK FROM block — so a bank that also writes them
+  draws the title twice and the ssh host three times. This used to be the
+  opposite rule, back when the markdown was the only channel for either.
+  Naming the instance in prose was also an un-gated way to disagree with
+  `spec.questions[].instance`, which is the field that actually decides
+  where a check runs; there is now nothing to disagree with.
 - Checks must be side-effect free. `check-lint` catches the known brittle
   idioms, not mutation.
 - `# desc:` is parsed ([exam.go:169,192](../facilitator/internal/exam/exam.go))
   and never validated, so a missing one ships an empty description to the score
   screen in silence.
-- `spec.instances` feeds only the lobby's availability flag;
+- `spec.instances` feeds only the exam selector's availability flag;
   `spec.questions[].instance` is what decides where a check actually runs.

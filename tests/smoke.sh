@@ -251,8 +251,101 @@ docker compose exec desktop curl -fs --max-time 5 -o /dev/null http://conductor:
 status=$(req GET /api/control/status)
 [ "$status" = "200" ] || fail "/api/control/status expected 200 via :8080, got $status"
 
+# SMOKE_PREPARE_BUDGET bounds the wait for a DRAWN attempt's cluster to be
+# seeded. Sibling of SMOKE_BOOT_BUDGET above, and far smaller for a
+# reason: a cold boot pulls images and builds a cluster from nothing,
+# while this runs a handful of setup.sh scripts against one that is
+# already up and healthy. The conductor bounds each of those at 240s of
+# its own (control.seedQuestionBudget), so this is the "the job is
+# wedged, stop waiting" backstop rather than a second opinion about how
+# long seeding ought to take. Unbounded it would hang the whole suite,
+# which is the one failure mode that produces no output at all.
+SMOKE_PREPARE_BUDGET=${SMOKE_PREPARE_BUDGET:-900}
+
+# start_session [JSON-BODY] -> prints the HTTP status of POST
+# /api/session/start, with exactly one substitution: a 202 is resolved
+# before it prints.
+#
+# 202 means the attempt was DRAWN but not started, because a pooled
+# hands-on bank seeds the subset it just drew before the clock may run
+# (docs/api.md, "Preparing an attempt"). No bank here pools on the
+# hands-on engine today — ckad-mock-01 asks all 22 of its 22 questions,
+# and kcna-mock is mcq, which never seeds — so every start below still
+# takes the 200 path and every assertion after one is untouched. This
+# exists so that the day one exam.yaml gains a spec.examLength, the suite
+# waits for the attempt instead of asserting against one that never
+# started.
+#
+# On the 202 path it polls GET /api/session until `preparing` clears.
+# That is the terminal condition, and NOT the control job going idle: the
+# job settles in the conductor up to a poll before the facilitator starts
+# the clock, so a watcher keyed on `busy` reads a session that is still
+# idle inside that window. It then prints 200 with $RESP holding the
+# running attempt's snapshot — the same shape a 200 start leaves there,
+# so every caller's json_field reads are unchanged. Any other status is
+# printed exactly as it came, so an unexpected code still fails the
+# caller's own assertion against the real code.
+#
+# Detail goes to stderr and this never calls `fail`: callers read it as
+# `status=$(start_session)`, and inside that subshell a FAILURES++ would
+# be discarded and anything printed to stdout would be swallowed into
+# $status instead of being seen.
+start_session() {
+  local code job elapsed=0 interval=2 state perr
+  if [ "$#" -gt 0 ]; then
+    code=$(curl -s -o "$RESP" -w '%{http_code}' -X POST \
+      -H 'Content-Type: application/json' -d "$1" "${BASE}/api/session/start")
+  else
+    code=$(req POST /api/session/start)
+  fi
+
+  if [ "$code" != "202" ]; then
+    # A refusal carries the facilitator's own words, and they are the
+    # whole diagnosis: "expected 200, got 409" on its own does not say
+    # whether an attempt is already running, the environment is still
+    # booting, or this bank now wants a reset between attempts.
+    [ "$code" = "200" ] || echo "  session start: HTTP ${code}: $(json_field error 2>/dev/null || true)" >&2
+    printf '%s' "$code"
+    return 0
+  fi
+
+  job=$(json_field jobId)
+  echo "  session start: 202 — preparing $(json_field questionCount) question(s) as job ${job} (budget ${SMOKE_PREPARE_BUDGET}s)" >&2
+  # Sleep at the BOTTOM, like wait_control and the facilitator's own
+  # watcher: a subset that seeds instantly must not cost an interval to
+  # notice. Which is also why there is no `continue` in here — it would
+  # skip the sleep and spin.
+  while [ "$elapsed" -lt "$SMOKE_PREPARE_BUDGET" ]; do
+    if [ "$(req GET /api/session)" = "200" ] && [ -z "$(json_field preparing)" ]; then
+      # `preparing` is gone, so the preparation settled one of the three
+      # documented ways: running (it worked), idle with prepareError (the
+      # seed job failed), idle without one (it was cancelled).
+      state=$(json_field state)
+      if [ "$state" = "running" ]; then
+        printf '200'
+        return 0
+      fi
+      perr=$(json_field prepareError)
+      if [ -n "$perr" ]; then
+        echo "  session start: job ${job} could not prepare the environment: ${perr}" >&2
+      else
+        echo "  session start: job ${job} cleared with the session '${state}' and no prepareError (cancelled, or the facilitator restarted mid-preparation)" >&2
+      fi
+      printf '%s' "$code"
+      return 0
+    fi
+    sleep "$interval"; elapsed=$((elapsed + interval))
+  done
+
+  echo "  session start: job ${job} did not finish preparing within ${SMOKE_PREPARE_BUDGET}s" >&2
+  echo "    that job is the thing to look at: curl -s ${BASE}/api/control/status; curl -s ${BASE}/api/control/log" >&2
+  echo "    raise the budget with SMOKE_PREPARE_BUDGET=<seconds> bash tests/smoke.sh" >&2
+  printf '%s' "$code"
+  return 0
+}
+
 echo "== session lifecycle: start, countdown, desktop unlock =="
-status=$(req POST /api/session/start)
+status=$(start_session)
 [ "$status" = "200" ] || fail "session start expected 200, got $status"
 state=$(json_field state)
 [ "$state" = "running" ] || fail "session start should report running, got $state"
@@ -621,7 +714,12 @@ for q in data.get("questions", []):
 
 # Blank honesty: an attempt that answers nothing must grade 0 and not
 # pass — not error, and not score by some default. Any draw does.
-status=$(req POST /api/session/start)
+#
+# Through start_session like every other start, even though an mcq bank
+# can never answer 202 (seedRequired() is false for an mcq exam, whatever
+# its pool): one idiom for starting an attempt, so a future engine change
+# does not have to find the sites that were left on the raw POST.
+status=$(start_session)
 [ "$status" = "200" ] || fail "mcq: blank start expected 200, got $status"
 status=$(req POST /api/session/end)
 [ "$status" = "202" ] || fail "mcq: blank end expected 202, got $status"
@@ -637,9 +735,18 @@ status=$(req DELETE /api/session)
 # multi). Retry a fresh attempt — cheap, no cluster involved — until one
 # lands, rather than let this section flake on an unlucky draw.
 mq=""
+mq_start_failed=0
 for _ in $(seq 1 30); do
-  status=$(req POST /api/session/start)
-  [ "$status" = "200" ] || fail "mcq: partial start expected 200, got $status"
+  status=$(start_session)
+  # Break, don't retry. Thirty refusals are one problem reported thirty
+  # times, and worse, the search below would then run against /api/exam's
+  # full POOL — which always contains a multi-select question — and
+  # "find" one for an attempt that does not exist.
+  if [ "$status" != "200" ]; then
+    fail "mcq: partial start expected 200, got $status"
+    mq_start_failed=1
+    break
+  fi
   status=$(req GET /api/exam)
   [ "$status" = "200" ] || fail "mcq: /api/exam expected 200, got $status"
   mq=$(first_multi_in_current_exam)
@@ -647,7 +754,12 @@ for _ in $(seq 1 30); do
   status=$(req DELETE /api/session)
   [ "$status" = "204" ] || fail "mcq: partial retry cleanup DELETE expected 204, got $status"
 done
-if [ -z "$mq" ]; then
+if [ "$mq_start_failed" = "1" ]; then
+  # Already reported, once, by the loop. The checks below need a RUNNING
+  # attempt: against an idle session the 403 gates among them would pass
+  # for entirely the wrong reason, so they are skipped rather than run.
+  :
+elif [ -z "$mq" ]; then
   fail "mcq: no multi-select question landed in 30 pooled draws — check the pool still has enough multi questions"
 else
   mcorrect=$(MQ="$mq" python3 -c '
@@ -701,7 +813,7 @@ fi
 # not the 97-question pool file, which is a superset a fresh draw need
 # not fully contain — from the derived key, and the grader must agree
 # the attempt scores 100%.
-status=$(req POST /api/session/start)
+status=$(start_session)
 [ "$status" = "200" ] || fail "mcq: full start expected 200, got $status"
 status=$(req GET /api/exam)
 [ "$status" = "200" ] || fail "mcq: /api/exam expected 200, got $status"
@@ -776,10 +888,8 @@ echo "== training mode: hints, solutions mid-attempt, scoring without ending =="
 status=$(req DELETE /api/session)
 [ "$status" = "204" ] || fail "training: could not reset the session, got $status"
 
-curl -s -o "$RESP" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
-  -d '{"mode":"training"}' "${BASE}/api/session/start" > /tmp/smoke-tstart.txt
-[ "$(cat /tmp/smoke-tstart.txt)" = "200" ] \
-  || fail "training: start expected 200, got $(cat /tmp/smoke-tstart.txt)"
+status=$(start_session '{"mode":"training"}')
+[ "$status" = "200" ] || fail "training: start expected 200, got $status"
 [ "$(json_field mode)" = "training" ] || fail "training: mode is '$(json_field mode)'"
 [ "$(json_field untimed)" = "True" ] || fail "training: untimed is '$(json_field untimed)', want True"
 
@@ -821,22 +931,39 @@ status=$(req DELETE /api/session)
 [ "$status" = "204" ] || fail "training: cleanup DELETE expected 204, got $status"
 
 # And the same gates must REFUSE in an exam attempt.
-status=$(req POST /api/session/start)
+#
+# This is a SECOND attempt with no environment reset since the training
+# one above. Harmless today — ckad-mock-01 is unpooled, so nothing was
+# seeded per-draw and there is nothing of the last draw left over — but
+# it is precisely the sequence a pooled hands-on bank may refuse. A
+# refusal is reported by start_session with the facilitator's own words,
+# and the gates are then SKIPPED rather than run: every one of them
+# answers 403 for an idle session too, so against a failed start they
+# would all pass for the wrong reason and prove nothing.
+status=$(start_session)
 [ "$status" = "200" ] || fail "exam-gate: start expected 200, got $status"
-[ "$(json_field mode)" = "exam" ] || fail "exam-gate: mode is '$(json_field mode)', want exam"
-[ "$(req GET /api/questions/q01/hints/1)" = "403" ] || fail "exam-gate: hints must be 403 in an exam"
-[ "$(req GET /api/questions/q01/solution)" = "403" ] || fail "exam-gate: solutions must be 403 mid-exam"
-[ "$(req POST /api/session/grade)" = "403" ] || fail "exam-gate: mid-attempt scoring must be 403 in an exam"
-curl -s -o "$RESP" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
-  -d '{"question":"q01"}' "${BASE}/api/control/reseed" > /tmp/smoke-reseed-exam.txt
-[ "$(cat /tmp/smoke-reseed-exam.txt)" = "403" ] \
-  || fail "exam-gate: reseed must be 403 in an exam, got $(cat /tmp/smoke-reseed-exam.txt)"
+if [ "$status" = "200" ]; then
+  [ "$(json_field mode)" = "exam" ] || fail "exam-gate: mode is '$(json_field mode)', want exam"
+  [ "$(req GET /api/questions/q01/hints/1)" = "403" ] || fail "exam-gate: hints must be 403 in an exam"
+  [ "$(req GET /api/questions/q01/solution)" = "403" ] || fail "exam-gate: solutions must be 403 mid-exam"
+  [ "$(req POST /api/session/grade)" = "403" ] || fail "exam-gate: mid-attempt scoring must be 403 in an exam"
+  curl -s -o "$RESP" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+    -d '{"question":"q01"}' "${BASE}/api/control/reseed" > /tmp/smoke-reseed-exam.txt
+  [ "$(cat /tmp/smoke-reseed-exam.txt)" = "403" ] \
+    || fail "exam-gate: reseed must be 403 in an exam, got $(cat /tmp/smoke-reseed-exam.txt)"
+fi
 status=$(req DELETE /api/session)
 [ "$status" = "204" ] || fail "exam-gate: cleanup DELETE expected 204, got $status"
 
 echo "== auto-end: session expires unattended and re-locks the desktop =="
 SESSION_DURATION_OVERRIDE=20s docker compose up -d --wait facilitator
-status=$(req POST /api/session/start)
+# Another second attempt with no environment reset (see the exam-gate
+# block above), and the facilitator has just been recreated on top of it
+# — a restart abandons any in-flight preparation, since a preparation is
+# deliberately in-memory only. Neither matters on an unpooled bank; both
+# would matter on a pooled one, and start_session says so out loud rather
+# than leaving the 25s sleep below to expire an attempt that never began.
+status=$(start_session)
 [ "$status" = "200" ] || fail "auto-end: session start expected 200, got $status"
 
 sleep 25   # duration override is 20s; give the expiry timer margin to fire

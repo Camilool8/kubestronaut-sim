@@ -1,9 +1,11 @@
 package mcqgrade
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
+	"kubestronaut-sim/facilitator/internal/evaluate"
 	"kubestronaut-sim/facilitator/internal/exam"
 )
 
@@ -178,6 +180,86 @@ func TestGradeScopesToQuestionIDs(t *testing.T) {
 	}
 	if res.Earned != 2 {
 		t.Errorf("Earned = %d, want 2 (q01 and q03 both correct)", res.Earned)
+	}
+}
+
+// The fixture's points do not sit in the curriculum's ratios —
+// Fundamentals holds 2 of 4 points but 75% of the curriculum — which is
+// exactly the shape a pooled draw produces, and exactly what weighting at
+// scoring time is for.
+func weightedFixture() *exam.Exam {
+	ex := fixtureExam()
+	ex.Domains = []exam.Domain{
+		{Name: "Kubernetes Fundamentals", WeightPct: 75},
+		{Name: "Container Orchestration", WeightPct: 25},
+	}
+	return ex
+}
+
+func TestGradeWeightsByCurriculumDomain(t *testing.T) {
+	// Both Fundamentals questions right, the Orchestration one wrong.
+	res := Grade(weightedFixture(), "b", map[string][]int{
+		"q01": {2},
+		"q03": {1},
+	}, nil)
+
+	if res.Percent != 75 {
+		t.Errorf("Percent = %d, want 75 (all of Fundamentals, none of Orchestration)", res.Percent)
+	}
+	if res.PointsPercent != 50 {
+		t.Errorf("PointsPercent = %d, want 50 (2 of 4 points)", res.PointsPercent)
+	}
+	if !res.Passed {
+		t.Errorf("Passed = false, want true — 75 is exactly the passing score")
+	}
+}
+
+func TestGradeDomainRollupAndVerdicts(t *testing.T) {
+	res := Grade(weightedFixture(), "b", map[string][]int{
+		"q01": {2},
+		"q02": {0},
+	}, nil)
+
+	want := []evaluate.DomainResult{
+		{Domain: "Kubernetes Fundamentals", Earned: 1, Total: 2, WeightPct: 75, QuestionCount: 2},
+		{Domain: "Container Orchestration", Earned: 0, Total: 2, WeightPct: 25, QuestionCount: 1},
+	}
+	if !reflect.DeepEqual(res.Domains, want) {
+		t.Errorf("Domains = %+v, want %+v", res.Domains, want)
+	}
+
+	// mcq is all-or-nothing, so a question is only ever correct or
+	// failed — never partial, even the 2-point multi-select.
+	for i, w := range []string{evaluate.VerdictCorrect, evaluate.VerdictFailed, evaluate.VerdictFailed} {
+		if got := res.Questions[i].Verdict; got != w {
+			t.Errorf("Questions[%d].Verdict = %q, want %q", i, got, w)
+		}
+	}
+	// Fundamentals' 75 points split evenly over its two 1-point
+	// questions; Orchestration's 25 all sit on its one question.
+	for i, w := range []float64{37.5, 25, 37.5} {
+		if got := res.Questions[i].WeightPct; got != w {
+			t.Errorf("Questions[%d].WeightPct = %v, want %v", i, got, w)
+		}
+	}
+}
+
+// A draw that misses a domain entirely renormalizes over what it drew:
+// the missing domain's weight cannot be earned, so it must not be in the
+// denominator either — otherwise a 65-question draw would cap below 100%.
+func TestGradeRenormalizesOverTheDrawnDomains(t *testing.T) {
+	res := Grade(weightedFixture(), "b", map[string][]int{
+		"q02": {0, 3},
+	}, []string{"q02"})
+
+	if len(res.Domains) != 1 || res.Domains[0].Domain != "Container Orchestration" {
+		t.Fatalf("Domains = %+v, want only the drawn Orchestration domain", res.Domains)
+	}
+	if res.Domains[0].WeightPct != 100 {
+		t.Errorf("WeightPct = %v, want 100 (the only domain drawn)", res.Domains[0].WeightPct)
+	}
+	if res.Percent != 100 {
+		t.Errorf("Percent = %d, want 100 — every question drawn was answered correctly", res.Percent)
 	}
 }
 

@@ -2,12 +2,18 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { getQuestion, type ExamQuestionInfo, type SessionMode } from "../api";
 import { useAsync } from "../lib/useAsync";
+import { desktopClipboard } from "../lib/desktopClipboard";
+import { pasteChordLabel } from "../lib/desktopKeymap";
+import { formatDuration } from "../lib/format";
+import { isTypingTarget } from "../lib/typing";
 import { strings } from "../strings";
 import { Async } from "./Async";
 import { Icon } from "./Icon";
 import { Markdown } from "./Markdown";
 import { HintTray } from "./HintTray";
+import { Navigator, type NavigatorQuestion } from "./Navigator";
 import { Skeleton } from "./Pending";
+import { toastStore } from "./toastStore";
 import { marksStore } from "./marksStore";
 
 interface QuestionPanelProps {
@@ -29,24 +35,29 @@ interface QuestionPanelProps {
   mode?: SessionMode;
 }
 
-// The collapsible left panel. Its whole job is the question text: the
-// candidate reads it in a 360px column, beside a terminal, under a clock
-// that cannot be paused.
+// The task pane. Its whole job is one task: the candidate reads it in a
+// 420px column, beside a terminal, under a clock that cannot be paused.
 //
-// Navigation used to be a scrolling list capped at 45% of the panel — 22
-// questions showing 8 at a time, each row an id, a points pill and a domain
-// string up to 50 characters ellipsed down to about eight. Half the panel
-// bought a truncated non-word. It is now a one-row navigator (prev, current,
-// next) plus a disclosure that overlays the panel with every question at
-// once, grouped by domain, where the long strings finally have a full line.
+// Three bands, and the order is the order the questions get asked in:
 //
-// The disclosure is absolutely positioned INSIDE .question-panel, which is
+//   head    which task this is, what it is called, and the four facts
+//           that place it — domain, share of the points, pacing budget,
+//           and the box it is graded on
+//   pane    the machine block (where to work, copyable), the bank's
+//           markdown, and what the grader will look at
+//   footer  previous / all tasks / next
+//
+// Navigation used to be a compact stepper row at the top of the header,
+// beside the current question's id. It is now the labelled footer row the
+// design brief draws: the same three moves, at the end of the reading
+// rather than above it, and discoverable without a keyboard.
+//
+// Navigator is absolutely positioned INSIDE .question-panel, which is
 // already position: relative. That is load-bearing rather than incidental:
 // opening it changes no flex geometry, so .desktop-pane never resizes, so
-// noVNC's ResizeObserver never fires. It is also why this is a disclosure
-// and not a modal — no scrim, no role="dialog", no focus trap. Dimming a
-// live remote desktop to pick question 12 would read as something going
-// wrong.
+// noVNC's ResizeObserver never fires. ui/src/styles/layout.test.ts pins
+// both halves of that pairing; see the comment at the top of Navigator.tsx
+// for the rest of it.
 export function QuestionPanel({
   questions,
   selectedId,
@@ -86,22 +97,44 @@ export function QuestionPanel({
     if (paneRef.current) paneRef.current.scrollTop = 0;
   }, [selectedId]);
 
-  // [ and ] step between questions. Deliberately not Alt+arrows: those are
-  // Back/Forward on Windows and Linux, and in a no-router SPA Back navigates
-  // out of a running exam. Bare bracket keys are safe because the handler
-  // below bows out over the desktop canvas, over any focused form control,
-  // and while a dialog is open — the product does have form controls (the
-  // mode picker, the clipboard textarea, the keyboard checkboxes).
+  // [ and ] step between questions, G opens and closes the navigator, F
+  // flags the task on screen — the same key the navigator's own foot
+  // names, working from the task you are reading as well as from inside
+  // the grid. Deliberately not Alt+arrows: those are Back/Forward on
+  // Windows and Linux, and in a no-router SPA Back navigates out of a
+  // running exam. Bare keys are safe because the handler below bows out
+  // over the desktop canvas, over any focused form control, and while a
+  // dialog is open — the product does have form controls (the mode
+  // picker, the clipboard textarea, the keyboard checkboxes).
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "[" && event.key !== "]") return;
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       const target = event.target as HTMLElement | null;
       // The RFB canvas owns the keyboard while focused, correctly — the
       // candidate is typing into a terminal.
       if (target?.closest(".desktop-pane")) return;
-      if (target?.closest("input, textarea, [contenteditable]")) return;
+      if (isTypingTarget(target)) return;
       if (document.querySelector('[role="dialog"]')) return;
+      // G is global rather than scoped to the open navigator, because the
+      // strip along its foot names it and that strip has to be true from
+      // the question you were reading as well as from inside the grid.
+      if (event.key === "g" || event.key === "G") {
+        event.preventDefault();
+        setJumpOpen((open) => {
+          if (open) jumpTriggerRef.current?.focus();
+          return !open;
+        });
+        return;
+      }
+      // The navigator handles F for the tile under the cursor while it is
+      // open; this one is for the task pane behind it.
+      if ((event.key === "f" || event.key === "F") && !jumpOpen) {
+        if (!selectedId) return;
+        event.preventDefault();
+        marksStore.toggleMark(selectedId);
+        return;
+      }
+      if (event.key !== "[" && event.key !== "]") return;
       const step = event.key === "[" ? prev : next;
       if (!step) return;
       event.preventDefault();
@@ -109,15 +142,22 @@ export function QuestionPanel({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [prev, next, onSelect]);
+  }, [prev, next, onSelect, selectedId, jumpOpen]);
 
   const closeJump = (returnFocus: boolean) => {
     setJumpOpen(false);
     if (returnFocus) jumpTriggerRef.current?.focus();
   };
 
-  const groups = useMemo(() => groupByDomain(questions), [questions]);
   const marked = selectedId !== null && marksStore.isMarked(selectedId);
+
+  // The denominator for the weight chip: the drawn attempt's own total, so
+  // a randomly drawn subset reports its own arithmetic rather than the
+  // whole pool's. Recomputed only when the question list itself changes.
+  const totalWeight = useMemo(
+    () => questions.reduce((sum, q) => sum + (q.weight || 0), 0),
+    [questions],
+  );
 
   return (
     <section
@@ -129,73 +169,42 @@ export function QuestionPanel({
           the questions beside the desktop you answer them on — and a
           full-screen desktop is not a state this product has. The panel
           is resizable between 280px and 600px and nothing narrower,
-          because 280px is where the nav row stops fitting. */}
+          because 280px is where the footer nav stops fitting on one row. */}
       {questions.length === 0 && <div className="question-empty">{emptyState}</div>}
       {questions.length > 0 && (
         <>
-          <header className="question-nav">
-            <div className="question-nav-row">
-              <button
-                className="question-nav-step"
-                onClick={() => prev && onSelect(prev.id)}
-                disabled={!prev}
-                aria-label={strings.questionPanel.prev}
-              >
-                <Icon name="chevron-left" />
-              </button>
-              <button
-                ref={jumpTriggerRef}
-                className="question-nav-current"
-                onClick={() => setJumpOpen((v) => !v)}
-                aria-expanded={jumpOpen}
-                aria-controls={jumpOpen ? "question-jump" : undefined}
-                disabled={!selected}
-              >
-                <span className="question-id">{selected?.id ?? "—"}</span>
-                {selected && (
-                  <span className="question-points">
-                    {strings.questionPanel.points(selected.totalPoints)}
-                  </span>
-                )}
-                <span className="question-nav-count" aria-hidden="true">
-                  {index >= 0 ? `${index + 1} / ${questions.length}` : ""}
-                </span>
-                {/* The open/closed reading lives here now. It used to be an
-                    accent border, which was the same declaration the current
-                    question tile takes forty pixels below. */}
-                <Icon name="chevron-down" className="disclosure-chevron" />
-                <span className="sr-only">
-                  {index >= 0
-                    ? strings.questionPanel.position(index + 1, questions.length)
-                    : strings.questionPanel.jumpOpenLabel}
-                </span>
-              </button>
-              <button
-                className="question-nav-step"
-                onClick={() => next && onSelect(next.id)}
-                disabled={!next}
-                aria-label={strings.questionPanel.next}
-              >
-                <Icon name="chevron-right" />
-              </button>
-            </div>
-            {selected && (
-              <div className="question-nav-tools">
-                {selected.instance && (
-                  <span className="instance-chip">
-                    {strings.questionPanel.sshHint(selected.instance)}
-                  </span>
-                )}
+          <header className="task-head">
+            <div className="task-head-row">
+              <span className="task-counter">
+                {index >= 0 ? strings.questionPanel.taskCounter(index + 1, questions.length) : ""}
+              </span>
+              {selected && (
                 <button
                   className="question-mark"
                   onClick={() => marksStore.toggleMark(selected.id)}
                   aria-pressed={marked}
                 >
-<Icon name={marked ? "flag-filled" : "flag"} />
+                  <Icon name={marked ? "flag-filled" : "flag"} />
                   {strings.questionPanel.mark}
+                  {/* aria-hidden: the chord is a visual reminder, and
+                      inside a button it would otherwise land in the middle
+                      of the accessible name. The shortcut reference (?) is
+                      where it is said out loud. */}
+                  <kbd className="key-hint" aria-hidden="true">
+                    {strings.questionPanel.markKey}
+                  </kbd>
                 </button>
-              </div>
+              )}
+            </div>
+            {/* The bank's short label, or its id when it has none — a task
+                pane with no heading at all reads as a fragment. The
+                markdown below opens with its own "# Question 4 | ..."
+                heading, which Markdown shifts to an h2 as well; see the
+                note in the report about retiring the bank's title line. */}
+            {selected && (
+              <h2 className="task-title">{selected.title ?? selected.id}</h2>
             )}
+            {selected && <TaskChips question={selected} totalWeight={totalWeight} />}
           </header>
 
           {/* aria-busy rather than blanking to "Loading…": a question fetch
@@ -204,6 +213,7 @@ export function QuestionPanel({
               flashes the pane on every step between questions. The previous
               question stays up until the next one is ready. */}
           <div className="question-pane" ref={paneRef} aria-busy={question.status === "loading"}>
+            {selected?.instance && <WorkFrom instance={selected.instance} />}
             <Async
               state={question}
               loading={<QuestionSkeleton />}
@@ -228,10 +238,59 @@ export function QuestionPanel({
             )}
           </div>
 
+          {/* Previous / all tasks / next, labelled and at the foot of the
+              reading. Exactly one primary button: Next is the move the
+              screen expects, and the last task simply disables it rather
+              than growing a second submit — the topbar already carries the
+              only one, and two ways to end an attempt is one too many. */}
+          <footer className="task-nav">
+            <button
+              className="btn task-nav-step"
+              onClick={() => prev && onSelect(prev.id)}
+              disabled={!prev}
+              aria-label={strings.questionPanel.prev}
+            >
+              <Icon name="chevron-left" />
+              {strings.questionPanel.prevShort}
+            </button>
+            <button
+              ref={jumpTriggerRef}
+              className="btn task-nav-jump"
+              onClick={() => setJumpOpen((v) => !v)}
+              aria-expanded={jumpOpen}
+              aria-controls={jumpOpen ? "question-jump" : undefined}
+              disabled={!selected}
+            >
+              <Icon name="grid" className="trigger-glyph" />
+              {strings.questionPanel.allTasks}
+              <kbd className="key-hint" aria-hidden="true">
+                {strings.navigator.keyGridKey}
+              </kbd>
+              <span className="sr-only">
+                {index >= 0
+                  ? strings.navigator.position(index + 1, questions.length)
+                  : strings.navigator.open}
+              </span>
+            </button>
+            <button
+              className="btn btn-primary task-nav-step"
+              onClick={() => next && onSelect(next.id)}
+              disabled={!next}
+              aria-label={strings.questionPanel.next}
+            >
+              {strings.questionPanel.nextShort}
+              <Icon name="chevron-right" />
+            </button>
+          </footer>
+
           {jumpOpen && (
-            <QuestionJump
-              groups={groups}
+            <Navigator
+              id="question-jump"
+              questions={toNavigator(questions)}
               selectedId={selectedId}
+              // "opened", never "answered": this screen knows it rendered
+              // the question's text and nothing more (marksStore.ts).
+              progress="opened"
               onSelect={(id) => {
                 onSelect(id);
                 closeJump(true);
@@ -242,6 +301,106 @@ export function QuestionPanel({
         </>
       )}
     </section>
+  );
+}
+
+// The four facts that place a task, in the order they answer "should I do
+// this one now?": what it is about, what it is worth, how long it is meant
+// to take, and which box it is graded on.
+//
+// Every one of them is optional at the source. `targetSeconds` in
+// particular arrives only from a facilitator new enough to send it, and an
+// older one simply has no pacing chip — never a blank or a zero.
+function TaskChips({
+  question,
+  totalWeight,
+}: {
+  question: ExamQuestionInfo;
+  totalWeight: number;
+}) {
+  const pct = totalWeight > 0 && question.weight > 0 ? (question.weight / totalWeight) * 100 : null;
+  const target = question.targetSeconds;
+  const derived = question.targetDerived === true;
+  const span =
+    target === undefined || target <= 0
+      ? null
+      : target >= 60
+        ? formatDuration(target)
+        : `${target}s`;
+
+  return (
+    <ul className="task-chips">
+      {question.domain && <li className="task-chip task-chip-domain">{question.domain}</li>}
+      {pct !== null && (
+        <li className="task-chip" title={strings.questionPanel.weightShareNote(pct)}>
+          {strings.questionPanel.weightShare(pct)}
+        </li>
+      )}
+      {span !== null && (
+        <li
+          className="task-chip"
+          title={
+            derived
+              ? strings.questionPanel.targetTimeDerivedNote
+              : strings.questionPanel.targetTimeNote
+          }
+        >
+          {derived
+            ? strings.questionPanel.targetTimeDerived(span)
+            : strings.questionPanel.targetTime(span)}
+          <span className="sr-only">
+            {". "}
+            {derived
+              ? strings.questionPanel.targetTimeDerivedNote
+              : strings.questionPanel.targetTimeNote}
+          </span>
+        </li>
+      )}
+      {question.instance && (
+        <li className="task-chip instance-chip">{question.instance}</li>
+      )}
+    </ul>
+  );
+}
+
+// Where the work happens. Drawn in the --machine-* palette — the dark
+// family that is identical in both themes — because it is literally a
+// computer: a command, and the one control that puts it on the machine's
+// own clipboard. Nothing else in this pane may borrow those tokens; the
+// rest of it is app surface.
+function WorkFrom({ instance }: { instance: string }) {
+  const command = strings.questionPanel.sshHint(instance);
+
+  const copy = async () => {
+    const outcome = await desktopClipboard.copy(command);
+    toastStore.push({
+      kind: outcome === "failed" ? "warning" : "info",
+      message:
+        outcome === "desktop"
+          ? strings.questionPanel.copiedToDesktop(command, pasteChordLabel())
+          : outcome === "browser"
+            ? strings.questionPanel.copied(command)
+            : strings.questionPanel.copyFailed,
+      dedupeKey: "copy-value",
+    });
+  };
+
+  return (
+    <div className="work-from">
+      <div className="work-from-head">
+        <span className="work-from-label">{strings.questionPanel.workFrom}</span>
+        <button
+          type="button"
+          className="work-from-copy"
+          onClick={copy}
+          aria-label={strings.questionPanel.copyValue(command)}
+        >
+          <Icon name="copy" />
+          {strings.questionPanel.copyShort}
+        </button>
+      </div>
+      <code className="work-from-command">{command}</code>
+    </div>
   );
 }
 
@@ -263,102 +422,34 @@ function QuestionSkeleton() {
   );
 }
 
-interface DomainGroup {
-  domain: string;
-  questions: ExamQuestionInfo[];
-}
-
-// Grouped by domain in order of first appearance, so the grid mirrors the
-// bank's own question order rather than sorting it into something the
-// candidate has not seen before.
-function groupByDomain(questions: ExamQuestionInfo[]): DomainGroup[] {
-  const groups: DomainGroup[] = [];
-  const byDomain = new Map<string, DomainGroup>();
-  for (const question of questions) {
-    let group = byDomain.get(question.domain);
-    if (!group) {
-      group = { domain: question.domain, questions: [] };
-      byDomain.set(question.domain, group);
-      groups.push(group);
-    }
-    group.questions.push(question);
-  }
-  return groups;
-}
-
-interface QuestionJumpProps {
-  groups: DomainGroup[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  onDismiss: () => void;
-}
-
-// Every question at once. Four ~76px tiles per row in the panel's 328px of
-// inner width means 22 questions is six rows — less vertical space than the
-// old list spent showing eight, and no scrolling to find where you are.
-function QuestionJump({ groups, selectedId, onSelect, onDismiss }: QuestionJumpProps) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  // A non-modal disclosure, so useFocusTrap is the wrong tool despite being
-  // right next door: it cycles Tab inside the container, which would strand
-  // a keyboard user who wanted to reach the timer or End Exam.
-  useEffect(() => {
-    ref.current?.querySelector<HTMLElement>('[aria-current="true"]')?.focus({ preventScroll: true });
-  }, []);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.stopPropagation();
-      onDismiss();
-    };
-    const node = ref.current;
-    node?.addEventListener("keydown", onKeyDown);
-    return () => node?.removeEventListener("keydown", onKeyDown);
-  }, [onDismiss]);
-
-  return (
-    <div className="question-jump" id="question-jump" ref={ref}>
-      {groups.map((group) => (
-        <div className="question-jump-group" key={group.domain}>
-          {/* h2, matching the shifted level the question markdown now
-              renders its own title at — the topbar owns the exam's h1. */}
-          <h2>{group.domain}</h2>
-          <ul className="question-grid">
-            {group.questions.map((q) => {
-              const current = q.id === selectedId;
-              const marked = marksStore.isMarked(q.id);
-              const viewed = marksStore.isViewed(q.id);
-              return (
-                <li key={q.id}>
-                  <button
-                    className={`question-tile${viewed ? " viewed" : ""}`}
-                    onClick={() => onSelect(q.id)}
-                    aria-current={current ? "true" : undefined}
-                  >
-                    <span className="question-tile-id">{q.id}</span>
-                    <span className="question-tile-points">
-                      {strings.questionPanel.points(q.totalPoints)}
-                    </span>
-                    {marked && (
-<Icon name="flag-filled" className="question-tile-mark" />
-                    )}
-                    <span className="sr-only">
-                      {[
-                        q.instance,
-                        viewed ? strings.questionPanel.viewed : null,
-                        marked ? strings.questionPanel.marked : null,
-                      ]
-                        .filter(Boolean)
-                        .join(", ")}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ))}
-    </div>
-  );
+/**
+ * The panel's questions as the shared navigator wants them.
+ *
+ * The tile prints the task's POSITION, not the bank id. It printed the id
+ * until the pane's identity block started counting "Task 01 / 22", which
+ * left the grid as the only surface here still naming questions the way
+ * the bank does — and made the tiles disagree with the counter directly
+ * above them. The mcq screen has always done it this way; the reason is
+ * the same on both, and gets sharper once a hands-on draw is a subset of
+ * the bank rather than all of it.
+ *
+ * Everything the old four-per-row grid drew on the tile — the bank's
+ * title, the domain, the instance, the points — moves into the spoken
+ * detail: at ten tiles to a row there is one line, and it belongs to the
+ * number.
+ */
+function toNavigator(questions: ExamQuestionInfo[]): NavigatorQuestion[] {
+  return questions.map((q, i) => ({
+    id: q.id,
+    // Zero-padded to match the identity block's counter, so a tile and
+    // the heading above it read as the same number.
+    label: String(i + 1).padStart(String(questions.length).length, "0"),
+    detail: [q.title, q.domain, q.instance, strings.questionPanel.points(q.totalPoints)]
+      .filter(Boolean)
+      .join(", "),
+    // "viewed" is the only thing this screen can observe. It is NOT an
+    // answer, and marksStore.ts is explicit that it may never be rendered
+    // as one; the navigator's `progress="opened"` picks the words.
+    done: marksStore.isViewed(q.id),
+  }));
 }

@@ -213,6 +213,19 @@ services:
       - ./banks:/banks:ro
       - shared:/shared:ro
       - session:/session
+      # A SECOND volume beside session, deliberately, and mounted on this
+      # service alone — the facilitator is the only process that can see
+      # every attempt.
+      #
+      # They are separate because their durability requirements are
+      # opposite. /session is one attempt's scratch state: a reset clears
+      # it, a bank switch invalidates it, and `./sim purge` is supposed to
+      # take it. /state holds every attempt the candidate has ever graded,
+      # which nothing short of an explicit `./sim purge --all` (or the
+      # UI's own Delete) may remove. Sharing one volume would mean one
+      # `docker compose down -v` erased both, which is exactly what purge
+      # used to do.
+      - state:/state
     networks: [examnet, controlnet]
     # No depends_on, deliberately, and all four entries had to go — not
     # just the two service_healthy ones. instance-1/2 were only
@@ -239,6 +252,8 @@ volumes:
   course-1: {}
   course-2: {}
   session: {}
+  # The attempt record. The one volume `./sim purge` keeps.
+  state: {}
   registry: {}
   containers-1: {}
   containers-2: {}

@@ -82,9 +82,11 @@ describe("QuestionPanel copy affordance", () => {
 });
 
 // Three questions across two domains, which is the smallest fixture that
-// exercises both ends of the navigator and the grid's grouping.
+// exercises both ends of the navigator and the grid's grouping. q01
+// carries a title and the others do not, because title is optional in
+// the bank format and both renderings have to hold in one grid.
 const bank: ExamQuestionInfo[] = [
-  { id: "q01", instance: "instance-1", domain: "Config", weight: 5, totalPoints: 5, hintCount: 0 },
+  { id: "q01", title: "Namespaces & quotas", instance: "instance-1", domain: "Config", weight: 5, totalPoints: 5, hintCount: 0 },
   { id: "q02", instance: "instance-2", domain: "Networking", weight: 7, totalPoints: 7, hintCount: 0 },
   { id: "q03", instance: "instance-2", domain: "Networking", weight: 9, totalPoints: 9, hintCount: 0 },
 ];
@@ -139,6 +141,16 @@ describe("QuestionPanel navigator", () => {
     expect(selected).toEqual(["q03", "q01"]);
   });
 
+  test("a bank title shows in the header, and its absence renders nothing", async () => {
+    renderNav("q01");
+    expect(await screen.findByText("Namespaces & quotas")).toBeInTheDocument();
+
+    renderNav("q02");
+    // q02 has no title: the header falls back to the id alone rather
+    // than rendering an empty span or the word "undefined".
+    expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
+  });
+
   test("the bracket keys stay out of the way while the terminal has focus", async () => {
     const selected: string[] = [];
     const { container } = renderNav("q02", (id) => void selected.push(id));
@@ -169,27 +181,49 @@ describe("QuestionPanel jump grid", () => {
     return within(grid);
   }
 
-  test("every question is reachable at once, grouped by domain", async () => {
+  test("every question is reachable at once", async () => {
     const grid = await openGrid("q01");
-    for (const id of ["q01", "q02", "q03"]) {
-      expect(grid.getByRole("button", { name: new RegExp(`^${id}`) })).toBeInTheDocument();
+    for (const n of ["1", "2", "3"]) {
+      expect(grid.getByRole("button", { name: new RegExp(`^${n}\\b`) })).toBeInTheDocument();
     }
-    // The domain finally gets a full line here instead of being ellipsed
-    // to about eight characters inside a 360px row.
-    expect(grid.getByRole("heading", { name: "Networking" })).toBeInTheDocument();
+  });
+
+  test("what the tile has no room to draw is still said", async () => {
+    const grid = await openGrid("q01");
+    // Ten tiles to a row leaves one line and it belongs to the number, so
+    // the bank's title, the domain, the instance and the points all travel
+    // in the button's accessible name rather than being dropped.
+    const tile = grid.getByRole("button", { name: /^1\b/ });
+    expect(tile).toHaveAccessibleName(/Namespaces & quotas/);
+    expect(tile).toHaveAccessibleName(/Config/);
+    expect(tile).toHaveAccessibleName(/instance-1/);
+    expect(tile).toHaveAccessibleName(/5 pts/);
+  });
+
+  test("the grid prints task positions, the same as the counter above it", async () => {
+    const grid = await openGrid("q01");
+    // This test used to assert the opposite, on the grounds that the
+    // panel's header printed bank ids too. It stopped doing that when the
+    // identity block started counting "Task 01 / 22", which left the grid
+    // as the only surface here still naming tasks the way the bank does —
+    // disagreeing with the heading directly above it. The mcq screen has
+    // always printed positions; the reason holds on both, and gets
+    // sharper once a hands-on draw is a subset rather than the whole bank.
+    expect(grid.getByRole("button", { name: /^2\b/ })).toBeInTheDocument();
+    expect(grid.queryByRole("button", { name: /^q02/ })).toBeNull();
   });
 
   test("the current question is announced as current, not just drawn as selected", async () => {
     const grid = await openGrid("q02");
-    expect(grid.getByRole("button", { name: /^q02/ })).toHaveAttribute("aria-current", "true");
-    expect(grid.getByRole("button", { name: /^q01/ })).not.toHaveAttribute("aria-current");
+    expect(grid.getByRole("button", { name: /^2\b/ })).toHaveAttribute("aria-current", "true");
+    expect(grid.getByRole("button", { name: /^1\b/ })).not.toHaveAttribute("aria-current");
   });
 
   test("picking a question closes the grid and hands focus back", async () => {
     const selected: string[] = [];
     const grid = await openGrid("q01", (id) => void selected.push(id));
 
-    await userEvent.click(grid.getByRole("button", { name: /^q03/ }));
+    await userEvent.click(grid.getByRole("button", { name: /^3\b/ }));
 
     expect(selected).toEqual(["q03"]);
     expect(document.querySelector("#question-jump")).toBeNull();
@@ -200,6 +234,20 @@ describe("QuestionPanel jump grid", () => {
     await openGrid("q01");
     await userEvent.keyboard("{Escape}");
     expect(document.querySelector("#question-jump")).toBeNull();
+  });
+
+  test("G opens and closes the grid, so the strip along its foot is true", async () => {
+    renderNav("q01");
+    await screen.findByRole("button", { name: /show all questions/i });
+
+    await userEvent.keyboard("g");
+    expect(document.querySelector("#question-jump")).not.toBeNull();
+
+    // The same key closes it, and the focus goes back to the trigger it
+    // came from rather than being dropped on <body>.
+    await userEvent.keyboard("g");
+    expect(document.querySelector("#question-jump")).toBeNull();
+    expect(screen.getByRole("button", { name: /show all questions/i })).toHaveFocus();
   });
 });
 
@@ -241,6 +289,140 @@ describe("QuestionPanel review marks", () => {
 
     await userEvent.click(mark);
     expect(mark).toHaveAttribute("aria-pressed", "false");
+  });
+});
+
+// The identity block above the task text: which task this is, what it is
+// called, and the four facts that place it. Every one of the four is
+// optional at the source, and two of them (`targetSeconds`,
+// `targetDerived`) arrive only from a facilitator new enough to send them.
+describe("QuestionPanel task header", () => {
+  test("the counter is zero-padded to the width of the total", async () => {
+    renderNav("q02");
+    // "TASK 02 / 3" would jump a pixel between 9 and 10 under a running
+    // clock; the padding is to the total's own width, so a 3-task attempt
+    // pads to one digit and a 20-task one to two.
+    expect(await screen.findByText("Task 2 / 3")).toBeInTheDocument();
+  });
+
+  test("the chips place the task: domain, share of the points, host", async () => {
+    renderNav("q01");
+    expect(await screen.findByText("Config")).toBeInTheDocument();
+    // 5 of the fixture's 21 points, rounded. Computed over the DRAWN
+    // questions, so a random draw reports its own arithmetic.
+    expect(screen.getByText("Weight 24%")).toBeInTheDocument();
+    expect(screen.getByText("instance-1")).toBeInTheDocument();
+  });
+
+  test("no target time is sent, so no pacing chip is drawn", async () => {
+    renderNav("q01");
+    await screen.findByText("Config");
+    // An older facilitator sends no targetSeconds at all. The chip is
+    // absent rather than empty, zero, or a guess.
+    expect(screen.queryByText(/^Target/)).not.toBeInTheDocument();
+  });
+
+  test("a target time is a budget, and a derived one says it is derived", async () => {
+    const timed: ExamQuestionInfo[] = [
+      { ...bank[0], targetSeconds: 360 },
+      { ...bank[1], targetSeconds: 420, targetDerived: true },
+      bank[2],
+    ];
+    const { rerender } = render(
+      <QuestionPanel questions={timed} selectedId="q01" onSelect={() => {}} />,
+    );
+
+    // Authored in the bank: a plain figure, and nothing anywhere may
+    // suggest running over it costs anything, because it does not.
+    const authored = await screen.findByText("Target 6m");
+    expect(authored).toHaveAttribute("title", expect.stringMatching(/budget, not a limit/i));
+    // The one thing this copy may never do is imply a cost. It says "not
+    // a limit" out loud; what it must not contain is a penalty at all.
+    expect(authored).toHaveTextContent(/not a limit/i);
+    expect(authored.textContent).not.toMatch(/penal|deduct|overdue|deadline|too slow/i);
+
+    rerender(<QuestionPanel questions={timed} selectedId="q02" onSelect={() => {}} />);
+
+    // Derived: arithmetic about weights, not a judgement of how long the
+    // work takes, and it has to say so where it is read.
+    const derived = await screen.findByText("Target ≈7m");
+    expect(derived).toHaveAttribute("title", expect.stringMatching(/derived/i));
+    expect(derived).toHaveTextContent(/derived from this task's share of the exam clock/i);
+  });
+
+  test("time is about the pane being open, never about effort", async () => {
+    const timed: ExamQuestionInfo[] = [{ ...bank[0], targetSeconds: 360 }, bank[1], bank[2]];
+    const { container } = render(
+      <QuestionPanel questions={timed} selectedId="q01" onSelect={() => {}} />,
+    );
+    await screen.findByText("Target 6m");
+
+    // Per-task time measures a pane being on screen. "Spent" and "worked"
+    // both claim to have measured attention, which nothing here can.
+    expect(container.textContent).not.toMatch(/\bspent\b|\bworked\b|\beffort\b/i);
+  });
+
+  test("F flags the task you are reading, not just the tile you are on", async () => {
+    marksStore.setScope("2026-07-27T10:00:00Z");
+    renderNav("q02");
+    const mark = await screen.findByRole("button", { name: /mark for review/i });
+    expect(mark).toHaveAttribute("aria-pressed", "false");
+
+    await userEvent.keyboard("f");
+
+    expect(mark).toHaveAttribute("aria-pressed", "true");
+    expect(marksStore.isMarked("q02")).toBe(true);
+  });
+
+  test("F stays out of the way while the terminal has focus", async () => {
+    marksStore.setScope("2026-07-27T10:00:00Z");
+    const { container } = renderNav("q02");
+    await screen.findByRole("button", { name: /mark for review/i });
+
+    const desktop = document.createElement("div");
+    desktop.className = "desktop-pane";
+    const target = document.createElement("button");
+    desktop.appendChild(target);
+    container.appendChild(desktop);
+    target.focus();
+
+    await userEvent.keyboard("f");
+
+    // "f" is a character in a shell, not a shortcut.
+    expect(marksStore.isMarked("q02")).toBe(false);
+  });
+});
+
+// The machine block — now the only thing the task pane says that the
+// bank's markdown does not.
+describe("QuestionPanel work-from block", () => {
+  test("the ssh command is on screen and copyable in one click", async () => {
+    const pasted: string[] = [];
+    desktopClipboard.connect({ clipboardPasteFrom: (t) => void pasted.push(t) });
+
+    renderNav("q02");
+    const copy = await screen.findByRole("button", { name: /copy ssh instance-2/i });
+    // The visible label is "Copy"; the accessible name says what gets
+    // copied and contains the visible word (WCAG 2.5.3).
+    expect(copy).toHaveTextContent("Copy");
+    await userEvent.click(copy);
+
+    expect(pasted).toEqual(["ssh instance-2"]);
+  });
+
+  test("the pane does not repeat exam methodology on every task", async () => {
+    renderNav("q02");
+    await screen.findByRole("button", { name: /copy ssh instance-2/i });
+
+    // Both of these used to sit under every task: a "Graded on" card
+    // saying grading reads the state you leave behind, and a note that
+    // kubectl needs no context switch. Both are true of all 22 tasks in
+    // the bank, so both were the same paragraph repeated 22 times in the
+    // column the candidate is meant to read closely. They belong to the
+    // exam, not the task, and they live in ExamIntro now.
+    expect(screen.queryByRole("region", { name: /graded on/i })).toBeNull();
+    expect(screen.queryByText(/not the commands you typed/i)).toBeNull();
+    expect(screen.queryByText(/no context to switch/i)).toBeNull();
   });
 });
 

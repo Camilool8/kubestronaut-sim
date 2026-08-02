@@ -1,0 +1,64 @@
+/* Self-hosted IBM Plex, the same two families the app loads through
+   @fontsource. Nothing here reaches the network: the .woff2 files are
+   vendored into site/fonts/ by site/build.sh, and the page is served from
+   one origin with no CDN, exactly as the rest of the product is.
+
+   Four faces, not the app's seven. The landing page sets 400 and 600 in
+   each family and nothing else, and the latin subset is the only one its
+   copy needs, so the whole typographic payload is 77KB.
+
+   If build.sh could not find ui/node_modules (no `npm ci` yet), these
+   @font-face rules simply fail to load and every family list in
+   tokens.css falls through to its next entry — system-ui for
+   --font-sans, ui-monospace for --font-mono. The page is plainer and
+   completely functional. That fallback is why the token stacks are used
+   as declared rather than overridden here.
+
+   `font-display: swap` on purpose: this page carries no layout that a
+   metric shift would break, and text that is readable immediately beats
+   text that is correct in 200ms. The unicode-range is @fontsource's own
+   for the latin subset. */
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(./fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url(./fonts/ibm-plex-sans-latin-600-normal.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(./fonts/ibm-plex-mono-latin-400-normal.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url(./fonts/ibm-plex-mono-latin-600-normal.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}

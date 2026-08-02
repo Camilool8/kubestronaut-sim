@@ -87,9 +87,11 @@ describe("Markdown wrapper: pane layout and prose styling do not share a class",
   // div were both classed `.md`, nesting `.md` inside `.md`. `.md` carried
   // pane layout (flex/overflow-y/padding) meant for QuestionPanel's scroll
   // region, so the inner (Markdown's own) wrapper picked up that padding
-  // a second time, and Task 8's `.solution-details` call site — which has
-  // no pane ancestor — would inherit an unwanted padding box with nothing
-  // to pair it with. The fix moves pane layout onto its own
+  // a second time, and a `.solution-details` call site with no pane
+  // ancestor — the score screen's verdict rows then, McqExam's
+  // training-mode check-answer now that the deep dive owns the reference
+  // solution — would inherit an unwanted padding box with nothing to
+  // pair it with. The fix moves pane layout onto its own
   // `.question-pane` selector, used only on QuestionPanel's wrapper, and
   // leaves `.md` prose-only so `<Markdown>` is a self-contained drop-in
   // anywhere.

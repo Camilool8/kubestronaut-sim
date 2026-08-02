@@ -7,22 +7,37 @@
 
 /* The full-height chain, unbroken from the viewport to the screen. Every
    screen root asserts a height against it — `.exam-layout` and
-   `.score-screen` at 100%, `.start-screen` at min-height 100% — and a
+   `.score-screen` at 100%, `.page` at min-height 100% — and a
    percentage height resolves to `auto` the moment ONE ancestor in the
-   chain is content-sized. `main` was that missing link: the lobby stopped
-   centering, the score page scrolled the body instead of itself, and the
-   exam desktop entered a resize feedback loop (a `.desktop-canvas` whose
-   height came from the noVNC canvas inside it, watched by noVNC's own
-   ResizeObserver, which then asked the server to resize to match). One
-   declaration; four screens. */
+   chain is content-sized. `main` was once the missing link: the lobby
+   stopped centering, the score page scrolled the body instead of itself,
+   and the exam desktop entered a resize feedback loop (a
+   `.desktop-canvas` whose height came from the noVNC canvas inside it,
+   watched by noVNC's own ResizeObserver, which then asked the server to
+   resize to match). One declaration; four screens. */
 html,
 body,
-#root,
-main {
+#root {
   height: 100%;
 }
 
+/* `main` used to be in that list. It cannot be, now that `.app-header`
+   is its sibling: 100% of #root PLUS a 56px header is taller than the
+   viewport, which hands the body a scrollbar — the exact failure the
+   score screen has its own `height: auto` override to avoid.
+
+   A column flex container instead. `main` takes the space the header
+   leaves, and because #root's height is definite the flex item's
+   resolved height is definite too, so every percentage height inside it
+   still has something real to resolve against. The chain holds whether
+   or not the header is rendered. */
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
 main {
+  flex: 1 1 auto;
   min-height: 0;
 }
 
@@ -93,17 +108,30 @@ h3 {
    current question and a marked question are all indistinguishable
    rectangles. */
 @media (forced-colors: active) {
-  .question-tile[aria-current="true"],
-  .bank-card.bank-active,
+  /* .navigator-tile, not the .question-tile this rule named until the
+     navigator replaced the jump grid. The selector went stale silently,
+     and forced colors is exactly where that costs the most: the current
+     tile is drawn everywhere else with --accent-soft, an accent border
+     and an inset shadow, and forced colors overrides all three and drops
+     box-shadow entirely. This outline was the only channel left, and it
+     was matching nothing. */
+  .navigator-tile[aria-current="true"],
+  .mode-card-on,
   .question-mark[aria-pressed="true"] {
     outline: 2px solid Highlight;
     outline-offset: -3px;
   }
 
+  /* Answered reads as a fill and a stronger border, both of which forced
+     colors overrides away, leaving it identical to unanswered. Width is
+     geometry rather than colour, so it survives. The flagged state needs
+     no twin: it carries an icon. */
+  .navigator-tile.is-done {
+    border-width: 3px;
+  }
+
   /* --text-disabled is overridden away; GrayText is the system's own. */
-  .btn:disabled,
-  .bank-card:disabled,
-  .question-nav-step:disabled {
+  .btn:disabled {
     color: GrayText;
   }
 

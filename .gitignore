@@ -56,6 +56,5 @@ killer-sh-*.txt
 
 # Deliberately NOT ignored, because they are project artifacts rather than
 # machine state, and a collaborator needs them to get the same results:
-#   .impeccable/design.json      — the DESIGN.md token/component sidecar
 #   .impeccable/live/config.json — which HTML file live mode injects into
 #   .claude/settings.json        — shared project config, if one is added

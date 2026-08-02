@@ -151,10 +151,9 @@ func TestStartAndResetClearAnswers(t *testing.T) {
 
 // Version 3 files predate answer storage; the version guard must discard
 // them (the standing migration strategy), not resume them answerless.
-// A pooled mcq attempt's drawn subset is what StartMCQ adds over plain
-// Start: it must persist and survive a reload exactly like mode and
-// answers already do.
-func TestStartMCQPersistsQuestionIDsAndReload(t *testing.T) {
+// A drawn subset is what StartDraw adds over plain Start: it must
+// persist and survive a reload exactly like mode and answers already do.
+func TestStartDrawPersistsQuestionIDsAndReload(t *testing.T) {
 	path := sessionPath(t)
 	clock, _ := fakeClock(epoch)
 	m, err := New(path, testBank, testDur, clock, func() {})
@@ -163,11 +162,11 @@ func TestStartMCQPersistsQuestionIDsAndReload(t *testing.T) {
 	}
 
 	want := []string{"q03", "q01", "q07"}
-	if _, err := m.StartMCQ(ModeExam, testDur, want); err != nil {
-		t.Fatalf("StartMCQ: %v", err)
+	if _, err := m.StartDraw(ModeExam, testDur, Draw{QuestionIDs: want}); err != nil {
+		t.Fatalf("StartDraw: %v", err)
 	}
 	if got := m.QuestionIDs(); !equalStrings(got, want) {
-		t.Errorf("QuestionIDs() after StartMCQ = %v, want %v", got, want)
+		t.Errorf("QuestionIDs() after StartDraw = %v, want %v", got, want)
 	}
 
 	m2, err := New(path, testBank, testDur, clock, func() {})
@@ -179,9 +178,8 @@ func TestStartMCQPersistsQuestionIDsAndReload(t *testing.T) {
 	}
 }
 
-// Plain Start is StartMCQ(mode, dur, nil) — every hands-on attempt, and
-// every mcq bank that has not opted into pooling, must get no subset at
-// all, not an empty-but-present one.
+// Plain Start is StartDraw with a zero Draw — every attempt that draws
+// nothing must get no subset at all, not an empty-but-present one.
 func TestPlainStartHasNoQuestionIDs(t *testing.T) {
 	clock, _ := fakeClock(epoch)
 	m, err := New(sessionPath(t), testBank, testDur, clock, func() {})
@@ -205,8 +203,8 @@ func TestResetClearsQuestionIDs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	if _, err := m.StartMCQ(ModeExam, testDur, []string{"q01", "q02"}); err != nil {
-		t.Fatalf("StartMCQ: %v", err)
+	if _, err := m.StartDraw(ModeExam, testDur, Draw{QuestionIDs: []string{"q01", "q02"}}); err != nil {
+		t.Fatalf("StartDraw: %v", err)
 	}
 	if err := m.Reset(); err != nil {
 		t.Fatalf("Reset: %v", err)

@@ -28,6 +28,7 @@
     "questions": [
       {
         "id": "q02",
+        "title": "Fix a failing Deployment",
         "instance": "instance-1",
         "domain": "Application Deployment",
         "weight": 7

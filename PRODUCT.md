@@ -9,7 +9,7 @@ web
 ## Users
 
 Candidates preparing for the CNCF Kubernetes certifications — today
-CKAD — in the days or weeks before a real sitting. They are comfortable
+CKAD and KCNA — in the days or weeks before a real sitting. They are comfortable
 in a terminal, they have Docker on their own machine, and they run the
 simulator themselves: one candidate, one machine, one session, no
 proctor and no cohort.
@@ -41,6 +41,15 @@ environment must score 0, the reference solutions must score 100%, and
 each domain's share of the points must track the published curriculum
 weights within 2 percentage points.
 
+The grader also applies those weights directly, rather than relying on
+that gate to make raw points come out right. The gate reads the authored
+bank, so it certifies the bank; it says nothing about a *draw* taken
+from one. Once an attempt can be a subset — a pooled bank, or a
+candidate narrowing to two domains — the points a draw happens to
+contain no longer carry the curriculum's shape, and only weighting the
+result restores it. The raw earned-over-total figure is still reported
+beside the weighted one, because a candidate is owed both.
+
 ## Operating Context
 
 Run locally with `./sim up`, then the browser. See
@@ -50,14 +59,24 @@ network topology, and [SECURITY.md](SECURITY.md) for the threat model.
 
 The parts that constrain product decisions:
 
-- The session arc is lobby catalog, timed exam view, submit or expiry,
-  score, then a new attempt or an exam switch — the last two rebuild the
-  whole environment behind a live progress checklist.
+- The session arc is exam selector, mode selector, timed exam view,
+  submit or expiry, score, then the explanation of any one task — and
+  from there a new attempt or an exam switch, the two that rebuild the
+  whole environment behind a live progress checklist. A progress
+  dashboard sits outside the arc, reachable whenever no attempt is
+  running.
+- `session.state` is still the outer switch and no screen contradicts
+  it: a URL fragment only chooses between the views available *within*
+  the state the server reports. `#/exams`, `#/exams/<id>/mode` and
+  `#/progress` exist while idle, `#/results` and `#/results/<qid>` once
+  an attempt has ended. So a refresh keeps its place, and a pasted link
+  can never show a screen the session is not actually in.
 - The exam desktop is XFCE with a terminal already open, Firefox
   restricted to a documentation allowlist, ssh to named instances as
   `candidate`, and a `/opt/course/<n>` working directory per question.
 - `down` then `up` resumes state, including an in-progress session.
-  `purge` deletes the volumes for a clean slate.
+  `purge` deletes the volumes for a clean slate — except the attempt
+  record, which only `purge --all` removes.
 - Bank authoring is `banks/<bank>/exam.yaml` plus per-question
   `validate.d/` checks and `solution.md`.
 
@@ -67,7 +86,12 @@ The parts that constrain product decisions:
 
 - One hands-on bank: CKAD Mock Exam 01, 22 questions across all five
   curriculum domains. 120 minutes, 66% to pass, Kubernetes 1.35, two
-  instances, kind two-node cluster.
+  instances, kind two-node cluster. Every attempt asks all 22 — that is a
+  property of this bank, not of the engine. Pooling (`spec.examLength`)
+  now works on both engines; a hands-on bank that opts in has its cluster
+  seeded for the drawn subset when the attempt starts rather than for
+  everything at boot, which is the trade that makes a large hands-on pool
+  possible and is not worth taking for 22.
 - One multiple-choice bank: KCNA Mock Exam, 97 original questions
   pooled down to 65 per attempt (`spec.examLength`), in the real exam's
   shape — 90 minutes, 75% to pass, weighted to the post-November-2025
@@ -80,10 +104,15 @@ The parts that constrain product decisions:
   **mcq** (answers stored in the session, graded in the facilitator —
   no cluster involvement, so an mcq attempt starts before the
   environment finishes booting and works on a phone).
-- Three ways to run an attempt: **Exam** (the bank's duration, no help),
-  **Training** (untimed, two-tier hints and solutions on demand, and
-  scoring that does not end the attempt) and **Speed** (half the
-  duration, no help).
+- Three ways to run an attempt, offered gentlest first: **Training**
+  (untimed, two-tier hints and solutions on demand, and scoring that
+  does not end the attempt), **Mastery** (half the duration, no help)
+  and **Exam** (the bank's duration, no help). What each one permits is
+  defined once, in `facilitator/internal/session`, and both described to
+  the UI and enforced by the handlers from there — so a mode card cannot
+  advertise something the server then refuses.
+  - Mastery is the wire id `speed`, and stays that way: renaming it
+    would invalidate every persisted session and every stored attempt.
 
 **Durable constraints**
 
@@ -94,8 +123,22 @@ The parts that constrain product decisions:
   exist for UX fidelity, not security. Training mode deliberately
   relaxes the solutions gate, because reading the solution is the point
   of that mode.
-- One session at a time, and one attempt record overwritten per attempt.
-  There is no attempt history and no cross-attempt analytics.
+- One session at a time. The live session file still holds exactly one
+  attempt and is overwritten by the next, but a *graded* attempt is now
+  also appended to a durable record (`/state/history.json`, its own
+  volume) that survives a reset, a bank switch and `./sim purge`. That
+  record backs cross-attempt analytics: best score and pass state per
+  exam, weakest domains, and progress along the five-certification path.
+  - Only **recorded** modes produce a record — Training is practice with
+    the solutions open, and counting it would make every "best score"
+    meaningless.
+  - A recorded attempt is not automatically a *counted* one. A
+    domain-filtered or short draw is kept and shown, but cannot set a
+    best score or claim a pass: 100% on a ten-task drill of one domain
+    is a good session and is not a CKAD pass.
+  - It stays on the candidate's machine. Nothing is uploaded, and the
+    only ways it leaves are the export the candidate asks for and the
+    delete they confirm.
 - The timer is server-side. In Exam mode it cannot be paused.
 - The exam requires a desktop-sized screen. Small screens get an
   explanation instead of a broken layout.
@@ -140,7 +183,12 @@ The parts that constrain product decisions:
 ## Evidence on Hand
 
 - 22 CKAD questions, each with per-check validators, a written solution
-  and two tiers of hints.
+  and two tiers of hints; and 97 KCNA questions, each with a full
+  explanation.
+- A durable record of graded attempts on the candidate's own machine,
+  which is what makes best-score, weakest-domain and path progress
+  answerable at all. It is evidence about one candidate and never about
+  a population — see the absences below.
 - Reference solution scripts that must score 100%, the
   fresh-environment-scores-0 gate, and the curriculum weight check. See
   [docs/testing.md](docs/testing.md).
@@ -148,10 +196,11 @@ The parts that constrain product decisions:
   ([docs/follow-ups.md](docs/follow-ups.md)).
 
 **Absences future work must not paper over:** there are no users,
-testimonials, adoption numbers, pass-rate claims, or hosted service.
-There is no attempt history, so nothing may promise progress over time.
-A bank that cannot produce a meaningful score must not be offered at
-all.
+testimonials, adoption numbers, pass-rate claims, or hosted service. The
+attempt history is one candidate's own record on one machine, so it may
+describe *their* progress and never a population's — no benchmark, no
+percentile, no "candidates who score X". A bank that cannot produce a
+meaningful score must not be offered at all.
 
 ## Product Principles
 

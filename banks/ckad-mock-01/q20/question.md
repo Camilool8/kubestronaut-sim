@@ -1,7 +1,3 @@
-# Question 20 | Expose a Deployment on a node port
-
-*Solve this question on instance: `ssh instance-2`*
-
 Namespace `aquila` runs Deployment `status-page` with 2 replicas, exposed
 inside the cluster by a ClusterIP Service named `status-page` on port
 `80`.

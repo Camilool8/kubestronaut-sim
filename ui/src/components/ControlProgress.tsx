@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import type { ControlJob, ControlPhase } from "../api";
+import { getControlLog, type ControlJob, type ControlPhase } from "../api";
 import { formatElapsed } from "../lib/format";
 import { useFocusTrap } from "../lib/useFocusTrap";
 import { Icon } from "./Icon";
@@ -18,6 +18,11 @@ interface ControlProgressProps {
 // only server — down. While it runs, polls fail and the checklist would
 // otherwise appear frozen, so the dialog says so out loud instead.
 const BLACKOUT_PHASE = "restart-facilitator";
+
+// The log pane's poll, while it is open. The conductor caps the log at
+// 200 short lines, so this is a small read, and it stops the moment the
+// pane closes or the job settles.
+const LOG_POLL_MS = 2000;
 
 function parseStamp(stamp: string | undefined): number | null {
   if (!stamp) return null;
@@ -99,10 +104,69 @@ export function ControlProgress({
   }, [failed]);
 
   const target = bankTitle || job.bank;
+  // A seed prepares the cluster for an attempt that has already been
+  // drawn; it destroys nothing and the clock has not started. Titled as
+  // itself rather than falling through to the reset's wording, which
+  // would tell a candidate waiting to begin that their environment is
+  // being wiped.
   const title =
-    job.op === "switch" ? strings.control.switchTitle(target) : strings.control.resetTitle;
+    job.op === "switch"
+      ? strings.control.switchTitle(target)
+      : job.op === "seed"
+        ? strings.control.seedTitle
+        : strings.control.resetTitle;
   const running = job.phases.find((p) => p.state === "running");
   const reconnecting = running?.id === BLACKOUT_PHASE;
+
+  // The build log, behind a closed disclosure. The one-line phase detail
+  // above overwrites itself; this is the retained output for whoever
+  // looked away for a minute of a four-minute rebuild. null = never
+  // fetched, so the empty state can tell "nothing printed yet" from
+  // "not open yet".
+  const [logOpen, setLogOpen] = useState(false);
+  const [logLines, setLogLines] = useState<string[] | null>(null);
+  const logPaneRef = useRef<HTMLPreElement>(null);
+  // Follow the newest line unless the user has scrolled up to read;
+  // snapping them back down mid-read would be the pane fighting them.
+  const logStickRef = useRef(true);
+
+  useEffect(() => {
+    // During the blackout phase the facilitator is down and every fetch
+    // would fail; the pane keeps its last lines and resumes after.
+    if (!logOpen || reconnecting) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const log = await getControlLog();
+        if (!cancelled) setLogLines(log.lines);
+      } catch {
+        // Keep the last lines; the next tick retries.
+      }
+    };
+    void load();
+    // A settled job's log is static: one read is the whole story.
+    if (failed) {
+      return () => {
+        cancelled = true;
+      };
+    }
+    const id = window.setInterval(() => void load(), LOG_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [logOpen, failed, reconnecting]);
+
+  useEffect(() => {
+    const pane = logPaneRef.current;
+    if (pane && logStickRef.current) pane.scrollTop = pane.scrollHeight;
+  }, [logLines]);
+
+  const onLogScroll = () => {
+    const pane = logPaneRef.current;
+    if (!pane) return;
+    logStickRef.current = pane.scrollHeight - pane.scrollTop - pane.clientHeight < 8;
+  };
   const jobStarted = parseStamp(job.startedAt);
   const totalElapsed = jobStarted === null ? null : formatElapsed(now - jobStarted);
   const doneCount = job.phases.filter((p) => p.state === "done").length;
@@ -169,6 +233,34 @@ export function ControlProgress({
           })}
         </ul>
 
+        {/* Closed by default: the checklist is the summary, this is the
+            appendix. Rendered in both states — a failed job's log is
+            exactly the one worth reading. */}
+        <details
+          className="control-log"
+          onToggle={(event) => setLogOpen(event.currentTarget.open)}
+        >
+          <summary>
+            <Icon name="chevron-down" className="disclosure-chevron" />
+            {strings.control.showLog}
+          </summary>
+          {/* Focusable because it scrolls: a keyboard user needs to reach
+              it to read past the visible tail. */}
+          <pre
+            className="control-log-pane"
+            ref={logPaneRef}
+            onScroll={onLogScroll}
+            tabIndex={0}
+            aria-label={strings.control.logLabel}
+          >
+            {logLines === null || logLines.length === 0
+              ? reconnecting
+                ? strings.control.logUnavailable
+                : strings.control.logEmpty
+              : logLines.join("\n")}
+          </pre>
+        </details>
+
         {failed ? (
           <>
             {/* Present-and-empty above would announce unreliably; this
@@ -183,16 +275,34 @@ export function ControlProgress({
               {/* A failed job freezes its own clock, so without this the
                   dialog was entirely static from the click until the new
                   job's first poll — the one moment the user most needs to
-                  know the button did something. */}
-              <button className="btn btn-primary" onClick={handleRetry} disabled={retrying}>
-                {retrying ? strings.control.starting : strings.control.retry}
-              </button>
+                  know the button did something.
+
+                  Not offered for a seed. Retry here means "run this job
+                  again", and every other job on this screen is a cluster
+                  rebuild, so that is what the handler does — for a failed
+                  seed it would tear down the environment the candidate
+                  still has, to recover from an attempt that never
+                  started. Dismissing lands them back on the mode screen,
+                  where pressing Start again is the retry. */}
+              {job.op !== "seed" && (
+                <button className="btn btn-primary" onClick={handleRetry} disabled={retrying}>
+                  {retrying ? strings.control.starting : strings.control.retry}
+                </button>
+              )}
             </div>
           </>
         ) : (
           <>
             <p className="control-hint">
-              {hasClusterRebuild ? strings.control.hint : strings.control.hintFast}
+              {/* A seed has neither shape: no cluster is rebuilt, but it
+                  runs one setup script per drawn question against a live
+                  cluster, so "usually a few seconds" would be a promise it
+                  cannot keep on a sixteen-task draw. */}
+              {job.op === "seed"
+                ? strings.control.hintSeed
+                : hasClusterRebuild
+                  ? strings.control.hint
+                  : strings.control.hintFast}
               {totalElapsed && (
                 <span className="control-elapsed" aria-hidden="true">
                   {strings.control.elapsed(totalElapsed)}

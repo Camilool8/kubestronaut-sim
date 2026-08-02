@@ -62,7 +62,52 @@ case "$cmd" in
     done
     echo "Exam environment ready. Exam UI: ${UI} — or ./sim ssh instance-1" ;;
   down)  docker compose down --remove-orphans ;;
-  purge) docker compose down -v --remove-orphans ;;
+  purge)
+    # This was `docker compose down -v`, which takes EVERY volume with it
+    # — including state, where every attempt the candidate has ever
+    # graded lives. Purge is what people run when the environment is
+    # wedged, i.e. precisely the moment losing five certifications of
+    # progress would hurt most, and nothing warned them.
+    #
+    # So: down without -v, then remove the project's volumes by name,
+    # skipping the one compose labelled `state`. The labels are compose's
+    # own (com.docker.compose.project / .volume), so nothing here has to
+    # guess at the "<project>_<name>" convention or hardcode the project.
+    case "${2:-}" in
+      "")
+        # Resolved BEFORE anything is torn down, so the failure path can
+        # honestly say nothing happened. Doing it after the `down` left
+        # this branch printing "Nothing was removed" with the containers
+        # and networks already gone.
+        project=$(docker compose config --format json 2>/dev/null | json_field name)
+        if [ -z "$project" ]; then
+          echo "Could not determine the compose project name; refusing to guess which"
+          echo "volumes are ours. Nothing was removed — the environment is untouched."
+          echo "Remove everything, attempt history included, with: ./sim purge --all"
+          exit 1
+        fi
+        docker compose down --remove-orphans
+        kept=0
+        for vol in $(docker volume ls -q --filter "label=com.docker.compose.project=${project}"); do
+          key=$(docker volume inspect -f '{{index .Labels "com.docker.compose.volume"}}' "$vol" 2>/dev/null || true)
+          if [ "$key" = "state" ]; then kept=1; continue; fi
+          docker volume rm "$vol" >/dev/null || echo "  could not remove ${vol} (still in use?)"
+        done
+        if [ "$kept" = "1" ]; then
+          echo "Purged. Attempt history was kept — remove it too with: ./sim purge --all"
+        else
+          echo "Purged. There was no attempt history to keep."
+        fi ;;
+      --all)
+        echo "Removing EVERY volume, including attempt history: every attempt graded on"
+        echo "this machine is deleted, there is no backup, and there is no undo."
+        echo "(Export it first from the app if you want to keep it.)"
+        docker compose down -v --remove-orphans
+        echo "Purged, attempt history included." ;;
+      *)
+        echo "usage: ./sim purge [--all]" >&2
+        exit 1 ;;
+    esac ;;
   doctor)
     # The first-run failures that are not this project's fault are almost
     # all environmental, and all of them are cheaper to find here than
@@ -103,7 +148,18 @@ case "$cmd" in
     # owns the reset sequence; this is just a thin trigger + progress
     # poll against the facilitator's /api/control proxy.
     echo "Resetting exam state via conductor (cluster + instances, cached images kept)..."
-    curl -fsS -X POST "${UI}/api/control/reset" >/dev/null
+    # The conductor refuses a reset while another job holds it: a bank
+    # switch, a reseed, or — since pooling — the seed job that prepares a
+    # pooled bank's cluster for the questions an attempt just drew. Bare
+    # `curl -fsS` exits 22 there and `set -e` takes this script with it,
+    # printing nothing at all, which reads as "reset does nothing".
+    if ! reset_err=$(curl -fsS -X POST "${UI}/api/control/reset" 2>&1 >/dev/null); then
+      echo "The conductor would not accept a reset: ${reset_err:-no answer from ${UI}}"
+      echo "It is busy while a bank switch, a reseed, or the preparation of a drawn"
+      echo "attempt is running. See what it is doing with:"
+      echo "  curl -s ${UI}/api/control/status"
+      exit 1
+    fi
     while :; do
       sleep 3
       status=$(curl -fsS "${UI}/api/control/status" 2>/dev/null) || continue
@@ -116,6 +172,6 @@ case "$cmd" in
   ssh)   docker compose exec "${2:-instance-1}" su - candidate ;;
   status) docker compose ps ;;
   grade) docker compose exec facilitator /entrypoint.sh grade ;;
-  help)  echo "usage: ./sim {up [bank]|down|reset|purge|doctor|ssh [instance]|status|grade}" ;;
-  *) echo "usage: ./sim {up [bank]|down|reset|purge|doctor|ssh [instance]|status|grade}"; exit 1 ;;
+  help)  echo "usage: ./sim {up [bank]|down|reset|purge [--all]|doctor|ssh [instance]|status|grade}" ;;
+  *) echo "usage: ./sim {up [bank]|down|reset|purge [--all]|doctor|ssh [instance]|status|grade}"; exit 1 ;;
 esac

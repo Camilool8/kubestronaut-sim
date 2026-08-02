@@ -1,7 +1,3 @@
-# Question 21 | The adapter pattern
-
-*Solve this question on instance: `ssh instance-1`*
-
 An application writes its metrics in a private format that the team's
 scraper cannot read. Rather than change the application, put a second
 container beside it that rewrites the output — the **adapter** pattern.

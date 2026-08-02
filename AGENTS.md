@@ -18,7 +18,8 @@ Makefile; the commands below are what CI runs
 |---|---|---|
 | Run the stack | `./sim up` | repo root |
 | Stop it | `./sim down` | repo root |
-| Bank gates | `tests/bank-weights.sh && tests/check-lint.sh && tests/check-lib.sh && tests/bank-hints.sh` | repo root |
+| Bank gates | `tests/bank-weights.sh && tests/check-lint.sh && tests/check-lib.sh && tests/bank-hints.sh && tests/bank-mcq.sh` | repo root |
+| Landing page | `site/build.sh --check` | repo root |
 | Go tests | `for m in conductor facilitator proxy; do (cd $m && go test ./... && go vet ./...); done` | repo root |
 | UI tests | `npm ci && npx tsc --noEmit && npm run lint && npm test` | **`ui/`** |
 | Smoke suite | `tests/smoke.sh` | repo root |
@@ -41,7 +42,7 @@ for any change that could affect grading or the environment.
 | `ui/` | React + Vite front end |
 | `images/` | Dockerfiles for the desktop, the instances, and the cluster host |
 | `banks/` | Question banks, the shared validator library, and Helm charts |
-| `tests/` | The four offline gates, the smoke suite, and reference solutions |
+| `tests/` | The offline bank gates, the smoke suite, and reference solutions |
 | `docs/` | Reference and explanation. Start at [docs/README.md](docs/README.md) |
 
 ## Conventions

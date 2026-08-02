@@ -23,10 +23,74 @@ export interface SessionSnapshot {
    * like, and the two must not render the same.
    */
   untimed: boolean;
+  /**
+   * How long this attempt has been running, server-measured. Present for
+   * every attempt including an untimed one, which is the whole reason it
+   * exists: `durationSeconds - remainingSeconds` is the elapsed time of a
+   * TIMED attempt only, and training reports both as 0.
+   */
+  elapsedSeconds?: number;
+  /**
+   * The seed this attempt's questions were drawn from — six lowercase hex
+   * digits. Pass it back to `startSession` to draw the same set again.
+   * Absent on an attempt started before seeding existed.
+   */
+  seed?: string;
+  /**
+   * Fingerprint of the question pool the draw ran against. A seed only
+   * reproduces a draw within one pool: edit the bank and the same seed
+   * yields a different set. Carry this beside the seed so a replay can
+   * say "the bank changed" instead of looking broken.
+   */
+  poolDigest?: string;
+  /**
+   * The curriculum domains this attempt drew from, when the candidate
+   * narrowed the draw. Absent or empty means the whole curriculum — a
+   * full-coverage attempt, the only kind a "passed" claim can rest on.
+   */
+  domainFilter?: string[];
+  /**
+   * An attempt that has been DRAWN but whose clock has not started,
+   * because its cluster is still being prepared for the questions it drew.
+   *
+   * Only a pooled hands-on bank ever produces one: that bank's boot skips
+   * the seed loop, so the drawn subset has to be seeded before the
+   * candidate can be let in. `state` stays "idle" throughout — deliberately
+   * not a fourth state, so a client that has never heard of pooling still
+   * reads a truthful snapshot, and DELETE /api/session still cancels.
+   *
+   * **This field, not `controlStatus.busy`, is the terminal condition.**
+   * The seed job settles in the conductor up to a poll before the clock
+   * starts; a watcher keyed on the job going idle sees `idle` in that
+   * window and flashes the lobby. The server starts the session first and
+   * clears this second, so a reader watching this never sees neither.
+   */
+  preparing?: PreparingAttempt;
+  /**
+   * Why the last preparation did not produce an attempt. Set with
+   * `preparing` absent and `state` still "idle"; absent when the
+   * preparation was cancelled rather than failed, which is not an error
+   * and must not be shown as one.
+   */
+  prepareError?: string;
+}
+
+/** An attempt between its draw and its clock. See `SessionSnapshot.preparing`. */
+export interface PreparingAttempt {
+  /** The conductor job doing the seeding; the overlay renders it as-is. */
+  jobId: string;
+  mode: SessionMode;
+  /** How many questions are being seeded, and so how many the attempt has. */
+  questionCount: number;
+  startedAt: string;
+  seed?: string;
+  poolDigest?: string;
 }
 
 export interface ExamQuestionInfo {
   id: string;
+  /** Optional short label from the bank; absent, displays fall back to the id. */
+  title?: string;
   /** Which shell host grades this question. Absent on an mcq exam. */
   instance?: string;
   domain: string;
@@ -36,22 +100,71 @@ export interface ExamQuestionInfo {
   hintCount: number;
   /** mcq only: true for a select-all-that-apply question. */
   multi?: boolean;
+  /**
+   * How long this question is meant to take, in seconds — the pacing
+   * figure the task chip prints.
+   *
+   * It is a budget, never a limit: nothing enforces it, and running over
+   * costs no points. Copy must not imply otherwise.
+   */
+  targetSeconds?: number;
+  /**
+   * True when `targetSeconds` was DERIVED (the question's weight's share
+   * of the exam clock) rather than authored in the bank. A derived figure
+   * must be labelled as derived — it is arithmetic about weights, not
+   * anyone's judgement of how long the work takes.
+   */
+  targetDerived?: boolean;
+}
+
+/**
+ * One curriculum domain of the loaded exam, as the bank publishes it.
+ *
+ * `weightPct` is `spec.domainWeights` — what the domain is worth in the
+ * real certification — while `questionCount` is how many questions the
+ * bank has in it. The two are independent: a domain can be worth 44% of
+ * the exam and hold three questions.
+ */
+export interface DomainInfo {
+  name: string;
+  weightPct: number;
+  questionCount: number;
 }
 
 /** Which engine grades the active bank. */
 export type ExamType = "hands-on" | "mcq";
 
-/** One selectable attempt mode, described by the server. */
+/**
+ * One selectable attempt mode, described by the server.
+ *
+ * Every flag is the behaviour the facilitator will actually enforce, so
+ * the mode screen's capability list is generated from them rather than
+ * restated here. Labels live in `strings.ts`: a mode's name is copy, its
+ * permissions are facts only the server knows.
+ */
 export interface ExamMode {
   id: Exclude<SessionMode, "">;
   durationSeconds: number;
   untimed: boolean;
+  /** Hints and reference solutions answer while the attempt runs. */
   helpAllowed: boolean;
+  /** Work can be scored mid-attempt without ending it. */
+  gradesPerTask: boolean;
+  /** A finished attempt in this mode belongs in the attempt history. */
+  recorded: boolean;
+  /** The one card the mode screen accents. Exactly one mode carries it. */
+  recommended: boolean;
 }
 
 export interface ExamInfo {
   name: string;
   title: string;
+  /**
+   * The certification this bank rehearses ("CKAD"), where `title` names
+   * the bank ("CKAD Mock Exam 01"). Optional — a bank need not claim
+   * one, and every display falls back to the title.
+   */
+  certification?: string;
   examType: ExamType;
   durationSeconds: number;
   passingScore: number;
@@ -68,10 +181,21 @@ export interface ExamInfo {
   questions: ExamQuestionInfo[];
   /** Rendered by the lobby's picker, so the modes are the server's list. */
   modes?: ExamMode[];
+  /**
+   * The bank's curriculum domains, in the order it declares them — the
+   * list the draw configurator's chips are built from.
+   *
+   * Read this rather than counting `questions` by domain: once an attempt
+   * has drawn its subset, `questions` is that subset, so counting it would
+   * show the drawn questions as if they were the whole curriculum.
+   */
+  domains?: DomainInfo[];
 }
 
 export interface QuestionDetail {
   id: string;
+  /** Optional short label from the bank; absent, displays fall back to the id. */
+  title?: string;
   /** Absent on an mcq exam. */
   instance?: string;
   domain: string;
@@ -82,9 +206,39 @@ export interface QuestionDetail {
   multi?: boolean;
 }
 
+/**
+ * One piece of upstream reading a question points at: the concept it
+ * names, and the page that explains it. Authored in the bank
+ * (`spec.questions[].docs`) and served only with the solution — the deep
+ * dive is read after the attempt, in the candidate's own browser, never
+ * on the exam desktop.
+ */
+export interface SolutionDoc {
+  label: string;
+  url: string;
+}
+
 export interface SolutionDetail {
   id: string;
   markdown: string;
+  /** Absent — not empty — on the many questions that declare none. */
+  docs?: SolutionDoc[];
+}
+
+/**
+ * A document a check chose to show alongside its verdict: what it found,
+ * what it wanted, or why the difference matters.
+ *
+ * Checks emit these through a sentinel-delimited trailer on stdout, so a
+ * check that emits nothing produces a byte-identical `message` and needs
+ * no edit. `kind` is closed at three values for the same reason `Verdict`
+ * is: the explanation screen has exactly three places to put one.
+ */
+export interface CheckArtifact {
+  kind: "actual" | "expected" | "why";
+  /** For syntax highlighting: "yaml", "text", … Absent means plain text. */
+  lang?: string;
+  body: string;
 }
 
 export interface CheckResult {
@@ -94,15 +248,68 @@ export interface CheckResult {
   earned: number;
   passed: boolean;
   message: string;
+  /**
+   * True when the check never ran because its "# points:" header is
+   * malformed in the bank. Rendered as "not graded", never as a failure.
+   */
+  skipped?: boolean;
+  /**
+   * Evidence for the explanation screen, dropped from checks that passed
+   * — a correct answer has nothing to explain, and keeping the documents
+   * would put a copy of the cluster's state in every session file.
+   */
+  artifacts?: CheckArtifact[];
+}
+
+/** The three states a graded question can be in. Server-decided. */
+export type Verdict = "correct" | "partial" | "failed";
+
+/** One curriculum domain's slice of a graded attempt, rolled up server-side. */
+export interface DomainResult {
+  domain: string;
+  earned: number;
+  total: number;
+  /**
+   * The domain's share of `Results.percent`, in percentage points — its
+   * published curriculum weight, renormalized over the domains this
+   * attempt actually covered. Not rounded; format it for display.
+   */
+  weightPct: number;
+  questionCount: number;
 }
 
 export interface QuestionResult {
   id: string;
+  /** Optional short label from the bank; absent, displays fall back to the id. */
+  title?: string;
   instance: string;
   domain: string;
   earned: number;
   total: number;
   checks: CheckResult[];
+  /**
+   * This question's share of `Results.percent`, in percentage points: its
+   * domain's weight split across that domain's questions by points. Every
+   * question's share sums to 100.
+   *
+   * Optional like every field below it: a result graded before these
+   * existed is persisted verbatim in the session file and served back
+   * unchanged after an upgrade, so a reader cannot assume they are there.
+   */
+  weightPct?: number;
+  /** correct / partial / failed, derived from earned and total by the grader. */
+  verdict?: Verdict;
+  /**
+   * How long this question was on screen, in seconds.
+   *
+   * It measures the TASK PANE, not attention — a candidate reading the
+   * question while thinking in a terminal accrues time, and one who
+   * walked away accrues (a capped amount of) it too. Every label built
+   * from this must say "open", never "spent" or "worked".
+   */
+  timeSpentSeconds?: number;
+  /** The question's pacing budget, repeated here so the table can compare. */
+  targetSeconds?: number;
   /**
    * mcq only (absent on hands-on results): the candidate's selection
    * (absent when unanswered), the answer key, and the option texts —
@@ -119,10 +326,33 @@ export interface Results {
   gradedAt: string;
   earned: number;
   total: number;
+  /**
+   * The score that decides `passed`: curriculum-weighted, so each domain
+   * counts for its published share whatever the drawn questions were
+   * worth. `pointsPercent` is the raw earned/total.
+   */
   percent: number;
+  pointsPercent?: number;
   passingScore: number;
   passed: boolean;
   questions: QuestionResult[];
+  /**
+   * Per-domain rollup over the questions this attempt was graded on, in
+   * bank order. Absent when nothing was graded.
+   */
+  domains?: DomainResult[];
+  /**
+   * How the attempt was run, copied onto the result so a score can be
+   * read without the session that produced it — which is what history
+   * and the results banner both need.
+   */
+  mode?: SessionMode;
+  seed?: string;
+  /** The domains the draw was narrowed to; absent means the whole curriculum. */
+  domainFilter?: string[];
+  /** The attempt's clock and what was used of it. 0 duration means untimed. */
+  durationSeconds?: number;
+  elapsedSeconds?: number;
 }
 
 interface ApiErrorBody {
@@ -257,17 +487,57 @@ export type SessionActionResponse =
   | { ok: true; session: SessionSnapshot }
   | { ok: false; error: string };
 
-// POST /api/session/start: 200 with the new session snapshot, or 409
-// (already running/ended) surfaced as {ok:false} for the caller to
-// handle by refetching the authoritative session state.
+/** How an attempt is configured at the moment it starts. */
+export interface StartOptions {
+  mode: Exclude<SessionMode, "">;
+  /**
+   * Replay a previous draw: six lowercase hex digits. Omitted, the server
+   * mints one — every attempt has a seed, so every attempt is replayable
+   * without the candidate having to ask for it in advance.
+   */
+  seed?: string;
+  /**
+   * Draw only from these curriculum domains. Omitted or empty draws from
+   * the whole curriculum.
+   */
+  domains?: string[];
+  /**
+   * The pool fingerprint the seed came from, when replaying. The server
+   * compares it against the loaded bank's and reports a mismatch back
+   * rather than refusing: the draw is still deterministic, it is just no
+   * longer the same set, and saying so beats a silent surprise.
+   */
+  poolDigest?: string;
+}
+
+export type StartSessionResponse =
+  | { ok: true; session: SessionSnapshot; poolChanged: boolean }
+  /**
+   * 202: drawn, not started. The cluster is being prepared for the drawn
+   * questions and the clock has not begun. The caller does NOT have a
+   * session to route on — it hands over to the session poller, which
+   * watches `preparing` and routes when it clears.
+   */
+  | { ok: true; preparing: PreparingAttempt; poolChanged: boolean }
+  | { ok: false; error: string };
+
+// POST /api/session/start: 200 with the new session snapshot, 202 with a
+// preparation to watch, or 409 (already running/ended, or a preparation
+// already in flight) surfaced as {ok:false} for the caller to handle by
+// refetching the authoritative session state.
 export async function startSession(
-  mode: Exclude<SessionMode, ""> = "exam",
+  options: StartOptions | Exclude<SessionMode, ""> = "exam",
   signal?: AbortSignal,
-): Promise<SessionActionResponse> {
+): Promise<StartSessionResponse> {
+  // The bare-mode form is kept because it is the honest call for every
+  // caller that has nothing to configure, and because `./sim` and
+  // tests/smoke.sh POST with no body at all — a signature that forced an
+  // object would only make those callers write `{ mode: "exam" }`.
+  const body: StartOptions = typeof options === "string" ? { mode: options } : options;
   const res = await request("/api/session/start", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode }),
+    body: JSON.stringify(body),
     signal,
   });
   if (res.status === 409) {
@@ -276,7 +546,72 @@ export async function startSession(
   if (!res.ok) {
     throw new Error(await readError(res));
   }
-  return { ok: true, session: (await res.json()) as SessionSnapshot };
+  // Branched on the STATUS, not on the body's shape. 202 also passes
+  // `res.ok`, and its body is a preparation rather than a session — read
+  // as one it would look like an attempt in state "preparing" with a zero
+  // clock, which is exactly the sort of thing that routes a candidate
+  // into an exam that has not been set up.
+  if (res.status === 202) {
+    const body = (await res.json()) as {
+      jobId: string;
+      mode: SessionMode;
+      questionCount: number;
+      seed?: string;
+      poolDigest?: string;
+      poolChanged?: boolean;
+    };
+    return {
+      ok: true,
+      preparing: {
+        jobId: body.jobId,
+        mode: body.mode,
+        questionCount: body.questionCount,
+        // The 202 does not carry one; the session's own `preparing` does,
+        // and that is what every display reads. Stamped here only so the
+        // shape is whole.
+        startedAt: "",
+        seed: body.seed,
+        poolDigest: body.poolDigest,
+      },
+      poolChanged: body.poolChanged === true,
+    };
+  }
+  const session = (await res.json()) as SessionSnapshot & { poolChanged?: boolean };
+  return { ok: true, session, poolChanged: session.poolChanged === true };
+}
+
+/**
+ * PUT /api/session/focus — tell the server which task is on screen.
+ *
+ * The server owns the clock here exactly as it owns the countdown: the
+ * client reports a question id and nothing else, and per-task time is
+ * accrued between reports. It rides the existing 10s session poller, so
+ * the resolution is coarse by design and a lost report costs at most one
+ * interval.
+ *
+ * A gap contributes at most 90 seconds however long it really was, so a
+ * candidate who closes the tab overnight is credited with a minute and a
+ * half rather than nine hours. The 409 (the attempt ended under us) is a
+ * tagged union rather than a throw for the same reason `putAnswer`'s is:
+ * the poller is about to re-route the screen anyway.
+ */
+export async function putFocus(
+  question: string,
+  signal?: AbortSignal,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await request("/api/session/focus", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question }),
+    signal,
+  });
+  if (res.status === 409 || res.status === 404) {
+    return { ok: false, error: await readError(res) };
+  }
+  if (!res.ok) {
+    throw new Error(await readError(res));
+  }
+  return { ok: true };
 }
 
 // POST /api/session/end: 202 with the ended session snapshot (submit,
@@ -420,7 +755,13 @@ export interface ControlPhase {
 
 export interface ControlJob {
   id: string;
-  op: "reset" | "switch";
+  /**
+   * "seed" prepares the cluster for an attempt that has been drawn but
+   * not started — only ever a pooled hands-on bank, whose boot skips the
+   * seed loop precisely because the draw decides what to seed. It renders
+   * through the same overlay as the other two, which is why it is a job.
+   */
+  op: "reset" | "switch" | "seed";
   bank: string;
   startedAt: string;
   /** RFC3339Nano; absent while the job is in flight. */
@@ -442,6 +783,26 @@ export async function getControlStatus(signal?: AbortSignal): Promise<ControlSta
     throw new Error(await readError(res));
   }
   return (await res.json()) as ControlStatus;
+}
+
+/** The bounded build log of the in-flight control job — or the last one,
+ * whose log is exactly the story a failed rebuild needs to tell. */
+export interface ControlLog {
+  jobId: string;
+  lines: string[];
+}
+
+export async function getControlLog(signal?: AbortSignal): Promise<ControlLog> {
+  const res = await request("/api/control/log", { signal });
+  if (!res.ok) {
+    throw new Error(await readError(res));
+  }
+  const body = (await res.json()) as Partial<ControlLog>;
+  // `lines ?? []`, the same guard getAnswers uses: a 200 whose body is
+  // missing the array crashed ControlProgress outright (`logLines.length`
+  // on undefined) — the type said it could not happen and the cast said
+  // so louder. A rebuild's log pane is the wrong place to find out.
+  return { jobId: body.jobId ?? "", lines: body.lines ?? [] };
 }
 
 export type ControlActionResponse =
@@ -466,23 +827,39 @@ export interface BankEntry {
   durationSeconds?: number;
   passingScore?: number;
   kubernetesVersion?: string;
+  /** How many questions ONE ATTEMPT draws. */
   questionCount?: number;
+  /**
+   * How many questions the bank authors. Larger than `questionCount`
+   * only for a pooled bank; the exam card prints the pair ("65 / 97")
+   * only when they differ, because "22 / 22" advertises a pool that is
+   * not one.
+   */
+  poolCount?: number;
   available: boolean;
   comingSoon?: boolean;
   note?: string;
 }
 
+/**
+ * The bank list without any attempt history attached.
+ *
+ * This is the shape of `GET /api/control/banks`, which the UI no longer
+ * calls — the exam selector reads `GET /api/catalog` instead, so that
+ * every card can carry how that exam has actually gone. The endpoint is
+ * still live and still the conductor's own answer (`./sim` and the smoke
+ * tests use it); what was removed is the client wrapper, because a
+ * plausible-looking `getBanks()` sitting beside `getCatalog()` is an
+ * invitation to fetch the list that knows nothing.
+ *
+ * The type stays because App still asks for one: it keeps a bank id →
+ * title map so the rebuild overlay can name the exam a switch is heading
+ * to, and `CatalogExam extends BankEntry`, so the catalog narrows to this
+ * without a second request.
+ */
 export interface BanksResponse {
   active: string;
   banks: BankEntry[];
-}
-
-export async function getBanks(signal?: AbortSignal): Promise<BanksResponse> {
-  const res = await request("/api/control/banks", { signal });
-  if (!res.ok) {
-    throw new Error(await readError(res));
-  }
-  return (await res.json()) as BanksResponse;
 }
 
 export async function startControlSwitch(
@@ -577,4 +954,187 @@ export async function reseedQuestion(
     return { ok: false, error: await readError(res) };
   }
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------
+// Attempt history and the exam catalog
+//
+// History is the first thing this product keeps across attempts. It lives
+// server-side in a Docker volume, NOT in localStorage — the facilitator is
+// the only process that can see every attempt, and a record that vanished
+// when the candidate opened a different browser would not be a record.
+// Wherever the design brief says "stored in this browser", the copy has to
+// say "stored on this machine".
+// ---------------------------------------------------------------------
+
+/**
+ * One domain's standing, rolled up across attempts rather than within one.
+ * `percent` is points earned over points available in that domain — raw,
+ * not curriculum-weighted, because this ranks a candidate's own domains
+ * against each other and the curriculum's weight is not part of that
+ * question.
+ */
+export interface DomainSummary {
+  domain: string;
+  earned: number;
+  total: number;
+  percent: number;
+  /**
+   * How many graded attempts contributed — every attempt, including the
+   * drills `counted` excludes.
+   *
+   * "Which domains am I weak in" is a different question from "does this
+   * count as a sitting": a domain drill is the most informative thing a
+   * candidate can do about a weak domain, and a rollup that ignored
+   * drills would keep reporting the weakness they spent all week fixing.
+   * Show this number beside the percentage — one weak run is not a trend.
+   */
+  attempts: number;
+}
+
+/**
+ * A graded attempt, kept forever.
+ *
+ * Deliberately SELF-CONTAINED: the certification, the exam title, the
+ * passing score and the domain rollup are copied in, never referenced.
+ * The dashboard shows all five certifications while only one bank is
+ * loadable at a time, so a record that pointed at its bank for the
+ * details would render as blanks for every exam except the current one.
+ */
+export interface AttemptRecord {
+  id: string;
+  bank: string;
+  certification?: string;
+  examTitle?: string;
+  examType: ExamType;
+  mode: SessionMode;
+  startedAt: string;
+  gradedAt: string;
+  seed?: string;
+  domainFilter?: string[];
+  durationSeconds?: number;
+  elapsedSeconds?: number;
+  questionCount: number;
+  earned: number;
+  total: number;
+  /** The weighted score, the same number the results banner shows. */
+  percent: number;
+  pointsPercent?: number;
+  passingScore: number;
+  passed: boolean;
+  /**
+   * Whether this attempt counts toward `best` and `passed`.
+   *
+   * False for a domain-filtered or short draw: 100% on a ten-task drill of
+   * one domain is a good session, but it is not a CKAD pass, and letting it
+   * light up the certification path would make the dashboard lie.
+   */
+  counted: boolean;
+  domains?: DomainResult[];
+}
+
+/** One exam's standing, derived from its counted attempts. */
+export interface ExamProgress {
+  attempts: number;
+  counted: number;
+  bestPercent?: number;
+  passed: boolean;
+  lastAttemptAt?: string;
+  /** Weakest first. Empty until at least one attempt has been graded. */
+  weakDomains: DomainSummary[];
+}
+
+/** A catalog row: everything the bank declares, plus how it has gone. */
+export interface CatalogExam extends BankEntry {
+  progress: ExamProgress;
+}
+
+export interface HistorySummary {
+  attempts: number;
+  /** Distinct certifications with a counted, passing attempt. The path figure. */
+  passedCount: number;
+  /** How many certifications the path has in it — the denominator. */
+  trackCount: number;
+  /** Weakest first, across every exam. Backs "drill my weak domains". */
+  weakDomains: DomainSummary[];
+}
+
+/**
+ * GET /api/catalog — the bank list joined to attempt history.
+ *
+ * Served by the facilitator rather than the conductor, for two reasons:
+ * the conductor has no access to the state volume, and LOOKING at the
+ * exam list must never be able to trigger a rebuild.
+ */
+export interface CatalogResponse {
+  active: string;
+  exams: CatalogExam[];
+  summary: HistorySummary;
+}
+
+export async function getCatalog(signal?: AbortSignal): Promise<CatalogResponse> {
+  const res = await request("/api/catalog", { signal });
+  if (!res.ok) {
+    throw new Error(await readError(res));
+  }
+  return (await res.json()) as CatalogResponse;
+}
+
+export interface HistoryResponse {
+  /** Most recent first. */
+  attempts: AttemptRecord[];
+  summary: HistorySummary;
+}
+
+export async function getHistory(signal?: AbortSignal): Promise<HistoryResponse> {
+  const res = await request("/api/history", { signal });
+  if (!res.ok) {
+    throw new Error(await readError(res));
+  }
+  return (await res.json()) as HistoryResponse;
+}
+
+/**
+ * DELETE /api/history — erase every attempt. There is no undo and no
+ * server-side backup, so the caller owns the confirmation.
+ */
+export async function deleteHistory(
+  signal?: AbortSignal,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await request("/api/history", { method: "DELETE", signal });
+  if (!res.ok) {
+    return { ok: false, error: await readError(res) };
+  }
+  return { ok: true };
+}
+
+/**
+ * The export document's URL. A plain link rather than a fetch: the browser
+ * saves it under the filename the server names, and no blob is built in
+ * memory to do it.
+ */
+export const historyExportURL = "/api/history/export";
+
+/**
+ * POST /api/history/import — merge an exported document into the record.
+ *
+ * Merge, not replace: importing a backup must never be a way to silently
+ * lose the attempts made since it was taken. Records already present (by
+ * `id`) are left alone, so importing the same file twice is a no-op.
+ */
+export async function importHistory(
+  document: string,
+  signal?: AbortSignal,
+): Promise<{ ok: true; imported: number; skipped: number } | { ok: false; error: string }> {
+  const res = await request("/api/history/import", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: document,
+    signal,
+  });
+  if (!res.ok) {
+    return { ok: false, error: await readError(res) };
+  }
+  const body = (await res.json()) as { imported: number; skipped: number };
+  return { ok: true, imported: body.imported, skipped: body.skipped };
 }

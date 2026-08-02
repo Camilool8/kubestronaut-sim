@@ -34,6 +34,13 @@ type grader struct {
 	mgr     *session.Manager
 	runner  evaluate.Runner
 	timeout time.Duration
+
+	// record appends the graded attempt to the durable history, and is
+	// nil in every run that keeps none (the tests, a dev run with no
+	// state volume). It is invoked only after SetResults has succeeded,
+	// so history records exactly what the candidate was shown, and its
+	// error is logged rather than returned — see the call site.
+	record func(token string, snap session.Snapshot, res *evaluate.Results) error
 }
 
 // newGrader returns a grader for ex, scoring against bank ex.Name (the
@@ -74,7 +81,16 @@ func (g *grader) Grade() {
 			}
 		}()
 
-		res := g.evaluateResults()
+		res, snap, err := g.evaluateResults()
+		if err != nil {
+			// A refusal, not a crash: the attempt cannot be scored
+			// honestly, and the candidate is told so on /api/results
+			// rather than shown a confident number.
+			if setErr := g.mgr.SetGradeError(token, err.Error()); setErr != nil {
+				log.Printf("facilitator: record grade-refusal: %v", setErr)
+			}
+			return
+		}
 		data, err := json.Marshal(res)
 		if err != nil {
 			if setErr := g.mgr.SetGradeError(token, err.Error()); setErr != nil {
@@ -85,6 +101,18 @@ func (g *grader) Grade() {
 		if err := g.mgr.SetResults(token, data); err != nil {
 			if setErr := g.mgr.SetGradeError(token, err.Error()); setErr != nil {
 				log.Printf("facilitator: record grade-results failure: %v", setErr)
+			}
+			return
+		}
+
+		// After SetResults, never before: history records what the
+		// candidate was actually shown. And logged, never propagated — a
+		// full state volume must not be able to turn a graded exam into a
+		// grading failure, which is what returning this error here would
+		// do.
+		if g.record != nil {
+			if err := g.record(token, snap, res); err != nil {
+				log.Printf("facilitator: attempt not recorded in history: %v", err)
 			}
 		}
 	}()
@@ -110,7 +138,10 @@ func (g *grader) PracticeGrade() (json.RawMessage, error) {
 	}
 	defer g.inFlight.Store(false)
 
-	res := g.evaluateResults()
+	res, _, err := g.evaluateResults()
+	if err != nil {
+		return nil, err
+	}
 	raw, err := json.Marshal(res)
 	if err != nil {
 		return nil, fmt.Errorf("marshal practice results: %w", err)
@@ -118,14 +149,45 @@ func (g *grader) PracticeGrade() (json.RawMessage, error) {
 	return raw, nil
 }
 
-// evaluateResults produces the graded Results for the active exam by
+// evaluateResults returns the graded Results for the active exam, and
+// the session snapshot it graded — the attempt's own description, which
+// the history recorder needs and which must be the one this run read
+// rather than whatever the session says a moment later.
+//
+// It produces those Results by
 // whichever engine it belongs to: hands-on runs the ssh checks against
 // the cluster; mcq scores the session's stored answers, pure and
 // instant. Both return the same schema, which is why everything
-// downstream of this call is engine-agnostic.
-func (g *grader) evaluateResults() *evaluate.Results {
-	if g.ex.Type == exam.TypeMCQ {
-		return mcqgrade.Grade(g.ex, g.bank, g.mgr.Answers(), g.mgr.QuestionIDs())
+// downstream of this call is engine-agnostic, and both are scoped to the
+// attempt's drawn question ids rather than to the whole bank.
+//
+// It refuses outright when the attempt's pool digest no longer describes
+// the loaded bank. exam.Subset SILENTLY SKIPS ids the exam does not
+// declare, so a session whose drawn ids outlived their bank would
+// otherwise be scored on the intersection and reported with a plausible,
+// wrong Total — a candidate would read a confident score for an exam
+// they did not sit. An error message is the better outcome, and making
+// Subset intolerant instead would break the every-question-in-bank-order
+// path every unpooled attempt takes.
+func (g *grader) evaluateResults() (*evaluate.Results, session.Snapshot, error) {
+	snap := g.mgr.Snapshot()
+	if err := exam.CheckPool(g.ex, snap.PoolDigest); err != nil {
+		return nil, snap, err
 	}
-	return evaluate.Grade(g.ex, g.bank, g.runner, g.timeout)
+
+	var res *evaluate.Results
+	if g.ex.Type == exam.TypeMCQ {
+		res = mcqgrade.Grade(g.ex, g.bank, g.mgr.Answers(), g.mgr.QuestionIDs())
+	} else {
+		res = evaluate.Grade(g.ex, g.bank, g.runner, g.timeout, g.mgr.QuestionIDs())
+	}
+	res.Describe(g.ex, evaluate.Attempt{
+		Mode:            snap.Mode,
+		Seed:            snap.Seed,
+		DomainFilter:    snap.DomainFilter,
+		DurationSeconds: snap.DurationSeconds,
+		ElapsedSeconds:  snap.ElapsedSeconds,
+		TimeSpent:       g.mgr.TimeSpent(),
+	})
+	return res, snap, nil
 }

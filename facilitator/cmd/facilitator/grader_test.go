@@ -277,8 +277,8 @@ func TestGradeMCQPooledAttemptScoresOnlyItsDrawnSubset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("session.New: %v", err)
 	}
-	if _, err := mgr.StartMCQ(session.ModeExam, time.Hour, []string{"q01", "q03"}); err != nil {
-		t.Fatalf("StartMCQ: %v", err)
+	if _, err := mgr.StartDraw(session.ModeExam, time.Hour, session.Draw{QuestionIDs: []string{"q01", "q03"}}); err != nil {
+		t.Fatalf("StartDraw: %v", err)
 	}
 	if err := mgr.SetAnswer("q01", []int{1}); err != nil { // correct
 		t.Fatalf("SetAnswer q01: %v", err)

@@ -30,9 +30,9 @@ bash tests/bank-weights.sh && bash tests/check-lint.sh \
 
 | Script | What it proves |
 |---|---|
-| `tests/bank-weights.sh` | Each domain's share of the points is within 2 percentage points of its `spec.domainWeights` entry, each question's `weight:` equals the sum of its `# points:` headers, and `exam.yaml` and the `q*/` directories list the same questions (header at tests/bank-weights.sh:7-17). |
+| `tests/bank-weights.sh` | Each question's `weight:` equals the sum of its `# points:` headers, and `exam.yaml` and the `q*/` directories list the same questions (header at tests/bank-weights.sh:7-17). The balance check has two modes, matching `tests/bank-mcq.sh`: for an unpooled bank, each domain's share of the points must sit within 2 percentage points of its `spec.domainWeights` entry — the bank IS the exam. For a pooled one (`spec.examLength` smaller than the pool), it instead requires each domain's pool to be deep enough for the per-domain count a stratified draw of that size needs; the pool's own ratio is free to differ, because every draw is stratified to the target regardless. |
 | `tests/check-lint.sh` | No validator grades spelling instead of behaviour: no `diff`, no `grep` over YAML, no `kubectl get -o yaml`, no `kubectl run`, no `grep -qx`. It also requires an exact `# points: N` header on every check and refuses a call into `banks/_lib/checks.sh` that never sourced it. |
-| `tests/check-lib.sh` | The `banks/_lib/checks.sh` helpers still treat `0.1` and `100m` as the same CPU request, `1Gi` and `1024Mi` as the same memory, and a trailing space as the same answer. |
+| `tests/check-lib.sh` | The `banks/_lib/checks.sh` helpers still treat `0.1` and `100m` as the same CPU request, `1Gi` and `1024Mi` as the same memory, and a trailing space as the same answer. It also covers `k8s_clean`, which decides what a captured object looks like on the explanation screen: server-side noise goes, and so does a cluster-assigned `clusterIP` — allocated per cluster, so an authored `expected/` document would disagree with the live object on every attempt, and a disagreeing line is drawn as the one that is *wrong*. `clusterIP: None` stays, because a human types that one. |
 | `tests/bank-hints.sh` | Every question in a bank that has hints has both tiers, and no hint shares 120 consecutive characters with its `solution.md` — a hint you can paste is the solution wearing a hint's name. |
 
 The bank format these enforce is specified in
@@ -104,7 +104,7 @@ npm test
 |---|---|
 | Regenerate `ui/package-lock.json` inside `node:22-alpine`, never with host npm | Host npm resolves differently and the image's `npm ci` then breaks (facilitator/Dockerfile:1) |
 | Do not upgrade vitest past v2 | It is pinned for vite 5 compatibility (ui/package.json:38-39) |
-| Keep `npm run lint` at zero errors and no new warnings | One warning is pre-existing; do not fix it as drive-by work and do not add to it |
+| Keep `npm run lint` at zero errors **and zero warnings** | It is clean as of this wave — `npx eslint src --max-warnings 0` passes. The one long-standing warning went out with the code that carried it, so there is no longer a baseline to hide a new one in. Keep it that way |
 | `npm run dev` needs a facilitator already on :8080 | `ui/vite.config.ts:17-25` proxies `/api` and the `/desktop` websocket there, so run `./sim up` first |
 
 Regenerate the lockfile like this:
@@ -116,7 +116,7 @@ docker run --rm -v "$PWD/ui":/w -w /w node:22-alpine npm install
 ## The smoke suite
 
 `tests/smoke.sh` is destructive. It runs `./sim purge` before anything
-else (tests/smoke.sh:35), so every volume and the whole cluster are
+else (tests/smoke.sh:39), so every volume and the whole cluster are
 deleted — never run it against an environment holding an attempt you
 want. It needs Docker, ~9GB of free RAM, and about 35 minutes.
 
@@ -125,8 +125,23 @@ bash tests/smoke.sh
 ```
 
 It starts with the four offline gates, so a mis-weighted bank fails in
-two seconds rather than forty minutes in. `SMOKE_BOOT_BUDGET` bounds
-the cold boot and defaults to 3600 seconds (tests/smoke.sh:42).
+two seconds rather than forty minutes in. Two budgets bound the waits,
+both overridable from the environment:
+
+| Variable | Default | Bounds |
+|---|---|---|
+| `SMOKE_BOOT_BUDGET` | 3600s | The cold boot (tests/smoke.sh:46) |
+| `SMOKE_PREPARE_BUDGET` | 900s | Seeding a drawn attempt's cluster after a `202` start (tests/smoke.sh:263) |
+
+Every start goes through one helper, `start_session`
+(tests/smoke.sh:265-345). It prints the HTTP status, and on a `202`
+polls `GET /api/session` until `preparing` clears before reporting
+`200` — so a caller reads one status whichever path the bank takes. The
+terminal condition is `preparing` disappearing, deliberately **not** the
+control job going idle. No bank in this repo pools on the hands-on
+engine today, so that branch is dormant and every start in the suite
+takes the `200` path; it exists so the suite does not silently stop
+testing what it claims to the day one does.
 
 | What it covers | Where |
 |---|---|
@@ -139,14 +154,15 @@ the cold boot and defaults to 3600 seconds (tests/smoke.sh:42).
 | Facilitator healthz, exam metadata, built UI assets, the desktop 403 while idle, and noVNC not published to the host | tests/smoke.sh:183-208 |
 | The docs-proxy allowlist: `kubernetes.io` and `code.jquery.com` allowed, `example.com`, analytics and open web search blocked, no direct egress from the desktop | tests/smoke.sh:210-231 |
 | The conductor unreachable from the host and the desktop, reachable only through `/api/control/*` | tests/smoke.sh:240-248 |
-| Session lifecycle: start, a countdown that decreases, desktop unlock, submit, results polling, and the solution and desktop gates re-locking | tests/smoke.sh:250-416 |
-| Solving all 22 questions of ckad-mock-01, each on the instance its `exam.yaml` entry names | tests/smoke.sh:331-356 |
-| Warm restart keeping the score, and `./sim reset` returning it to 0 with `/opt/course` re-created empty | tests/smoke.sh:418-440 |
-| A bank round trip, CKAD to the hidden `smoke-01` fixture and back, including its one question and the fixture staying out of the lobby list | tests/smoke.sh:442-538 |
-| Switching to a coming-soon certification refused with 400 | tests/smoke.sh:470-473 |
-| A bank id or question id that is not a slug refused with 400, so neither reaches a filesystem path | tests/smoke.sh:476, tests/smoke.sh:582 |
-| Training mode: hint tiers served one at a time, solutions readable mid-attempt, a practice grade that never becomes a result — and every one of those endpoints 403 in an exam attempt | tests/smoke.sh:540-602 |
-| A session expiring unattended and re-locking the desktop | tests/smoke.sh:604-626 |
+| Session lifecycle: start, a countdown that decreases, desktop unlock, submit, results polling, and the solution and desktop gates re-locking | tests/smoke.sh:347-508 |
+| Solving all 22 questions of ckad-mock-01, each on the instance its `exam.yaml` entry names | tests/smoke.sh:428-453 |
+| Warm restart keeping the score, and `./sim reset` returning it to 0 with `/opt/course` re-created empty | tests/smoke.sh:510-531 |
+| A bank round trip, CKAD to the hidden `smoke-01` fixture and back, including its one question and the fixture staying out of the exam selector's list | tests/smoke.sh:539-635 |
+| Switching to a coming-soon certification refused with 400 | tests/smoke.sh:563-571 |
+| A bank id or question id that is not a slug refused with 400, so neither reaches a filesystem path | tests/smoke.sh:572-576, tests/smoke.sh:926-928 |
+| The mcq engine on kcna-mock: a blank attempt grading 0, a partial one, full marks against the attempt's own drawn subset, and the answer gates | tests/smoke.sh:637-883 |
+| Training mode: hint tiers served one at a time, solutions readable mid-attempt, a practice grade that never becomes a result — and every one of those endpoints 403 in an exam attempt | tests/smoke.sh:885-956 |
+| A session expiring unattended and re-locking the desktop | tests/smoke.sh:958-986 |
 
 CKA is covered only as an assertion that switching to it is refused.
 The round trip runs through `smoke-01`, which has one question and
@@ -156,8 +172,8 @@ therefore reseeds in seconds.
 
 | Gate | Where |
 |---|---|
-| A fresh environment scores 0 | tests/smoke.sh:271-273, :434, :522, :538 |
-| Every `tests/solutions/<bank>/qNN.sh` scores 100% | tests/smoke.sh:352-356 |
+| A fresh environment scores 0 | tests/smoke.sh:370, :531, :619, :635 |
+| Every `tests/solutions/<bank>/qNN.sh` scores 100% | tests/smoke.sh:432-453 |
 
 The fresh-scores-0 gate is the load-bearing one. It is what catches a
 check that passes by accident or against state a previous attempt left
@@ -174,7 +190,7 @@ every pull request, and on manual dispatch.
 
 | Job | What it runs |
 |---|---|
-| `banks` | The four offline gates |
+| `banks` | The four offline gates, `tests/bank-mcq.sh`, and `site/build.sh --check` |
 | `go` | `go test ./...` then `go vet ./...` for `facilitator`, `conductor` and `proxy`, in a matrix with `fail-fast: false` |
 | `ui` | `npm ci`, `npx tsc --noEmit`, `npm run lint`, `npm test`, all with `working-directory: ui` |
 | `images` | Builds all six Dockerfiles with `PRELOAD=none`, then `docker compose config -q` |

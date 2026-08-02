@@ -1,0 +1,31 @@
+{
+  "apiVersion": "sim.kubestronaut.dev/v1alpha1",
+  "kind": "Exam",
+  "metadata": {
+    "name": "handson-pool-bank",
+    "title": "Hands-on Pool Test Exam"
+  },
+  "spec": {
+    "examType": "hands-on",
+    "duration": "60m",
+    "passingScore": 66,
+    "kubernetesVersion": "1.35",
+    "instances": [
+      { "name": "instance-1" }
+    ],
+    "domainWeights": {
+      "Domain A": 60,
+      "Domain B": 40
+    },
+    "examLength": 3,
+    "questions": [
+      { "id": "q01", "instance": "instance-1", "domain": "Domain A", "weight": 4,
+        "docs": [{ "label": "Persistent volumes", "url": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/" }] },
+      { "id": "q02", "instance": "instance-1", "domain": "Domain A", "weight": 4 },
+      { "id": "q03", "instance": "instance-1", "domain": "Domain A", "weight": 4 },
+      { "id": "q04", "instance": "instance-1", "domain": "Domain A", "weight": 4 },
+      { "id": "q05", "instance": "instance-1", "domain": "Domain B", "weight": 4 },
+      { "id": "q06", "instance": "instance-1", "domain": "Domain B", "weight": 4 }
+    ]
+  }
+}

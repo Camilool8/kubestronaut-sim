@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
-import { Start } from "./screens/Start";
+import { Exams } from "./screens/Exams";
+import { Mode } from "./screens/Mode";
+import { Progress } from "./screens/Progress";
 import { Score } from "./screens/Score";
 import { ControlProgress } from "./components/ControlProgress";
 import { BootProgress } from "./screens/BootProgress";
@@ -12,6 +14,7 @@ import { HintTray } from "./components/HintTray";
 import { KeyboardSettings } from "./components/KeyboardSettings";
 import { ShortcutHelp } from "./components/ShortcutHelp";
 import { DesktopRequired } from "./components/DesktopRequired";
+import { AppHeader } from "./components/AppHeader";
 import { Dialog } from "./components/Dialog";
 import { ExamIntro } from "./components/ExamIntro";
 import { InfoDrawer } from "./components/InfoDrawer";
@@ -38,17 +41,54 @@ const AXE_OPTS = {
 const examJSON = {
   name: "ckad-mock-01",
   title: "CKAD Mock Exam 01",
+  certification: "CKAD",
+  examType: "hands-on",
   durationSeconds: 7200,
   passingScore: 66,
   kubernetesVersion: "1.35",
+  questionCount: 1,
   questions: [
     { id: "q01", instance: "instance-1", domain: "Config", weight: 5, totalPoints: 5, hintCount: 0 },
   ],
+  // The mode screen renders one card per entry and one capability row
+  // per flag, so the scan needs all three or it covers a third of it.
+  modes: [
+    {
+      id: "training",
+      durationSeconds: 0,
+      untimed: true,
+      helpAllowed: true,
+      gradesPerTask: true,
+      recorded: false,
+      recommended: false,
+    },
+    {
+      id: "speed",
+      durationSeconds: 3600,
+      untimed: false,
+      helpAllowed: false,
+      gradesPerTask: false,
+      recorded: true,
+      recommended: true,
+    },
+    {
+      id: "exam",
+      durationSeconds: 7200,
+      untimed: false,
+      helpAllowed: false,
+      gradesPerTask: false,
+      recorded: true,
+      recommended: false,
+    },
+  ],
 };
 
-const banksJSON = {
+// GET /api/catalog — the bank list joined to attempt history. The CKAD
+// row carries a counted, passing attempt so the scan covers the card's
+// best-attempt bar as well as its empty state; the CKA row has none.
+const catalogJSON = {
   active: "ckad-mock-01",
-  banks: [
+  exams: [
     {
       id: "ckad-mock-01",
       title: "CKAD Mock Exam 01",
@@ -57,6 +97,14 @@ const banksJSON = {
       durationSeconds: 7200,
       questionCount: 3,
       available: true,
+      progress: {
+        attempts: 2,
+        counted: 2,
+        bestPercent: 74,
+        passed: true,
+        lastAttemptAt: "2026-07-30T18:00:00Z",
+        weakDomains: [],
+      },
     },
     {
       id: "cka-mock-01",
@@ -66,6 +114,7 @@ const banksJSON = {
       durationSeconds: 7200,
       questionCount: 2,
       available: true,
+      progress: { attempts: 0, counted: 0, passed: false, weakDomains: [] },
     },
     {
       id: "kcna-mock",
@@ -75,8 +124,59 @@ const banksJSON = {
       available: false,
       comingSoon: true,
       note: "Multiple-choice engine not built yet",
+      progress: { attempts: 0, counted: 0, passed: false, weakDomains: [] },
     },
   ],
+  summary: {
+    attempts: 2,
+    passedCount: 1,
+    trackCount: 5,
+    weakDomains: [{ domain: "Config", earned: 4, total: 10, percent: 40, attempts: 2 }],
+  },
+};
+
+const historyJSON = {
+  attempts: [
+    {
+      id: "a1",
+      bank: "ckad-mock-01",
+      certification: "CKAD",
+      examTitle: "CKAD Mock Exam 01",
+      examType: "hands-on",
+      mode: "exam",
+      startedAt: "2026-07-30T16:00:00Z",
+      gradedAt: "2026-07-30T18:00:00Z",
+      durationSeconds: 7200,
+      elapsedSeconds: 5400,
+      questionCount: 3,
+      earned: 12,
+      total: 17,
+      percent: 74,
+      passingScore: 66,
+      passed: true,
+      counted: true,
+    },
+    // The uncounted row: a drill, which must render with its mark rather
+    // than be hidden.
+    {
+      id: "a2",
+      bank: "ckad-mock-01",
+      certification: "CKAD",
+      examType: "hands-on",
+      mode: "training",
+      startedAt: "2026-07-28T16:00:00Z",
+      gradedAt: "2026-07-28T17:00:00Z",
+      questionCount: 1,
+      earned: 2,
+      total: 5,
+      percent: 40,
+      passingScore: 66,
+      passed: false,
+      counted: false,
+      domainFilter: ["Config"],
+    },
+  ],
+  summary: catalogJSON.summary,
 };
 
 const resultsJSON = {
@@ -139,15 +239,17 @@ function stubFetch() {
       const url = String(input);
       const body = url.includes("/api/exam")
         ? examJSON
-        : url.includes("/api/control/banks")
-          ? banksJSON
-          : url.includes("/api/results")
-            ? resultsJSON
-            : url.includes("/solution")
-              ? solutionJSON
-              : url.includes("/api/questions/")
-                ? questionJSON
-                : {};
+        : url.includes("/api/catalog")
+          ? catalogJSON
+          : url.includes("/api/history")
+            ? historyJSON
+            : url.includes("/api/results")
+              ? resultsJSON
+              : url.includes("/solution")
+                ? solutionJSON
+                : url.includes("/api/questions/")
+                  ? questionJSON
+                  : {};
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -175,6 +277,10 @@ describe("axe: no WCAG violations", () => {
     vi.unstubAllGlobals();
     toastStore.clear();
     marksStore.reset();
+    // jsdom keeps one location for the whole file. The deep-dive scan
+    // navigates by fragment, and a fragment left behind would put every
+    // Score render after it on the deep dive instead of the results body.
+    window.location.hash = "";
   });
 
   // The exam screen was the one surface this suite never scanned, which is
@@ -233,34 +339,48 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  test("lobby (Start)", async () => {
+  test("exam selector", async () => {
     const { container } = render(
-      <Start
-        onSessionChange={() => {}}
-        onControlStart={() => {}}
-        catalogVersion={0}
-        onBanksLoaded={() => {}}
-      />,
+      <Exams onControlStart={() => {}} catalogVersion={0} onBanksLoaded={() => {}} />,
     );
-    await screen.findByText("CKAD Mock Exam 01", { selector: "h1" });
+    await screen.findByText("CKAD", { selector: "h2" });
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  // Three mode cards, each with a capability list whose state is carried
+  // by an sr-only word beside a decorative glyph. If that word were ever
+  // dropped the list would say nothing at all to a screen reader, and a
+  // scan of a single card would not show it.
+  test("mode selector", async () => {
+    const { container } = render(
+      <Mode bankId="ckad-mock-01" catalogVersion={0} onSessionChange={() => {}} />,
+    );
+    await screen.findByRole("button", { name: /start exam/i });
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  // The dashboard is the one screen in the product with a real <table>
+  // and a real <input>, which are the two things axe has the most to say
+  // about: a header cell with no scope and a file picker with no label
+  // are both silent on screen and both fatal to a screen reader.
+  test("progress dashboard", async () => {
+    const { container } = render(<Progress catalogVersion={0} />);
+    await screen.findByRole("table");
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
   // The switch-confirm used to be hand-rolled divs with no role, no
   // aria-modal and no focus trap, and this suite never caught it because
-  // the lobby scan never opened it. Scan it open.
-  test("lobby with the switch-confirm dialog open", async () => {
+  // the selector scan never opened it. Scan it open.
+  test("exam selector with the switch-confirm dialog open", async () => {
     const user = userEvent.setup();
     const { container } = render(
-      <Start
-        onSessionChange={() => {}}
-        onControlStart={() => {}}
-        catalogVersion={0}
-        onBanksLoaded={() => {}}
-      />,
+      <Exams onControlStart={() => {}} catalogVersion={0} onBanksLoaded={() => {}} />,
     );
-    await screen.findByText("CKAD Mock Exam 01", { selector: "h1" });
-    await user.click(screen.getByRole("button", { name: /CKA Mock Exam 01/ }));
+    await screen.findByText("CKA", { selector: "h2" });
+    // The second live card is not the active bank, so choosing it is a
+    // rebuild and must go through the dialog.
+    await user.click(screen.getAllByRole("button", { name: /choose a mode/i })[1]);
     // Assert it actually opened — a disabled card would leave this suite
     // silently scanning a closed dialog, which is how the original gap
     // survived.
@@ -268,29 +388,26 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // A 502 from /api/control/banks used to leave the lobby blank — see
+  // A 502 from the catalog endpoint used to leave the lobby blank — see
   // Async's comment on why its error prop is mandatory. This suite never
   // scanned that state, so the role="alert" card's name/role/value
-  // (title, body, dynamic Retry button) never had an axe pass.
-  test("lobby catalog error card", async () => {
+  // (title, body, dynamic Retry button) never had an axe pass. (The lobby
+  // reads GET /api/catalog now rather than the conductor's
+  // /api/control/banks; the failure mode it guards is the same one.)
+  test("exam selector catalog error card", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
-        if (url.includes("/api/control/banks")) {
-          return new Response(JSON.stringify({ error: "banks unavailable" }), { status: 502 });
+        if (url.includes("/api/catalog")) {
+          return new Response(JSON.stringify({ error: "catalog unavailable" }), { status: 502 });
         }
         const body = url.includes("/api/exam") ? examJSON : {};
         return new Response(JSON.stringify(body), { status: 200 });
       }),
     );
     const { container } = render(
-      <Start
-        onSessionChange={() => {}}
-        onControlStart={() => {}}
-        catalogVersion={0}
-        onBanksLoaded={() => {}}
-      />,
+      <Exams onControlStart={() => {}} catalogVersion={0} onBanksLoaded={() => {}} />,
     );
     // Confirm the error card is actually the thing on screen, not a
     // loading or empty state a mis-routed mock would leave behind.
@@ -299,27 +416,44 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
+  // The verdict is the screen's h1 now ("Passed — 70% against a 66%
+  // threshold"), not a "PASS" badge under a bare percentage. Waiting on
+  // the heading by name is also what keeps the scan off the grading
+  // state, whose own h1 is on screen until the first poll lands.
   test("score screen with results", async () => {
     const { container } = render(<Score onNewAttempt={() => {}} endReason="submitted" />);
-    await screen.findByText("PASS");
+    await screen.findByRole("heading", { level: 1, name: /passed/i });
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
   // Solutions used to render through a bare, unstyled ReactMarkdown and this
-  // suite never scanned one open, so the shared renderer's code-block chrome
+  // suite never scanned one, so the shared renderer's code-block chrome
   // (figure/figcaption, a copy button with a dynamic per-language aria-label,
-  // and inline CopyableCode buttons) never had an axe pass. It also nests a
-  // <details> (solution) inside a <details> (question), each with its own
-  // interactive summary and now buttons inside both — exactly the shape
-  // nested-interactive-content violations hide in. Assert both disclosures
-  // are actually expanded before scanning, not merely present in the DOM.
-  test("score screen with an open solution", async () => {
+  // and inline CopyableCode buttons) never had an axe pass.
+  //
+  // That chrome used to be reached by opening a disclosure inside a verdict
+  // row, and the old comment here justified the scan partly by the shape:
+  // a <details> (solution) inside a <details> (row), each with its own
+  // interactive summary and buttons inside both. The row carries no
+  // solution any more — it belongs to the screen with room for it — so
+  // that justification is gone and should not be quietly inherited: the
+  // deep dive renders the solution in a plain <section>, with no
+  // disclosure around it and nothing nested to hide a
+  // nested-interactive violation in.
+  //
+  // What the scan still buys is the chrome itself, on the screen the
+  // product actually renders it on, reached the way the product reaches
+  // it — Score owns `#/results/<id>` and the row's own anchor is the
+  // route in. Explain.test.tsx scans that component in isolation; this
+  // covers what Score assembles around it, which is the composition a
+  // candidate meets.
+  test("score screen deep dive, with the reference solution rendered", async () => {
     const user = userEvent.setup();
     const { container } = render(<Score onNewAttempt={() => {}} endReason="submitted" />);
-    await screen.findByText("PASS");
+    await screen.findByRole("heading", { level: 1, name: /passed/i });
 
     await user.click(screen.getByText("q01"));
-    await user.click(screen.getByText(/show solution/i));
+    await user.click(screen.getByRole("link", { name: /full explanation/i }));
 
     // The shared renderer's code-block chrome, present only once the
     // solution has actually loaded and rendered.
@@ -330,9 +464,14 @@ describe("axe: no WCAG violations", () => {
   });
 
   test("control progress overlay, running and failed", async () => {
+    const user = userEvent.setup();
     const { container, rerender } = render(
       <ControlProgress job={runningJob} onRetry={() => {}} onDismiss={() => {}} onBackground={() => {}} />,
     );
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+
+    // The build log pane is a focusable scroll region; scan it open.
+    await user.click(screen.getByText(/show build log/i));
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
 
     rerender(
@@ -433,6 +572,35 @@ describe("axe: no WCAG violations", () => {
   test("desktop-required gate", async () => {
     // The one screen a phone or a 400%-zoomed desktop ever sees.
     const { container } = render(<DesktopRequired verdict="narrow" />);
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  // The header is on nearly every screen, so anything wrong here is
+  // wrong everywhere. Both variants are scanned: they differ in what
+  // leads the left cluster, which is exactly where the landmark, the
+  // link and the nav all live.
+  test("app header, brand variant", async () => {
+    const { container } = render(
+      <AppHeader
+        crumb="Choose an exam"
+        nav={[
+          { label: "History", to: "/progress" },
+          { label: "Packs", to: "/packs", current: true },
+        ]}
+      />,
+    );
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  test("app header, back variant", async () => {
+    const { container } = render(
+      <AppHeader
+        variant="back"
+        back={{ label: "Exams", to: "/exams" }}
+        crumb="CKAD"
+        detail="Certified Kubernetes Application Developer"
+      />,
+    );
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
@@ -562,7 +730,7 @@ describe("axe: no WCAG violations", () => {
       <McqExam session={mcqSession} fetchedAt={Date.now()} onSessionChange={() => {}} />,
     );
     await screen.findByText("Which component persists cluster state?");
-    await user.click(screen.getByRole("button", { name: /end exam/i }));
+    await user.click(screen.getByRole("button", { name: /submit exam/i }));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText(/1 question is unanswered/)).toBeInTheDocument();
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();

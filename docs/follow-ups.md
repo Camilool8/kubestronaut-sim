@@ -31,9 +31,6 @@ Known, chosen, and not currently worth the cost of changing.
 - **The ingress `ValidatingWebhookConfiguration` is left in place.** It
   matches the real exam's behaviour, including rejecting a malformed
   Ingress.
-- **`.impeccable/design.json` is tracked but read by nothing in this
-  repository.** It is the sidecar for an external tool; it costs 37KB
-  and confuses nobody who does not have that tool.
 - **CI builds images with `PRELOAD=none`.** A full preload in CI would
   cost more minutes than it would catch bugs. Cross-architecture
   coverage is therefore partial, and a cold-cache smoke run on the
@@ -49,13 +46,25 @@ Recorded because each has been proposed at least once and is settled.
 - **No authentication, permanently.** See [../SECURITY.md](../SECURITY.md).
   Notes elsewhere of the form "needs auth once hosted" describe a
   scenario that is not planned.
-- **No attempt history and no cross-attempt analytics.** One attempt
-  record, overwritten per attempt. [../PRODUCT.md](../PRODUCT.md) states
-  this as a durable constraint, so proposals that depend on a history
-  store are out of scope rather than pending.
-- **`spec.domainWeights` is read by no Go code.** Only
-  `tests/bank-weights.sh` consumes it. That is sufficient: it is a build
-  gate, not a runtime value.
+- ~~**No attempt history and no cross-attempt analytics.**~~ **Overturned,
+  deliberately.** This was a durable constraint until the design brief
+  made cross-attempt progress a product goal, and it is now built: every
+  graded attempt in a recorded mode is appended to `/state/history.json`
+  in its own volume, and `GET /api/catalog` joins that record to the bank
+  list. See [../PRODUCT.md](../PRODUCT.md) for the rules that came with it
+  — recorded is not the same as counted, and only the candidate's own
+  machine ever holds it. The *live session* file is unchanged: it still
+  holds exactly one attempt and is still overwritten by the next.
+  Struck through rather than deleted, because this entry was cited as
+  settled and a reader who remembers it needs to find out it was reversed
+  rather than simply not find it.
+- ~~**`spec.domainWeights` is read by no Go code.**~~ **No longer true.**
+  It is now a runtime value in three places: `exam.Load` derives
+  `Exam.Domains` from it, `exam.Draw` stratifies a pooled or filtered draw by it,
+  and both graders weight the final score by it. Kept here struck through
+  rather than deleted because this entry was cited as settled, and a
+  reader who remembers it needs to know it was overturned rather than
+  simply not find it.
 - **`spec.environment.kubernetesVersion` and `nodes` are
   informational.** They are surfaced to the UI and drive nothing.
 

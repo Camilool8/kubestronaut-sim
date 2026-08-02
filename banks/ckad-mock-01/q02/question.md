@@ -1,7 +1,3 @@
-# Question 2 | Fix a failing Deployment
-
-*Solve this question on instance: `ssh instance-1`*
-
 Deployment `nova-api` in Namespace `nova` is failing to roll out.
 
 1. Before changing anything, save the currently configured (broken) container

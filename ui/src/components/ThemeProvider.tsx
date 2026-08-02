@@ -34,9 +34,9 @@ export function cycleTheme(pref: ThemePreference): ThemePreference {
 }
 
 // useTheme owns the preference state and keeps the DOM attribute in
-// sync; applyTheme is called on mount so a stored choice survives
-// reloads (index.html carries no inline script — first paint may briefly
-// use the system theme, acceptable for a local tool).
+// sync. index.html's inline script has already applied a stored choice
+// before first paint; the mount-time applyTheme re-asserts it and
+// covers the "system" case the script leaves alone.
 export function useTheme(): [ThemePreference, () => void] {
   const [pref, setPref] = useState<ThemePreference>(() => loadTheme());
 

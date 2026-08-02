@@ -1,7 +1,3 @@
-# Question 1 | Namespaces & ResourceQuota
-
-*Solve this question on instance: `ssh instance-1`*
-
 Team Aurora owns every Namespace labeled `team=aurora`.
 
 1. Create a new Namespace `aurora-staging` labeled `team=aurora`.

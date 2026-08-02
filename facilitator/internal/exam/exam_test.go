@@ -1,9 +1,11 @@
 package exam
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -51,6 +53,12 @@ func TestLoad(t *testing.T) {
 		t.Errorf("Questions[1].ID = %q, want %q (file order not preserved)", q01.ID, "q01")
 	}
 
+	if q02.Title != "Fix a failing Deployment" {
+		t.Errorf("q02.Title = %q, want %q", q02.Title, "Fix a failing Deployment")
+	}
+	if q01.Title != "" {
+		t.Errorf("q01.Title = %q, want empty (title is optional)", q01.Title)
+	}
 	if q02.Instance != "instance-1" {
 		t.Errorf("q02.Instance = %q, want %q", q02.Instance, "instance-1")
 	}
@@ -341,7 +349,7 @@ func loadMCQDoc(t *testing.T, specExtra string, questions ...string) (*Exam, err
 
 // poolFixture builds an Exam with the given domain weights and, for each
 // domain, a pool of poolSizes[domain] questions in "<domain-initial><n>"
-// ids (e.g. "F1".."F6" for "Fundamentals") — plenty for DrawMCQ to
+// ids (e.g. "F1".."F6" for "Fundamentals") — plenty for Draw to
 // sample from without colliding with real bank ids in any test failure
 // message.
 func poolFixture(t *testing.T, order []string, weights map[string]int, poolSizes map[string]int, examLength int) *Exam {
@@ -419,20 +427,21 @@ func TestDomainTargetsMissingDomainErrors(t *testing.T) {
 	}
 }
 
-// DrawMCQ with no pooling configured (the default every bank has until
+// A draw with no pooling configured (the default every bank has until
 // it opts in) must return every question, unchanged, in bank order —
 // this is the backward-compatibility path every existing mcq bank and
 // the hidden smoke-mcq fixture rely on.
-func TestDrawMCQNoPoolingReturnsFullBankInOrder(t *testing.T) {
+func TestDrawNoPoolingReturnsFullBankInOrder(t *testing.T) {
 	e := poolFixture(t, kcnaDomainOrder, kcnaWeights,
 		map[string]int{
 			"Kubernetes Fundamentals": 3, "Container Orchestration": 2,
 			"Cloud Native Application Delivery": 2, "Cloud Native Architecture": 2,
 		}, 0)
-	ids, err := DrawMCQ(e)
+	res, err := Draw(e, DrawOptions{})
 	if err != nil {
-		t.Fatalf("DrawMCQ: %v", err)
+		t.Fatalf("Draw: %v", err)
 	}
+	ids := res.IDs
 	if len(ids) != len(e.Questions) {
 		t.Fatalf("len(ids) = %d, want %d (the full pool)", len(ids), len(e.Questions))
 	}
@@ -446,7 +455,7 @@ func TestDrawMCQNoPoolingReturnsFullBankInOrder(t *testing.T) {
 // A pooled draw must land exactly on domainTargets' per-domain counts —
 // not just approximately, every single time — and never repeat or
 // invent an id.
-func TestDrawMCQStratifiesExactlyByDomain(t *testing.T) {
+func TestDrawStratifiesExactlyByDomain(t *testing.T) {
 	poolSizes := map[string]int{
 		"Kubernetes Fundamentals": 40, "Container Orchestration": 30,
 		"Cloud Native Application Delivery": 16, "Cloud Native Architecture": 15,
@@ -458,10 +467,11 @@ func TestDrawMCQStratifiesExactlyByDomain(t *testing.T) {
 		byID[q.ID] = q
 	}
 
-	ids, err := DrawMCQ(e)
+	res, err := Draw(e, DrawOptions{})
 	if err != nil {
-		t.Fatalf("DrawMCQ: %v", err)
+		t.Fatalf("Draw: %v", err)
 	}
+	ids := res.IDs
 	if len(ids) != 65 {
 		t.Fatalf("len(ids) = %d, want 65", len(ids))
 	}
@@ -490,28 +500,31 @@ func TestDrawMCQStratifiesExactlyByDomain(t *testing.T) {
 	}
 }
 
-// Two draws from the same pool must (almost always) differ — otherwise
-// this "random" draw is a fixed sample wearing a randomizer's clothes.
-// The pool here is large enough that a coincidental match is
+// Two UNSEEDED draws from the same pool must (almost always) differ —
+// otherwise this "random" draw is a fixed sample wearing a randomizer's
+// clothes. The pool here is large enough that a coincidental match is
 // astronomically unlikely, so a match is treated as a real failure.
-func TestDrawMCQVariesBetweenAttempts(t *testing.T) {
+func TestDrawVariesBetweenAttempts(t *testing.T) {
 	poolSizes := map[string]int{
 		"Kubernetes Fundamentals": 40, "Container Orchestration": 30,
 		"Cloud Native Application Delivery": 16, "Cloud Native Architecture": 15,
 	}
 	e := poolFixture(t, kcnaDomainOrder, kcnaWeights, poolSizes, 65)
 
-	first, err := DrawMCQ(e)
+	first, err := Draw(e, DrawOptions{})
 	if err != nil {
-		t.Fatalf("DrawMCQ (first): %v", err)
+		t.Fatalf("Draw (first): %v", err)
 	}
-	second, err := DrawMCQ(e)
+	second, err := Draw(e, DrawOptions{})
 	if err != nil {
-		t.Fatalf("DrawMCQ (second): %v", err)
+		t.Fatalf("Draw (second): %v", err)
+	}
+	if first.Seed == second.Seed {
+		t.Error("two unseeded draws minted the same seed — the mint is not random")
 	}
 	same := true
-	for i := range first {
-		if first[i] != second[i] {
+	for i := range first.IDs {
+		if first.IDs[i] != second.IDs[i] {
 			same = false
 			break
 		}
@@ -522,8 +535,8 @@ func TestDrawMCQVariesBetweenAttempts(t *testing.T) {
 }
 
 // A domain whose authored pool is smaller than the draw needs is a bank
-// bug DrawMCQ must refuse rather than silently under-fill.
-func TestDrawMCQErrorsWhenADomainPoolIsTooShallow(t *testing.T) {
+// bug Draw must refuse rather than silently under-fill.
+func TestDrawErrorsWhenADomainPoolIsTooShallow(t *testing.T) {
 	// Every other domain's pool is generously oversized (so the total
 	// pool safely exceeds the 65-question draw and this actually
 	// exercises the per-domain check, not the "pool <= examLength, skip
@@ -535,8 +548,14 @@ func TestDrawMCQErrorsWhenADomainPoolIsTooShallow(t *testing.T) {
 		"Cloud Native Architecture":         7, // needs 8, only 7 authored
 	}
 	e := poolFixture(t, kcnaDomainOrder, kcnaWeights, poolSizes, 65)
-	if _, err := DrawMCQ(e); err == nil {
-		t.Error("DrawMCQ with a shallow Architecture pool: got nil error, want one naming the shortfall")
+	_, err := Draw(e, DrawOptions{})
+	if err == nil {
+		t.Fatal("Draw with a shallow Architecture pool: got nil error, want one naming the shortfall")
+	}
+	// A bank that cannot satisfy its own weights is an authoring bug, not
+	// a bad request, and the HTTP layer tells the two apart by this.
+	if errors.Is(err, ErrDrawRequest) {
+		t.Errorf("err = %v, want it NOT wrapped in ErrDrawRequest", err)
 	}
 }
 
@@ -557,5 +576,57 @@ func TestSpeedDurationDefaultsToHalf(t *testing.T) {
 	}
 	if ex.SpeedDuration != ex.Duration/2 {
 		t.Errorf("SpeedDuration = %v, want half of %v", ex.SpeedDuration, ex.Duration)
+	}
+}
+
+// Domains is the ordered form of spec.domainWeights the graders weight
+// with: question order, never map order, and one entry per domain the
+// questions actually use.
+func TestLoadDomains(t *testing.T) {
+	ex, err := Load("testdata/exam-mcq.json", "testdata/bank-mcq")
+	if err != nil {
+		t.Fatalf("Load mcq fixture: %v", err)
+	}
+	want := []Domain{
+		// q01 is Fundamentals and comes first in the file; the weights map
+		// lists Orchestration first, and must not decide the order.
+		{Name: "Kubernetes Fundamentals", WeightPct: 60},
+		{Name: "Container Orchestration", WeightPct: 40},
+	}
+	if !reflect.DeepEqual(ex.Domains, want) {
+		t.Errorf("Domains = %+v, want %+v", ex.Domains, want)
+	}
+}
+
+// A bank with no spec.domainWeights still gets its domains listed, at
+// weight 0 — "this bank publishes no curriculum split", which is what
+// makes the graders fall back to weighting by points.
+func TestLoadDomainsWithoutWeights(t *testing.T) {
+	ex, err := Load(examJSON, bankDir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	want := []Domain{
+		{Name: "Application Deployment"},
+		{Name: "Application Environment, Configuration and Security"},
+	}
+	if !reflect.DeepEqual(ex.Domains, want) {
+		t.Errorf("Domains = %+v, want %+v", ex.Domains, want)
+	}
+}
+
+func TestSubset(t *testing.T) {
+	ex := &Exam{Questions: []Question{{ID: "q01"}, {ID: "q02"}, {ID: "q03"}}}
+
+	// Empty ids means "no subset was drawn": the whole bank, in order.
+	if got := Subset(ex, nil); len(got) != 3 || got[0].ID != "q01" || got[2].ID != "q03" {
+		t.Errorf("Subset(nil) = %+v, want all three in bank order", got)
+	}
+
+	// Draw order wins over bank order, and an id the bank does not
+	// declare is skipped rather than faked into an empty question.
+	got := Subset(ex, []string{"q03", "q99", "q01"})
+	if len(got) != 2 || got[0].ID != "q03" || got[1].ID != "q01" {
+		t.Errorf("Subset([q03 q99 q01]) = %+v, want [q03 q01]", got)
 	}
 }

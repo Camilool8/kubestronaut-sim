@@ -195,4 +195,31 @@ describe("ControlProgress", () => {
     expect(status).toHaveTextContent(/Recreate Kubernetes cluster/);
     expect(status).not.toHaveTextContent("1m 04s");
   });
+
+  test("the build log opens on demand and shows the retained output", async () => {
+    const user = setupUser();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({ jobId: "job-1", lines: [" • Preparing nodes ...", " • Installing CNI ..."] }),
+          { status: 200 },
+        ),
+      ),
+    );
+    try {
+      render(<ControlProgress job={runningJob} {...props} />);
+
+      // Closed by default, and no fetch until opened: the checklist is
+      // the summary, the log is the appendix.
+      expect(screen.queryByText(/Preparing nodes/)).not.toBeInTheDocument();
+      expect(fetch).not.toHaveBeenCalled();
+
+      await user.click(screen.getByText(/show build log/i));
+      expect(await screen.findByText(/Preparing nodes/)).toBeInTheDocument();
+      expect(screen.getByText(/Installing CNI/)).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

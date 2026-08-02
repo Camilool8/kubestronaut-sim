@@ -1,4 +1,4 @@
-// Shared vocabulary for "something is happening". The product has four
+// Shared vocabulary for "something is happening". The product has five
 // tiers and each one uses exactly one mechanism:
 //
 //   ambient     TopProgress            a foreground request the user is
@@ -7,6 +7,8 @@
 //   blocking    ControlProgress        a multi-minute destructive job owns
 //                                      the screen.
 //   background  BackgroundJobChip      a backgrounded job is still running.
+//   gating      BootProgress           the environment does not exist yet,
+//                                      so no screen below can be truthful.
 //
 // The rule that makes all four work: **every pending state carries at least
 // one channel that changes without motion** — an elapsed counter, a step

@@ -274,3 +274,62 @@ func phaseState(t *testing.T, j *Job, id string) PhaseState {
 	t.Fatalf("phase %s not found in %+v", id, j.Phases)
 	return ""
 }
+
+func TestLogRetainsLinesAndDropsTheOldest(t *testing.T) {
+	s := NewStore(fixedClock())
+	j, _ := s.Begin("reset", "", testPhases())
+
+	s.AppendLog(j.ID, "first")
+	for i := 0; i < maxLogLines; i++ {
+		s.AppendLog(j.ID, "line")
+	}
+
+	jobID, lines := s.Log()
+	if jobID != j.ID {
+		t.Fatalf("Log() jobID = %q, want %q", jobID, j.ID)
+	}
+	if len(lines) != maxLogLines {
+		t.Fatalf("len(lines) = %d, want %d (bounded)", len(lines), maxLogLines)
+	}
+	if lines[0] != "line" {
+		t.Fatalf("lines[0] = %q, want the oldest line dropped", lines[0])
+	}
+}
+
+func TestLogSurvivesSettlementButNotTheNextJob(t *testing.T) {
+	s := NewStore(fixedClock())
+	j, _ := s.Begin("reset", "", testPhases())
+	s.AppendLog(j.ID, "kept")
+	s.Fail(j.ID, "boom")
+
+	// A failed job's log is exactly the one worth reading.
+	if _, lines := s.Log(); len(lines) != 1 || lines[0] != "kept" {
+		t.Fatalf("log after Fail = %v, want [kept]", lines)
+	}
+	// Settled means no more writes: a goroutine still draining the dead
+	// job's output must not grow its log.
+	s.AppendLog(j.ID, "stale")
+	if _, lines := s.Log(); len(lines) != 1 {
+		t.Fatalf("log grew after settlement: %v", lines)
+	}
+
+	j2, _ := s.Begin("switch", "kcna-mock", testPhases())
+	if jobID, lines := s.Log(); jobID != j2.ID || len(lines) != 0 {
+		t.Fatalf("new job inherited the old log: id=%q lines=%v", jobID, lines)
+	}
+}
+
+func TestLogTruncatesOversizedLines(t *testing.T) {
+	s := NewStore(fixedClock())
+	j, _ := s.Begin("reset", "", testPhases())
+
+	long := make([]byte, maxLogLineBytes+100)
+	for i := range long {
+		long[i] = 'x'
+	}
+	s.AppendLog(j.ID, string(long))
+
+	if _, lines := s.Log(); len(lines[0]) != maxLogLineBytes {
+		t.Fatalf("len(lines[0]) = %d, want %d", len(lines[0]), maxLogLineBytes)
+	}
+}

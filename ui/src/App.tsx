@@ -11,23 +11,25 @@ import {
   type BootStatus,
   type ControlActionResponse,
   type ControlStatus,
-  type ExamType,
+  type ExamInfo,
   type SessionSnapshot,
 } from "./api";
 import { BootProgress } from "./screens/BootProgress";
-import { Start } from "./screens/Start";
+import { Exams } from "./screens/Exams";
+import { Mode } from "./screens/Mode";
 import { Exam, ExamGateControls } from "./screens/Exam";
 import { McqExam } from "./screens/McqExam";
+import { Progress } from "./screens/Progress";
 import { Score } from "./screens/Score";
 import { DesktopRequired, gateOverridden, useDesktopGate } from "./components/DesktopRequired";
+import { AppHeader, type AppHeaderProps } from "./components/AppHeader";
 import { BackgroundJobChip } from "./components/BackgroundJobChip";
 import { ControlProgress } from "./components/ControlProgress";
-import { ThemeToggle } from "./components/ThemeToggle";
-import { InfoButton } from "./components/InfoButton";
 import { ToastLayer } from "./components/Toast";
 import { TopProgress } from "./components/TopProgress";
 import { ScreenTransition } from "./components/ScreenTransition";
 import { toastStore } from "./components/toastStore";
+import { useRoute } from "./lib/useHashRoute";
 import { strings } from "./strings";
 
 // Control-status poll cadence: fast while a job is running (the overlay
@@ -42,7 +44,19 @@ const CONTROL_POLL_IDLE_MS = 15_000;
 // poller and its own overlay.
 const BOOT_POLL_MS = 2_000;
 
-// The visible screen is a pure function of session.state — no router.
+// Session-poll cadence while an attempt is being prepared. Fast, because
+// the clock starts the instant preparation lands and the candidate is
+// looking at a progress overlay with an exam behind it.
+const PREPARE_POLL_MS = 1_000;
+
+// The visible screen is a function of session.state FIRST and the URL
+// fragment second. session.state stays the outer switch — it is server
+// truth, and no bookmark may contradict it — and the route only chooses
+// between the views that exist within one state. Today that is `idle`
+// alone: the exam selector and the mode screen are two steps before a
+// session exists, and a reload in the middle of them should not lose
+// its place.
+//
 // App owns the single session poller (10s interval + window focus) and
 // the poll timestamp that Exam/TimerBar anchor their 1Hz local tick to,
 // so every screen transition and every timer resync flows from one
@@ -80,6 +94,11 @@ export default function App() {
   const seenSession = useRef(false);
   const pollToastId = useRef<number | null>(null);
 
+  // The view beneath session.state. Read here rather than in the screens
+  // so one component decides what is on screen and what the header above
+  // it says about that.
+  const route = useRoute();
+
   const gateVerdict = useDesktopGate();
   // A desktop user who merely shrank their window can wave the gate
   // through; a touch-only device cannot, because the capability is
@@ -87,20 +106,24 @@ export default function App() {
   const gateBlocked =
     gateVerdict === "blocked" || (gateVerdict === "narrow" && !gateOverridden());
 
-  // Which engine the active bank runs on. null until /api/exam answers,
-  // which every consumer below treats as hands-on — the conservative
-  // read (gates apply). Retried on a timer because during a cold boot
-  // the facilitator is not listening yet, and an mcq bank's whole point
-  // is being usable before the cluster is: the boot-screen bypass below
-  // depends on this value arriving as soon as the server can answer.
-  const [examType, setExamType] = useState<ExamType | null>(null);
+  // The loaded exam. null until /api/exam answers, which every consumer
+  // below treats as hands-on — the conservative read (gates apply).
+  // Retried on a timer because during a cold boot the facilitator is not
+  // listening yet, and an mcq bank's whole point is being usable before
+  // the cluster is: the boot-screen bypass below depends on this
+  // arriving as soon as the server can answer.
+  //
+  // The whole response is kept, not just the engine: the mode screen's
+  // header names the certification, and reading it from here means a
+  // deep link into that screen needs no prior visit to the selector.
+  const [exam, setExam] = useState<ExamInfo | null>(null);
   useEffect(() => {
     let stopped = false;
     let timer = 0;
     const tick = async () => {
       try {
-        const exam = await getExam();
-        if (!stopped) setExamType(exam.examType ?? "hands-on");
+        const loaded = await getExam();
+        if (!stopped) setExam(loaded);
       } catch {
         if (!stopped) timer = window.setTimeout(tick, 3000);
       }
@@ -111,7 +134,7 @@ export default function App() {
       window.clearTimeout(timer);
     };
   }, [catalogVersion]);
-  const isMcq = examType === "mcq";
+  const isMcq = exam?.examType === "mcq";
 
   const applySession = useCallback((next: SessionSnapshot) => {
     seenSession.current = true;
@@ -144,6 +167,51 @@ export default function App() {
   useEffect(() => {
     return pollSession(applySession, handlePollError);
   }, [applySession, handlePollError]);
+
+  // While an attempt is being prepared — drawn, cluster still being seeded
+  // — the ordinary 10s poll is far too slow: the clock starts the moment
+  // seeding lands, and the candidate would sit on the lobby for most of a
+  // poll interval with their exam already running behind it.
+  //
+  // Keyed on `session.preparing` and NOT on the control job going idle.
+  // The job settles in the conductor up to a poll before the facilitator
+  // starts the session, so a watcher keyed on `busy` fires inside that
+  // window, sees `idle`, and flashes the lobby. The server starts the
+  // session first and clears `preparing` second, so this can never
+  // observe a moment with neither.
+  const preparing = session?.preparing !== undefined;
+  useEffect(() => {
+    if (!preparing) return;
+    let stopped = false;
+    const timer = window.setInterval(() => {
+      getSession()
+        .then((next) => {
+          if (!stopped) applySession(next);
+        })
+        .catch(() => {
+          // The facilitator restarts itself during some jobs. The next
+          // tick picks it up; the overlay is still saying what is going on.
+        });
+    }, PREPARE_POLL_MS);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [preparing, applySession]);
+
+  // A preparation that failed leaves the session idle with the reason
+  // attached. Said once, as a toast, rather than rendered into the lobby:
+  // the lobby is where the candidate now needs to act, and the reason is
+  // about the attempt that did not start.
+  const prepareError = session?.prepareError;
+  useEffect(() => {
+    if (!prepareError) return;
+    toastStore.push({
+      kind: "warning",
+      message: strings.control.prepareFailed(prepareError),
+      dedupeKey: "prepare-error",
+    });
+  }, [prepareError]);
 
   // Boot progress. Stops the moment the environment reports ready — a
   // ready environment can only go back to building via a control job,
@@ -306,6 +374,57 @@ export default function App() {
     !showOverlay &&
     !backgroundedJob;
 
+  // The one route with a parameter. `#/exams/<id>/mode` names the bank
+  // its cards would start, which need not be the loaded one — a stale
+  // bookmark, or a switch that failed — so the id travels to the screen
+  // and the screen checks it against the exam the server actually has.
+  const modeBankId =
+    route.segments[0] === "exams" && route.segments[2] === "mode" ? route.segments[1] : null;
+
+  // The dashboard. Only meaningful while idle: session.state is the outer
+  // switch, so asking for it mid-attempt or on the results screen would
+  // render the exam or the score anyway — and a nav link that lands you
+  // somewhere else is worse than one that is not there.
+  const onProgress = route.segments[0] === "progress";
+  const idle = session?.state === "idle";
+
+  // Two destinations, and the dashboard is otherwise reachable from
+  // nowhere. Only offered where both of them work.
+  const nav = idle
+    ? [
+        { label: strings.header.navExams, to: "/exams", current: !onProgress },
+        { label: strings.header.navProgress, to: "/progress", current: onProgress },
+      ]
+    : undefined;
+
+  // What the header calls the current location. Derived from the same
+  // state and route the screen switch below is derived from, so the
+  // crumb and the page under it can never name two different things.
+  //
+  // The mode screen is the one screen reached FROM another, so it takes
+  // the back variant. Its crumb waits on /api/exam rather than blocking
+  // the header on it: the way out must be there from the first frame.
+  const headerProps: Partial<AppHeaderProps> =
+    idle && modeBankId
+      ? {
+          variant: "back",
+          back: { label: strings.header.backToExams, to: "/exams" },
+          crumb: exam?.certification || exam?.title,
+          detail: exam?.certification
+            ? strings.exams.certNames[exam.certification]
+            : undefined,
+          nav,
+        }
+      : {
+          crumb:
+            session?.state === "ended"
+              ? strings.header.crumbResults
+              : idle && onProgress
+                ? strings.header.crumbProgress
+                : strings.header.crumbLobby,
+          nav,
+        };
+
   let screen = null;
   if (booting) {
     screen = <BootProgress boot={boot} onRetry={handleNewAttempt} />;
@@ -318,9 +437,16 @@ export default function App() {
   } else {
     switch (session.state) {
       case "idle":
-        screen = (
-          <Start
+        screen = onProgress ? (
+          <Progress catalogVersion={catalogVersion} />
+        ) : modeBankId ? (
+          <Mode
+            bankId={modeBankId}
+            catalogVersion={catalogVersion}
             onSessionChange={applySession}
+          />
+        ) : (
+          <Exams
             onControlStart={runControlAction}
             catalogVersion={catalogVersion}
             onBanksLoaded={handleBanksLoaded}
@@ -367,14 +493,12 @@ export default function App() {
   return (
     <>
       <TopProgress />
-      <main>
-        <ScreenTransition screenKey={booting ? "booting" : (session?.state ?? "loading")}>
-          {screen}
-        </ScreenTransition>
-      </main>
-      <ToastLayer />
+      {/* The header is chrome for the screens that are a PAGE. The exam is
+          not one — it has its own topbar carrying a clock and a submit
+          button — and neither is the boot screen, which is a takeover with
+          nothing to navigate to yet. */}
       {session && !booting && session.state !== "running" && (
-        <div className="floating-controls">
+        <AppHeader {...headerProps}>
           {/* A backgrounded rebuild used to run for 2-4 minutes with no
               indicator anywhere: the lobby behind it looked idle while the
               cluster it describes was being torn down. */}
@@ -385,10 +509,25 @@ export default function App() {
               onReopen={() => setBackgroundedJobId(null)}
             />
           )}
-          <InfoButton floating />
-          <ThemeToggle floating />
-        </div>
+        </AppHeader>
       )}
+      <main>
+        {/* Keyed on the VIEW, not just the session state: the exam
+            selector and the mode screen are both `idle`, and without the
+            route in the key the transition would not run between them. */}
+        <ScreenTransition
+          screenKey={
+            booting
+              ? "booting"
+              : `${session?.state ?? "loading"}${
+                  onProgress ? ":progress" : modeBankId ? ":mode" : ""
+                }`
+          }
+        >
+          {screen}
+        </ScreenTransition>
+      </main>
+      <ToastLayer />
       {showOverlay && overlayJob && (
         <ControlProgress
           job={overlayJob}

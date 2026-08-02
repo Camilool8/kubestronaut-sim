@@ -1,5 +1,22 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
-import { endSession, getExam, practiceGrade, type Results, type SessionSnapshot } from "../api";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import {
+  endSession,
+  getExam,
+  practiceGrade,
+  putFocus,
+  type ExamQuestionInfo,
+  type Results,
+  type SessionSnapshot,
+} from "../api";
 import { useAsync } from "../lib/useAsync";
 import { TimerBar } from "../components/TimerBar";
 import { QuestionPanel } from "../components/QuestionPanel";
@@ -18,6 +35,7 @@ import { PendingBar } from "../components/Pending";
 import { toastStore } from "../components/toastStore";
 import { marksStore } from "../components/marksStore";
 import { formatClock, formatClockSpoken, formatElapsed } from "../lib/format";
+import { isTypingTarget } from "../lib/typing";
 import { strings } from "../strings";
 
 // DesktopViewport pulls in @novnc/novnc, which is almost the entire main
@@ -68,7 +86,7 @@ export function ExamGateControls({ session, fetchedAt, onSessionChange }: ExamPr
 
   // This is the only submit control a phone has. A discarded {ok:false}
   // (409) or a rejected fetch used to leave the button flicking back to
-  // "End Exam" with nothing said, which reads exactly like a button that
+  // "Submit exam" with nothing said, which reads exactly like a button that
   // does nothing — while the server-side clock keeps running.
   const end = async () => {
     setEnding(true);
@@ -113,7 +131,7 @@ export function ExamGateControls({ session, fetchedAt, onSessionChange }: ExamPr
         </p>
       )}
       <button className="btn btn-danger" onClick={end} disabled={ending}>
-        {ending ? strings.exam.ending : strings.exam.endExam}
+        {ending ? strings.exam.ending : strings.exam.endAttempt(session.mode)}
       </button>
     </div>
   );
@@ -173,7 +191,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       const target = event.target as HTMLElement | null;
       if (target?.closest(".desktop-pane")) return;
-      if (target?.closest("input, textarea, [contenteditable]")) return;
+      if (isTypingTarget(target)) return;
       if (document.querySelector('[role="dialog"]')) return;
       event.preventDefault();
       setHelpOpen(true);
@@ -221,13 +239,39 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
   // that was always a function of two things already on hand.
   const selectedId = pickedId ?? exam?.questions[0]?.id ?? null;
 
+  // Tell the server which task is on screen, so per-task time can be
+  // accrued server-side (the client reports a question id and nothing
+  // else; PUT /api/session/focus owns the arithmetic).
+  //
+  // Failure is a no-op in every direction: a facilitator too old to have
+  // the route 404s, an ended attempt 409s, and a dropped request throws.
+  // None of them may interrupt an attempt — this is telemetry, and a
+  // candidate under a running clock must never be shown a toast about it.
+  useEffect(() => {
+    if (!selectedId) return;
+    const controller = new AbortController();
+    void putFocus(selectedId, controller.signal).catch(() => {});
+    return () => controller.abort();
+  }, [selectedId]);
+
   // Computed when the confirm dialog opens, not subscribed: the marks
   // store is only read here, and re-rendering the whole exam screen on
   // every mark toggle would be a lot of work for a list nobody is
   // looking at yet.
-  const questionIds = exam?.questions.map((q) => q.id) ?? [];
-  const reviewMarked = confirmOpen ? questionIds.filter((id) => marksStore.isMarked(id)) : [];
-  const reviewUnseen = confirmOpen ? questionIds.filter((id) => !marksStore.isViewed(id)) : [];
+  // Listed as attempt positions ("Task 4"), never bank ids — the same
+  // rule the mcq screen follows, and for the same reason: the ids are an
+  // artifact of the draw, and every other part of this screen counts
+  // tasks.
+  const reviewMarked = confirmOpen
+    ? (exam?.questions ?? []).flatMap((q, i) =>
+        marksStore.isMarked(q.id) ? [strings.exam.taskNumber(i + 1)] : [],
+      )
+    : [];
+  const reviewUnseen = confirmOpen
+    ? (exam?.questions ?? []).flatMap((q, i) =>
+        marksStore.isViewed(q.id) ? [] : [strings.exam.taskNumber(i + 1)],
+      )
+    : [];
 
   const handleConfirmEnd = async () => {
     setEnding(true);
@@ -249,6 +293,16 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
 
   // Desktop connection health surfaces as toasts: sticky warning while
   // reconnecting, brief confirmation when it comes back.
+  // The topbar's environment line. Both halves are server facts: the
+  // cluster's Kubernetes version, and the boxes the DRAWN tasks name —
+  // read off the questions rather than the bank's instance list, so a
+  // drawn attempt advertises only the hosts it can actually send you to.
+  const hosts = useMemo(() => {
+    const seen = new Set<string>();
+    for (const q of exam?.questions ?? []) if (q.instance) seen.add(q.instance);
+    return [...seen].sort().join(", ");
+  }, [exam]);
+
   const desktopDownRef = useRef(false);
   const handleDesktopState = useCallback((state: string) => {
     if (state === "disconnected") {
@@ -277,6 +331,12 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
         onEndClick={() => setConfirmOpen(true)}
         extras={
           <>
+            {exam && (
+              <span className="exam-env">
+                {strings.exam.environment(exam.kubernetesVersion, hosts)}
+              </span>
+            )}
+            {exam && exam.questions.length > 0 && <ExamProgress questions={exam.questions} />}
             <button
               className="info-button"
               onClick={() => setClipboardOpen((v) => !v)}
@@ -359,8 +419,8 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
       </div>
 
       {confirmOpen && (
-        <Dialog title={strings.exam.confirmTitle} onClose={() => setConfirmOpen(false)}>
-          <p>{strings.exam.confirmBody}</p>
+        <Dialog title={strings.exam.confirmTitle(session.mode)} onClose={() => setConfirmOpen(false)}>
+          <p>{strings.exam.confirmBody(session.mode)}</p>
           {/* Submitting used to be a bare yes/no. The two things a
               candidate most wants to know at that moment — did I flag
               anything for another look, and is there a question I never
@@ -389,7 +449,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
               {strings.exam.cancel}
             </button>
             <button className="btn btn-danger" onClick={handleConfirmEnd} disabled={ending}>
-              {ending ? strings.exam.ending : strings.exam.endExam}
+              {ending ? strings.exam.ending : strings.exam.endAttempt(session.mode)}
             </button>
           </div>
         </Dialog>
@@ -422,7 +482,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
           {practice.questions.map((q) => (
             <details key={q.id} className="score-question">
               <summary>
-                {q.id} — {q.earned}/{q.total}
+                {strings.practice.questionScore(q.id, q.earned, q.total)}
               </summary>
               <CheckList checks={q.checks} />
             </details>
@@ -435,6 +495,40 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
         </Dialog>
       )}
       {introOpen && <ExamIntro onClose={() => setIntroOpen(false)} />}
+    </div>
+  );
+}
+
+// How far through the tasks the attempt is, in the topbar.
+//
+// Its own component so it can subscribe to the marks store without
+// re-rendering the exam screen — and with it the RFB viewport — on every
+// flag. That was the reason the old code read the store only while the
+// submit dialog was open; the reading is now on screen all the time, so
+// the subscription moved down here instead of up there.
+//
+// "Opened" is the only word this screen is allowed: it knows it rendered
+// a task's text, never that the work was done (components/marksStore.ts).
+// The bar is aria-hidden — the sentence beside it already says the same
+// thing, and a second voice reading a percentage adds nothing.
+function ExamProgress({ questions }: { questions: ExamQuestionInfo[] }) {
+  useSyncExternalStore(marksStore.subscribe, marksStore.getVersion);
+
+  const total = questions.length;
+  const opened = questions.filter((q) => marksStore.isViewed(q.id)).length;
+  const flagged = questions.filter((q) => marksStore.isMarked(q.id)).length;
+  // A fraction, not a rounded percent: scaleX takes one directly, and
+  // rounding to whole percent threw away precision the bar can show.
+  const fraction = total > 0 ? opened / total : 0;
+
+  return (
+    <div className="exam-progress">
+      <span className="exam-progress-text">{strings.exam.progress(opened, total, flagged)}</span>
+      <div className="exam-progress-track" aria-hidden="true">
+        {/* scaleX rather than width — only transform and opacity animate
+            without relayout. Same as .job-chip-bar-fill. */}
+        <div className="exam-progress-bar" style={{ transform: `scaleX(${fraction})` }} />
+      </div>
     </div>
   );
 }

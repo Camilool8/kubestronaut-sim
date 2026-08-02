@@ -1,0 +1,1242 @@
+/* The landing page's own layout and components.
+   ============================================================================
+
+   Every colour, size, radius, shadow, duration and spacing step below is a
+   var() into tokens.css — the app's stylesheet, mirrored here verbatim by
+   site/build.sh. There is not one literal colour in this file, and there
+   must never be: a landing page with its own hex values is a second source
+   of truth that diverges the first time a token changes.
+
+   The three rules from DESIGN.md this page leans on hardest:
+
+   THE MACHINE IS NOT THE APP. `.term` is the quickstart terminal, and it is
+   literally a computer, so it takes --machine-* — a dark palette that
+   appears in BOTH themes and never follows the app's. It keeps its own
+   titlebar, border and mono type so the boundary survives dark mode, where
+   the page around it is also dark but visibly blue where the machine is
+   near-neutral. --ink is NOT that palette: --ink is this product raising
+   its voice (`.limits`), and in dark mode it inverts into a raised band.
+
+   RARE ACCENT. Blue arrives for four things only: focus, currency, the one
+   filled primary button per screen, and links. `.btn-primary` is that one
+   button. Hover is a step of TONE, never the accent. The orbit figure is
+   the one addition: its rings are CURRENCY — they carry which exams exist
+   — and they borrow the same --exam-tint alias the cards below use, so a
+   ring and its card cannot disagree about an engine's hue.
+
+   TWO-TIER HAIRLINE. --border-strong for an edge that identifies a
+   control's hit area (buttons); --border for structure (cards, rules).
+
+   Motion is written additively inside prefers-reduced-motion:
+   no-preference, animating only compositor properties, so a reduced-motion
+   reader never depends on an animation being correctly cancelled. There is
+   exactly one authored animation on this page — the orbit — and every
+   other moving thing is feedback on a control the reader just touched. */
+
+/* ------------------------------------------------------------------ base */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* The header is sticky, so an in-page anchor would otherwise land its
+   target underneath it. Declared on the scroll container rather than as a
+   scroll-margin on each target, so a new section needs no extra rule. */
+html {
+  scroll-padding-top: calc(56px + var(--space-5));
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text-body);
+  font-family: var(--font-sans);
+  /* A reading surface, not a working one. The app's base is --text-m
+     because the task panel shares a screen with a terminal; this page
+     shares a screen with nothing, so it takes the next step up. */
+  font-size: var(--text-l);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.2;
+  letter-spacing: var(--tracking-tight);
+  font-weight: 600;
+}
+
+p {
+  margin: 0;
+}
+
+ul,
+ol,
+dl,
+dd {
+  margin: 0;
+  padding: 0;
+}
+
+li {
+  list-style: none;
+}
+
+a {
+  color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+a:hover {
+  color: var(--accent-strong);
+}
+
+/* An inline code chip. --radius-xs and not --radius-s: a box sized to a
+   few characters needs a corner proportional to itself.
+
+   The horizontal padding is the app's own value and stays, which carries
+   one authoring constraint with it: a chip must never END a sentence,
+   because its trailing padding pushes the full stop a clear space away
+   and the punctuation reads as detached. Word the sentence so something
+   follows the chip. Three places on this page used to get this wrong. */
+code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  padding: 0.1em 0.35em;
+  border-radius: var(--radius-xs);
+  background: var(--surface-raised);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* Inside a <pre> the chip treatment is wrong twice over: the fill would
+   paint an app surface on top of a machine one, and the padding would
+   break the line grid. The block owns the styling; the code element only
+   carries the semantics. */
+pre code {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  overflow-wrap: normal;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Keyboard focus is visible on every interactive element in both themes.
+   No border-radius here: the outline already follows the element's own. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Visually hidden, still announced. The clip idiom rather than a
+   transform, so a keyboard-reachable element is never moved off-screen. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Fixed, not absolute: the visible state is anchored to the viewport
+   rather than to whatever box the link happens to live in. */
+.skip-link:focus {
+  position: fixed;
+  z-index: var(--z-panel);
+  top: var(--space-3);
+  left: var(--space-3);
+  width: auto;
+  height: auto;
+  clip-path: none;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  font-size: var(--text-s);
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--shadow-2);
+}
+
+/* The one measure the whole page is built on. */
+.shell {
+  width: 100%;
+  max-width: var(--page-max);
+  margin-inline: auto;
+  padding-inline: var(--space-5);
+}
+
+/* --------------------------------------------------------------- header */
+
+/* Deliberately no z-index. Sticky already paints above the page's static
+   content, and claiming --z-panel here put the header level with the
+   focused skip link, which is on that layer by design — same layer, later
+   in the DOM, so the header covered the one control a keyboard user needs
+   before anything else. Nothing on this page is positioned, so the header
+   has nothing to outrank. */
+.site-header {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.site-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: 56px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.brand-mark {
+  width: 26px;
+  height: 26px;
+  flex: none;
+}
+
+.brand-word {
+  font-size: var(--text-l);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* The product is "kubestronaut"; "-sim" says this is the rehearsal. */
+.brand-word-tail {
+  color: var(--text-secondary);
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.site-nav a {
+  color: var(--text-secondary);
+  font-size: var(--text-s);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.site-nav a:hover {
+  color: var(--text);
+}
+
+/* -------------------------------------------------------------- buttons */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* em padding, so the control scales with its own type. */
+  padding: 0.6em 1.2em;
+  /* 44px minimum on a coarse pointer is handled by the media query at the
+     foot of this file; 2.75rem is the floor everywhere. */
+  min-height: 2.75rem;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: var(--text-m);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* The fill steps and the label goes accent; the BORDER does not move, so a
+   hovered button is never mistaken for a selected one. */
+.btn:hover {
+  background: var(--raised-hover);
+  color: var(--accent-strong);
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.btn-primary:hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  color: var(--accent-contrast);
+}
+
+/* ----------------------------------------------------------------- hero */
+
+.hero {
+  display: grid;
+  gap: var(--space-7);
+  padding-block: var(--space-8) var(--space-7);
+}
+
+/* --text-hero has exactly one site in the system and this is it. It
+   clamps DOWN to --text-4xl on a narrow viewport rather than to an
+   invented value, so the ramp stays inside the scale.
+
+   20ch, not 16ch: the sentence is two phrases of seventeen characters and
+   the tighter measure broke it across three lines, which is one more than
+   a headline gets. balance keeps the two lines even as the clamp moves. */
+.hero-copy h1 {
+  font-size: clamp(var(--text-4xl), 5.2vw, var(--text-hero));
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+  max-width: 20ch;
+  text-wrap: balance;
+}
+
+.lede {
+  margin-top: var(--space-4);
+  max-width: 52ch;
+  font-size: var(--text-xl);
+  line-height: 1.55;
+  color: var(--text-body);
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+/* ---------------------------------------------------------- the orbit */
+/* The Kubestronaut path as an instrument: five orbits, one per
+   certification, and a body on each. The two with a bank are drawn solid
+   with a filled body; the three without are dashed with a hollow one, and
+   the caption names which is which — three channels, so the state never
+   rests on hue alone.
+
+   Colour comes from --exam-tint, the same alias the exam cards use, and
+   [data-engine="soon"] in tokens.css is already the system's answer for
+   "advertised, not runnable". Nothing here invents a value. */
+
+.orbit {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.orbit-title {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.orbit-svg {
+  display: block;
+  width: 100%;
+  max-width: 21rem;
+  height: auto;
+}
+
+/* The path is static. A rotating ring is a loading spinner, which is the
+   one thing this figure must never be mistaken for; the body travels and
+   the orbit stays put, which is also what actually happens. */
+.orbit-path {
+  fill: none;
+  stroke: var(--exam-tint);
+  stroke-width: 2;
+}
+
+[data-state="soon"] .orbit-path {
+  stroke-width: 1.25;
+  stroke-dasharray: 2 8;
+  stroke-linecap: round;
+}
+
+/* The --bg stroke is a knockout, not an outline: it punches the body
+   through its own orbit line so the two read as one object at a crossing
+   rather than as a dot resting ambiguously on a wire. */
+.orbit-body {
+  fill: var(--exam-tint);
+  stroke: var(--bg);
+  stroke-width: 3;
+}
+
+[data-state="soon"] .orbit-body {
+  fill: var(--bg);
+  stroke: var(--exam-tint);
+  stroke-width: 1.5;
+}
+
+/* Each label is centred ON its own ring, at an angle no other label
+   uses. That is what ties a name to a circle when five of them are
+   concentric: the label breaks the line it belongs to, the way a scale
+   is labelled. paint-order draws the --bg stroke first, so it knocks a
+   clean gap rather than colliding with the ring, and with every ring
+   outside it that the word happens to cross.
+
+   Ranged around the clock rather than stacked along one radius: five
+   names on a diagonal read as a caption in the corner, not as labels. */
+.orbit-label {
+  fill: var(--exam-tint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 5;
+  stroke-linejoin: round;
+}
+
+/* The destination. --ink is this product's raised voice and in dark mode
+   it steps UP to stay visible against the page, so the anchor holds in
+   both themes without a second rule. */
+.orbit-core {
+  fill: var(--ink);
+  stroke: var(--ink-border);
+  stroke-width: 1;
+}
+
+.orbit-caption {
+  max-width: 46ch;
+  font-size: var(--text-m);
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* ----------------------------------------------------------- quickstart */
+
+.quickstart-run {
+  display: grid;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.quickstart-note {
+  max-width: 46ch;
+  font-size: var(--text-m);
+  color: var(--text-muted);
+}
+
+/* -------------------------------------------------------- the terminal */
+/* A MACHINE surface. Identical in both themes on purpose: a terminal does
+   not have a light mode, and the whole point of this family is that it
+   does not follow the app. */
+
+.term {
+  margin: 0;
+  border: 1px solid var(--machine-border);
+  border-radius: var(--radius-m);
+  background: var(--machine-surface);
+  overflow: hidden;
+  box-shadow: var(--shadow-2);
+}
+
+/* Its own titlebar. In dark mode this, the border and the mono type are
+   what separate the machine from the page behind it, since lightness no
+   longer can. */
+.term-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--machine-chrome);
+  border-bottom: 1px solid var(--machine-border);
+}
+
+.term-bar-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--machine-green);
+}
+
+.term-bar-title {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--machine-faint);
+}
+
+/* Scroll-Inside: a long command line scrolls in its own box, never the
+   page. */
+.term-body {
+  margin: 0;
+  padding: var(--space-4);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-s);
+  line-height: 1.9;
+  color: var(--machine-text);
+  tab-size: 2;
+}
+
+/* aria-hidden in the markup and unselectable here, so copying the block
+   yields runnable commands rather than three stray dollar signs. */
+.term-prompt {
+  color: var(--machine-green);
+  user-select: none;
+}
+
+/* --machine-muted, not --machine-comment. The comment token is decorative
+   (2.7:1) and exists for renders where dimmed text is a PICTURE of output;
+   these comments are instructions someone reads, so they clear 4.5:1. */
+.term-note {
+  color: var(--machine-muted);
+}
+
+.term-url {
+  color: var(--machine-blue);
+}
+
+/* ---------------------------------------------------------------- stats */
+
+.stats {
+  padding-block: var(--space-7);
+  border-top: 1px solid var(--border);
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
+  gap: var(--space-6) var(--space-7);
+}
+
+.stat-figure {
+  font-family: var(--font-mono);
+  font-size: var(--text-6xl);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: var(--tracking-tight);
+  /* Mono-For-Truth: these are measurements, so they are set in mono and
+     tabular, the same as the results figure they borrow their step from. */
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/* The quieter half of a compound figure — real information a reader would
+   miss, so --text-muted and not --text-decorative. */
+.stat-figure-of {
+  font-size: var(--text-2xl);
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.stat-label {
+  margin-top: var(--space-2);
+  font-size: var(--text-l);
+}
+
+.stat-note {
+  margin-top: var(--space-2);
+  font-size: var(--text-m);
+  color: var(--text-secondary);
+}
+
+/* -------------------------------------------------------------- sections */
+
+.section {
+  padding-block: var(--space-8);
+  border-top: 1px solid var(--border);
+}
+
+.section-head {
+  max-width: 62ch;
+  margin-bottom: var(--space-6);
+}
+
+.section-head h2 {
+  font-size: var(--text-3xl);
+}
+
+.section-lede {
+  margin-top: var(--space-3);
+  font-size: var(--text-l);
+  color: var(--text-secondary);
+}
+
+.section-lede-tight {
+  max-width: 62ch;
+  margin-bottom: var(--space-5);
+}
+
+.subhead {
+  margin-top: var(--space-8);
+  margin-bottom: var(--space-4);
+  font-size: var(--text-2xl);
+}
+
+/* The first of the two list headings follows the section head, which
+   already supplies the gap. */
+.subhead-first {
+  margin-top: 0;
+}
+
+/* ------------------------------------------------------------ exam cards */
+
+.exam-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(21rem, 100%), 1fr));
+  gap: var(--space-4);
+}
+
+/* Denser: these carry a name and a reason, not a stat strip. */
+.exam-grid-soon {
+  grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
+}
+
+.exam-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--surface);
+  /* A card is not a control, so its edge is structural and takes the
+     weaker tier. What lifts it off the page is the shadow. */
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-1);
+}
+
+.exam-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+/* --exam-tint on --exam-tint-soft: the one alias pair in the system,
+   repointed by data-engine on the card itself. */
+.exam-avatar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-l);
+  background: var(--exam-tint-soft);
+  color: var(--exam-tint);
+  font-family: var(--font-mono);
+  font-size: var(--text-s);
+  font-weight: 600;
+}
+
+.exam-card-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.exam-card-name h4 {
+  font-size: var(--text-xl);
+}
+
+.exam-card-name p {
+  margin-top: var(--space-1);
+  font-size: var(--text-s);
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+/* A live and a coming-soon card must be told apart by a WORD, never only
+   by a hue. */
+.exam-badge {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  padding: 0.3em 0.6em;
+  border-radius: var(--radius-xs);
+  background: var(--muted-soft);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.exam-badge-live {
+  background: var(--success-soft);
+  color: var(--success-strong);
+}
+
+.exam-stats {
+  display: flex;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+/* column-reverse, not a reordered DOM: <dl> requires dt before dd, and a
+   screen reader wants to hear "Duration, 2h" in that order. Drawing the
+   figure above its label is a visual arrangement only. */
+.exam-stats > div {
+  flex: 1 1 7rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column-reverse;
+  /* flex-start is the BOTTOM in column-reverse, so every cell's label
+     lands on one line and a value that wraps grows upward. Packing to
+     flex-end instead hangs the wrapped cell's label below its
+     neighbours', which is the misalignment this strip exists to avoid. */
+  justify-content: flex-start;
+  gap: 3px;
+  padding: var(--space-3) 0;
+}
+
+.exam-stats dt {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.exam-stats dd {
+  font-family: var(--font-mono);
+  font-size: var(--text-l);
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* The pool half of "65 / 97". Quieter than the drawn count, but a real
+   number a reader would miss. */
+.exam-stat-of {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.exam-stat-engine {
+  color: var(--exam-tint);
+}
+
+.exam-desc {
+  font-size: var(--text-m);
+  color: var(--text-secondary);
+}
+
+.domains {
+  margin-top: auto;
+}
+
+.domains-title {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Tags, not chips. Nothing filters anything here, so nothing wears a
+   control's border, hover or cursor — a tag that looks clickable and is
+   not is worse than a plain one. */
+.tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 0.25em 0.6em;
+  border-radius: var(--radius-xs);
+  background: var(--surface-raised);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.tag b {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A coming-soon card drops the shadow, dashes the border and sits on the
+   page fill — an inversion that reads correctly in both themes, because
+   --bg is darker than --surface in light and lighter in dark. */
+.exam-card-soon {
+  gap: var(--space-3);
+  background: var(--bg);
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.exam-card-soon .exam-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-m);
+  font-size: var(--text-xs);
+}
+
+.exam-card-soon .exam-card-name h4 {
+  font-size: var(--text-l);
+  color: var(--text-secondary);
+}
+
+/* The reason is the entire point of listing an exam nobody can sit, so it
+   is never dimmed below the body floor and never clamped. Unavailability
+   is carried by a dashed edge, a SOON badge and the absence of any action
+   — never by opacity. */
+.exam-note {
+  font-size: var(--text-m);
+  color: var(--text-muted);
+}
+
+/* --------------------------------------------------------- mode matrix */
+/* Four properties the three modes answer differently. A table, because
+   comparing them is the whole job, and three prose blocks make the reader
+   hold six answers in their head to do it. */
+
+/* Scroll-Inside again: four columns of prose do not fit a phone, and the
+   house answer is a box that scrolls rather than a page that does. The
+   region is focusable in the markup so it can be scrolled from the
+   keyboard, which is what makes the pattern legitimate. */
+.mode-table-scroll {
+  overflow-x: auto;
+}
+
+.mode-table {
+  width: 100%;
+  min-width: 44rem;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.mode-table th,
+.mode-table td {
+  padding: var(--space-4) var(--space-4) var(--space-4) 0;
+  vertical-align: top;
+  border-top: 1px solid var(--border);
+}
+
+/* The column heads are the three mode names and carry the section's
+   weight; nothing rules above them because the section head already
+   separates this block from what precedes it. */
+.mode-table thead th,
+.mode-table thead td {
+  border-top: 0;
+  padding-top: 0;
+}
+
+/* Equal thirds. Left to content the Training column took half the table,
+   because its cells say the most — and three columns of different widths
+   stop reading as three peers being compared. */
+.mode-table thead th {
+  width: 26%;
+  font-size: var(--text-xl);
+  color: var(--text);
+  letter-spacing: var(--tracking-tight);
+}
+
+/* The row labels are the axis, not content: quieter than the cells they
+   introduce, and fixed-width so the four rows align. */
+.mode-table tbody th {
+  width: 12rem;
+  font-size: var(--text-s);
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.mode-table tbody td {
+  font-size: var(--text-m);
+  color: var(--text-secondary);
+}
+
+/* The concrete minutes under a relative rule. Mono because they are
+   measurements, and tabular so the two columns' figures line up. */
+.mode-sub {
+  display: block;
+  margin-top: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.mode-notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(24rem, 100%), 1fr));
+  gap: var(--space-4) var(--space-6);
+  margin-top: var(--space-6);
+}
+
+.mode-notes p {
+  max-width: 56ch;
+  font-size: var(--text-m);
+  color: var(--text-muted);
+}
+
+/* ----------------------------------------------------------- ink band */
+/* --ink is not the machine palette. It is a near-black band used INSIDE
+   light mode to frame a headline — this product raising its voice. In dark
+   mode it inverts role and becomes a RAISED surface, so the band still
+   reads as a band against the page rather than disappearing into it. */
+
+.limits {
+  /* Rebinding the token rather than overriding the rule: --accent on --ink
+     is too close to read as a focus indicator, and --ink-accent is the
+     token measured against this exact fill (7.38:1 light, 7.01:1 dark). */
+  --focus-ring: var(--ink-accent);
+  margin-top: var(--space-8);
+  padding-block: var(--space-8);
+  background: var(--ink);
+  color: var(--ink-muted);
+}
+
+.limits h2,
+.limits dt {
+  color: var(--ink-text);
+}
+
+.limits .section-lede {
+  color: var(--ink-muted);
+}
+
+.limits a {
+  color: var(--ink-accent);
+}
+
+.limits code {
+  background: var(--ink-raised);
+  color: var(--ink-text);
+}
+
+.limit-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
+  gap: var(--space-5) var(--space-6);
+}
+
+.limit {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--ink-border);
+}
+
+.limit dt {
+  font-size: var(--text-l);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+}
+
+.limit dd {
+  margin-top: var(--space-2);
+  font-size: var(--text-m);
+  color: var(--ink-muted);
+}
+
+/* -------------------------------------------------------- evidence rows */
+/* Four pieces of evidence for one claim, not four features. A row list
+   puts the component beside what it buys the score; a card grid would
+   have said "features" and lost the argument the section is making. */
+
+.evidence-row {
+  display: grid;
+  gap: var(--space-2) var(--space-6);
+  padding-block: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.evidence dt {
+  font-size: var(--text-l);
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: var(--tracking-tight);
+}
+
+.evidence dd {
+  max-width: 64ch;
+  font-size: var(--text-m);
+  color: var(--text-secondary);
+}
+
+/* ------------------------------------------------------------ docs index */
+/* The page is a front door and the repository is what is behind it. Three
+   groups, matching the split docs/README.md already makes for itself, so
+   the two cannot drift into different taxonomies. */
+
+.docs-index {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(17rem, 100%), 1fr));
+  gap: var(--space-6);
+}
+
+.docs-group-title {
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-s);
+  color: var(--text-muted);
+}
+
+.docs-entry + .docs-entry {
+  margin-top: var(--space-4);
+}
+
+.docs-entry dt {
+  font-size: var(--text-l);
+  font-weight: 600;
+}
+
+/* The link is the heading, so it carries no underline at rest — the
+   weight and the accent already say it is one. The underline arrives on
+   hover, where it confirms the target rather than decorating the list. */
+.docs-entry dt a {
+  text-decoration: none;
+}
+
+.docs-entry dt a:hover {
+  text-decoration: underline;
+}
+
+.docs-entry dd {
+  margin-top: var(--space-1);
+  max-width: 44ch;
+  font-size: var(--text-m);
+  color: var(--text-secondary);
+}
+
+/* --------------------------------------------------------------- footer */
+
+.site-footer {
+  padding-block: var(--space-7);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.footer-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
+  gap: var(--space-5) var(--space-6);
+}
+
+.footer-title {
+  font-size: var(--text-s);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: var(--space-3);
+}
+
+.footer-text {
+  font-size: var(--text-m);
+  color: var(--text-secondary);
+  max-width: 40ch;
+}
+
+.footer-links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-m);
+}
+
+/* The non-affiliation notice. Binding on every surface that names a
+   certification, and this page names all five. It sits in the footer here
+   for the same reason it does in the app: the notice is a permanent
+   property of the product, not a message about the page you are on. */
+.disclaimer {
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+.disclaimer-title {
+  font-size: var(--text-s);
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-2);
+}
+
+.disclaimer p {
+  font-size: var(--text-s);
+  line-height: 1.7;
+  color: var(--text-muted);
+  max-width: 90ch;
+}
+
+/* ---------------------------------------------------------- responsive */
+/* Three breakpoints, each changing structure rather than scale, plus one
+   keyed to pointer type. */
+
+@media (min-width: 760px) {
+  /* The component beside what it buys, rather than above it. */
+  .evidence-row {
+    grid-template-columns: 18rem 1fr;
+    align-items: baseline;
+  }
+}
+
+@media (min-width: 900px) {
+  /* The claim on the left, the figure that qualifies it on the right.
+     Centred rather than start-aligned: the figure is a disc, so its
+     optical centre is its geometric one and hanging it from the top
+     leaves the column bottom-heavy. */
+  .hero {
+    grid-template-columns: 1fr minmax(0, 21rem);
+    gap: var(--space-8);
+    align-items: center;
+    padding-block: var(--space-9) var(--space-8);
+  }
+
+  .quickstart-run {
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: var(--space-6);
+  }
+}
+
+@media (max-width: 600px) {
+  /* Page gutters close a step. */
+  .shell {
+    padding-inline: var(--space-4);
+  }
+
+  .term-body {
+    font-size: var(--text-xs);
+  }
+
+  /* The stat strip's four cells become two rows of two rather than four
+     unreadable columns. */
+  .exam-stats > div {
+    flex-basis: 45%;
+  }
+
+  .hero-actions .btn {
+    flex: 1 1 100%;
+  }
+}
+
+/* Keyed to pointer type, not to width: a touch screen at any size needs
+   the 44px minimum. */
+@media (any-pointer: coarse) {
+  .btn {
+    min-height: 44px;
+  }
+
+  .site-nav a {
+    padding-block: var(--space-2);
+  }
+}
+
+/* -------------------------------------------------------------- motion */
+/* Additive, never a default that a reduce-guard later neutralises. Layout
+   is identical either way, and the orbit's bodies are placed at their
+   authored angles in the markup — so with motion off the figure is a
+   composed diagram rather than five dots stacked at twelve o'clock. */
+
+@media (prefers-reduced-motion: no-preference) {
+  .btn,
+  .site-nav a,
+  a {
+    transition:
+      background-color var(--dur-quick) var(--ease-out),
+      border-color var(--dur-quick) var(--ease-out),
+      color var(--dur-quick) var(--ease-out);
+  }
+
+  .btn:active {
+    transform: translateY(1px);
+    transition-duration: 50ms;
+  }
+
+  /* The page's one authored animation.
+     transform-box: view-box puts the origin in the SVG's own coordinate
+     space, so every ring turns about the figure's centre rather than
+     about its own dot. Where that is unsupported the dot spins in place,
+     which is wrong but harmless.
+
+     Periods rise with radius, the way real ones do. They are also
+     mutually prime enough that the five never resolve into a pattern, so
+     the figure never looks like it is counting something. */
+  .orbit-track {
+    transform-box: view-box;
+    transform-origin: 160px 160px;
+    animation: orbit-turn linear infinite;
+    /* linear on purpose. An orbit that eases is a widget, not an orbit,
+       and this is the one place on the page where the literal reading is
+       also the correct one. */
+  }
+
+  [data-ring="kcna"] .orbit-track {
+    animation-duration: 54s;
+  }
+  [data-ring="kcsa"] .orbit-track {
+    animation-duration: 76s;
+  }
+  [data-ring="cka"] .orbit-track {
+    animation-duration: 98s;
+  }
+  [data-ring="ckad"] .orbit-track {
+    animation-duration: 124s;
+  }
+  [data-ring="cks"] .orbit-track {
+    animation-duration: 158s;
+  }
+
+  /* Set by the observer at the foot of index.html once the hero has
+     scrolled away. Five orbits turning behind the reader is battery spent
+     on something nobody is looking at. */
+  .orbit-svg[data-idle] .orbit-track {
+    animation-play-state: paused;
+  }
+}
+
+@keyframes orbit-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Windows High Contrast drops box-shadow and overrides every colour we
+   set, which costs the live/soon distinction its fill. The badge word and
+   the dashed edge survive; this restores the card boundary that does not.
+   The orbit keeps its meaning there too: solid against dashed, and a
+   filled body against a hollow one, are both shape rather than colour. */
+@media (forced-colors: active) {
+  .exam-card,
+  .term {
+    border-color: CanvasText;
+  }
+}

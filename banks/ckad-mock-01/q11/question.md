@@ -1,7 +1,3 @@
-# Question 11 | Helm release management
-
-*Solve this question on instance: `ssh instance-1`*
-
 Team Carina manages its workloads with Helm in Namespace `carina`. The
 chart repository `sim` is already configured on this instance.
 
