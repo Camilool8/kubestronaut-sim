@@ -68,6 +68,12 @@ export function ExamIntro({ onClose }: { onClose: () => void }) {
         ))}
       </ol>
 
+      {/* Below the legend and outside it: the legend's numbers key to the
+          four regions on the schematic, and grading is not one of them. */}
+      <section className="intro-note" aria-label={s.methodTitle}>
+        <strong>{s.methodTitle}</strong> — {s.method}
+      </section>
+
       <div className="confirm-actions">
         <button className="btn btn-primary" onClick={onClose}>
           {s.done}

@@ -1067,8 +1067,8 @@
 }
 
 /* ---- question navigator ----
-   The task pane's three bands: the identity header, the machine block and
-   graded-on card inside the scroll region, and the footer nav.
+   The task pane's three bands: the identity header, the machine block
+   inside the scroll region, and the footer nav.
 
    Navigation used to be a compact stepper row at the top of this header,
    beside the current question's id. It is now the labelled footer row at
@@ -1346,46 +1346,6 @@
   font-size: var(--text-m);
   color: var(--machine-green-soft);
   word-break: break-word;
-}
-
-.work-from-note {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  line-height: 1.5;
-  color: var(--machine-faint);
-}
-
-/* What the grader will look at, at the foot of the task text. An inset
-   card rather than a callout: it is a summary of the task above it, so it
-   takes the quiet left rule the brief draws and none of the verdict
-   colours — nothing has been graded yet. */
-.graded-on {
-  display: block;
-  margin-top: var(--space-4);
-  padding: var(--space-3);
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--border-strong);
-  border-radius: 0 var(--radius-s) var(--radius-s) 0;
-}
-
-.graded-on-label {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: var(--space-1);
-}
-
-.graded-on-body {
-  margin: 0;
-  font-size: var(--text-s);
-  line-height: 1.6;
-  color: var(--text-secondary);
 }
 
 /* ---- navigator ----
@@ -3532,6 +3492,25 @@
 }
 
 .intro-legend strong {
+  color: var(--text);
+}
+
+/* The grading note under the legend. Indented to the legend's text
+   column (the number's 1.4rem plus its gap) so it reads as a continuation
+   of the list rather than a new section, and separated by a rule instead
+   of a fifth number — the numbers key to the schematic's four regions,
+   and grading is not a region of the screen. */
+.intro-note {
+  display: block;
+  margin: 0 0 var(--space-4);
+  padding-top: var(--space-3);
+  padding-left: calc(1.4rem + var(--space-3));
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.intro-note strong {
   color: var(--text);
 }
 

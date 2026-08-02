@@ -284,17 +284,14 @@ export const strings = {
     // The one surface in the task pane drawn in the --machine-* palette,
     // because it is literally a computer: the command, and where to run it.
     workFrom: "Work from",
-    workFromNote:
-      "kubectl on each instance already points at this cluster — there is no context to switch.",
     copyShort: "Copy",
 
-    // ---- what the grader will look at ----
-    gradedOn: "Graded on",
-    gradedOnBody: (points: string, instance: string) =>
-      `What the checks find on the cluster and on ${instance} when grading runs — the state you leave behind, not the commands you typed. Worth ${points}.`,
-    // Same sentence for an attempt whose bank names no instance.
-    gradedOnBodyNoHost: (points: string) =>
-      `What the checks find on the cluster when grading runs — the state you leave behind, not the commands you typed. Worth ${points}.`,
+    // The pane once carried two more paragraphs here: that kubectl needs no
+    // context switch, and that grading reads the state you leave behind.
+    // Both were true of every task in the bank, so both repeated 22 times
+    // in a column the candidate is meant to read closely. They are exam
+    // METHODOLOGY, and they moved to where methodology is explained once —
+    // strings.intro, the "How this exam works" card.
 
     // ---- the footer nav ----
     // Short labels, because the row draws an arrow beside each. The full
@@ -391,7 +388,7 @@ export const strings = {
       },
       {
         title: "Exam desktop",
-        body: "A real Linux desktop. The terminal is already open; ssh to the instance the question names and solve with kubectl. Firefox is there too, limited to the allowlisted documentation sites.",
+        body: "A real Linux desktop. The terminal is already open; ssh to the instance the question names and solve with kubectl — it already points at this cluster on every instance, so there is no context to switch. Firefox is there too, limited to the allowlisted documentation sites.",
       },
       {
         title: "The countdown",
@@ -402,6 +399,12 @@ export const strings = {
         body: "Done early? Submit here. The desktop locks immediately and your score appears once grading completes.",
       },
     ] as { title: string; body: string }[],
+    // Deliberately NOT a fifth legend entry: the legend's numbers key to
+    // the four regions drawn on the schematic above it, and grading is not
+    // a region of the screen. It sits below, unnumbered.
+    methodTitle: "How grading works",
+    method:
+      "Every task is scored by checks that read the state you leave behind — what is on the cluster and on the exam instances when grading runs, never the commands you typed. How you got there does not matter: a kubectl one-liner, an applied manifest and an edit in place all score the same. Each task's share of the exam is on the chip row beside its title.",
   },
 
   info: {

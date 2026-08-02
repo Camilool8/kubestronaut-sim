@@ -393,8 +393,8 @@ describe("QuestionPanel task header", () => {
   });
 });
 
-// The machine block and the graded-on card, the two things the task pane
-// says that the bank's markdown does not.
+// The machine block — now the only thing the task pane says that the
+// bank's markdown does not.
 describe("QuestionPanel work-from block", () => {
   test("the ssh command is on screen and copyable in one click", async () => {
     const pasted: string[] = [];
@@ -410,14 +410,19 @@ describe("QuestionPanel work-from block", () => {
     expect(pasted).toEqual(["ssh instance-2"]);
   });
 
-  test("what the grader will look at is stated, without claiming to know the checks", async () => {
+  test("the pane does not repeat exam methodology on every task", async () => {
     renderNav("q02");
-    const card = await screen.findByRole("region", { name: /graded on/i });
-    // The bank does not publish its check descriptions before grading, so
-    // this says what is true of every task rather than inventing a
-    // per-task summary — including that typing is not what is read.
-    expect(card).toHaveTextContent(/not the commands you typed/i);
-    expect(card).toHaveTextContent(/7 pts/);
+    await screen.findByRole("button", { name: /copy ssh instance-2/i });
+
+    // Both of these used to sit under every task: a "Graded on" card
+    // saying grading reads the state you leave behind, and a note that
+    // kubectl needs no context switch. Both are true of all 22 tasks in
+    // the bank, so both were the same paragraph repeated 22 times in the
+    // column the candidate is meant to read closely. They belong to the
+    // exam, not the task, and they live in ExamIntro now.
+    expect(screen.queryByRole("region", { name: /graded on/i })).toBeNull();
+    expect(screen.queryByText(/not the commands you typed/i)).toBeNull();
+    expect(screen.queryByText(/no context to switch/i)).toBeNull();
   });
 });
 

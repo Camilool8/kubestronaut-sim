@@ -27,6 +27,19 @@ describe("ExamIntro", () => {
     expect(strings.intro.legend).toHaveLength(4);
   });
 
+  test("grading is explained here, and outside the numbered legend", () => {
+    render(<ExamIntro onClose={() => {}} />);
+
+    // This moved out of the task pane, where it was the same paragraph
+    // under all 22 tasks. It must NOT become a fifth legend entry: those
+    // numbers key to the four regions drawn on the schematic, and grading
+    // is not a region of the screen.
+    const note = screen.getByRole("region", { name: strings.intro.methodTitle });
+    expect(note).toHaveTextContent(/state you leave behind/i);
+    expect(note).toHaveTextContent(/never the commands you typed/i);
+    expect(within(screen.getByRole("list")).queryByText(strings.intro.methodTitle)).toBeNull();
+  });
+
   test("the schematic has an accessible name, not just boxes", () => {
     render(<ExamIntro onClose={() => {}} />);
     expect(screen.getByRole("img", { name: /question panel/i })).toBeInTheDocument();

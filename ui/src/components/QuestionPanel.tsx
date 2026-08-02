@@ -228,10 +228,6 @@ export function QuestionPanel({
             >
               {(data) => <Markdown>{data.markdown}</Markdown>}
             </Async>
-            {/* Only under text that actually arrived: a "graded on" card
-                floating under a load failure would be the only thing on
-                screen, and it says nothing about how to recover. */}
-            {selected && question.status === "success" && <GradedOn question={selected} />}
             {/* Inside the scrolling pane, below the question: a candidate
                 reaching for a hint has just finished reading, and the
                 tray should be where their eye already is. Keyed by id so
@@ -404,30 +400,7 @@ function WorkFrom({ instance }: { instance: string }) {
         </button>
       </div>
       <code className="work-from-command">{command}</code>
-      <p className="work-from-note">{strings.questionPanel.workFromNote}</p>
     </div>
-  );
-}
-
-// What the grader will actually look at, at the foot of the task text.
-//
-// The bank does not publish its check descriptions before grading (they
-// arrive with the results, in `CheckResult.desc`), so this says the two
-// things that are true of every task in the product rather than inventing
-// a per-task summary: grading reads the state you leave behind, and this
-// is what the task is worth. See the report — a `gradedOn` field on the
-// bank spec would let this print the real thing.
-function GradedOn({ question }: { question: ExamQuestionInfo }) {
-  const points = strings.questionPanel.points(question.totalPoints);
-  return (
-    <section className="graded-on" aria-label={strings.questionPanel.gradedOn}>
-      <span className="graded-on-label">{strings.questionPanel.gradedOn}</span>
-      <p className="graded-on-body">
-        {question.instance
-          ? strings.questionPanel.gradedOnBody(points, question.instance)
-          : strings.questionPanel.gradedOnBodyNoHost(points)}
-      </p>
-    </section>
   );
 }
 
