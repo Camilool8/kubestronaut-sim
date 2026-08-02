@@ -41,6 +41,13 @@ jobs:
         run: bash tests/bank-hints.sh
       - name: MCQ banks
         run: bash tests/bank-mcq.sh
+      # The landing page is generated from ui/src/styles/tokens.css and
+      # the real bank files. Nothing imports it, so a drifted token or a
+      # question count that no longer matches the banks would sit there
+      # indefinitely — a public page quietly advertising numbers the
+      # product stopped producing.
+      - name: Landing page in sync
+        run: bash site/build.sh --check
 
   go:
     name: Go (${{ matrix.module }})

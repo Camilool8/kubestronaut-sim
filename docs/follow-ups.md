@@ -50,9 +50,13 @@ Recorded because each has been proposed at least once and is settled.
   record, overwritten per attempt. [../PRODUCT.md](../PRODUCT.md) states
   this as a durable constraint, so proposals that depend on a history
   store are out of scope rather than pending.
-- **`spec.domainWeights` is read by no Go code.** Only
-  `tests/bank-weights.sh` consumes it. That is sufficient: it is a build
-  gate, not a runtime value.
+- ~~**`spec.domainWeights` is read by no Go code.**~~ **No longer true.**
+  It is now a runtime value in three places: `exam.Load` derives
+  `Exam.Domains` from it, `exam.DrawMCQ` stratifies a pooled draw by it,
+  and both graders weight the final score by it. Kept here struck through
+  rather than deleted because this entry was cited as settled, and a
+  reader who remembers it needs to know it was overturned rather than
+  simply not find it.
 - **`spec.environment.kubernetesVersion` and `nodes` are
   informational.** They are surfaced to the UI and drive nothing.
 
