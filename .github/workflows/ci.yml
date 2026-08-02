@@ -41,11 +41,19 @@ jobs:
         run: bash tests/bank-hints.sh
       - name: MCQ banks
         run: bash tests/bank-mcq.sh
-      # The landing page is generated from ui/src/styles/tokens.css and
-      # the real bank files. Nothing imports it, so a drifted token or a
-      # question count that no longer matches the banks would sit there
-      # indefinitely — a public page quietly advertising numbers the
-      # product stopped producing.
+      # Two different guarantees, both because nothing imports this page.
+      # site/tokens.css and site/favicon.svg are MIRRORS, regenerated into
+      # a temp tree and diffed, so a token change that never reached the
+      # landing page fails here. The figures in index.html are written by
+      # hand and cannot be regenerated, so they are ASSERTED against the
+      # banks instead — the advertised question total, its per-bank
+      # breakdown, and each pooled bank's drawn-of-pool pair.
+      #
+      # That second half is new, and it is new because this comment used
+      # to claim it and be wrong: a whole wave shipped while the page
+      # still told the world the product kept no attempt history, and
+      # nothing failed. A public page advertising numbers the product
+      # stopped producing is exactly what this step is for.
       - name: Landing page in sync
         run: bash site/build.sh --check
 

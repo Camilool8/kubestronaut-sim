@@ -83,12 +83,89 @@ generate() {
   fi
 }
 
+# The figures on the page, against the banks they describe.
+#
+# The three mirrored files above are held equal by regenerating them, but
+# index.html is written by hand and nothing regenerates it -- so the
+# numbers it advertises could only ever drift. They have: a whole wave
+# shipped attempt history while the page still told the world there was
+# none, and this gate's own CI comment claimed to be catching exactly
+# that. It was not. A claim the build does not hold up does not ship
+# (PRODUCT.md, principle 3), and that applies to the build's claims too.
+#
+# Which banks count is the product's own answer, not a list kept here:
+# `hidden: true` is what keeps the smoke fixtures out of the exam
+# selector, and it keeps them out of the advertised total for the same
+# reason. exam.yaml is machine-shaped and simple, so it is parsed with
+# regexes -- the same bargain tests/bank-weights.sh takes, and the reason
+# neither needs yq on the host running it.
+check_figures() {
+  python3 - "$repo" <<'PY'
+import pathlib, re, sys
+
+repo = pathlib.Path(sys.argv[1])
+page = (repo / "site" / "index.html").read_text()
+
+banks = []
+for path in sorted((repo / "banks").glob("*/exam.yaml")):
+    text = path.read_text()
+    head, _, spec = text.partition("\nspec:")
+    if re.search(r"^\s*hidden:\s*true\s*$", head, re.M):
+        continue
+    pool = len(re.findall(r"^\s*-\s+id:\s*\S+", spec, re.M))
+    drawn = re.search(r"^\s*examLength:\s*(\d+)\s*$", spec, re.M)
+    banks.append((path.parent.name, pool, int(drawn.group(1)) if drawn else None))
+
+fail = []
+if not banks:
+    fail.append("found no listable bank under banks/ -- the parse is wrong")
+
+# The headline total, matched through its label rather than its position:
+# there are three .stat-figure elements and only one of them counts
+# questions.
+total = sum(pool for _, pool, _ in banks)
+block = next(
+    (b for b in re.findall(r'<li class="stat">.*?</li>', page, re.S)
+     if "Questions written" in b),
+    None,
+)
+if block is None:
+    fail.append('no <li class="stat"> block labelled "Questions written"')
+else:
+    shown = re.search(r'<p class="stat-figure">\s*(\d+)', block)
+    if shown is None:
+        fail.append("the questions stat has no figure")
+    elif int(shown.group(1)) != total:
+        fail.append(f"questions stat says {shown.group(1)}, banks hold {total}")
+    # The note breaks the total down per bank, so every part must be real
+    # too -- a right total made of two wrong halves is still a wrong page.
+    for name, pool, _ in banks:
+        if str(pool) not in block:
+            fail.append(f"{name} has {pool} questions, absent from the stat note")
+
+# A pooled bank advertises "drawn / pool". Page-wide containment rather
+# than a pinned selector: this pair is drawn on the exam card and the
+# prose beneath it, and pinning one spelling of the markup would make
+# every re-layout a false failure.
+for name, pool, drawn in banks:
+    if drawn is None:
+        continue
+    if not re.search(rf"\b{drawn}\b.*?\b{pool}\b", page, re.S):
+        fail.append(f"{name} draws {drawn} of {pool}, not advertised as such")
+
+for line in fail:
+    print(f"build.sh: {line}", file=sys.stderr)
+sys.exit(1 if fail else 0)
+PY
+}
+
 if [ "${1:-}" = "--check" ]; then
   tmp=$(mktemp -d)
   trap 'rm -rf "$tmp"' EXIT
   generate "$tmp"
 
   status=0
+  check_figures || status=1
   for f in tokens.css favicon.svg; do
     if ! diff -q "$tmp/$f" "$here/$f" >/dev/null 2>&1; then
       echo "build.sh: site/$f is out of date - run site/build.sh" >&2

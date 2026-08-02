@@ -52,8 +52,9 @@
             A killer.sh-style rehearsal for the Kubernetes certifications, as a
             Docker Compose stack on your own machine: a countdown that cannot be
             paused, a real Linux desktop with terminals, a real two-node
-            Kubernetes cluster to act on, and a per-check score with full
-            solutions afterwards. Deliberately harder than the real exams.
+            Kubernetes cluster to act on, a per-check score with full solutions
+            afterwards, and a record of every graded attempt to measure the
+            next one against. Deliberately harder than the real exams.
           </p>
 
           <p class="hero-caveat">
@@ -114,7 +115,8 @@
             <h3 class="stat-label">Questions written</h3>
             <p class="stat-note">
               22 hands-on for CKAD and 97 multiple-choice for KCNA, counted from
-              <code>banks/*/exam.yaml</code>. All original: no third-party exam
+              <code>spec.questions</code> in their <code>exam.yaml</code>. All
+              original: no third-party exam
               dump may be committed here, because CC BY-SA 4.0 requires the
               banks to be ours to license.
             </p>
@@ -148,7 +150,8 @@
           <p class="section-lede">
             One bank is loaded at a time, because a bank is a Kubernetes cluster
             seeded for its questions — so choosing another one is a destructive
-            2–4 minute rebuild, and the app asks first.
+            2–4 minute rebuild, and the app asks first. Your attempt record sits
+            on its own volume and survives it.
           </p>
         </div>
 
@@ -325,7 +328,8 @@
           <p class="section-lede">
             Offered gentlest first. What each one permits is defined once in the
             server and enforced there, so a card cannot advertise something the
-            server then refuses.
+            server then refuses. Being recorded is one of those permissions: a
+            Mastery or Exam run is kept as an attempt, a Training run is not.
           </p>
         </div>
 
@@ -402,11 +406,15 @@
               </dd>
             </div>
             <div class="limit">
-              <dt>No attempt history.</dt>
+              <dt>No benchmark, and no percentile.</dt>
               <dd>
-                One session at a time, and one attempt record overwritten per
-                attempt. There is no cross-attempt analytics and nothing here
-                promises progress over time.
+                Graded attempts are kept — best score per exam, weakest
+                domains, progress along the five-certification path — but that
+                record is one candidate's, on one machine. It can describe your
+                progress and never a population's, so nothing here compares you
+                to other candidates. Training runs are not recorded at all:
+                practice with the solutions open would make every best score
+                meaningless.
               </dd>
             </div>
             <div class="limit">
@@ -467,11 +475,14 @@
             </p>
           </li>
           <li class="fact">
-            <h3>Weights the build checks</h3>
+            <h3>Weights the build checks, and the grader applies</h3>
             <p>
               A domain's share of an exam's points is its published curriculum
               weight, and <code>tests/bank-weights.sh</code> fails the build if
-              any domain drifts more than two percentage points from it.
+              any domain drifts more than two percentage points from it. That
+              gate certifies the authored bank, not a draw taken from one, so
+              the grader weights the score directly as well, and reports the raw
+              points beside it.
             </p>
           </li>
         </ul>
