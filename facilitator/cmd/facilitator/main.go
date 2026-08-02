@@ -19,6 +19,7 @@ import (
 	"kubestronaut-sim/facilitator/internal/desktop"
 	"kubestronaut-sim/facilitator/internal/evaluate"
 	"kubestronaut-sim/facilitator/internal/exam"
+	"kubestronaut-sim/facilitator/internal/history"
 	"kubestronaut-sim/facilitator/internal/session"
 	"kubestronaut-sim/facilitator/internal/web"
 )
@@ -96,6 +97,13 @@ func runGrade() error {
 func runServer() error {
 	cfg := loadExamConfig()
 	sessionFile := envOr("SESSION_FILE", "/session/session.json")
+	// A SEPARATE volume from the session file's, deliberately. The two
+	// have opposite durability requirements: /session is scratch that
+	// `./sim purge` is meant to take with it, while /state holds every
+	// attempt the candidate has ever graded and must survive purge, a
+	// reset, and a bank switch. Mounting them together would mean one
+	// `docker compose down -v` erased both.
+	historyFile := envOr("HISTORY_FILE", "/state/history.json")
 	listen := envOr("LISTEN", ":8080")
 	desktopAddr := envOr("DESKTOP_ADDR", "desktop:6080")
 	durOverride := os.Getenv("SESSION_DURATION_OVERRIDE")
@@ -155,8 +163,23 @@ func runServer() error {
 		return fmt.Errorf("session: %w", err)
 	}
 
+	// history.Open never fails on a bad file: an unreadable or
+	// wrong-version document is moved aside and reported, never removed.
+	// The error it can still return is for something else going wrong
+	// entirely, and even that must not stop an exam being sat — a
+	// candidate who cannot see their past attempts is inconvenienced; one
+	// who cannot start an attempt at all is stuck.
+	hist, err := history.Open(historyFile)
+	if err != nil {
+		log.Printf("attempt history unavailable (%v); attempts will not be recorded", err)
+		hist = nil
+	}
+
 	runner := evaluate.NewSSHRunner(cfg.sshKey)
 	g := newGrader(ex, mgr, runner, checkTimeout)
+	g.record = func(token string, snap session.Snapshot, res *evaluate.Results) error {
+		return recordAttempt(hist, ex, token, snap, res)
+	}
 	gradeFn := g.Grade
 	onExpire.Store(&gradeFn)
 
@@ -188,7 +211,14 @@ func runServer() error {
 		envOr("READY_MARKER", "/shared/ready"),
 	)
 
-	handler := api.New(ex, cfg.bankDir, mgr, g.Grade, desktopHandler, controlProxy, web.FS(), boot, g.PracticeGrade)
+	// WithBanks is a plain server-side GET of the conductor's bank list,
+	// not the reverse proxy above: GET /api/catalog is answered HERE
+	// because the conductor cannot see /state, and because looking at the
+	// exam list must never be able to trigger a rebuild.
+	handler := api.New(ex, cfg.bankDir, mgr, g.Grade, desktopHandler, controlProxy, web.FS(), boot, g.PracticeGrade,
+		api.WithHistory(hist),
+		api.WithBanks(newBanksFetcher(conductorURL)),
+	)
 
 	srv := &http.Server{
 		Addr:              listen,

@@ -196,6 +196,15 @@ the stretch a candidate most needs narrated; `POST /api/session/start`
 returns 409 until the environment is genuinely ready, which is the
 protection a dependency would otherwise have provided.
 
+The facilitator's own boot has one more step than it used to: it opens
+`/state/history.json` before it starts listening. That read cannot fail
+the boot, and it cannot destroy anything either — a document it cannot
+parse is renamed to `history.json.corrupt.N` and a fresh record started,
+never removed or truncated. If even the rename fails, the store goes
+read-only for the rest of the process rather than writing over bytes
+nobody has rescued: the exam still runs, it just records nothing, and
+says so on stderr (facilitator/internal/history/history.go:1-25).
+
 Failures surface as state, not as silence. bootstrap.sh traps `ERR` and
 writes the failing command into the phase file
 (images/k8s-env/bootstrap.sh:10), and start.sh keeps the container alive
@@ -245,12 +254,13 @@ through.
 
 | Step | Owner | What happens |
 |---|---|---|
-| Choose an exam, then a mode | facilitator | Serves the embedded UI, the bank catalog through the control proxy, and `GET /api/exam`. |
+| Choose an exam, then a mode | facilitator | Serves the embedded UI and `GET /api/exam`. `GET /api/catalog` joins the conductor's bank list to attempt history — answered by the facilitator itself, not proxied, because the conductor cannot see `/state` and because looking at the exam list must never be able to trigger a rebuild. |
 | Start | facilitator | `POST /api/session/start` moves idle -> running and arms an expiry timer. 409 until k8s-env is ready (hands-on banks only — see below). |
 | Work | desktop, instances | The candidate drives Xfce over noVNC, reaches `instance-1` and `instance-2` over ssh, and reads docs through docs-proxy. |
 | End | facilitator | Submit, or the timer expires. running -> ended, and the desktop locks. |
 | Grade | facilitator | `internal/evaluate` runs every check over ssh, asynchronously. |
 | Score | facilitator | `GET /api/results` serves the graded breakdown; solutions unlock. |
+| Record | facilitator | Once — and only once — `SetResults` has succeeded, a self-contained record is appended to `/state/history.json`. Training attempts are not recorded (`session.Recorded`), and a write failure here is logged, never propagated: a full disk must not be able to turn a graded exam into a grading failure. |
 
 A multiple-choice bank (`spec.examType: mcq` — KCNA today) runs the
 same lifecycle on the same session machinery with the cluster cut out
@@ -292,7 +302,7 @@ fidelity with the real exam, not for security.
 
 ## State and volumes
 
-Eight named volumes and four bind mounts.
+Nine named volumes and four bind mounts.
 
 | Volume | Holds | Written by |
 |---|---|---|
@@ -301,7 +311,15 @@ Eight named volumes and four bind mounts.
 | `course-1`, `course-2` | `/opt/course` on each instance | `instance-1`, `instance-2` |
 | `containers-1`, `containers-2` | podman container storage on each instance | `instance-1`, `instance-2` |
 | `session` | `/session/session.json`, the session state machine's persistence | `facilitator` |
+| `state` | `/state/history.json`, every graded attempt ever | `facilitator` |
 | `registry` | Images pushed by the image-building questions | `registry` |
+
+`session` and `state` are two volumes on one service on purpose. Their
+durability requirements are opposite: `/session` is one attempt's
+scratch, which a reset clears and a bank switch invalidates, while
+`/state` is the attempt record and outlives all of it. Sharing a volume
+would mean one `docker compose down -v` erased both — which is what
+`./sim purge` used to do.
 
 Bind mounts: `./banks` read-only into k8s-env, both instances,
 docs-proxy, conductor and facilitator; `./tests` read-only into both
@@ -326,7 +344,16 @@ already active. Switch banks from the exam selector.
 |---|---|---|
 | `./sim down` | all kept | Resumes: same cluster, same candidate work, no re-seed |
 | `./sim reset` | all kept | Rebuilds the cluster and wipes the instances through the conductor; cached images survive |
-| `./sim purge` | all eight destroyed | Cold boot: node image load, image pulls, full seed |
+| `./sim purge` | eight destroyed, `state` kept | Cold boot: node image load, image pulls, full seed. Attempt history survives |
+| `./sim purge --all` | all nine destroyed | The same cold boot, and every graded attempt is gone |
+
+Purge keeps `state` because purge is what people run when the
+environment is wedged — precisely the moment losing every attempt they
+have ever graded would hurt most. It removes the project's volumes one
+at a time, skipping the one compose labelled `state`
+(`com.docker.compose.volume`, so nothing has to guess at the
+`<project>_<name>` convention). `--all` is the deliberate escape hatch
+and says what it is about to destroy before it does (sim:65-105).
 
 A resumed cluster is never re-seeded. bootstrap.sh runs the bank's
 `setup.sh` scripts only for a cluster it created in this run, because

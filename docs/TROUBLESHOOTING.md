@@ -17,7 +17,7 @@ docker compose logs k8s-env     # the cluster host, where boots fail
 
 ## Before a boot
 
-Every row here is something `./sim doctor` reports (`sim:66-99`). Run it
+Every row here is something `./sim doctor` reports (`sim:106-140`). Run it
 before a first boot on a new machine; it is cheaper than finding these
 twenty minutes in.
 
@@ -57,7 +57,7 @@ twenty minutes in.
 | Symptom | Cause | Fix |
 |---|---|---|
 | A check scores 0 and the resource looks correct | Questions are graded on behaviour wherever behaviour is the point, not on the shape of the YAML | Reproduce the grader's test in-cluster before assuming a bug |
-| `Reset failed: <error>` | The conductor's reset job did not settle cleanly (`sim:101-115`) | Read the error, then `docker compose logs conductor`. `./sim purge && ./sim up` is the fallback |
+| `Reset failed: <error>` | The conductor's reset job did not settle cleanly (`sim:141-155`) | Read the error, then `docker compose logs conductor`. `./sim purge && ./sim up` is the fallback |
 | You want a score without ending the attempt | `./sim grade` runs the session-free scoreboard | It records no result and touches no session state. See [cli.md](cli.md) |
 
 Test the way the graders do — from inside the cluster, not from the
@@ -69,8 +69,9 @@ kubectl -n <ns> run tmp --rm -it --restart=Never --image=nginx:alpine -- curl -m
 
 ## Nothing here matches
 
-`./sim purge && ./sim up` rebuilds from nothing. It destroys all eight
-volumes, including any in-progress attempt — see
+`./sim purge && ./sim up` rebuilds from nothing. It destroys eight
+volumes, including any in-progress attempt, and keeps the ninth — your
+attempt history survives a purge. See
 [cli.md](cli.md#choosing-between-down-reset-and-purge) for what each
 command removes.
 

@@ -877,7 +877,16 @@ export interface DomainSummary {
   earned: number;
   total: number;
   percent: number;
-  /** How many counted attempts contributed. One weak run is not a trend. */
+  /**
+   * How many graded attempts contributed — every attempt, including the
+   * drills `counted` excludes.
+   *
+   * "Which domains am I weak in" is a different question from "does this
+   * count as a sitting": a domain drill is the most informative thing a
+   * candidate can do about a weak domain, and a rollup that ignored
+   * drills would keep reporting the weakness they spent all week fixing.
+   * Show this number beside the percentage — one weak run is not a trend.
+   */
   attempts: number;
 }
 

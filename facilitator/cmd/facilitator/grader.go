@@ -34,6 +34,13 @@ type grader struct {
 	mgr     *session.Manager
 	runner  evaluate.Runner
 	timeout time.Duration
+
+	// record appends the graded attempt to the durable history, and is
+	// nil in every run that keeps none (the tests, a dev run with no
+	// state volume). It is invoked only after SetResults has succeeded,
+	// so history records exactly what the candidate was shown, and its
+	// error is logged rather than returned — see the call site.
+	record func(token string, snap session.Snapshot, res *evaluate.Results) error
 }
 
 // newGrader returns a grader for ex, scoring against bank ex.Name (the
@@ -74,7 +81,7 @@ func (g *grader) Grade() {
 			}
 		}()
 
-		res, err := g.evaluateResults()
+		res, snap, err := g.evaluateResults()
 		if err != nil {
 			// A refusal, not a crash: the attempt cannot be scored
 			// honestly, and the candidate is told so on /api/results
@@ -94,6 +101,18 @@ func (g *grader) Grade() {
 		if err := g.mgr.SetResults(token, data); err != nil {
 			if setErr := g.mgr.SetGradeError(token, err.Error()); setErr != nil {
 				log.Printf("facilitator: record grade-results failure: %v", setErr)
+			}
+			return
+		}
+
+		// After SetResults, never before: history records what the
+		// candidate was actually shown. And logged, never propagated — a
+		// full state volume must not be able to turn a graded exam into a
+		// grading failure, which is what returning this error here would
+		// do.
+		if g.record != nil {
+			if err := g.record(token, snap, res); err != nil {
+				log.Printf("facilitator: attempt not recorded in history: %v", err)
 			}
 		}
 	}()
@@ -119,7 +138,7 @@ func (g *grader) PracticeGrade() (json.RawMessage, error) {
 	}
 	defer g.inFlight.Store(false)
 
-	res, err := g.evaluateResults()
+	res, _, err := g.evaluateResults()
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +149,12 @@ func (g *grader) PracticeGrade() (json.RawMessage, error) {
 	return raw, nil
 }
 
-// evaluateResults produces the graded Results for the active exam by
+// evaluateResults returns the graded Results for the active exam, and
+// the session snapshot it graded — the attempt's own description, which
+// the history recorder needs and which must be the one this run read
+// rather than whatever the session says a moment later.
+//
+// It produces those Results by
 // whichever engine it belongs to: hands-on runs the ssh checks against
 // the cluster; mcq scores the session's stored answers, pure and
 // instant. Both return the same schema, which is why everything
@@ -145,10 +169,10 @@ func (g *grader) PracticeGrade() (json.RawMessage, error) {
 // they did not sit. An error message is the better outcome, and making
 // Subset intolerant instead would break the every-question-in-bank-order
 // path every unpooled attempt takes.
-func (g *grader) evaluateResults() (*evaluate.Results, error) {
+func (g *grader) evaluateResults() (*evaluate.Results, session.Snapshot, error) {
 	snap := g.mgr.Snapshot()
 	if err := exam.CheckPool(g.ex, snap.PoolDigest); err != nil {
-		return nil, err
+		return nil, snap, err
 	}
 
 	var res *evaluate.Results
@@ -165,5 +189,5 @@ func (g *grader) evaluateResults() (*evaluate.Results, error) {
 		ElapsedSeconds:  snap.ElapsedSeconds,
 		TimeSpent:       g.mgr.TimeSpent(),
 	})
-	return res, nil
+	return res, snap, nil
 }

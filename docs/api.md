@@ -8,12 +8,12 @@ Two services. The facilitator serves the whole browser-facing surface
 on port 8080 — the API, the embedded UI, the desktop proxy, and a
 reverse proxy to the conductor. The conductor listens on `:9000` on an
 `internal: true` network with no host port, and is reachable only
-through that proxy (`facilitator/cmd/facilitator/main.go:170-174`).
+through that proxy (`facilitator/cmd/facilitator/main.go:203-207`).
 Host ports are in [cli.md](cli.md).
 
 Errors are `{"error":"..."}` as `application/json`
-(`facilitator/internal/api/api.go:641`,
-`conductor/internal/api/api.go:115`). Both `/healthz` endpoints answer
+(`facilitator/internal/api/api.go:962-963`,
+`conductor/internal/api/api.go:128-130`). Both `/healthz` endpoints answer
 in plain text, and the desktop's locked responses in HTML or plain
 text.
 
@@ -36,31 +36,31 @@ would invalidate every persisted session and every stored attempt.
 
 The three columns after the clock are not restated per handler: they are
 `session.HelpAllowed`, `session.GradesPerTask` and `session.Recorded`
-(`facilitator/internal/session/session.go:59-93`), which both the gates
+(`facilitator/internal/session/session.go:75-87`), which both the gates
 below and the `modes` array in `GET /api/exam` read.
 
 ## Session-state gates
 
 Session state is `idle`, `running` or `ended`. An idle session reports
 its mode as the empty string
-(`facilitator/internal/session/session.go:616-617`), which is what
+(`facilitator/internal/session/session.go:959-963`), which is what
 closes every mode-based gate below while idle.
 
 | Gate | Open when | Closed response | Source |
 |---|---|---|---|
-| Solutions | `state == "ended"`, **or** `HelpAllowed(mode)` | 403 | `facilitator/internal/api/api.go:364` |
-| Hints | `HelpAllowed(mode)` and `state != "idle"` | 403 | `facilitator/internal/api/api.go:422` |
-| Mid-attempt score | `GradesPerTask(mode)` and `state == "running"` | 403 on mode, 409 on state | `facilitator/internal/api/api.go:544` |
-| Answer writes (mcq) | `state == "running"` | 409 | `facilitator/internal/api/api.go:376-379` |
-| Focus reports | `state == "running"` | 409 | `facilitator/internal/api/api.go:781-783` |
-| Desktop | `state == "running"`, any mode | 403 | `facilitator/cmd/facilitator/main.go:163-165` |
-| Re-seed | `mode == "training"` and `state == "running"` | 403 | `conductor/internal/control/reseed.go:83-89` |
-| Bank switch | `state != "running"` | 409 | `conductor/internal/control/control.go:198-204` |
+| Solutions | `state == "ended"`, **or** `HelpAllowed(mode)` | 403 | `facilitator/internal/api/api.go:465-469` |
+| Hints | `HelpAllowed(mode)` and `state != "idle"` | 403 | `facilitator/internal/api/api.go:523-531` |
+| Mid-attempt score | `GradesPerTask(mode)` and `state == "running"` | 403 on mode, 409 on state | `facilitator/internal/api/api.go:645-652` |
+| Answer writes (mcq) | `state == "running"` | 409 | `facilitator/internal/api/api.go:578-581` |
+| Focus reports | `state == "running"` | 409 | `facilitator/internal/api/api.go:823-826` |
+| Desktop | `state == "running"`, any mode | 403 | `facilitator/cmd/facilitator/main.go:196-198` |
+| Re-seed | `mode == "training"` and `state == "running"` | 403 | `conductor/internal/control/reseed.go:92-98` |
+| Bank switch | `state != "running"` | 409 | `conductor/internal/control/control.go:253-259` |
 | Reset | Always open | — | `conductor/internal/control/control.go:26-30` |
 
 **The solutions gate is not "403 until the session has ended".** The
 condition is `snap.State != "ended" && snap.Mode != session.ModeTraining`,
-so a *running* Training attempt gets 200 — `tests/smoke.sh:560-561`
+so a *running* Training attempt gets 200 — `tests/smoke.sh:793-794`
 asserts exactly that. A running `exam` or `speed` attempt gets 403, and so
 does an idle session, whose mode is empty whatever the last attempt
 was.
@@ -73,7 +73,7 @@ None of these gates is a security control. Every `solution.md` and
 ### GET /healthz
 
 Backs the compose healthcheck. Always 200, `text/plain`, body `ok`
-(`facilitator/internal/api/api.go:109-113`).
+(`facilitator/internal/api/api.go:143-147`).
 
 ### GET /api/boot
 
@@ -97,7 +97,7 @@ fields.
 `state` is `booting`, `ready` or `failed`, and `error` is populated
 only for `failed`. Always 200: "still building" is a normal answer to
 this question, not an error
-(`facilitator/internal/api/api.go:546-548`). The `/shared/ready` marker
+(`facilitator/internal/api/api.go:864-869`). The `/shared/ready` marker
 is the authority on readiness and overrides whatever the phase file
 claims, in both directions
 (`facilitator/internal/bootstate/bootstate.go:95-129`).
@@ -140,10 +140,11 @@ a described mode and an enforced one cannot disagree: `helpAllowed` is
 with, including under `SESSION_DURATION_OVERRIDE`.
 
 `recorded` says whether a finished attempt in that mode belongs in the
-durable attempt history. Nothing reads it yet — there is no history —
-and it is declared now so the promise on the card and the rule in the
-recorder are one statement rather than two. `recommended` marks the one
-card the mode screen accents; exactly one mode carries it.
+durable attempt history, and the recorder honours exactly this predicate
+— see [Attempt history](#attempt-history). The promise on the card and
+the rule in the recorder are one statement rather than two.
+`recommended` marks the one card the mode screen accents; exactly one
+mode carries it.
 
 Mode **labels** are deliberately not in this response. A mode's name is
 user-facing copy and lives in `ui/src/strings.ts`; its permissions are
@@ -159,7 +160,7 @@ needs no prior call to `GET /api/control/banks`.
 normalizes an absent `spec.examType` to `hands-on`). For hands-on,
 `totalPoints` sums the question's checks, excluding any whose
 `# points:` header was malformed
-(`facilitator/internal/api/api.go:272-280`). For mcq questions the
+(`facilitator/internal/api/api.go:301-312`). For mcq questions the
 entry is `{"id", "domain", "weight", "totalPoints", "hintCount",
 "multi"}` — no `instance`, `totalPoints` equals `weight`, and `multi`
 marks a select-all-that-apply question. `questions` marshals as `[]`,
@@ -192,7 +193,7 @@ worth 44% and hold three questions.
 
 **`domains` is always counted over the full pool**, while `questions`
 above is narrowed to the drawn subset once an attempt starts
-(`facilitator/internal/api/api.go:288-305`). Counting `questions` by
+(`facilitator/internal/api/api.go:313-320`). Counting `questions` by
 domain instead would show a candidate the questions they already drew as
 if they were the whole curriculum.
 
@@ -207,7 +208,7 @@ question needs no restart.
 
 For an mcq exam the response instead carries the choices — never the
 answer key, which reaches the client only inside graded results
-(`facilitator/internal/api/api.go:318-322`):
+(`facilitator/internal/api/api.go:412-415`):
 
 ```json
 {"id": "q01", "domain": "Kubernetes Fundamentals", "markdown": "...", "options": ["...", "...", "...", "..."], "multi": false}
@@ -216,8 +217,8 @@ answer key, which reaches the client only inside graded results
 | Code | When |
 |---|---|
 | 200 | `id` names a question in the loaded exam. |
-| 404 | It does not (`facilitator/internal/api/api.go:229`). |
-| 500 | `question.md` could not be read (`facilitator/internal/api/api.go:235`). |
+| 404 | It does not (`facilitator/internal/api/api.go:429-432`). |
+| 500 | `question.md` could not be read (`facilitator/internal/api/api.go:434-438`). |
 
 ### GET /api/questions/{id}/solution
 
@@ -231,9 +232,9 @@ The question's `solution.md`. Gated — see
 | Code | When |
 |---|---|
 | 200 | Gate open, `id` known. |
-| 403 | Gate closed (`facilitator/internal/api/api.go:265-267`). |
-| 404 | Gate open, unknown `id` (`facilitator/internal/api/api.go:271-273`). |
-| 500 | `solution.md` could not be read (`facilitator/internal/api/api.go:277-280`). |
+| 403 | Gate closed (`facilitator/internal/api/api.go:466-469`). |
+| 404 | Gate open, unknown `id` (`facilitator/internal/api/api.go:471-475`). |
+| 500 | `solution.md` could not be read (`facilitator/internal/api/api.go:477-481`). |
 
 The gate is checked before the id is looked up, so the endpoint cannot
 be used to discover which question ids exist.
@@ -255,9 +256,9 @@ over the `hintCount` reported by `GET /api/exam`.
 | Code | When |
 |---|---|
 | 200 | Training attempt, known `id`, `n` in range. |
-| 403 | Not a training attempt, or no attempt at all (`facilitator/internal/api/api.go:323-328`). |
-| 404 | Unknown `id`, or `n` outside 1..`hintCount` (`facilitator/internal/api/api.go:334-351`). |
-| 500 | `hints.md` could not be read (`facilitator/internal/api/api.go:346`). |
+| 403 | Not a training attempt, or no attempt at all (`facilitator/internal/api/api.go:523-531`). |
+| 404 | Unknown `id`, or `n` outside 1..`hintCount` (`facilitator/internal/api/api.go:534-555`). |
+| 500 | `hints.md` could not be read (`facilitator/internal/api/api.go:546-550`). |
 
 The route is registered unconditionally, so the difference between 404
 and 403 never leaks the attempt's mode.
@@ -280,10 +281,10 @@ echoes the stored (sorted) selection.
 
 | Code | When |
 |---|---|
-| 200 | Stored (`facilitator/internal/api/api.go:423`). |
-| 400 | Not an mcq exam, the body is not `{"selected":[...]}`, an index is out of range or duplicated, or more than one index on a single-answer question (`facilitator/internal/api/api.go:372-409`). |
-| 404 | Unknown `id` (`facilitator/internal/api/api.go:383-386`). |
-| 409 | No attempt is running (`facilitator/internal/api/api.go:376-379`, re-checked at the write: `:414-418`). |
+| 200 | Stored (`facilitator/internal/api/api.go:625`). |
+| 400 | Not an mcq exam, the body is not `{"selected":[...]}`, an index is out of range or duplicated, or more than one index on a single-answer question (`facilitator/internal/api/api.go:574-612`). |
+| 404 | Unknown `id` (`facilitator/internal/api/api.go:584-588`). |
+| 409 | No attempt is running (`facilitator/internal/api/api.go:578-581`, re-checked at the write: `:616-620`). |
 
 The 409 is checked before the id lookup, matching the solution
 handler's ordering. Selections are persisted in the session file
@@ -296,7 +297,7 @@ Every stored selection, keyed by question id — the bulk read the UI
 hydrates from on mount and the score review reads after grading.
 Always 200; `{"answers":{}}` when idle or on a hands-on bank. Never
 includes the answer key
-(`facilitator/internal/api/api.go:435-437`).
+(`facilitator/internal/api/api.go:632-638`).
 
 ```json
 {"answers": {"q01": [1], "q07": [0, 2]}}
@@ -320,17 +321,17 @@ one field appears here and nowhere else.
 
 | Code | When |
 |---|---|
-| 200 | Started (`facilitator/internal/api/api.go:750-753`). |
-| 400 | `mode` is not `exam`, `training` or `speed` (`:710`); the body is non-empty and not JSON (`:703`); `seed` is not six lowercase hex digits, or `domains` names a domain the bank does not have (`:727`). |
-| 409 | The environment is still starting (`facilitator/internal/api/api.go:693-696`), or a session is already running or ended (`:747`). |
-| 500 | The bank's pool cannot satisfy its own `domainWeights` at this draw size (`:730`) — an authoring bug `tests/bank-mcq.sh` should have caught first. |
+| 200 | Started (`facilitator/internal/api/api.go:792-795`). |
+| 400 | `mode` is not `exam`, `training` or `speed` (`:751-753`); the body is non-empty and not JSON (`:744-746`); `seed` is not six lowercase hex digits, or `domains` names a domain the bank does not have (`:768-770`). |
+| 409 | The environment is still starting (`facilitator/internal/api/api.go:734-737`), or a session is already running or ended (`:788-790`). |
+| 500 | The bank's pool cannot satisfy its own `domainWeights` at this draw size (`:771-773`) — an authoring bug `tests/bank-mcq.sh` should have caught first. |
 
 The readiness gate is what stops a 120-minute clock starting against a
 half-built environment: the facilitator answers long before the cluster
 is usable. **An mcq exam skips the readiness gate** — it needs no
 cluster, no instances and no desktop, so the attempt starts the moment
 the facilitator can answer, while the environment finishes booting in
-the background (`facilitator/internal/api/api.go:690-696`).
+the background (`facilitator/internal/api/api.go:733-737`).
 
 ### The draw
 
@@ -398,10 +399,10 @@ countdown, so a client cannot inflate how long it spent anywhere.
 
 | Code | When |
 |---|---|
-| 200 | Recorded (`facilitator/internal/api/api.go:810`). |
-| 400 | The body is not JSON, or `question` is empty (`facilitator/internal/api/api.go:790`). |
-| 404 | `question` is outside this attempt's drawn subset (`facilitator/internal/api/api.go:797`). |
-| 409 | No attempt is running (`facilitator/internal/api/api.go:781-783`). |
+| 200 | Recorded (`facilitator/internal/api/api.go:852`). |
+| 400 | The body is not JSON, or `question` is empty (`facilitator/internal/api/api.go:831-833`). |
+| 404 | `question` is outside this attempt's drawn subset (`facilitator/internal/api/api.go:838-840`). |
+| 409 | No attempt is running (`facilitator/internal/api/api.go:823-826`). |
 
 Time accrues to the **previously** reported question when a new report
 arrives, so the first report of an attempt credits nothing and the
@@ -432,7 +433,7 @@ question's `timeSpentSeconds`.
 ### GET /api/session
 
 Current session state. Always 200
-(`facilitator/internal/api/api.go:829-831`).
+(`facilitator/internal/api/api.go:871-872`).
 
 ```json
 {
@@ -473,11 +474,11 @@ background; the desktop locks immediately. No body.
 
 | Code | When |
 |---|---|
-| 202 | Ended; the body is the session shape (`facilitator/internal/api/api.go:562`). |
-| 409 | The session is idle, or already ended with results recorded (`facilitator/internal/api/api.go:555-558`). |
+| 202 | Ended; the body is the session shape (`facilitator/internal/api/api.go:883`). |
+| 409 | The session is idle, or already ended with results recorded (`facilitator/internal/api/api.go:876-879`). |
 
 Re-POSTing on an ended-but-ungraded session succeeds as a no-op and
-retries the grade (`facilitator/internal/session/session.go:331-335`).
+retries the grade (`facilitator/internal/session/session.go:588-592`).
 
 ### POST /api/session/grade
 
@@ -487,13 +488,13 @@ same shape as `GET /api/results`.
 
 | Code | When |
 |---|---|
-| 200 | Graded (`facilitator/internal/api/api.go:621-624`). |
-| 403 | Not a training attempt (`facilitator/internal/api/api.go:604-606`). |
-| 409 | No attempt is running (`facilitator/internal/api/api.go:608-610`), a grading run is already in flight, or the bank changed under the attempt (`facilitator/internal/api/api.go:618-620`, and see [Grading refuses on a changed bank](#grading-refuses-on-a-changed-bank)). |
-| 501 | This build has no practice grader wired (`facilitator/internal/api/api.go:612-614`). |
+| 200 | Graded (`facilitator/internal/api/api.go:659-666`). |
+| 403 | Not a training attempt (`facilitator/internal/api/api.go:645-648`). |
+| 409 | No attempt is running (`facilitator/internal/api/api.go:649-652`), a grading run is already in flight, or the bank changed under the attempt (`facilitator/internal/api/api.go:659-662`, and see [Grading refuses on a changed bank](#grading-refuses-on-a-changed-bank)). |
+| 501 | This build has no practice grader wired (`facilitator/internal/api/api.go:653-656`). |
 
 The score is never persisted, so `GET /api/results` still answers 409
-afterwards — `tests/smoke.sh:573` pins that.
+afterwards — `tests/smoke.sh:800-806` pins that.
 
 ### GET /api/results
 
@@ -501,10 +502,10 @@ The graded scoreboard for the ended attempt.
 
 | Code | When |
 |---|---|
-| 200 | Grading finished (`facilitator/internal/api/api.go:874-878`). |
-| 202 | Ended, still grading: `{"state":"grading"}` (`facilitator/internal/api/api.go:866`). |
-| 409 | The session has not ended (`facilitator/internal/api/api.go:860`). |
-| 500 | Grading failed, or refused; the body carries the reason (`facilitator/internal/api/api.go:870`). |
+| 200 | Grading finished (`facilitator/internal/api/api.go:916-921`). |
+| 202 | Ended, still grading: `{"state":"grading"}` (`facilitator/internal/api/api.go:906-909`). |
+| 409 | The session has not ended (`facilitator/internal/api/api.go:901-903`). |
+| 500 | Grading failed, or refused; the body carries the reason (`facilitator/internal/api/api.go:911-913`). |
 
 ```json
 {
@@ -662,12 +663,246 @@ never `partial`.
 
 Returns the session to idle from any state, clearing results, and locks
 the desktop. The conductor calls it as the first phase of every reset
-and switch (`conductor/internal/control/control.go:339-356`).
+and switch (`conductor/internal/control/control.go:396-413`).
 
 | Code | When |
 |---|---|
-| 204 | Reset, from any state (`facilitator/internal/api/api.go:571`). |
-| 500 | The reset could not be persisted (`facilitator/internal/api/api.go:567`). |
+| 204 | Reset, from any state (`facilitator/internal/api/api.go:886-891`). |
+| 500 | The reset could not be persisted (`facilitator/internal/api/api.go:887-889`). |
+
+### Attempt history
+
+Every endpoint below reads or writes `/state/history.json` on the
+`state` volume — the first thing this product keeps across attempts, and
+the one thing `./sim purge` does not destroy. The five `/api/history`
+routes answer 503 when a build has no history store wired: the route
+exists, it has nowhere to write, and that is a different fact from a 404
+(`facilitator/internal/api/history.go:57-65`). `GET /api/catalog` is the
+exception — it still has a bank list to serve, so it degrades to empty
+progress rather than refusing.
+
+A record is written by the grader, once `SetResults` has succeeded, and
+only for a **recorded** mode (`session.Recorded` — everything but
+Training). A failure to record is logged and never propagated: a full
+state volume must not turn a graded exam into a grading failure
+(`facilitator/cmd/facilitator/grader.go:108-118`).
+
+Records are **self-contained**. The certification, exam title, passing
+score and domain rollup are copied in, never referenced. The dashboard
+shows five certifications while only one bank is loadable at a time, so
+a record that pointed at its bank would render as blanks for the other
+four.
+
+#### counted
+
+`counted` is whether an attempt may set an exam's `bestPercent` or claim
+its `passed`. Three clauses, each one a way the dashboard could
+otherwise lie (`facilitator/internal/history/record.go:75-106`):
+
+| Clause | Rejects |
+|---|---|
+| `session.Recorded(mode)` | Training — practice with the solutions open is not a sitting. Never fires on the recording path; it is there for an *imported* record, which came from a document this build did not write. |
+| No `domainFilter` | A domain drill. 100% on a ten-task drill of one domain is a good session and is not a CKAD pass. |
+| `questionCount >= the bank's declared length` | A short draw. Fewer questions is an easier exam, and a bank's passing score was set against its declared length. |
+
+The flag is written once and then trusted — except that an *imported*
+record came from a document this build did not write and can claim
+anything. So every rollup re-checks the two clauses a record can verify
+about **itself**, its mode and its domain filter, and ignores a `counted`
+that contradicts them. The length clause cannot be re-checked at read
+time and is not attempted: a record's bank may not be the loaded one,
+which is the whole point of a self-contained record
+(`facilitator/internal/history/record.go:107-123`).
+
+An uncounted attempt is still **kept and shown** — it just does not move
+the certification path. It also still contributes to `weakDomains`,
+deliberately: a drill is the most informative thing a candidate can do
+about a weak domain, and a rollup that ignored drills would keep
+reporting the weakness they spent all week fixing.
+
+`trackCount` is 5 and is a constant of the CNCF **program** (KCNA, KCSA,
+CKA, CKAD, CKS), not a count of the banks this build ships. Deriving it
+from the catalog would shrink the denominator to 1 whenever the
+conductor is unreachable, and tell a candidate who passed CKAD that they
+were a Kubestronaut. `passedCount` counts distinct *track*
+certifications with a counted, passing attempt, so it can never exceed
+`trackCount`.
+
+### GET /api/history
+
+Every attempt, most recent first, plus the cross-exam summary. Always
+200 (or 503).
+
+```json
+{
+  "attempts": [
+    {
+      "id": "9f2c41ab30de5517",
+      "bank": "ckad-mock-01",
+      "certification": "CKAD",
+      "examTitle": "CKAD Mock Exam 01",
+      "examType": "hands-on",
+      "mode": "exam",
+      "startedAt": "2026-07-30T09:20:11Z",
+      "gradedAt": "2026-07-30T11:20:44Z",
+      "seed": "a1b2c3",
+      "durationSeconds": 7200,
+      "elapsedSeconds": 7233,
+      "questionCount": 22,
+      "earned": 41,
+      "total": 60,
+      "percent": 68,
+      "pointsPercent": 68,
+      "passingScore": 66,
+      "passed": true,
+      "counted": true,
+      "domains": [
+        {"domain": "Application Design and Build", "earned": 12, "total": 20, "weightPct": 20, "questionCount": 5}
+      ]
+    }
+  ],
+  "summary": {
+    "attempts": 1,
+    "passedCount": 1,
+    "trackCount": 5,
+    "weakDomains": [
+      {"domain": "Services and Networking", "earned": 3, "total": 12, "percent": 25, "attempts": 1}
+    ]
+  }
+}
+```
+
+`attempts` marshals as `[]`, never `null`. `id` is the session's own
+attempt token, which is what makes recording idempotent — a recovery
+re-grade of the same attempt updates nothing rather than showing the
+candidate the same sitting twice. `weakDomains` is weakest first, ranked
+on **raw** points earned over points available: this ranks a candidate's
+own domains against each other, and how much the exam board weights a
+domain is not part of that question.
+
+### DELETE /api/history
+
+Erases every attempt. 204, or 503. There is no undo and no server-side
+backup, so the confirmation belongs to the caller — this handler does
+exactly what it is asked.
+
+### GET /api/history/summary
+
+Just the `summary` object above, for a caller that wants the four
+numbers without every record. Always 200 (or 503).
+
+### GET /api/history/export
+
+The record as a downloadable document, with
+`Content-Disposition: attachment; filename="kubestronaut-sim-history-YYYY-MM-DD.json"`
+so a plain `<a href>` saves a named file rather than rendering JSON in a
+tab. The date is in the name because the one thing a candidate needs
+from a folder of these is which is newest.
+
+```json
+{"version": 1, "attempts": [ ... ]}
+```
+
+The export is exactly what import accepts.
+
+### POST /api/history/import
+
+Merges an exported document into the record. The body is the document
+itself; no `Content-Type` is required or checked.
+
+```json
+{"imported": 3, "skipped": 12}
+```
+
+| Code | When |
+|---|---|
+| 200 | Merged. |
+| 400 | Not JSON, larger than 4 MiB, or a `version` newer than this build understands. |
+| 500 | The merged record could not be written. |
+| 503 | No history store. |
+
+**Merge, never replace.** Records already present by `id` are skipped,
+so importing a backup can never silently lose the attempts made since it
+was taken, and importing the same file twice is a no-op. A record with
+no `id` is skipped too: it cannot be de-duplicated, so importing it
+would grow a duplicate on every import of the same file.
+
+A `version` of 0 (a document written before the field existed, or a
+saved `GET /api/history` body) is accepted — it is readable, so it is
+read. A version from the future is refused rather than silently having
+its unknown fields dropped, because the candidate is keeping that file
+as their backup.
+
+The same asymmetry governs loading. An unparseable or wrong-version
+`history.json` is **renamed aside** — `history.json.corrupt.N`, picking
+a suffix that is free so an earlier rescue is never clobbered — and a
+fresh record started. It is never removed and never truncated. This is
+deliberately *not* the session file's discard-on-version-mismatch
+policy: discarding a session costs one attempt, discarding history costs
+everything the candidate has ever done
+(`facilitator/internal/history/history.go:1-25`).
+
+### GET /api/catalog
+
+The conductor's bank list joined to attempt history — the exam
+selector's one call. Always 200 (503 is impossible here: a build with no
+history still has a bank list).
+
+```json
+{
+  "active": "ckad-mock-01",
+  "exams": [
+    {
+      "id": "ckad-mock-01",
+      "title": "CKAD Mock Exam 01",
+      "certification": "CKAD",
+      "examType": "hands-on",
+      "durationSeconds": 7200,
+      "passingScore": 66,
+      "questionCount": 22,
+      "poolCount": 22,
+      "available": true,
+      "progress": {
+        "attempts": 3,
+        "counted": 2,
+        "bestPercent": 71,
+        "passed": true,
+        "lastAttemptAt": "2026-07-30T11:20:44Z",
+        "weakDomains": [
+          {"domain": "Services and Networking", "earned": 6, "total": 24, "percent": 25, "attempts": 2}
+        ]
+      }
+    }
+  ],
+  "summary": { "attempts": 3, "passedCount": 1, "trackCount": 5, "weakDomains": [] }
+}
+```
+
+Each row is a `GET /api/control/banks` entry with one field added, so
+every field documented under [that endpoint](#get-apicontrolbanks)
+applies unchanged. `progress` is keyed on the **bank id** — a catalog
+row is a bank — while `summary.passedCount` is keyed on certification.
+
+`bestPercent` is absent when no counted attempt exists, rather than 0:
+0% is a real score and "never sat" is not. `lastAttemptAt` is the most
+recent attempt of *any* kind, counted or not — a drill is still
+something the candidate did.
+
+**This endpoint is served by the facilitator, not proxied to the
+conductor**, for two reasons: the conductor has no access to the state
+volume, and *looking* at the exam list must never be able to trigger a
+rebuild. The facilitator makes a server-side `GET` of
+`/api/control/banks` with a 5-second timeout and reaches for that one
+route only (`facilitator/cmd/facilitator/history.go:120-149`).
+
+**A conductor that does not answer degrades, it does not 500.** The exam
+list is the app's front door: a candidate who cannot reach it cannot
+reach anything. The degraded response is the bank this facilitator has
+loaded, marked available, plus one row per other bank the history
+remembers, marked unavailable with a `note` saying why — this build
+genuinely does not know whether those can still be switched to, and the
+service that owns that answer is the one that did not reply
+(`facilitator/internal/api/history.go:263-304`).
 
 ### /desktop and /desktop/
 
@@ -693,7 +928,7 @@ Any path that is not `/api/*` or `/desktop*` serves the embedded UI:
 the real file when one exists, otherwise `index.html`, so client-side
 routes such as `/score` load. An unmatched path under `/api/` is a JSON
 404, never `index.html`
-(`facilitator/internal/api/api.go:609-613`).
+(`facilitator/internal/api/api.go:930-933`).
 
 ## Conductor
 
@@ -728,25 +963,25 @@ The single in-flight control job and the last finished one. Always 200.
 `op` is `reset` or `switch`; `bank` is a switch's target and `""` for a
 reset. A phase `state` is `pending`, `running`, `done` or `failed`, and
 `detail` is a one-line tail of that phase's command output capped at
-160 bytes (`conductor/internal/control/control.go:418-420`). A failed
+160 bytes (`conductor/internal/control/control.go:479-482`). A failed
 job carries `error` and keeps the failed phase in `lastJob`. `job` and
 `lastJob` are omitted while unset.
 
 `./sim reset` polls `busy` and then reads `lastJob.error`
-(`sim:107-114`).
+(`sim:147-153`).
 
 ### POST /api/control/reset
 
 Rebuilds the environment on the current bank. No body. Asynchronous:
 poll `/api/control/status`. Five phases — end-session, wipe-instances,
 recreate-cluster, restart-instances, verify
-(`conductor/internal/control/control.go:109-117`).
+(`conductor/internal/control/control.go:170-208`).
 
 | Code | When |
 |---|---|
-| 202 | Job accepted; the body is `{"job": {...}}` (`conductor/internal/api/api.go:48`). |
-| 409 | Another control operation is in flight (`conductor/internal/api/api.go:92-93`). |
-| 500 | The job could not be started (`conductor/internal/api/api.go:105`). |
+| 202 | Job accepted; the body is `{"job": {...}}` (`conductor/internal/api/api.go:59`). |
+| 409 | Another control operation is in flight (`conductor/internal/api/api.go:103-104`). |
+| 500 | The job could not be started (`conductor/internal/api/api.go:117-118`). |
 
 Reset has no session guard by design: it *is* the "abandon this
 attempt" operation (`conductor/internal/control/control.go:26-30`).
@@ -755,7 +990,7 @@ attempt" operation (`conductor/internal/control/control.go:26-30`).
 
 Re-runs one question's `setup.sh`, restoring that question's starting
 state and discarding the work done on it. Synchronous, and bounded at
-240s (`conductor/internal/control/reseed.go:41`) — it returns an
+240s (`conductor/internal/control/reseed.go:41-45`) — it returns an
 outcome rather than a job id, and never takes the single-job lock a
 rebuild needs.
 
@@ -765,10 +1000,10 @@ rebuild needs.
 
 | Code | When |
 |---|---|
-| 200 | `{"ok": true}` (`conductor/internal/api/api.go:63`). |
-| 400 | The body has no non-empty `question` (`conductor/internal/api/api.go:56`), or the id fails the `^q[0-9]{1,3}$` shape check or the active bank's question allowlist (`conductor/internal/control/reseed.go:60-75`). |
-| 403 | The attempt is not a running Training attempt (`conductor/internal/control/reseed.go:83-89`). |
-| 409 | A control job is in flight (`conductor/internal/control/reseed.go:79-81`), or another re-seed is running (`conductor/internal/control/reseed.go:91-93`). |
+| 200 | `{"ok": true}` (`conductor/internal/api/api.go:74`). |
+| 400 | The body has no non-empty `question` (`conductor/internal/api/api.go:66-68`), or the id fails the `^q[0-9]{1,3}$` shape check or the active bank's question allowlist (`conductor/internal/control/reseed.go:63-79`). |
+| 403 | The attempt is not a running Training attempt (`conductor/internal/control/reseed.go:92-98`). |
+| 409 | A control job is in flight (`conductor/internal/control/reseed.go:86-90`), or another re-seed is running (`conductor/internal/control/reseed.go:100-102`). |
 | 500 | `setup.sh` exited non-zero, or the session state could not be read. |
 
 The id passes two gates because it ends up inside a shell command: the
@@ -802,7 +1037,7 @@ side.
 instant a switch rewrites it. `available` is false for a coming-soon
 entry, a non-`hands-on` exam type, or a bank whose topology does not
 fit the fixed `instance-1`/`instance-2` layout; `note` gives the reason
-(`conductor/internal/catalog/catalog.go:213-248`).
+(`conductor/internal/catalog/catalog.go:213-247`).
 
 ### POST /api/control/switch
 
@@ -810,7 +1045,7 @@ Activates a different bank: writes `/shared/bank`, rebuilds the
 cluster, restarts the instances and then the bank-reading services,
 facilitator last. Asynchronous. Seven phases — reset's five plus
 `write-bank` before the rebuild and `restart-facilitator` after the
-instances (`conductor/internal/control/control.go:172-186`).
+instances (`conductor/internal/control/control.go:275-330`).
 
 ```json
 {"bank": "ckad-mock-01"}
@@ -818,7 +1053,7 @@ instances (`conductor/internal/control/control.go:172-186`).
 
 | Code | When |
 |---|---|
-| 202 | Job accepted; the body is `{"job": {...}}` (`conductor/internal/api/api.go:83`). |
-| 400 | The body has no non-empty `bank` (`conductor/internal/api/api.go:75`), or the bank is unknown, malformed or not runnable (`conductor/internal/api/api.go:97`). |
-| 409 | An attempt is running — end it first (`conductor/internal/api/api.go:95`) — or another control operation is in flight (`conductor/internal/api/api.go:93`). |
-| 500 | Switching is not configured on this conductor (`conductor/internal/control/control.go:192-194`). |
+| 202 | Job accepted; the body is `{"job": {...}}` (`conductor/internal/api/api.go:94`). |
+| 400 | The body has no non-empty `bank` (`conductor/internal/api/api.go:85-87`), or the bank is unknown, malformed or not runnable (`conductor/internal/api/api.go:107-108`). |
+| 409 | An attempt is running — end it first (`conductor/internal/api/api.go:105-106`) — or another control operation is in flight (`conductor/internal/api/api.go:103-104`). |
+| 500 | Switching is not configured on this conductor (`conductor/internal/control/control.go:247-249`). |

@@ -19,6 +19,7 @@ import (
 
 	"kubestronaut-sim/facilitator/internal/bootstate"
 	"kubestronaut-sim/facilitator/internal/exam"
+	"kubestronaut-sim/facilitator/internal/history"
 	"kubestronaut-sim/facilitator/internal/session"
 )
 
@@ -46,6 +47,12 @@ type server struct {
 	ui       fs.FS
 	boot     *bootstate.Reader
 	practice PracticeGrader
+	// hist is the durable attempt record and banks the server-side route
+	// to the conductor's bank list. Both are optional (see the Option
+	// constructors in history.go) and both are nil in every test and dev
+	// run that predates them.
+	hist  *history.Store
+	banks BanksFetcher
 }
 
 // New builds the facilitator's complete HTTP handler: the /api/*
@@ -63,8 +70,16 @@ type server struct {
 // is happening rather than simply refusing to answer. A nil Reader means
 // "assume ready", which keeps direct/dev runs and tests that do not care
 // about boot from having to construct one.
-func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desktop, control http.Handler, ui fs.FS, boot *bootstate.Reader, practice PracticeGrader) http.Handler {
+//
+// Everything that arrived after the original nine parameters comes in as
+// an Option instead (WithHistory, WithBanks). A tenth and eleventh
+// positional argument would have made every existing call site — five
+// test files and main — restate two nils they do not care about.
+func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desktop, control http.Handler, ui fs.FS, boot *bootstate.Reader, practice PracticeGrader, opts ...Option) http.Handler {
 	s := &server{ex: ex, bankDir: bankDir, mgr: mgr, grade: grade, desktop: desktop, ui: ui, boot: boot, practice: practice}
+	for _, opt := range opts {
+		opt(s)
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealthz)
@@ -85,6 +100,23 @@ func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desk
 	mux.HandleFunc("POST /api/session/grade", s.handlePracticeGrade)
 	mux.HandleFunc("GET /api/results", s.handleResults)
 	mux.HandleFunc("DELETE /api/session", s.handleSessionDelete)
+
+	// Attempt history and the exam catalog. Registered unconditionally,
+	// like the hints route on a hintless bank: ServeMux patterns are
+	// static, and a build with no history store answers 503 (the route
+	// exists, it has nowhere to write) rather than 404 (this build has
+	// never heard of it) — a difference the client can act on.
+	//
+	// /api/catalog is served HERE and not proxied to the conductor, for
+	// two reasons: the conductor cannot see the state volume history
+	// lives in, and looking at the exam list must never be able to
+	// trigger a rebuild.
+	mux.HandleFunc("GET /api/history", s.handleHistoryGet)
+	mux.HandleFunc("DELETE /api/history", s.handleHistoryDelete)
+	mux.HandleFunc("GET /api/history/summary", s.handleHistorySummary)
+	mux.HandleFunc("GET /api/history/export", s.handleHistoryExport)
+	mux.HandleFunc("POST /api/history/import", s.handleHistoryImport)
+	mux.HandleFunc("GET /api/catalog", s.handleCatalog)
 
 	// Control-plane passthrough to the conductor (reset, bank switch,
 	// catalog). The subtree pattern is more specific than "/", so the

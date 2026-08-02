@@ -11,7 +11,7 @@ after `./sim up` can also be done from the browser at
 |---|---|
 | Docker Engine, or Docker Desktop | Every service is a container. |
 | Docker Compose v2 (`docker compose`) | The stack is a single compose project. |
-| `python3` | `./sim up` and `./sim reset` read JSON fields with it (`sim:11`, `sim:110`). |
+| `python3` | `./sim up` and `./sim reset` read JSON fields with it (`sim:11`, `sim:150`). |
 | `curl` | `./sim up`, `./sim reset` and `./sim doctor` poll the facilitator with it. |
 | `bash` | `./sim` uses `$SECONDS` and `set -o pipefail`. |
 | ~9GB RAM available to Docker | An XFCE desktop plus a two-node cluster. |
@@ -21,7 +21,7 @@ after `./sim up` can also be done from the browser at
 with it (`sim:11`), so without `python3` every poll yields an empty
 state, no phase line is printed, and the command spins until
 `SIM_BOOT_BUDGET` expires rather than finishing. `./sim doctor` reports
-it as `MISSING (./sim up needs it)` (`sim:74`).
+it as `MISSING (./sim up needs it)` (`sim:114`).
 
 ## Commands
 
@@ -29,13 +29,14 @@ it as `MISSING (./sim up needs it)` (`sim:74`).
 |---|---|---|
 | `./sim up [bank]` | `docker compose up -d --build`, then polls `/api/boot` every 3s, printing each phase as it changes, until the environment reports ready. | Nothing. |
 | `./sim down` | `docker compose down --remove-orphans`. Volumes survive, so the next `up` resumes the same exam — including a running attempt. | Nothing. |
-| `./sim purge` | `down` plus `-v`. | All eight volumes: the kind cluster and its image cache, `/shared` (ready marker, active bank, ssh keys), the session file, both `/opt/course` directories, both podman stores, and the exam registry. |
+| `./sim purge` | `down`, then removes the project's volumes one at a time, skipping the one holding attempt history. | Eight volumes: the kind cluster and its image cache, `/shared` (ready marker, active bank, ssh keys), the session file, both `/opt/course` directories, both podman stores, and the exam registry. **Not** `state`. |
+| `./sim purge --all` | `down -v`. Prints what it is about to destroy first. | All nine volumes, `state` included — every attempt ever graded on this machine, with no backup and no undo. |
 | `./sim doctor` | Preflight report: Docker, Compose, `python3`, RAM, disk, cgroups, warm volumes, UI. | Nothing. |
 | `./sim reset` | POSTs `/api/control/reset` and polls `/api/control/status` until the job settles. Same code path as the UI's New attempt button. | The session, both instances' work directories and podman stores, the exam registry's contents, and the kind cluster. |
 | `./sim ssh [instance]` | `docker compose exec <instance> su - candidate`, defaulting to `instance-1`. | Nothing. |
 | `./sim status` | `docker compose ps`. | Nothing. |
 | `./sim grade` | Runs the facilitator's session-free scoreboard against the environment as it stands (`docker compose exec facilitator /entrypoint.sh grade`). Hands-on banks only: an mcq bank's answers live in the session, not the cluster, so `grade` refuses with a pointer to the UI/API rather than printing a misleading 0%. | Nothing. It records no result and touches no session state. |
-| `./sim help` | Prints the usage string. It is also the default with no argument (`sim:4`), and what an unknown subcommand prints before exiting 1 (`sim:120`). | Nothing. |
+| `./sim help` | Prints the usage string. It is also the default with no argument (`sim:4`), and what an unknown subcommand prints before exiting 1 (`sim:160`). | Nothing. |
 
 ### up
 
@@ -52,7 +53,7 @@ that shows the rest.
 Requires a running stack: it drives the conductor through the
 facilitator at `http://localhost:8080`. The five phases are
 end-session, wipe-instances, recreate-cluster, restart-instances and
-verify (`conductor/internal/control/control.go:109-117`).
+verify (`conductor/internal/control/control.go:170-208`).
 
 Cached images are kept, so a reset needs no network. Bank switching is
 not available here — use the exam selector, or see [BANK](#bank).
@@ -64,10 +65,16 @@ not available here — use the exam selector, or see [BANK](#bank).
 | Stop for now, resume the same attempt later | `./sim down` |
 | Start a fresh attempt on the same bank | `./sim reset` |
 | Reclaim disk, or make the `BANK` argument take effect again | `./sim purge` |
+| Erase every attempt this machine has ever graded | `./sim purge --all` |
+
+Purge keeps the `state` volume. Purge is what people run when the
+environment is wedged, which is exactly the moment losing five
+certifications of progress would hurt most; `--all` is the deliberate
+way to lose it, and export from the app first if it matters.
 
 ### doctor
 
-The disk check runs `alpine:3.21` (`sim:81`), so the first `doctor` on
+The disk check runs `alpine:3.21` (`sim:121`), so the first `doctor` on
 a clean machine pulls that image.
 
 ## Configuration variables

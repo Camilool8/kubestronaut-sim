@@ -68,7 +68,8 @@ The parts that constrain product decisions:
   restricted to a documentation allowlist, ssh to named instances as
   `candidate`, and a `/opt/course/<n>` working directory per question.
 - `down` then `up` resumes state, including an in-progress session.
-  `purge` deletes the volumes for a clean slate.
+  `purge` deletes the volumes for a clean slate — except the attempt
+  record, which only `purge --all` removes.
 - Bank authoring is `banks/<bank>/exam.yaml` plus per-question
   `validate.d/` checks and `solution.md`.
 
@@ -110,8 +111,22 @@ The parts that constrain product decisions:
   exist for UX fidelity, not security. Training mode deliberately
   relaxes the solutions gate, because reading the solution is the point
   of that mode.
-- One session at a time, and one attempt record overwritten per attempt.
-  There is no attempt history and no cross-attempt analytics.
+- One session at a time. The live session file still holds exactly one
+  attempt and is overwritten by the next, but a *graded* attempt is now
+  also appended to a durable record (`/state/history.json`, its own
+  volume) that survives a reset, a bank switch and `./sim purge`. That
+  record backs cross-attempt analytics: best score and pass state per
+  exam, weakest domains, and progress along the five-certification path.
+  - Only **recorded** modes produce a record — Training is practice with
+    the solutions open, and counting it would make every "best score"
+    meaningless.
+  - A recorded attempt is not automatically a *counted* one. A
+    domain-filtered or short draw is kept and shown, but cannot set a
+    best score or claim a pass: 100% on a ten-task drill of one domain
+    is a good session and is not a CKAD pass.
+  - It stays on the candidate's machine. Nothing is uploaded, and the
+    only ways it leaves are the export the candidate asks for and the
+    delete they confirm.
 - The timer is server-side. In Exam mode it cannot be paused.
 - The exam requires a desktop-sized screen. Small screens get an
   explanation instead of a broken layout.
@@ -164,10 +179,11 @@ The parts that constrain product decisions:
   ([docs/follow-ups.md](docs/follow-ups.md)).
 
 **Absences future work must not paper over:** there are no users,
-testimonials, adoption numbers, pass-rate claims, or hosted service.
-There is no attempt history, so nothing may promise progress over time.
-A bank that cannot produce a meaningful score must not be offered at
-all.
+testimonials, adoption numbers, pass-rate claims, or hosted service. The
+attempt history is one candidate's own record on one machine, so it may
+describe *their* progress and never a population's — no benchmark, no
+percentile, no "candidates who score X". A bank that cannot produce a
+meaningful score must not be offered at all.
 
 ## Product Principles
 
