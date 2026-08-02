@@ -11,7 +11,14 @@ MiscMenubarDefault=FALSE
 MiscShowUnsafePasteDialog=FALSE
 MiscBordersDefault=TRUE
 ScrollingUnlimited=TRUE
-ColorForeground=#d9dee5
-ColorBackground=#0b1220
-ColorCursor=#7aa2f7
-ColorPalette=#121a2b;#e5605a;#57d183;#e0a850;#7aa2f7;#c792ea;#5fd0e0;#d9dee5;#57626f;#e5605a;#57d183;#e0a850;#a4c0fb;#c792ea;#8fe0ec;#f7f9fc
+# This palette is the --machine-* family from ui/src/styles/tokens.css,
+# not the app's dark theme. The terminal IS the machine, and the machine
+# does not follow the app's theme — see the note at the top of that file.
+# Green and amber here are --machine-green and --machine-amber, which are
+# also the dark --syntax-string and --syntax-number, so a YAML block in
+# the question panel and the same YAML in the candidate's vim are the
+# same two colours. Keep the xfconf twin next door in step.
+ColorForeground=#c3ccd9
+ColorBackground=#0b0f16
+ColorCursor=#6f9cf8
+ColorPalette=#161d2b;#e5605a;#63d68a;#e8c46a;#6f9cf8;#c792ea;#5fd0e0;#c3ccd9;#6b7a90;#e5605a;#8fd6a8;#e8c46a;#9dbcff;#c792ea;#8fe0ec;#f0f4fa

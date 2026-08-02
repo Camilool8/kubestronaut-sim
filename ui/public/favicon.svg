@@ -1,5 +1,12 @@
+<!-- The product mark: an orbit and two bodies on an ink field. Geometry
+     and colours are the design brief's, scaled from its 30px drawing to
+     a 32px viewBox. The three colours are --ink, --machine-blue,
+     --machine-green-soft and --machine-amber from ui/src/styles/tokens.css
+     — this file is one of that file's three mirrors, so it moves when
+     they do. No Kubernetes or CNCF mark is used or implied. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="7" fill="#0b1220"/>
-  <path d="M9 11l5 5-5 5" stroke="#7aa2f7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <line x1="17" y1="21" x2="24" y2="21" stroke="#7aa2f7" stroke-width="2.5" stroke-linecap="round"/>
+  <rect width="32" height="32" rx="9" fill="#101728"/>
+  <circle cx="16" cy="16" r="8.3" fill="none" stroke="#6f9cf8" stroke-width="1.6"/>
+  <circle cx="25.1" cy="6.9" r="3.2" fill="#8fd6a8"/>
+  <circle cx="6.9" cy="25.1" r="2.1" fill="#e8c46a"/>
 </svg>

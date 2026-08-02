@@ -12,6 +12,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       dbus-x11 tigervnc-standalone-server novnc websockify x11-xserver-utils \
       firefox-esr openssh-client curl ca-certificates procps \
       fonts-jetbrains-mono \
+    # The app moved to IBM Plex Mono; the terminal deliberately did not.
+    # Debian 12 ships no fonts-ibm-plex package, so matching it here would
+    # mean fetching a font over the network at image build time. Not worth
+    # it: the terminal is the machine, and the machine is not the app --
+    # see the --machine-* note in ui/src/styles/tokens.css. A different
+    # mono inside the VNC canvas reinforces that split rather than
+    # breaking it. The COLOURS are the part that must match, and do.
     && rm -rf /var/lib/apt/lists/*
 RUN useradd -m -s /bin/bash candidate \
     && printf '\n[ -f /shared/exam/motd ] && cat /shared/exam/motd\n' >> /home/candidate/.bashrc

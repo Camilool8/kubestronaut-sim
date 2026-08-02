@@ -10,7 +10,12 @@
   <property name="misc-borders-default" type="bool" value="true"/>
   <property name="scrolling-unlimited" type="bool" value="true"/>
   <property name="font-name" type="string" value="JetBrains Mono 11"/>
-  <property name="color-foreground" type="string" value="#d9dee5"/>
-  <property name="color-background" type="string" value="#0b1220"/>
-  <property name="color-cursor" type="string" value="#7aa2f7"/>
+  <!-- The --machine-* family from ui/src/styles/tokens.css. color-palette
+       was previously absent here while terminalrc declared one, so a
+       1.1+ terminal fell back to the built-in palette and the two files
+       were only nominally in sync. -->
+  <property name="color-foreground" type="string" value="#c3ccd9"/>
+  <property name="color-background" type="string" value="#0b0f16"/>
+  <property name="color-cursor" type="string" value="#6f9cf8"/>
+  <property name="color-palette" type="string" value="#161d2b;#e5605a;#63d68a;#e8c46a;#6f9cf8;#c792ea;#5fd0e0;#c3ccd9;#6b7a90;#e5605a;#8fd6a8;#e8c46a;#9dbcff;#c792ea;#8fe0ec;#f0f4fa"/>
 </channel>

@@ -212,7 +212,7 @@ export const strings = {
     licenses: [
       "Simulator code: Apache License 2.0",
       "Question banks: Creative Commons BY-SA 4.0",
-      "Typefaces: IBM Plex Sans and JetBrains Mono (SIL Open Font License)",
+      "Typefaces: IBM Plex Sans and IBM Plex Mono in the app, JetBrains Mono on the exam desktop (SIL Open Font License)",
       "Desktop client: built on noVNC (MPL 2.0)",
     ],
     howItWorks: "How this exam works",

@@ -130,28 +130,28 @@ const lockedHTML = `<!doctype html>
 <style>
   :root {
     color-scheme: light;
-    --bg: #f7f9fc;
+    --bg: #f6f8fc;
     --surface: #ffffff;
-    --border: #a0acbe;
-    --text: #1a212b;
-    --text-muted: #57626f;
+    --border: #d7dde8;
+    --text: #101728;
+    --text-muted: #5a6478;
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --bg: #0b1220;
-    --surface: #121a2b;
-    --border: #465476;
-    --text: #d9dee5;
-    --text-muted: #97a0af;
+    --bg: #101728;
+    --surface: #182033;
+    --border: #3a4560;
+    --text: #dfe5ee;
+    --text-muted: #94a0b2;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]):not([data-theme="dark"]) {
       color-scheme: dark;
-      --bg: #0b1220;
-      --surface: #121a2b;
-      --border: #465476;
-      --text: #d9dee5;
-      --text-muted: #97a0af;
+      --bg: #101728;
+      --surface: #182033;
+      --border: #3a4560;
+      --text: #dfe5ee;
+      --text-muted: #94a0b2;
     }
   }
   html, body {

@@ -1,8 +1,10 @@
 /* kubestronaut-sim component styles. All color/spacing/type values come
    from styles/tokens.css (dual light/dark themes); element defaults and
    focus/motion guards live in styles/base.css. Identity: calm terminal-
-   professional — IBM Plex Sans for prose, JetBrains Mono wherever the
-   product talks in numbers, ids, or code. */
+   professional — IBM Plex Sans for prose, IBM Plex Mono wherever the
+   product talks in numbers, ids, or code. The exam desktop's terminal
+   stays on JetBrains Mono on purpose; see the --machine-* note in
+   styles/tokens.css. */
 
 .btn {
   background: var(--surface-raised);
@@ -169,7 +171,7 @@
   width: min(680px, 100%);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-l);
   box-shadow: var(--shadow-2);
   padding: var(--space-6);
 }
@@ -177,8 +179,9 @@
 .start-card h1 {
   margin: 0 0 var(--space-4);
   color: var(--text);
-  font-size: var(--text-2xl);
-  font-weight: 700;
+  font-size: var(--text-4xl);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
 }
 
 .start-hero {
@@ -428,16 +431,18 @@
 .timer {
   font-family: var(--font-mono);
   font-size: var(--text-l);
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   padding: 0.2em 0.6em;
   border-radius: var(--radius-s);
   background: var(--surface-raised);
   border: 1px solid var(--border);
-  /* On its own --surface-raised chip, plain --accent is 4.1:1; the
-     countdown is normal-size text and needs 4.5:1. --accent-strong is
-     5.6:1 here. .timer-low overrides this to --danger and is unaffected. */
-  color: var(--accent-strong);
+  /* Ink, not accent. The clock is the most-read value on the screen and
+     it is not something you act on, so under the Rare Accent Rule it has
+     no claim on blue — the design brief draws it in ink for the same
+     reason. 15.78:1 on --surface-raised. .timer-low overrides to
+     --danger, which is the one state where intensity IS information. */
+  color: var(--text);
   letter-spacing: 0.03em;
 }
 
@@ -862,13 +867,16 @@
   color: var(--text);
 }
 
+/* The ramp tightened when the type scale moved to the brief's steps, so
+   these are re-pinned rather than re-pointed: --text-m is now the body
+   size, and a heading that matches its own body text is not a heading. */
 .md h1,
 .md h2 {
-  font-size: var(--text-l);
+  font-size: var(--text-xl);
 }
 
 .md h3 {
-  font-size: var(--text-m);
+  font-size: var(--text-l);
 }
 
 /* Past h3 the size ramp has run out — another step down would land under
@@ -1138,7 +1146,7 @@
   overscroll-behavior: contain;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-l);
   box-shadow: var(--shadow-3);
   padding: var(--space-5);
 }
@@ -1201,7 +1209,7 @@
 .score-banner {
   text-align: center;
   padding: var(--space-6);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-l);
   border: 1px solid var(--border);
   background: var(--surface);
   box-shadow: var(--shadow-1);
@@ -1221,21 +1229,24 @@
    the banner owns the spacing around this number. */
 .score-percent {
   font-family: var(--font-mono);
-  font-size: var(--text-hero);
+  font-size: var(--text-6xl);
   font-weight: 700;
   line-height: 1.1;
   margin: 0;
 }
 
 .score-verdict {
-  font-size: var(--text-xl);
+  font-size: var(--text-2xl);
   font-weight: 700;
   letter-spacing: 0.12em;
   margin: var(--space-2) 0;
 }
 
+/* The verdict word is text, so it takes the -strong tier. Plain
+   --success is the graphics tier (3:1) and is correct for the check
+   icons and tile marks, which all carry an sr-only text equivalent. */
 .score-banner.pass .score-verdict {
-  color: var(--success);
+  color: var(--success-strong);
 }
 
 .score-banner.fail .score-verdict {
@@ -1643,7 +1654,7 @@
   overscroll-behavior: contain;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-l);
   box-shadow: var(--shadow-3);
   padding: var(--space-4);
 }
@@ -1761,7 +1772,7 @@
     right: 0;
     left: 0;
     width: 100%;
-    border-radius: var(--radius-m) var(--radius-m) 0 0;
+    border-radius: var(--radius-l) var(--radius-l) 0 0;
     max-height: 80dvh;
   }
 }
@@ -1782,7 +1793,7 @@
 .boot-panel {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-l);
   box-shadow: var(--shadow-2);
   padding: var(--space-5) var(--space-6);
   width: 560px;
@@ -1791,7 +1802,8 @@
 
 .boot-panel h1 {
   margin-top: 0;
-  font-size: var(--text-xl);
+  font-size: var(--text-3xl);
+  letter-spacing: var(--tracking-tight);
 }
 
 @media (max-width: 600px) {
@@ -1826,7 +1838,7 @@
 .control-dialog {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-l);
   box-shadow: var(--shadow-3);
   padding: var(--space-5) var(--space-6);
   width: 520px;
@@ -2072,7 +2084,8 @@
   flex-shrink: 0;
   font-family: var(--font-mono);
   font-weight: 700;
-  color: var(--warn);
+  /* A glyph, not an icon — text tier. */
+  color: var(--warn-strong);
   line-height: 1.55;
 }
 
@@ -2088,8 +2101,9 @@
   border-radius: var(--radius-s);
   color: var(--text-muted);
   /* Sized up because the × glyph is small at body size. Goes away with
-     the icon set, which sizes on 1em and needs no compensation. */
-  font-size: 1.1rem;
+     the icon set, which sizes on 1em and needs no compensation. Was a
+     literal 1.1rem; the widened ramp has a step within a pixel of it. */
+  font-size: var(--text-xl);
   line-height: 1;
   cursor: pointer;
   padding: 0 0.2em;
@@ -2418,14 +2432,15 @@
   width: min(34rem, 100%);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-l);
   box-shadow: var(--shadow-2);
   padding: var(--space-5);
 }
 
 .desktop-required-card h1 {
   margin: 0 0 var(--space-3);
-  font-size: var(--text-xl);
+  font-size: var(--text-3xl);
+  letter-spacing: var(--tracking-tight);
 }
 
 .desktop-required-needs {
@@ -3178,7 +3193,7 @@
 }
 
 .mcq-question .mcq-option-letter {
-  font-size: var(--text-l);
+  font-size: var(--text-xs);
 }
 
 .mcq-check-answer {
