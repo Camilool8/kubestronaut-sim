@@ -81,8 +81,11 @@ Keep the `questions:` keys in that order, one per line, with no inline
 comments. [bank-weights.sh](../tests/bank-weights.sh) parses the block with a
 regex, not a YAML library, so a reordered key or a trailing comment hides a
 question from the gate — which then fails the bank for disagreeing with the
-directory listing. The one optional key, `title:`, goes directly after `id:`;
-both gate regexes tolerate it there and nowhere else.
+directory listing. `title:` is the one optional key that goes *inside* that
+run — directly after `id:`, where both gate regexes tolerate it and nowhere
+else. The other two, `targetSeconds:` and `docs:`, go *after* it, below
+`weight:` (hands-on) or `correct:` (mcq), where the regexes have already
+stopped looking.
 
 | Field | Meaning and status |
 |---|---|
@@ -103,7 +106,46 @@ both gate regexes tolerate it there and nowhere else.
 | `spec.questions[].title` | Optional short label shown in the question navigator, the jump grid and the score review. Absent, the UI falls back to the id (hands-on) or the attempt position (mcq) |
 | `spec.questions[].domain` | Must match a `domainWeights` key |
 | `spec.questions[].weight` | Must equal the sum of this question's `# points:` headers |
-| `spec.questions[].targetSeconds` | Optional pacing budget, in seconds, shown on the task chip. Absent, the facilitator derives one from the question's weight's share of the exam clock ([exam.go](../facilitator/internal/exam/exam.go), `TargetSeconds`) and flags it `targetDerived` on `GET /api/exam`, so a derived figure is never presented as the author's judgement — neither shipped bank sets it. It is a budget, never a limit: nothing enforces it and running over costs no points. Write it as the **last** key of the question block, after `weight:` (hands-on) or `correct:` (mcq); both gate regexes end there, and a `targetSeconds:` line above them hides the question from the gate |
+| `spec.questions[].targetSeconds` | Optional pacing budget, in seconds, shown on the task chip. Absent, the facilitator derives one from the question's weight's share of the exam clock ([exam.go](../facilitator/internal/exam/exam.go), `TargetSeconds`) and flags it `targetDerived` on `GET /api/exam`, so a derived figure is never presented as the author's judgement — neither shipped bank sets it. It is a budget, never a limit: nothing enforces it and running over costs no points. Write it below `weight:` (hands-on) or `correct:` (mcq); both gate regexes end there, and a `targetSeconds:` line above them hides the question from the gate |
+| `spec.questions[].docs` | Optional upstream reading: a list of `{label, url}`. Shown in the post-attempt deep dive — see [Documentation links](#documentation-links-specquestionsdocs). Write it below `weight:`/`correct:` for the same reason `targetSeconds` goes there |
+
+## Documentation links: `spec.questions[].docs`
+
+A question may name the upstream pages that explain its subject:
+
+```yaml
+    - id: q08
+      title: Route two Services with one Ingress
+      instance: instance-2
+      domain: Services and Networking
+      weight: 9
+      docs:
+        - label: Ingress
+          url: https://kubernetes.io/docs/concepts/services-networking/ingress/
+```
+
+They reach the client on `GET /api/questions/{id}/solution` and nowhere
+else, so they appear in exactly one place: the footer of the **post-attempt
+deep dive**, read in the candidate's own browser once the attempt is over.
+They are deliberately not attached to the question. During the attempt the
+candidate is on the exam desktop, which browses through the documentation
+allowlist proxy (`spec.environment.allowedDomains`) and never sees this
+field — a link out of an exam is not something an exam offers.
+
+Rules, all enforced by [exam.go](../facilitator/internal/exam/exam.go):
+
+- `label` names the **concept**, not the URL: `Ingress path types`, not
+  `kubernetes.io/docs/…`. The footer is read as a list of things to go
+  and learn.
+- `url` must be `https://` and must parse. **A bad entry is dropped and
+  logged, never fatal** — every other load error refuses the bank because
+  every other one is about the exam, while a mistyped study link must
+  never stop someone sitting one. The rest of the list still loads.
+- Omit the key entirely when there is no single obviously-right page.
+  Absent is the default and the response omits the field, which the UI
+  renders as nothing at all. **A wrong link on a study tool is worse than
+  no link**, so prefer a page-level URL over an anchor you are not certain
+  of, and prefer nothing over a page you have not opened.
 
 ## Pooling a bank: `spec.examLength`
 
@@ -242,9 +284,10 @@ Differences from the hands-on shape:
   ([catalog.go](../conductor/internal/catalog/catalog.go)) — nothing
   would ever ssh to them.
 - **Question keys are `id / domain / (weight) / multi / options /
-  correct`**, in that order, one per line —
-  [bank-mcq.sh](../tests/bank-mcq.sh) parses the block with a regex kept
-  honest by the same directory cross-check bank-weights.sh uses.
+  correct`**, in that order, one per line (with `docs:` after `correct:`
+  if the question has one) — [bank-mcq.sh](../tests/bank-mcq.sh) parses
+  the block with a regex kept honest by the same directory cross-check
+  bank-weights.sh uses.
 - **`weight` is optional and defaults to 1**, matching the real exam's
   uniform scoring. Domain balance is then question-count share.
 - **`options`** is 3-6 single-line quoted strings (inline markdown such
@@ -350,9 +393,19 @@ the [\_lib/checks.sh](../banks/_lib/checks.sh) helpers rather than by hand:
 ```
 
 Call them **after** the failure message and **before** `exit 1`.
-[q19/10\_service.sh](../banks/ckad-mock-01/q19/validate.d/10_service.sh) and
-[q16/10\_probes.sh](../banks/ckad-mock-01/q16/validate.d/10_probes.sh) are the
-two worked examples.
+
+Every check in `ckad-mock-01` now emits at least a `show_why`, so the
+bank itself is the reference. Two are worth reading first:
+[q19/10\_service.sh](../banks/ckad-mock-01/q19/validate.d/10_service.sh)
+shows the full three-artifact shape with an `evidence()` helper reused
+across several failure paths, and
+[q16/10\_probes.sh](../banks/ckad-mock-01/q16/validate.d/10_probes.sh)
+shows a JSON fragment captured with `jq` instead of a whole object.
+
+Prefer a `jq` projection to a whole object where the check is about a few
+fields. It sidesteps the server-side noise entirely, and the pane then
+shows what the check is about rather than everything that happens to sit
+near it.
 
 The rules the grader
 ([evaluate/artifact.go](../facilitator/internal/evaluate/artifact.go)) applies:

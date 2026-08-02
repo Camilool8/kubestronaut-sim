@@ -227,15 +227,30 @@ The question's `solution.md`. Gated — see
 [Session-state gates](#session-state-gates).
 
 ```json
-{"id": "q01", "markdown": "..."}
+{
+  "id": "q08",
+  "markdown": "...",
+  "docs": [
+    {"label": "Ingress", "url": "https://kubernetes.io/docs/concepts/services-networking/ingress/"}
+  ]
+}
 ```
+
+`docs` is `spec.questions[].docs` from the bank, omitted entirely when
+the question declares none — which most do. It is rendered as the
+explanation screen's footer, opening in the candidate's own browser.
+These links never reach the exam desktop, which browses through the
+documentation allowlist proxy and never sees this endpoint. An entry
+whose URL is not `https` or does not parse is dropped at bank load with
+a log line rather than failing the boot: a mistyped study link must not
+stop someone sitting an exam.
 
 | Code | When |
 |---|---|
 | 200 | Gate open, `id` known. |
-| 403 | Gate closed (`facilitator/internal/api/api.go:466-469`). |
-| 404 | Gate open, unknown `id` (`facilitator/internal/api/api.go:471-475`). |
-| 500 | `solution.md` could not be read (`facilitator/internal/api/api.go:477-481`). |
+| 403 | Gate closed (`facilitator/internal/api/api.go:514-517`). |
+| 404 | Gate open, unknown `id` (`facilitator/internal/api/api.go:521-524`). |
+| 500 | `solution.md` could not be read (`facilitator/internal/api/api.go:527-530`). |
 
 The gate is checked before the id is looked up, so the endpoint cannot
 be used to discover which question ids exist.
@@ -325,7 +340,7 @@ one field appears here and nowhere else.
 | 200 | Started. The clock is running. |
 | 202 | **Drawn, not started** — a pooled hands-on bank only. The cluster is being prepared for the questions just drawn and the clock has not begun. See [Preparing an attempt](#preparing-an-attempt). |
 | 400 | `mode` is not `exam`, `training` or `speed`; the body is non-empty and not JSON; `seed` is not six lowercase hex digits, or `domains` names a domain the bank does not have. |
-| 409 | The environment is still starting; a session is already running or ended; a preparation is already in flight; or the conductor refused or could not be reached (the body carries its own words). |
+| 409 | The environment is still starting; a session is already running or ended; a preparation is already in flight; the conductor refused or could not be reached (the body carries its own words); or — pooled hands-on only — **the cluster is still holding a different draw's objects**. |
 | 500 | The bank's pool cannot satisfy its own `domainWeights` at this draw size — an authoring bug `tests/bank-weights.sh` should have caught first. |
 | 503 | This build has no route to the conductor, so a pooled hands-on bank's cluster cannot be prepared. |
 
@@ -342,6 +357,12 @@ Only a **pooled hands-on bank** produces this, and no bank in this repo is
 one — every bank here takes the 200 path. It exists because such a bank's
 cluster is deliberately empty at boot: the draw decides what to seed, so
 seeding cannot happen until the draw has.
+
+Two reference implementations handle it, and both are exercised only by
+the branch being dormant: `startSession` plus the poller in
+`ui/src/App.tsx`, and `start_session` in `tests/smoke.sh`. A client that
+branches on the body's shape instead of the status code will pass every
+test in this repo and break on the first bank that pools.
 
 The 202 body is a preparation, not a session:
 
@@ -380,9 +401,20 @@ When `preparing` goes:
   and same ids. Route into it.
 - `state: "idle"` with `prepareError` — show it and stay put. No clock
   ever started, so nothing was lost.
-- `state: "idle"` with no `prepareError` — cancelled, or the facilitator
-  restarted mid-preparation. Return to the lobby silently; this is not an
-  error.
+- `state: "idle"` with no `prepareError` — cancelled. Return to the lobby
+  silently; this is not an error.
+
+**`prepareError` can also arrive without this process ever having
+prepared anything.** A preparation lives in memory, so a facilitator that
+restarts mid-preparation loses the draw entirely and cannot resume it —
+there is nothing left to start. On its first `GET /api/session`, a pooled
+hands-on server asks the conductor whether its last job was a `seed`; an
+idle session plus a seed job means the seeding was done for an attempt
+that no longer exists, because a preparation that had *succeeded* would
+have started an attempt, and an attempt is persisted. It then says so
+rather than leaving a poller waiting forever, and the next
+`POST /api/session/start` is refused 409 until the environment is reset —
+the cluster is holding a draw nothing can now enumerate.
 
 `DELETE /api/session` cancels and guarantees no attempt starts. It cannot
 stop the conductor's job, so the overlay runs to completion — harmless,

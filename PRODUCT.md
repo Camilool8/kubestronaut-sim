@@ -9,7 +9,7 @@ web
 ## Users
 
 Candidates preparing for the CNCF Kubernetes certifications — today
-CKAD — in the days or weeks before a real sitting. They are comfortable
+CKAD and KCNA — in the days or weeks before a real sitting. They are comfortable
 in a terminal, they have Docker on their own machine, and they run the
 simulator themselves: one candidate, one machine, one session, no
 proctor and no cohort.
@@ -60,10 +60,17 @@ network topology, and [SECURITY.md](SECURITY.md) for the threat model.
 The parts that constrain product decisions:
 
 - The session arc is exam selector, mode selector, timed exam view,
-  submit or expiry, score, then a new attempt or an exam switch — the
-  last two rebuild the whole environment behind a live progress
-  checklist. Only the first two are addressed by a URL fragment; every
-  other screen is a pure function of the server's session state.
+  submit or expiry, score, then the explanation of any one task — and
+  from there a new attempt or an exam switch, the two that rebuild the
+  whole environment behind a live progress checklist. A progress
+  dashboard sits outside the arc, reachable whenever no attempt is
+  running.
+- `session.state` is still the outer switch and no screen contradicts
+  it: a URL fragment only chooses between the views available *within*
+  the state the server reports. `#/exams`, `#/exams/<id>/mode` and
+  `#/progress` exist while idle, `#/results` and `#/results/<qid>` once
+  an attempt has ended. So a refresh keeps its place, and a pasted link
+  can never show a screen the session is not actually in.
 - The exam desktop is XFCE with a terminal already open, Firefox
   restricted to a documentation allowlist, ssh to named instances as
   `candidate`, and a `/opt/course/<n>` working directory per question.
@@ -176,7 +183,12 @@ The parts that constrain product decisions:
 ## Evidence on Hand
 
 - 22 CKAD questions, each with per-check validators, a written solution
-  and two tiers of hints.
+  and two tiers of hints; and 97 KCNA questions, each with a full
+  explanation.
+- A durable record of graded attempts on the candidate's own machine,
+  which is what makes best-score, weakest-domain and path progress
+  answerable at all. It is evidence about one candidate and never about
+  a population — see the absences below.
 - Reference solution scripts that must score 100%, the
   fresh-environment-scores-0 gate, and the curriculum weight check. See
   [docs/testing.md](docs/testing.md).
