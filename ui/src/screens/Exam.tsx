@@ -35,6 +35,7 @@ import { PendingBar } from "../components/Pending";
 import { toastStore } from "../components/toastStore";
 import { marksStore } from "../components/marksStore";
 import { formatClock, formatClockSpoken, formatElapsed } from "../lib/format";
+import { isTypingTarget } from "../lib/typing";
 import { strings } from "../strings";
 
 // DesktopViewport pulls in @novnc/novnc, which is almost the entire main
@@ -190,7 +191,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       const target = event.target as HTMLElement | null;
       if (target?.closest(".desktop-pane")) return;
-      if (target?.closest("input, textarea, [contenteditable]")) return;
+      if (isTypingTarget(target)) return;
       if (document.querySelector('[role="dialog"]')) return;
       event.preventDefault();
       setHelpOpen(true);

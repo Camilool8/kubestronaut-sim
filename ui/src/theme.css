@@ -2281,8 +2281,14 @@
 
 /* Pinned to the bottom of the sidebar, under whatever the breakdown
    needed. Prose, not a control — see NextSession in Score.tsx. */
+/* Directly under the breakdown, NOT pinned to the foot of the column.
+   `margin-top: auto` reads well in a mockup, where the sidebar is about
+   as tall as what it sits beside — but this column stretches to the
+   verdict table, and a 65-question attempt made that 3993px, so the one
+   card telling the candidate what to study next landed 3393px below the
+   weak-domain list it names. Advice belongs against its evidence. */
 .results-next {
-  margin-top: auto;
+  margin-top: var(--space-5);
   padding: var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius-m);

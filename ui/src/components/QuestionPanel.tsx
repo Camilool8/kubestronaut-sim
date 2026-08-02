@@ -5,6 +5,7 @@ import { useAsync } from "../lib/useAsync";
 import { desktopClipboard } from "../lib/desktopClipboard";
 import { pasteChordLabel } from "../lib/desktopKeymap";
 import { formatDuration } from "../lib/format";
+import { isTypingTarget } from "../lib/typing";
 import { strings } from "../strings";
 import { Async } from "./Async";
 import { Icon } from "./Icon";
@@ -112,7 +113,7 @@ export function QuestionPanel({
       // The RFB canvas owns the keyboard while focused, correctly — the
       // candidate is typing into a terminal.
       if (target?.closest(".desktop-pane")) return;
-      if (target?.closest("input, textarea, [contenteditable]")) return;
+      if (isTypingTarget(target)) return;
       if (document.querySelector('[role="dialog"]')) return;
       // G is global rather than scoped to the open navigator, because the
       // strip along its foot names it and that strip has to be true from

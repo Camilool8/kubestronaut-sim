@@ -21,6 +21,7 @@ import {
   type SolutionDetail,
 } from "../api";
 import { useAsync } from "../lib/useAsync";
+import { isTypingTarget } from "../lib/typing";
 import { Async } from "../components/Async";
 import { TimerBar } from "../components/TimerBar";
 import { Dialog } from "../components/Dialog";
@@ -129,7 +130,7 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
       if (event.key !== "[" && event.key !== "]") return;
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       const target = event.target as HTMLElement | null;
-      if (target?.closest("input, textarea, [contenteditable]")) return;
+      if (isTypingTarget(target)) return;
       if (document.querySelector('[role="dialog"]')) return;
       const step = event.key === "[" ? prev : next;
       if (!step) return;
@@ -453,7 +454,7 @@ function McqQuestion({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       const target = event.target as HTMLElement | null;
-      if (target?.closest("input, textarea, [contenteditable]")) return;
+      if (isTypingTarget(target)) return;
       if (document.querySelector('[role="dialog"]')) return;
       if (event.key === "g" || event.key === "G") {
         event.preventDefault();

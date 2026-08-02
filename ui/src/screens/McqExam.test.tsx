@@ -326,6 +326,25 @@ describe("McqExam navigator", () => {
     return { user, grid: within(grid) };
   }
 
+  // The shortcut the footer advertises has to survive the action the
+  // candidate just took. Selecting an option focuses a checkbox, and a
+  // "don't steal keys while typing" guard that treated every <input> as
+  // typing swallowed G on the one screen where it matters most.
+  test("G opens the navigator with an option focused", async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    const { container } = render(
+      <McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />,
+    );
+    await screen.findByText("Which component persists cluster state?");
+
+    await user.click(screen.getByRole("checkbox", { name: /etcd/i }));
+    expect(document.activeElement?.tagName).toBe("INPUT");
+
+    await user.keyboard("g");
+    await waitFor(() => expect(container.querySelector("#mcq-jump")).not.toBeNull());
+  });
+
   test("the tiles are attempt positions, never bank ids", async () => {
     const { grid } = await openNavigator();
     // q01/q02 are artifacts of the 97-question pool a random draw sampled
