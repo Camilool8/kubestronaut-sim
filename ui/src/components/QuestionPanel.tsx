@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { getQuestion, type ExamQuestionInfo, type SessionMode } from "../api";
 import { useAsync } from "../lib/useAsync";
 import { strings } from "../strings";
@@ -7,6 +7,7 @@ import { Async } from "./Async";
 import { Icon } from "./Icon";
 import { Markdown } from "./Markdown";
 import { HintTray } from "./HintTray";
+import { Navigator, type NavigatorQuestion } from "./Navigator";
 import { Skeleton } from "./Pending";
 import { marksStore } from "./marksStore";
 
@@ -36,17 +37,15 @@ interface QuestionPanelProps {
 // Navigation used to be a scrolling list capped at 45% of the panel — 22
 // questions showing 8 at a time, each row an id, a points pill and a domain
 // string up to 50 characters ellipsed down to about eight. Half the panel
-// bought a truncated non-word. It is now a one-row navigator (prev, current,
-// next) plus a disclosure that overlays the panel with every question at
-// once, grouped by domain, where the long strings finally have a full line.
+// bought a truncated non-word. It is now a one-row header (prev, current,
+// next) plus Navigator, the shared disclosure that overlays the panel with
+// every question at once.
 //
-// The disclosure is absolutely positioned INSIDE .question-panel, which is
+// Navigator is absolutely positioned INSIDE .question-panel, which is
 // already position: relative. That is load-bearing rather than incidental:
 // opening it changes no flex geometry, so .desktop-pane never resizes, so
-// noVNC's ResizeObserver never fires. It is also why this is a disclosure
-// and not a modal — no scrim, no role="dialog", no focus trap. Dimming a
-// live remote desktop to pick question 12 would read as something going
-// wrong.
+// noVNC's ResizeObserver never fires. See the comment at the top of
+// Navigator.tsx for the rest of it.
 export function QuestionPanel({
   questions,
   selectedId,
@@ -86,15 +85,15 @@ export function QuestionPanel({
     if (paneRef.current) paneRef.current.scrollTop = 0;
   }, [selectedId]);
 
-  // [ and ] step between questions. Deliberately not Alt+arrows: those are
-  // Back/Forward on Windows and Linux, and in a no-router SPA Back navigates
-  // out of a running exam. Bare bracket keys are safe because the handler
-  // below bows out over the desktop canvas, over any focused form control,
-  // and while a dialog is open — the product does have form controls (the
-  // mode picker, the clipboard textarea, the keyboard checkboxes).
+  // [ and ] step between questions, G opens and closes the navigator.
+  // Deliberately not Alt+arrows: those are Back/Forward on Windows and
+  // Linux, and in a no-router SPA Back navigates out of a running exam.
+  // Bare keys are safe because the handler below bows out over the desktop
+  // canvas, over any focused form control, and while a dialog is open —
+  // the product does have form controls (the mode picker, the clipboard
+  // textarea, the keyboard checkboxes).
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "[" && event.key !== "]") return;
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       const target = event.target as HTMLElement | null;
       // The RFB canvas owns the keyboard while focused, correctly — the
@@ -102,6 +101,18 @@ export function QuestionPanel({
       if (target?.closest(".desktop-pane")) return;
       if (target?.closest("input, textarea, [contenteditable]")) return;
       if (document.querySelector('[role="dialog"]')) return;
+      // G is global rather than scoped to the open navigator, because the
+      // strip along its foot names it and that strip has to be true from
+      // the question you were reading as well as from inside the grid.
+      if (event.key === "g" || event.key === "G") {
+        event.preventDefault();
+        setJumpOpen((open) => {
+          if (open) jumpTriggerRef.current?.focus();
+          return !open;
+        });
+        return;
+      }
+      if (event.key !== "[" && event.key !== "]") return;
       const step = event.key === "[" ? prev : next;
       if (!step) return;
       event.preventDefault();
@@ -116,7 +127,6 @@ export function QuestionPanel({
     if (returnFocus) jumpTriggerRef.current?.focus();
   };
 
-  const groups = useMemo(() => groupByDomain(questions), [questions]);
   const marked = selectedId !== null && marksStore.isMarked(selectedId);
 
   return (
@@ -166,8 +176,8 @@ export function QuestionPanel({
                 <Icon name="chevron-down" className="disclosure-chevron" />
                 <span className="sr-only">
                   {index >= 0
-                    ? strings.questionPanel.position(index + 1, questions.length)
-                    : strings.questionPanel.jumpOpenLabel}
+                    ? strings.navigator.position(index + 1, questions.length)
+                    : strings.navigator.open}
                 </span>
               </button>
               <button
@@ -230,9 +240,13 @@ export function QuestionPanel({
           </div>
 
           {jumpOpen && (
-            <QuestionJump
-              groups={groups}
+            <Navigator
+              id="question-jump"
+              questions={toNavigator(questions)}
               selectedId={selectedId}
+              // "opened", never "answered": this screen knows it rendered
+              // the question's text and nothing more (marksStore.ts).
+              progress="opened"
               onSelect={(id) => {
                 onSelect(id);
                 closeJump(true);
@@ -264,107 +278,26 @@ function QuestionSkeleton() {
   );
 }
 
-interface DomainGroup {
-  domain: string;
-  questions: ExamQuestionInfo[];
-}
-
-// Grouped by domain in order of first appearance, so the grid mirrors the
-// bank's own question order rather than sorting it into something the
-// candidate has not seen before.
-function groupByDomain(questions: ExamQuestionInfo[]): DomainGroup[] {
-  const groups: DomainGroup[] = [];
-  const byDomain = new Map<string, DomainGroup>();
-  for (const question of questions) {
-    let group = byDomain.get(question.domain);
-    if (!group) {
-      group = { domain: question.domain, questions: [] };
-      byDomain.set(question.domain, group);
-      groups.push(group);
-    }
-    group.questions.push(question);
-  }
-  return groups;
-}
-
-interface QuestionJumpProps {
-  groups: DomainGroup[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  onDismiss: () => void;
-}
-
-// Every question at once. Four ~76px tiles per row in the panel's 328px of
-// inner width means 22 questions is six rows — less vertical space than the
-// old list spent showing eight, and no scrolling to find where you are.
-function QuestionJump({ groups, selectedId, onSelect, onDismiss }: QuestionJumpProps) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  // A non-modal disclosure, so useFocusTrap is the wrong tool despite being
-  // right next door: it cycles Tab inside the container, which would strand
-  // a keyboard user who wanted to reach the timer or End Exam.
-  useEffect(() => {
-    ref.current?.querySelector<HTMLElement>('[aria-current="true"]')?.focus({ preventScroll: true });
-  }, []);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.stopPropagation();
-      onDismiss();
-    };
-    const node = ref.current;
-    node?.addEventListener("keydown", onKeyDown);
-    return () => node?.removeEventListener("keydown", onKeyDown);
-  }, [onDismiss]);
-
-  // Tiles widen as a set, not per question: a grid mixing titled and
-  // untitled widths would read as two different controls.
-  const titled = groups.some((group) => group.questions.some((q) => q.title));
-
-  return (
-    <div className="question-jump" id="question-jump" ref={ref}>
-      {groups.map((group) => (
-        <div className="question-jump-group" key={group.domain}>
-          {/* h2, matching the shifted level the question markdown now
-              renders its own title at — the topbar owns the exam's h1. */}
-          <h2>{group.domain}</h2>
-          <ul className={`question-grid${titled ? " question-grid-titled" : ""}`}>
-            {group.questions.map((q) => {
-              const current = q.id === selectedId;
-              const marked = marksStore.isMarked(q.id);
-              const viewed = marksStore.isViewed(q.id);
-              return (
-                <li key={q.id}>
-                  <button
-                    className={`question-tile${viewed ? " viewed" : ""}`}
-                    onClick={() => onSelect(q.id)}
-                    aria-current={current ? "true" : undefined}
-                  >
-                    <span className="question-tile-id">{q.id}</span>
-                    <span className="question-tile-points">
-                      {strings.questionPanel.points(q.totalPoints)}
-                    </span>
-                    {q.title && <span className="question-tile-title">{q.title}</span>}
-                    {marked && (
-<Icon name="flag-filled" className="question-tile-mark" />
-                    )}
-                    <span className="sr-only">
-                      {[
-                        q.instance,
-                        viewed ? strings.questionPanel.viewed : null,
-                        marked ? strings.questionPanel.marked : null,
-                      ]
-                        .filter(Boolean)
-                        .join(", ")}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ))}
-    </div>
-  );
+/**
+ * The panel's questions as the shared navigator wants them.
+ *
+ * The tile prints the bank id, because that is what this screen's own nav
+ * header names the question — the mcq screen is the one that must not (see
+ * McqExam.tsx). Everything the old four-per-row grid drew on the tile —
+ * the bank's title, the domain, the instance, the points — moves into the
+ * spoken detail: at ten tiles to a row there is one line, and it belongs
+ * to the number.
+ */
+function toNavigator(questions: ExamQuestionInfo[]): NavigatorQuestion[] {
+  return questions.map((q) => ({
+    id: q.id,
+    label: q.id,
+    detail: [q.title, q.domain, q.instance, strings.questionPanel.points(q.totalPoints)]
+      .filter(Boolean)
+      .join(", "),
+    // "viewed" is the only thing this screen can observe. It is NOT an
+    // answer, and marksStore.ts is explicit that it may never be rendered
+    // as one; the navigator's `progress="opened"` picks the words.
+    done: marksStore.isViewed(q.id),
+  }));
 }

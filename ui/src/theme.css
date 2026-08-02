@@ -963,8 +963,10 @@
                          comfortable line. 700px would be ~90ch, a worse
                          read than the 360px default.
        280px             is where the nav row (a mono `ssh instance-1`, a
-                         points pill and two 28px steps) stops fitting and
-                         the jump grid drops to three columns.
+                         points pill and two 28px steps) stops fitting.
+                         The navigator halves to five columns just above
+                         it, at a 320px container — measured, because ten
+                         22px tiles clip a three-character label.
 
      Deliberately a custom property and not an inline `width`: an inline
      style beats a class rule, so a persisted width could otherwise win
@@ -1149,132 +1151,316 @@
   white-space: nowrap;
 }
 
-/* ---- jump grid ----
-   Overlays the panel rather than displacing it. .question-panel is already
-   position: relative, so this costs no flex geometry — which matters more
-   than it looks: any height change in .question-panel resizes .desktop-pane,
-   and .desktop-pane is the one element in the product with a ResizeObserver
-   watching it (noVNC). It also survives the <=900px rule unchanged, where
-   .question-panel itself becomes absolutely positioned. */
-.question-jump {
+/* ---- navigator ----
+   The full-panel disclosure of every question, shared by both exam
+   engines (components/Navigator.tsx).
+
+   It overlays its host rather than displacing it. .question-panel is
+   already position: relative, and so is .mcq-question, so this costs no
+   flex geometry — which matters more than it looks: any height change in
+   .question-panel resizes .desktop-pane, and .desktop-pane is the one
+   element in the product with a ResizeObserver watching it (noVNC). It
+   also survives the <=900px rule unchanged, where .question-panel itself
+   becomes absolutely positioned.
+
+   Three bands: the filters, the scrolling grid, and a foot naming the
+   four tile states and the keys that work here. Only the middle band
+   scrolls (Scroll-Inside), so the counts and the legend hold still while
+   sixty-five tiles move under them. */
+.navigator {
   position: absolute;
   inset: 0;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
   background: var(--surface);
+  /* Named container so the grid below can size itself to THIS box rather
+     than to the viewport. What constrains it is the question panel's
+     width, which the candidate drags with .panel-resizer, and no media
+     query can see that number. */
+  container: navigator / inline-size;
+}
+
+.navigator-head {
+  flex-shrink: 0;
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.navigator-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* The anchored idioms every control in this product borrows: 6px, a
+   hairline, a --surface-raised fill. The chosen filter takes the accent
+   edge AND the wash — two channels, like the tile below it, so which
+   filter is on is never carried by hue alone. */
+.navigator-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  padding: 0.3em 0.6em;
+  cursor: pointer;
+}
+
+.navigator-chip:hover {
+  background: var(--raised-hover);
+  color: var(--text);
+}
+
+.navigator-chip:active {
+  transform: translateY(1px);
+}
+
+.navigator-chip[aria-pressed="true"] {
+  color: var(--text);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+/* Mono and tabular: it is a count, and counts that change width make a
+   stable reading look unstable. --text on --accent-soft is 12.5:1 light
+   and 11.4:1 dark, so it holds on the pressed chip too. */
+.navigator-chip-count {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.navigator-body {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: var(--space-3);
 }
 
-.question-jump-group {
-  margin-bottom: var(--space-4);
-}
-
-.question-jump-group:last-child {
-  margin-bottom: 0;
-}
-
-/* The domain finally gets a full line here. In the old list it shared a
-   360px row with an id and a points pill, which ellipsed "Application
-   Environment, Configuration and Security" down to about eight characters. */
-.question-jump-group h2 {
-  margin: 0 0 var(--space-2);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-}
-
-.question-grid {
+/* Ten to a row, so row two starts at eleven and a position is found by
+   counting rows instead of reading every tile. The tiles size to the
+   container and not the other way round: the same ten columns are ~30px
+   wide in a 360px question panel and ~70px in the mcq screen's 760px
+   column, and neither needs its own rule. */
+.navigator-grid {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(4.25rem, 1fr));
-  gap: var(--space-2);
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: var(--space-1);
 }
 
-/* Four states, four distinct channels — no two share a value. Unopened
-   takes the structural hairline, opened takes the strong one (this was a
-   STATE carried by a 1.50:1 border, the one unambiguous WCAG 1.4.11
-   failure in the old palette), hover moves the fill and never the edge,
-   and current takes the accent edge plus a wash plus an inset bar. */
-.question-tile {
+/* Ten columns need about 310px to hold a three-character label. The
+   question panel's resizer bottoms out at 280px, where ten columns are
+   22px wide and .navigator-tile's overflow: hidden quietly ate the
+   second digit — 56 of 65 tiles rendered "Q6" for "Q65", which is worse
+   than no navigator at all. Halve the grid below that, the same shape
+   the coarse-pointer rule already uses for a thumb.
+
+   Keyed to the container and not the viewport because the panel is
+   dragged, not resized with the window: a 1440px desktop with a narrow
+   panel is exactly the case a media query would miss. */
+@container navigator (max-width: 320px) {
+  .navigator-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/* Four states, four channels, no two sharing a value. Unseen takes the
+   structural hairline; opened/answered takes the strong one plus a fill
+   (this was a STATE carried by a 1.50:1 border, the one unambiguous WCAG
+   1.4.11 failure in the old palette); flagged takes the warn edge plus a
+   drawn flag; current takes the accent edge plus a wash plus a 3px inset
+   bar. Hover moves the fill and never the edge, so the tile under a
+   cursor is never mistaken for the question you are on. Every state that
+   is a colour carries a second channel that survives greyscale. */
+.navigator-tile {
   position: relative;
   width: 100%;
+  min-width: 0;
+  min-height: 2rem;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.1em;
-  text-align: left;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
   background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius-s);
-  padding: 0.35em 0.5em;
+  padding: 0.25em 0.2em;
   cursor: pointer;
 }
 
-.question-tile.viewed {
+.navigator-tile.is-done {
+  background: var(--surface-raised);
   border-color: var(--border-strong);
 }
 
-.question-tile:hover:not([aria-current="true"]) {
+.navigator-tile.is-flagged {
+  border-color: var(--warn);
+}
+
+.navigator-tile:hover:not([aria-current="true"]) {
   background: var(--surface-hover);
 }
 
-.question-tile:active {
+/* A tile that already carries a fill hovers to the fill's own hover
+   step, or the hover would read as a state change rather than a cursor. */
+.navigator-tile.is-done:hover:not([aria-current="true"]) {
+  background: var(--raised-hover);
+}
+
+.navigator-tile:active {
   transform: translateY(1px);
 }
 
-.question-tile[aria-current="true"] {
+.navigator-tile[aria-current="true"] {
   background: var(--accent-soft);
   border-color: var(--accent);
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
-.question-tile-id {
-  font-family: var(--font-mono);
-  font-weight: 700;
-}
-
-.question-tile-points {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-}
-
-/* The current tile sits on --surface-raised, where plain --accent is
-   4.1:1; its points value takes --accent-strong (5.6:1 light, 8.5:1 dark). */
-.question-tile[aria-current="true"] .question-tile-points {
-  color: var(--accent-strong);
-}
-
-.question-tile-mark {
+/* The flag rides the corner rather than taking a line of its own: at ten
+   tiles to a row there is one line, and it belongs to the number.
+   --warn-strong rather than --warn because a 10px stroked glyph is a
+   thin graphic, and the text tier is the safer floor for it. */
+.navigator-tile-flag {
   position: absolute;
-  top: 0.25em;
-  right: 0.3em;
+  top: 1px;
+  right: 1px;
+  font-size: var(--text-2xs);
+  color: var(--warn-strong);
+}
+
+.navigator-empty {
+  margin: 0;
+  font-size: var(--text-s);
+  color: var(--text-muted);
+}
+
+.navigator-foot {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.navigator-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
   font-size: var(--text-xs);
   color: var(--text-muted);
 }
 
-/* The bank's short label, when it ships one: a sans line under the mono
-   id, ellipsed so the tile stays a tile. Muted holds on the current
-   tile's wash too — --text-muted on --accent-soft is 5.2:1 light and
-   5.5:1 dark, over the 4.5:1 floor. */
-.question-tile-title {
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  max-width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.navigator-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
 }
 
-/* A grid with titles gets wider tiles as a set — mixing compact and wide
-   tiles in one grid would read as two different controls. */
-.question-grid-titled {
-  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+/* Each swatch is a miniature of the tile it names, drawn from the same
+   tokens the grid uses. A legend whose swatch is not the real thing
+   teaches the wrong mapping. */
+.navigator-swatch {
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+}
+
+.navigator-swatch-done {
+  background: var(--surface-raised);
+  border-color: var(--border-strong);
+}
+
+.navigator-swatch-flagged {
+  border-color: var(--warn);
+}
+
+.navigator-swatch-current {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* The keys that work while the grid is open, where they are being used.
+   The shortcut reference behind ? lists the same four; this strip exists
+   because nobody opens a help dialog to find out how to move one tile. */
+.navigator-keys {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.navigator-keys span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+}
+
+.navigator-keys kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5em;
+  min-height: 1.4em;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 0 0.25em;
+}
+
+/* Ten 30px tiles do not survive a thumb, and the mcq exam is the one
+   this product runs on a phone. Keyed to pointer type rather than width,
+   like the panel's own --control-size bump. */
+@media (any-pointer: coarse) {
+  .navigator-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .navigator-tile,
+  .navigator-chip {
+    min-height: 44px;
+  }
+}
+
+/* Motion-additive, like every other transition in the product: written
+   inside no-preference rather than as a default a reduce-guard later has
+   to neutralise. */
+@media (prefers-reduced-motion: no-preference) {
+  .navigator-tile,
+  .navigator-chip {
+    transition:
+      background var(--dur-quick) var(--ease-out),
+      border-color var(--dur-quick) var(--ease-out),
+      color var(--dur-quick) var(--ease-out),
+      transform 50ms var(--ease-out);
+  }
 }
 
 /* which box to ssh into — the single most load-bearing fact per question.
@@ -2959,8 +3145,7 @@
   .drawer-close,
   .code-block-copy,
   .question-nav-step,
-  .question-mark,
-  .question-tile {
+  .question-mark {
     min-width: 44px;
     min-height: 44px;
   }
@@ -3180,7 +3365,6 @@
   .question-nav-step,
   .question-nav-current,
   .question-mark,
-  .question-tile,
   .job-chip,
   .code-block-copy,
   .toast-dismiss,
@@ -3443,8 +3627,8 @@
 /* ===== Multiple-choice exam screen =====
 
    One centred column: nav row, stem, options. Reuses the hands-on
-   panel's .question-nav / .question-jump / .question-tile families so
-   the two exam types read as one product; everything mcq-specific is
+   panel's .question-nav family and the shared .navigator so the two
+   exam types read as one product; everything mcq-specific is
    namespaced .mcq-*. Mobile-first — this is the one exam type with no
    desktop requirement, so the column simply narrows on a phone. */
 
@@ -3468,9 +3652,10 @@
   padding: var(--space-4) var(--space-3);
 }
 
-/* position: relative is load-bearing: .question-jump (reused as
-   .mcq-jump) is absolutely positioned against this box, exactly as it
-   is against .question-panel on the hands-on screen. min-height: 0 lets
+/* position: relative is load-bearing: .navigator is absolutely
+   positioned against this box, exactly as it is against .question-panel
+   on the hands-on screen — layout.test.ts pins both halves of that
+   pairing, so neither can drift alone. min-height: 0 lets
    .mcq-pane's overflow-y actually engage instead of stretching the flex
    column past its parent. */
 .mcq-question {
@@ -3607,18 +3792,6 @@
 
 .mcq-check-answer {
   margin-top: var(--space-4);
-}
-
-/* The jump grid tile's answered state: same slot the hands-on grid
-   spends on points, here a check that means "an answer is saved". */
-.question-tile-answered {
-  width: 14px;
-  height: 14px;
-  color: var(--success);
-}
-
-.question-tile.answered {
-  border-color: var(--border-strong);
 }
 
 /* ===== Score-screen answer review (mcq) ===== */

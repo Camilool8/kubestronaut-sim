@@ -28,6 +28,7 @@ import { Icon } from "../components/Icon";
 import { Markdown } from "../components/Markdown";
 import { CheckList } from "../components/CheckList";
 import { HintTray } from "../components/HintTray";
+import { Navigator, type NavigatorQuestion } from "../components/Navigator";
 import { Skeleton } from "../components/Pending";
 import { toastStore } from "../components/toastStore";
 import { marksStore } from "../components/marksStore";
@@ -420,6 +421,26 @@ function McqQuestion({
     if (returnFocus) jumpTriggerRef.current?.focus();
   };
 
+  // G opens and closes the navigator, the same binding the hands-on panel
+  // carries — minus its desktop-canvas guard, which has no counterpart
+  // here, exactly like the [ and ] handler in the parent.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "g" && event.key !== "G") return;
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, [contenteditable]")) return;
+      if (document.querySelector('[role="dialog"]')) return;
+      event.preventDefault();
+      setJumpOpen((open) => {
+        if (open) jumpTriggerRef.current?.focus();
+        return !open;
+      });
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   return (
     <section className="mcq-question" aria-label={strings.mcq.regionLabel}>
       <header className="question-nav">
@@ -447,7 +468,7 @@ function McqQuestion({
             </span>
             <Icon name="chevron-down" className="disclosure-chevron" />
             <span className="sr-only">
-              {strings.questionPanel.position(index + 1, total)}
+              {strings.navigator.position(index + 1, total)}
             </span>
           </button>
           <button
@@ -575,10 +596,13 @@ function McqQuestion({
       </footer>
 
       {jumpOpen && (
-        <McqJump
-          questions={questions}
-          answers={answers}
+        <Navigator
+          id="mcq-jump"
+          questions={toNavigator(questions, answers)}
           selectedId={selectedId}
+          // "answered" is a fact here, not a guess: the answers are server
+          // state this screen holds a copy of.
+          progress="answered"
           onSelect={(id) => {
             onSelect(id);
             closeJump(true);
@@ -646,116 +670,25 @@ function McqCheckAnswer({ questionId }: { questionId: string }) {
   );
 }
 
-interface McqJumpProps {
-  questions: ExamQuestionInfo[];
-  answers: Record<string, number[]>;
-  selectedId: string;
-  onSelect: (id: string) => void;
-  onDismiss: () => void;
-}
-
-// Every question at once, grouped by domain, with the one state the
-// hands-on grid cannot have: answered/unanswered, which here the UI
-// genuinely knows — the answers are server state it holds a copy of.
-function McqJump({
-  questions,
-  answers,
-  selectedId,
-  onSelect,
-  onDismiss,
-}: McqJumpProps) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    ref.current
-      ?.querySelector<HTMLElement>('[aria-current="true"]')
-      ?.focus({ preventScroll: true });
-  }, []);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.stopPropagation();
-      onDismiss();
-    };
-    const node = ref.current;
-    node?.addEventListener("keydown", onKeyDown);
-    return () => node?.removeEventListener("keydown", onKeyDown);
-  }, [onDismiss]);
-
-  const groups = useMemo(() => {
-    const byDomain = new Map<string, ExamQuestionInfo[]>();
-    const order: string[] = [];
-    for (const q of questions) {
-      if (!byDomain.has(q.domain)) {
-        byDomain.set(q.domain, []);
-        order.push(q.domain);
-      }
-      byDomain.get(q.domain)?.push(q);
-    }
-    return order.map((domain) => ({
-      domain,
-      questions: byDomain.get(domain) ?? [],
-    }));
-  }, [questions]);
-
-  // The tile's own sequence position (1-65), not its bank id — same
-  // reasoning as the nav badge above: q.id is an artifact of the pool a
-  // random draw sampled from, not something the candidate should see.
-  const positionOf = useMemo(() => {
-    const m = new Map<string, number>();
-    questions.forEach((q, i) => m.set(q.id, i + 1));
-    return m;
-  }, [questions]);
-
-  // Tiles widen as a set, not per question — same rule as the hands-on
-  // jump grid. Today no mcq bank ships titles, so this stays compact.
-  const titled = questions.some((q) => q.title);
-
-  return (
-    <div className="question-jump mcq-jump" id="mcq-jump" ref={ref}>
-      {groups.map((group) => (
-        <div className="question-jump-group" key={group.domain}>
-          <h2>{group.domain}</h2>
-          <ul className={`question-grid${titled ? " question-grid-titled" : ""}`}>
-            {group.questions.map((q) => {
-              const current = q.id === selectedId;
-              const answered = (answers[q.id] ?? []).length > 0;
-              const marked = marksStore.isMarked(q.id);
-              return (
-                <li key={q.id}>
-                  <button
-                    className={`question-tile${answered ? " answered" : ""}`}
-                    onClick={() => onSelect(q.id)}
-                    aria-current={current ? "true" : undefined}
-                  >
-                    <span className="question-tile-id">
-                      {strings.mcq.questionNumber(positionOf.get(q.id) ?? 0)}
-                    </span>
-                    {answered && (
-                      <Icon name="check" className="question-tile-answered" />
-                    )}
-                    {q.title && <span className="question-tile-title">{q.title}</span>}
-                    {marked && (
-                      <Icon name="flag-filled" className="question-tile-mark" />
-                    )}
-                    <span className="sr-only">
-                      {[
-                        answered
-                          ? strings.mcq.answered
-                          : strings.mcq.unanswered,
-                        marked ? strings.questionPanel.marked : null,
-                      ]
-                        .filter(Boolean)
-                        .join(", ")}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ))}
-    </div>
-  );
+/**
+ * This screen's questions as the shared navigator wants them.
+ *
+ * The tile prints the attempt position, never the bank id — q61 is an
+ * artifact of the 97-question pool a random draw sampled from, and it is
+ * non-sequential and meaningless to whoever is sitting the exam. Every
+ * other mcq surface already says Q-numbers: the nav badge, the submit
+ * dialog's unanswered list, the practice dialog.
+ */
+function toNavigator(
+  questions: ExamQuestionInfo[],
+  answers: Record<string, number[]>,
+): NavigatorQuestion[] {
+  return questions.map((q, i) => ({
+    id: q.id,
+    label: strings.mcq.questionNumber(i + 1),
+    // The domain is the one per-question fact an mcq candidate can use,
+    // and the same one the nav header shows for the current question.
+    detail: q.domain,
+    done: (answers[q.id] ?? []).length > 0,
+  }));
 }

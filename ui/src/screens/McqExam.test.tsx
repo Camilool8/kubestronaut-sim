@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { McqExam } from "./McqExam";
 import { marksStore } from "../components/marksStore";
@@ -228,6 +228,57 @@ describe("McqExam answering", () => {
     await user.click(screen.getAllByRole("button", { name: /end training/i })[0]);
     expect(await screen.findByRole("dialog")).toHaveAccessibleName(/training/i);
     expect(screen.queryByText(/cannot be undone/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("McqExam navigator", () => {
+  async function openNavigator(stored: Record<string, number[]> = {}) {
+    stubFetch(stored);
+    const user = userEvent.setup();
+    const { container } = render(
+      <McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />,
+    );
+    await screen.findByText("Which component persists cluster state?");
+    await user.click(screen.getByRole("button", { name: /show all questions/i }));
+    const grid = container.querySelector<HTMLElement>("#mcq-jump");
+    if (!grid) throw new Error("the navigator did not open");
+    return { user, grid: within(grid) };
+  }
+
+  test("the tiles are attempt positions, never bank ids", async () => {
+    const { grid } = await openNavigator();
+    // q01/q02 are artifacts of the 97-question pool a random draw sampled
+    // from. The candidate has only ever seen Q1 and Q2.
+    expect(grid.getByRole("button", { name: /^Q1\b/ })).toBeInTheDocument();
+    expect(grid.getByRole("button", { name: /^Q2\b/ })).toBeInTheDocument();
+    expect(grid.queryByRole("button", { name: /q0\d/ })).toBeNull();
+  });
+
+  test("a saved answer is a tile state, because here the UI genuinely knows", async () => {
+    const { grid } = await openNavigator({ q01: [1] });
+    await waitFor(() =>
+      expect(grid.getByRole("button", { name: /^Q1\b/ })).toHaveAccessibleName(/(?<!un)answered/),
+    );
+    expect(grid.getByRole("button", { name: /^Q2\b/ })).toHaveAccessibleName(/unanswered/);
+  });
+
+  test("picking a tile moves the screen to that question", async () => {
+    const { user, grid } = await openNavigator();
+    await user.click(grid.getByRole("button", { name: /^Q2\b/ }));
+    await screen.findByText("Which are container interface standards? Choose all that apply.");
+    expect(document.querySelector("#mcq-jump")).toBeNull();
+  });
+
+  test("G opens and closes it, the same binding the hands-on panel carries", async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+    await screen.findByText("Which component persists cluster state?");
+
+    await user.keyboard("g");
+    expect(document.querySelector("#mcq-jump")).not.toBeNull();
+    await user.keyboard("g");
+    expect(document.querySelector("#mcq-jump")).toBeNull();
   });
 });
 

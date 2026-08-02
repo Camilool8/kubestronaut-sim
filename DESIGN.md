@@ -435,7 +435,7 @@ rule, so a persisted width would win over the clamp.
 
 | Number | Meaning |
 |---|---|
-| 280px | where the nav row stops fitting and the jump grid drops to three columns |
+| 280px | where the nav row stops fitting. The navigator halves to five columns just above it, on a container query at 320px — ten tiles that narrow clip their own labels |
 | 360px | the default |
 | 600px | a measure decision: 568px of text at the 15px base is about 75ch, and 700px would be ~90ch |
 | 50vw | narrows the panel as the window narrows, without touching the stored preference. No listener, no JS |
@@ -595,7 +595,7 @@ There is no site nav. What stands in for it:
 |---|---|
 | Topbar (exam only) | `--surface` under a hairline bottom border, wrapping rather than compressing, title flexing from an 8rem basis and ellipsing |
 | Question navigator | one header row — prev, the current question's id and points, next — above the pane, with the bank's optional question title (`.question-nav-title`, the one flex item in the row allowed to ellipse), the instance chip and the review-mark toggle on a second row |
-| Jump grid | a full-panel disclosure of every question as mono tiles auto-filled from a 4.25rem minimum, grouped under their curriculum domain, which is where the long domain string gets a full line. A bank that ships question titles adds a muted sans line per tile and widens every grid to a 7.5rem minimum as a set (`.question-grid-titled`). No scrim, no `role="dialog"`, no focus trap: dimming a live remote desktop to pick question 12 would read as a fault |
+| Navigator | one component (`.navigator`) for both engines, a full-panel disclosure in three bands: filter chips (`All` / flagged / unseen-or-unanswered), a flat ten-column grid of mono tiles, and a foot naming the four states and the keys. Ten to a row only pays off if row two starts at eleven, so the grid is sequential and the domain travels in each tile's accessible name rather than as a visual grouping. Five columns below a 320px container and for a coarse pointer. Its vocabulary is a prop, not a fork: hands-on says opened/unseen, mcq says answered/unanswered, because `marksStore` may not call a viewed question attempted. No scrim, no `role="dialog"`, no focus trap: dimming a live remote desktop to pick question 12 would read as a fault |
 | App header | `.app-header`, 56px, on every screen that is a PAGE and deliberately not on the exam (which has a topbar carrying a clock and a submit button) or the boot screen. Two variants of one component: `brand` leads with the mark and wordmark, `back` replaces both with a labelled way out for a screen reached FROM another. `flex-shrink: 0` is load-bearing — as a flex item its `height` is only a base size, and a tall page squashed it to its min-content height |
 | Skip link | the `.sr-only` clip idiom, never a transform; on focus it becomes `position: fixed`, so its visible state is anchored to the viewport rather than to the pane it lives in |
 
@@ -658,7 +658,7 @@ dialog.
 | `.mcq-option` | an anchored control: `--surface-raised` fill on `--border`, 6px corners, 44px minimum touch target. Hover steps the fill to `--raised-hover` and never moves the edge |
 | `.mcq-option-on` | the full three-channel selection: accent edge, `--accent-soft` wash, 3px inset bar — plus the visible native checkbox as the non-visual channel. The option letter goes `--accent-strong` on the wash |
 | `.mcq-footer` | Previous / answered-tally / Next, with the final question's Next giving way to the one primary button. The tally deliberately counts completion; position lives in the header, and two numbers both claiming to locate the candidate was the confusion this footer used to cause |
-| Answered tile | the jump grid's tile plus a check icon and "answered" sr text — server state, not a rendering guess, because mcq answers are saved per click |
+| Answered tile | the navigator's `is-done` tile under `progress="answered"`: `--surface-raised` behind the strong hairline, plus "answered" in the accessible name — server state, not a rendering guess, because mcq answers are saved per click |
 
 ### Result and teaching components
 
@@ -780,10 +780,11 @@ region rather than a pending one once the pulse is off.
 - **Don't** add a form control without first checking whether the
   interaction belongs in the terminal. Four exist, and each earned its
   place.
-- **Don't** reach for a dropdown, select or menu. The jump grid is this
+- **Don't** reach for a dropdown, select or menu. The navigator is this
   product's disclosure pattern and already carries more per option than a
-  native select can render — domain grouping with the full string, points,
-  and viewed/marked flags.
+  native select can render — four states each on two channels, live
+  filter counts, and the domain and points in every tile's accessible
+  name.
 - **Don't** convey a control's state with `opacity`. It dims the border and
   the focus ring along with the label, and composites to a ratio nobody
   measured. Use `--text-disabled`.

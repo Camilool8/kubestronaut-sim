@@ -181,25 +181,31 @@ describe("QuestionPanel jump grid", () => {
     return within(grid);
   }
 
-  test("every question is reachable at once, grouped by domain", async () => {
+  test("every question is reachable at once", async () => {
     const grid = await openGrid("q01");
     for (const id of ["q01", "q02", "q03"]) {
       expect(grid.getByRole("button", { name: new RegExp(`^${id}`) })).toBeInTheDocument();
     }
-    // The domain finally gets a full line here instead of being ellipsed
-    // to about eight characters inside a 360px row.
-    expect(grid.getByRole("heading", { name: "Networking" })).toBeInTheDocument();
   });
 
-  test("a titled bank shows its labels on the tiles and widens the grid as a set", async () => {
+  test("what the tile has no room to draw is still said", async () => {
     const grid = await openGrid("q01");
-    // The title is part of the tile, so a keyboard or screen-reader user
-    // gets it in the button's own name.
-    expect(grid.getByRole("button", { name: /Namespaces & quotas/ })).toBeInTheDocument();
-    // One question with a title widens every grid in the panel — a mixed
-    // grid of compact and wide tiles would read as two controls.
-    const list = document.querySelector(".question-grid");
-    expect(list?.className).toContain("question-grid-titled");
+    // Ten tiles to a row leaves one line and it belongs to the id, so the
+    // bank's title, the domain, the instance and the points all travel in
+    // the button's accessible name rather than being dropped.
+    const tile = grid.getByRole("button", { name: /^q01/ });
+    expect(tile).toHaveAccessibleName(/Namespaces & quotas/);
+    expect(tile).toHaveAccessibleName(/Config/);
+    expect(tile).toHaveAccessibleName(/instance-1/);
+    expect(tile).toHaveAccessibleName(/5 pts/);
+  });
+
+  test("the hands-on grid prints bank ids, because its header does too", async () => {
+    const grid = await openGrid("q01");
+    // The mcq screen is the one that must show positions instead: there
+    // the id is an artifact of the pool a random draw sampled from.
+    expect(grid.getByRole("button", { name: /^q02/ })).toBeInTheDocument();
+    expect(grid.queryByRole("button", { name: /^Q2\b/ })).toBeNull();
   });
 
   test("the current question is announced as current, not just drawn as selected", async () => {
@@ -223,6 +229,20 @@ describe("QuestionPanel jump grid", () => {
     await openGrid("q01");
     await userEvent.keyboard("{Escape}");
     expect(document.querySelector("#question-jump")).toBeNull();
+  });
+
+  test("G opens and closes the grid, so the strip along its foot is true", async () => {
+    renderNav("q01");
+    await screen.findByRole("button", { name: /show all questions/i });
+
+    await userEvent.keyboard("g");
+    expect(document.querySelector("#question-jump")).not.toBeNull();
+
+    // The same key closes it, and the focus goes back to the trigger it
+    // came from rather than being dropped on <body>.
+    await userEvent.keyboard("g");
+    expect(document.querySelector("#question-jump")).toBeNull();
+    expect(screen.getByRole("button", { name: /show all questions/i })).toHaveFocus();
   });
 });
 

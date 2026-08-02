@@ -88,4 +88,21 @@ describe("desktop viewport", () => {
     const css = await readThemeCss();
     expect(ruleBody(css, ".desktop-viewport")).toContain("position: relative");
   });
+
+  // The other half of the same rule, and the half that was never pinned:
+  // the navigator overlays the question panel out of flow. In flow it
+  // would be a flex child, its height would move .question-panel's, and
+  // .desktop-pane beside it would resize — which costs a framebuffer
+  // round-trip on every open. Both of its hosts have to stay positioned
+  // for `inset: 0` to mean the panel rather than the viewport.
+  test("the question navigator overlays its host instead of displacing it", async () => {
+    const css = await readThemeCss();
+    const navigator = ruleBody(css, ".navigator");
+
+    expect(navigator, "the navigator's own rule was renamed or removed").not.toBeNull();
+    expect(navigator).toContain("position: absolute");
+    expect(navigator).toContain("inset: 0");
+    expect(ruleBody(css, ".question-panel")).toContain("position: relative");
+    expect(ruleBody(css, ".mcq-question")).toContain("position: relative");
+  });
 });

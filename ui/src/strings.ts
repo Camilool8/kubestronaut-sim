@@ -201,16 +201,10 @@ export const strings = {
     retry: "Retry",
     prev: "Previous question",
     next: "Next question",
-    // The navigator's own button opens the full grid, so its accessible
-    // name has to carry both where you are and what activating it does.
-    position: (n: number, total: number) => `Question ${n} of ${total}. Show all questions.`,
-    jumpOpenLabel: "Show all questions",
     // Never "answered" or "done": the UI knows it rendered the text, not
     // that the work was done, and the grader is the only thing that knows
     // the latter.
     mark: "Mark for review",
-    marked: "marked for review",
-    viewed: "viewed",
     points: (points: number) => `${points} pts`,
     sshHint: (instance: string) => `ssh ${instance}`,
     copyValue: (value: string) => `Copy ${value}`,
@@ -220,6 +214,56 @@ export const strings = {
     copiedToDesktop: (value: string, chord: string) => `Copied ${value}. Paste with ${chord}`,
     copied: (value: string) => `Copied ${value}`,
     copyFailed: "Could not copy that value.",
+  },
+
+  // The question navigator, shared by both exam engines — the hands-on
+  // panel's full-panel disclosure and the multiple-choice screen's. One
+  // component, so one namespace: these keys used to be split across
+  // `questionPanel` and `mcq`, and the two copies had drifted.
+  navigator: {
+    // The trigger lives in each screen's nav header, but it is the
+    // navigator's own control, so its copy is here. The accessible name
+    // carries both where you are and what activating it does.
+    open: "Show all questions",
+    position: (n: number, total: number) => `Question ${n} of ${total}. Show all questions.`,
+    regionLabel: "All questions",
+    filterLabel: "Show",
+    filterAll: "All",
+    filterFlagged: "Flagged",
+    // Two vocabularies for one state, because the two engines know
+    // different things. The mcq screen holds the server's answer sheet, so
+    // it can say whether a question is answered; the hands-on screen only
+    // knows this tab rendered the text.
+    filterUnseen: "Unseen",
+    filterUnanswered: "Unanswered",
+    legendCurrent: "Current",
+    legendOpened: "Opened",
+    legendAnswered: "Answered",
+    legendFlagged: "Flagged",
+    legendUnseen: "Unseen",
+    legendUnanswered: "Unanswered",
+    // Spoken, never drawn: ten tiles to a row leaves one line and it
+    // belongs to the number.
+    opened: "opened",
+    unseen: "not opened",
+    answered: "answered",
+    unanswered: "unanswered",
+    flagged: "flagged for review",
+    // A filter matching nothing says which filter and what would fill it.
+    emptyFlagged: "Nothing is flagged. Press F on a tile, or use Mark for review.",
+    emptyUnseen: "Every question has been opened.",
+    emptyUnanswered: "Every question has an answer.",
+    // The shortcut strip. Keys first, then what they do, matching the
+    // shortcut reference the ? key opens.
+    keyLeft: "Left arrow",
+    keyRight: "Right arrow",
+    keyMove: "move",
+    keyFlagKey: "F",
+    keyFlag: "flag",
+    keyGridKey: "G",
+    keyGrid: "grid",
+    keyDigits: "1–9",
+    keyJump: "jump",
   },
 
   markdown: {
@@ -412,8 +456,6 @@ export const strings = {
     // The attempt ended (timer, or a submit elsewhere) between the click
     // and the save; the screen is about to flip to the score on its own.
     saveConflict: "The attempt has ended; that last change wasn't recorded.",
-    answered: "answered",
-    unanswered: "unanswered",
     // Submit dialog: unlike the hands-on screen, here the UI genuinely
     // knows what is unanswered — the answers live server-side.
     reviewUnanswered: (n: number) =>
@@ -500,11 +542,17 @@ export const strings = {
     colDoes: "Does",
     noneMac: "No shortcuts are being translated. This is not a Mac, or translation is switched off.",
     // The page's own shortcuts. Kept as copy rather than derived because
-    // the handlers live in three different components (QuestionPanel,
-    // PanelResizer, useFocusTrap) and there is no registry to read them
-    // from — if one moves, this table has to move with it.
+    // the handlers live in four different components (QuestionPanel,
+    // Navigator, PanelResizer, useFocusTrap) and there is no registry to
+    // read them from — if one moves, this table has to move with it. The
+    // navigator repeats its own four in a strip along its foot, where a
+    // candidate is actually using them.
     browserShortcuts: [
       ["[  /  ]", "Previous / next question"],
+      ["G", "Show or hide the question grid"],
+      ["Arrows", "Move between tiles, in the grid"],
+      ["1 – 9", "Jump to a tile, in the grid"],
+      ["F", "Flag the tile you are on, in the grid"],
       ["?", "This list"],
       ["Esc", "Close a panel or dialog"],
       ["← / →", "Resize the question panel (when the divider has focus)"],
