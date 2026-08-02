@@ -10,7 +10,14 @@ const STORAGE_KEY = "sim.panelWidth";
 // Mirrors the clamp on .question-panel in theme.css. Kept in both places
 // on purpose: CSS enforces it against the viewport (which JS never sees
 // without a listener), JS enforces it against the pointer.
-const DEFAULT_WIDTH = 360;
+//
+// DEFAULT_WIDTH is --task-pane-width, the measure the design specifies by
+// number. It is duplicated rather than read back with getComputedStyle:
+// this value is needed before first paint, and a layout read in a layout
+// effect to recover a constant we already know is a worse trade than one
+// mirrored number. theme.css names the token in its fallback, so the two
+// are at least visibly a pair.
+const DEFAULT_WIDTH = 420;
 const MIN_WIDTH = 280;
 const MAX_WIDTH = 600;
 const STEP = 16;
@@ -79,8 +86,9 @@ export function PanelResizer({ panelId }: PanelResizerProps) {
     document.documentElement.style.setProperty("--panel-width", `${px}px`);
   }, []);
 
-  // Before paint, so a stored width never shows as a 360px flash. The CSS
-  // fallback var(--panel-width, 360px) covers the frame before this runs.
+  // Before paint, so a stored width never shows as a default-width flash.
+  // The CSS fallback var(--panel-width, var(--task-pane-width)) covers the
+  // frame before this runs.
   useLayoutEffect(() => {
     applyWidth(width);
   }, [applyWidth, width]);

@@ -69,7 +69,7 @@ describe("PanelResizer accessibility contract", () => {
     // A separator's implicit orientation is horizontal, so this must be explicit.
     expect(sep).toHaveAttribute("aria-orientation", "vertical");
     expect(sep).toHaveAttribute("aria-controls", "question-panel");
-    expect(sep).toHaveAttribute("aria-valuenow", "360");
+    expect(sep).toHaveAttribute("aria-valuenow", "420");
     expect(sep).toHaveAttribute("aria-valuemin", "280");
     expect(sep).toHaveAttribute("aria-valuemax", "600");
     expect(sep).toHaveAccessibleName(/resize/i);
@@ -84,13 +84,13 @@ describe("PanelResizer keyboard", () => {
     sep.focus();
 
     await userEvent.keyboard("{ArrowRight}");
-    expect(sep).toHaveAttribute("aria-valuenow", "376");
+    expect(sep).toHaveAttribute("aria-valuenow", "436");
 
     await userEvent.keyboard("{Shift>}{ArrowRight}{/Shift}");
-    expect(sep).toHaveAttribute("aria-valuenow", "440");
+    expect(sep).toHaveAttribute("aria-valuenow", "500");
 
     await userEvent.keyboard("{ArrowLeft}");
-    expect(sep).toHaveAttribute("aria-valuenow", "424");
+    expect(sep).toHaveAttribute("aria-valuenow", "484");
   });
 
   test("Home and End pin to the bounds and never pass them", async () => {
@@ -174,11 +174,12 @@ describe("PanelResizer pointer", () => {
     pointer(sep, "pointermove", 560);
     // Written to the custom property imperatively — no setState per frame,
     // or <Markdown> would re-parse the question sixty times a second.
-    expect(panelWidth()).toBe("420px");
+    // 420 default + 60px of travel.
+    expect(panelWidth()).toBe("480px");
 
     pointer(sep, "pointerup", 560);
-    expect(sep).toHaveAttribute("aria-valuenow", "420");
-    expect(window.localStorage.getItem(STORAGE_KEY)).toBe("420");
+    expect(sep).toHaveAttribute("aria-valuenow", "480");
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBe("480");
   });
 
   test("a drag holds the desktop's resize for the whole gesture", () => {
@@ -207,7 +208,7 @@ describe("PanelResizer pointer", () => {
 
     await userEvent.dblClick(sep);
 
-    expect(sep).toHaveAttribute("aria-valuenow", "360");
+    expect(sep).toHaveAttribute("aria-valuenow", "420");
     expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 });
@@ -217,7 +218,8 @@ describe("PanelResizer persistence", () => {
     window.localStorage.setItem(STORAGE_KEY, "480");
     renderResizer();
     expect(screen.getByRole("separator")).toHaveAttribute("aria-valuenow", "480");
-    // Applied in a layout effect, so a stored width never flashes at 360.
+    // Applied in a layout effect, so a stored width never flashes at the
+    // default.
     // This is the assertion that caught the original bug: written to an
     // ancestor ref, it was empty here, because a child's layout effect
     // runs before its parent's ref is attached.
@@ -229,7 +231,7 @@ describe("PanelResizer persistence", () => {
     (stored) => {
       window.localStorage.setItem(STORAGE_KEY, stored);
       renderResizer();
-      expect(screen.getByRole("separator")).toHaveAttribute("aria-valuenow", "360");
+      expect(screen.getByRole("separator")).toHaveAttribute("aria-valuenow", "420");
     },
   );
 });

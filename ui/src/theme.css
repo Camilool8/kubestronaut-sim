@@ -1027,7 +1027,7 @@
                          the pane's 1rem gutters that is 568px, which at
                          the 15px base is about 75ch — the top of a
                          comfortable line. 700px would be ~90ch, a worse
-                         read than the 360px default.
+                         read than the --task-pane-width default.
        280px             is where the footer nav stops fitting on one row
                          (Previous, All tasks and Next, labelled).
                          The navigator halves to five columns just above
@@ -1037,7 +1037,7 @@
      Deliberately a custom property and not an inline `width`: an inline
      style beats a class rule, so a persisted width could otherwise win
      over the clamp and render the panel unusably narrow. */
-  width: clamp(280px, var(--panel-width, 360px), min(600px, 50vw));
+  width: clamp(280px, var(--panel-width, var(--task-pane-width)), min(600px, 50vw));
   flex-shrink: 0;
   position: relative;
   /* --control-size lived here for the header's 28px icon steppers, which
