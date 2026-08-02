@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/http"
 	"os"
@@ -78,6 +79,7 @@ func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desk
 	mux.HandleFunc("PUT /api/questions/{id}/answer", s.handleAnswerPut)
 	mux.HandleFunc("GET /api/answers", s.handleAnswersGet)
 	mux.HandleFunc("POST /api/session/start", s.handleSessionStart)
+	mux.HandleFunc("PUT /api/session/focus", s.handleSessionFocus)
 	mux.HandleFunc("GET /api/session", s.handleSessionGet)
 	mux.HandleFunc("POST /api/session/end", s.handleSessionEnd)
 	mux.HandleFunc("POST /api/session/grade", s.handlePracticeGrade)
@@ -137,6 +139,24 @@ type examResponse struct {
 	// Modes the lobby renders its picker from, so the three cards are
 	// described by the server rather than hardcoded in the UI.
 	Modes []examMode `json:"modes"`
+	// Domains is the bank's curriculum, in the order it declares it — the
+	// list a draw configurator builds its chips from. Computed from the
+	// FULL pool, never from Questions above: once an attempt has started,
+	// Questions is that attempt's drawn subset, and counting it by domain
+	// would present the drawn questions as if they were the curriculum.
+	Domains []domainInfo `json:"domains"`
+}
+
+// domainInfo is one curriculum domain of the loaded exam.
+//
+// WeightPct and QuestionCount are independent numbers and neither
+// implies the other: a domain can be worth 44% of the certification and
+// hold three questions. The first is what the exam board publishes, the
+// second is how much of it this bank has written.
+type domainInfo struct {
+	Name          string `json:"name"`
+	WeightPct     int    `json:"weightPct"`
+	QuestionCount int    `json:"questionCount"`
 }
 
 // examMode is one selectable attempt mode.
@@ -182,6 +202,14 @@ type examQuestionInfo struct {
 	TotalPoints int    `json:"totalPoints"`
 	HintCount   int    `json:"hintCount"`
 	Multi       bool   `json:"multi,omitempty"`
+	// TargetSeconds is the question's pacing budget, and TargetDerived
+	// says it was computed from the question's share of the exam clock
+	// rather than authored in the bank. The pair travels together because
+	// they are different claims — an author's judgement of the work
+	// versus arithmetic about weights — and a display that cannot tell
+	// them apart will state the second with the first's confidence.
+	TargetSeconds int  `json:"targetSeconds,omitempty"`
+	TargetDerived bool `json:"targetDerived,omitempty"`
 }
 
 func (s *server) handleExam(w http.ResponseWriter, r *http.Request) {
@@ -209,6 +237,7 @@ func (s *server) handleExam(w http.ResponseWriter, r *http.Request) {
 			HintCount: q.HintCount,
 			Multi:     q.Multi,
 		}
+		info.TargetSeconds, info.TargetDerived = exam.TargetSeconds(s.ex, q)
 		if s.ex.Type == exam.TypeMCQ {
 			info.TotalPoints = q.Weight
 		} else {
@@ -216,6 +245,7 @@ func (s *server) handleExam(w http.ResponseWriter, r *http.Request) {
 		}
 		resp.Questions = append(resp.Questions, info)
 	}
+	resp.Domains = s.domainInfo()
 	// Each card's advertised clock comes from durationFor — the same
 	// function POST /api/session/start resolves the real clock with — so
 	// the number on the card is the number the attempt gets, including
@@ -249,6 +279,29 @@ func totalPoints(q exam.Question) int {
 	return total
 }
 
+// domainInfo lists the loaded exam's curriculum domains in bank order,
+// counted over the WHOLE pool (s.ex.Questions) rather than over whatever
+// GET /api/exam is currently listing — questionsForExamResponse narrows
+// that to the drawn subset once an attempt starts, and a configurator
+// built on the narrowed count would show a candidate the questions they
+// drew as if they were the entire curriculum.
+func (s *server) domainInfo() []domainInfo {
+	counts := make(map[string]int, len(s.ex.Domains))
+	for _, q := range s.ex.Questions {
+		counts[q.Domain]++
+	}
+	// Pre-sized (not nil) so a bank with no domains marshals as "[]".
+	out := make([]domainInfo, 0, len(s.ex.Domains))
+	for _, d := range s.ex.Domains {
+		out = append(out, domainInfo{
+			Name:          d.Name,
+			WeightPct:     d.WeightPct,
+			QuestionCount: counts[d.Name],
+		})
+	}
+	return out
+}
+
 // declaredQuestionCount is the exam's length as the candidate is meant
 // to see it BEFORE an attempt exists to draw one from: ex.ExamLength for
 // a pooled mcq bank, otherwise the size of the whole pool. Every display
@@ -256,6 +309,16 @@ func totalPoints(q exam.Question) int {
 // len(s.ex.Questions) directly — that would show the pool's full size on
 // a bank where a candidate never sees more than ExamLength of it.
 func (s *server) declaredQuestionCount() int {
+	// Once an attempt exists, its own draw is the only truthful answer,
+	// and it is not always ex.ExamLength: a domain filter can leave a
+	// pool too shallow to draw the declared length from, and a filtered
+	// hands-on attempt has no declared length at all. Both then report
+	// fewer questions than the bank advertises, and this field is the one
+	// every count display reads — "Question 1 of 65" on a 12-question
+	// drill is the whole screen lying at once.
+	if ids := s.mgr.QuestionIDs(); len(ids) > 0 {
+		return len(ids)
+	}
 	if s.ex.ExamLength > 0 && s.ex.ExamLength < len(s.ex.Questions) {
 		return s.ex.ExamLength
 	}
@@ -583,6 +646,17 @@ type sessionResponse struct {
 	EndReason        string `json:"endReason"`
 	Mode             string `json:"mode"`
 	Untimed          bool   `json:"untimed"`
+	// ElapsedSeconds is always present, including 0 for an idle session:
+	// it is the only figure that describes an UNTIMED attempt's clock,
+	// since durationSeconds - remainingSeconds is 0 for training whatever
+	// the truth is. Omitting it at 0 would make "just started" and "no
+	// such field" the same wire state.
+	ElapsedSeconds int `json:"elapsedSeconds"`
+	// How this attempt's questions were drawn. Omitted while idle, and on
+	// an attempt started by a build that predates seeding.
+	Seed         string   `json:"seed,omitempty"`
+	PoolDigest   string   `json:"poolDigest,omitempty"`
+	DomainFilter []string `json:"domainFilter,omitempty"`
 }
 
 func toSessionResponse(snap session.Snapshot) sessionResponse {
@@ -594,11 +668,26 @@ func toSessionResponse(snap session.Snapshot) sessionResponse {
 		EndReason:        snap.EndReason,
 		Mode:             snap.Mode,
 		Untimed:          snap.Untimed,
+		ElapsedSeconds:   snap.ElapsedSeconds,
+		Seed:             snap.Seed,
+		PoolDigest:       snap.PoolDigest,
+		DomainFilter:     snap.DomainFilter,
 	}
 	if !snap.StartedAt.IsZero() {
 		resp.StartedAt = snap.StartedAt.Format(time.RFC3339Nano)
 	}
 	return resp
+}
+
+// startResponse is the session shape plus the one fact that belongs to
+// the REQUEST rather than to the attempt: whether the pool the caller
+// replayed from is still the pool they got. It is reported here and
+// nowhere else, and is deliberately not persisted — the attempt itself
+// is perfectly ordinary, it just is not the same set of questions the
+// seed produced last time.
+type startResponse struct {
+	sessionResponse
+	PoolChanged bool `json:"poolChanged,omitempty"`
 }
 
 func (s *server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
@@ -615,48 +704,120 @@ func (s *server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusConflict, "the exam environment is still starting")
 		return
 	}
-	// Body is optional and defaults to an exam attempt: ./sim and
-	// tests/smoke.sh both POST with no body at all, and must keep
-	// working unchanged.
-	mode := session.ModeExam
-	var body struct {
-		Mode string `json:"mode"`
+	// Body is optional and defaults to an unseeded, unfiltered exam
+	// attempt: ./sim and tests/smoke.sh both POST with no body at all,
+	// and must keep working unchanged. An empty body decodes as io.EOF,
+	// which is why the decode error is tolerated rather than rejected.
+	body := startRequest{Mode: session.ModeExam}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+		writeJSONError(w, http.StatusBadRequest, "body must be JSON: {\"mode\":...}")
+		return
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err == nil && body.Mode != "" {
-		mode = body.Mode
+	if body.Mode == "" {
+		body.Mode = session.ModeExam
 	}
-	if !session.ValidMode(mode) {
-		writeJSONError(w, http.StatusBadRequest, "unknown mode "+mode)
+	if !session.ValidMode(body.Mode) {
+		writeJSONError(w, http.StatusBadRequest, "unknown mode "+body.Mode)
 		return
 	}
 
-	// A pooled mcq bank draws its subset fresh on every Start — Reset
-	// already clears the previous attempt's QuestionIDs, so "New attempt"
-	// always means a new random draw, not a replay of the last one. An
-	// unpooled bank (ExamLength unset, or a pool no bigger than it) draws
-	// the whole pool, unchanged — see exam.DrawMCQ.
-	var snap session.Snapshot
-	var err error
-	if s.ex.Type == exam.TypeMCQ {
-		ids, drawErr := exam.DrawMCQ(s.ex)
-		if drawErr != nil {
-			// A bank whose pool cannot satisfy its own domainWeights at
-			// this draw size is an authoring bug tests/bank-mcq.sh should
-			// have caught before this ever ran — surfaced as a 500
-			// rather than silently starting an attempt with too few
-			// questions in some domain.
-			writeJSONError(w, http.StatusInternalServerError, drawErr.Error())
+	// Every attempt draws, on both engines. A pooled mcq bank draws a
+	// fresh subset (Reset having cleared the last one, so "New attempt"
+	// means a new draw rather than a replay); everything else draws every
+	// in-scope question in bank order, which without a domain filter is
+	// the whole bank exactly as before. See exam.Draw.
+	drawn, err := exam.Draw(s.ex, exam.DrawOptions{Seed: body.Seed, Domains: body.Domains})
+	if err != nil {
+		// A malformed seed or an unknown domain is the caller's mistake;
+		// a pool that cannot satisfy its own domainWeights at this draw
+		// size is an authoring bug tests/bank-mcq.sh should have caught
+		// long before this ran, and must not be reported as if the
+		// candidate had asked for something wrong.
+		if errors.Is(err, exam.ErrDrawRequest) {
+			writeJSONError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		snap, err = s.mgr.StartMCQ(mode, s.durationFor(mode), ids)
-	} else {
-		snap, err = s.mgr.Start(mode, s.durationFor(mode))
+		writeJSONError(w, http.StatusInternalServerError, err.Error())
+		return
 	}
+
+	// A replay whose pool has moved on is started, not refused. The draw
+	// is still perfectly deterministic — it is simply no longer the same
+	// set — and refusing would leave a candidate holding an old seed with
+	// nothing at all rather than with a comparable attempt and a warning.
+	poolChanged := body.PoolDigest != "" && body.PoolDigest != drawn.PoolDigest
+
+	snap, err := s.mgr.StartDraw(body.Mode, s.durationFor(body.Mode), session.Draw{
+		QuestionIDs:  drawn.IDs,
+		Seed:         drawn.Seed,
+		PoolDigest:   drawn.PoolDigest,
+		DomainFilter: drawn.Domains,
+	})
 	if err != nil {
 		writeJSONError(w, http.StatusConflict, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, toSessionResponse(snap))
+	writeJSON(w, http.StatusOK, startResponse{
+		sessionResponse: toSessionResponse(snap),
+		PoolChanged:     poolChanged,
+	})
+}
+
+// startRequest is the POST /api/session/start body. Every field is
+// optional, including the object itself.
+type startRequest struct {
+	Mode string `json:"mode"`
+	// Seed replays a previous draw; empty mints a fresh one.
+	Seed string `json:"seed"`
+	// Domains narrows the draw to part of the curriculum. Empty draws
+	// from all of it, which is the only kind of attempt a "passed" claim
+	// can rest on.
+	Domains []string `json:"domains"`
+	// PoolDigest is the pool the seed came from, when replaying. Compared
+	// against the loaded bank's and reported back, never enforced.
+	PoolDigest string `json:"poolDigest"`
+}
+
+// handleSessionFocus records which task is on screen. The client reports
+// a question id and nothing else — the server owns this clock exactly as
+// it owns the countdown — and time accrues to the previously reported
+// question when a new report arrives.
+//
+// It rides the UI's existing session poller, so a lost report costs at
+// most one interval, and the 409/404 pair mirrors the answer PUT: the
+// state check comes first so the endpoint cannot double as a way to
+// enumerate question ids.
+func (s *server) handleSessionFocus(w http.ResponseWriter, r *http.Request) {
+	if s.mgr.Snapshot().State != "running" {
+		writeJSONError(w, http.StatusConflict, "no attempt is running")
+		return
+	}
+
+	var body struct {
+		Question string `json:"question"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Question == "" {
+		writeJSONError(w, http.StatusBadRequest, "body must be JSON: {\"question\":\"q01\"}")
+		return
+	}
+	// findQuestion already restricts to the attempt's drawn subset, which
+	// is exactly the right scope: time spent on a pool question this
+	// attempt never contained is not a thing that can have happened.
+	if _, ok := s.findQuestion(body.Question); !ok {
+		writeJSONError(w, http.StatusNotFound, "unknown question "+body.Question)
+		return
+	}
+
+	if err := s.mgr.Focus(body.Question); err != nil {
+		// The attempt ended between the state check and the write.
+		if errors.Is(err, session.ErrConflict) {
+			writeJSONError(w, http.StatusConflict, "no attempt is running")
+			return
+		}
+		writeJSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
 // bootState reads the environment's start-up state, treating a nil

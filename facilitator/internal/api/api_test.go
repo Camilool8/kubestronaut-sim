@@ -154,12 +154,19 @@ type examResponse struct {
 	KubernetesVersion string `json:"kubernetesVersion"`
 	QuestionCount     int    `json:"questionCount"`
 	Questions         []struct {
-		ID          string `json:"id"`
-		Instance    string `json:"instance"`
-		Domain      string `json:"domain"`
-		Weight      int    `json:"weight"`
-		TotalPoints int    `json:"totalPoints"`
+		ID            string `json:"id"`
+		Instance      string `json:"instance"`
+		Domain        string `json:"domain"`
+		Weight        int    `json:"weight"`
+		TotalPoints   int    `json:"totalPoints"`
+		TargetSeconds int    `json:"targetSeconds"`
+		TargetDerived bool   `json:"targetDerived"`
 	} `json:"questions"`
+	Domains []struct {
+		Name          string `json:"name"`
+		WeightPct     int    `json:"weightPct"`
+		QuestionCount int    `json:"questionCount"`
+	} `json:"domains"`
 }
 
 func TestExam(t *testing.T) {

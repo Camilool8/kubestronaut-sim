@@ -102,6 +102,7 @@ both gate regexes tolerate it there and nowhere else.
 | `spec.questions[].title` | Optional short label shown in the question navigator, the jump grid and the score review. Absent, the UI falls back to the id (hands-on) or the attempt position (mcq) |
 | `spec.questions[].domain` | Must match a `domainWeights` key |
 | `spec.questions[].weight` | Must equal the sum of this question's `# points:` headers |
+| `spec.questions[].targetSeconds` | Optional pacing budget, in seconds, shown on the task chip. Absent, the facilitator derives one from the question's weight's share of the exam clock ([exam.go](../facilitator/internal/exam/exam.go), `TargetSeconds`) and flags it `targetDerived` on `GET /api/exam`, so a derived figure is never presented as the author's judgement — neither shipped bank sets it. It is a budget, never a limit: nothing enforces it and running over costs no points. Write it as the **last** key of the question block, after `weight:` (hands-on) or `correct:` (mcq); both gate regexes end there, and a `targetSeconds:` line above them hides the question from the gate |
 
 ## Points and domain weights
 

@@ -91,6 +91,17 @@ func Recorded(mode string) bool { return mode != ModeTraining }
 // most useful default for someone practising rather than rehearsing.
 func Recommended(mode string) bool { return mode == ModeSpeed }
 
+// FocusGapCap bounds how much time a single gap between focus reports
+// can contribute to a question.
+//
+// The client reports which task is on screen every poll interval, so a
+// normal gap is ten seconds. A candidate who closes the tab overnight
+// produces a gap of nine hours, and billing it would turn "time on this
+// question" into "time between two page loads". Ninety seconds is
+// generous for a missed report or two and useless as a way to accrue a
+// figure nobody was present for.
+const FocusGapCap = 90 * time.Second
+
 // reasonExpired is the EndReason the package itself assigns when a
 // running session is ended by the timer or a lazy expiry check, as
 // opposed to reasons supplied by callers of End (e.g. "submitted").
@@ -135,13 +146,42 @@ type Manager struct {
 	// that engine's answer sheet.
 	answers map[string][]int
 
-	// questionIDs is the attempt's drawn subset, in draw order — set once
-	// at StartMCQ and immutable for the attempt's life, exactly like mode
-	// and attemptDur above. Nil for a hands-on attempt, and for an mcq
-	// attempt started via plain Start (no pooling): "no subset" means
+	// draw is the attempt's drawn question set and the parameters that
+	// produced it — set once at StartDraw and immutable for the attempt's
+	// life, exactly like mode and attemptDur above. Its QuestionIDs is
+	// empty for an attempt started via plain Start: "no subset" means
 	// "the whole bank", the pre-pooling behaviour every existing bank
 	// still gets by default.
-	questionIDs []string
+	draw Draw
+
+	// timeSpent is qid → seconds the question has been on screen,
+	// accrued between Focus reports. Never mutated in place: every
+	// accrual replaces the whole map, so captureLocked/restoreLocked
+	// rollback stays correct with a plain pointer copy.
+	timeSpent map[string]int
+	// focusQID and focusSince are the open interval — which question was
+	// last reported on screen, and when. Deliberately NOT persisted: a
+	// restart should not bill the downtime to whatever was open when the
+	// process went away. The next report simply opens a fresh interval.
+	focusQID   string
+	focusSince time.Time
+}
+
+// Draw is an attempt's question set and the parameters that produced it.
+// A seed only reproduces a draw within one pool, so PoolDigest travels
+// beside Seed rather than being re-derived later from a bank that may by
+// then be a different bank.
+type Draw struct {
+	// QuestionIDs is the drawn subset in attempt order. Empty means "no
+	// subset was drawn" — the whole bank.
+	QuestionIDs []string
+	// Seed is the six-hex-digit seed the draw came out of.
+	Seed string
+	// PoolDigest fingerprints the pool the draw ran against.
+	PoolDigest string
+	// DomainFilter is the curriculum domains the draw was narrowed to,
+	// empty for a whole-curriculum attempt.
+	DomainFilter []string
 }
 
 // Snapshot is a read-only view of a session at one instant.
@@ -157,6 +197,19 @@ type Snapshot struct {
 	// rather than on RemainingSeconds == 0, which is also what an expired
 	// attempt looks like.
 	Untimed bool
+	// ElapsedSeconds is how long this attempt has been running (or ran,
+	// once it has ended), measured by the same clock as everything else
+	// here. It exists because DurationSeconds - RemainingSeconds is the
+	// elapsed time of a TIMED attempt only: an untimed training attempt
+	// reports both as 0, and there is no other way to say how long it has
+	// been going. 0 when idle.
+	ElapsedSeconds int
+	// Seed, PoolDigest and DomainFilter describe how this attempt's
+	// questions were drawn. All empty when idle, and on an attempt
+	// started before seeding existed.
+	Seed         string
+	PoolDigest   string
+	DomainFilter []string
 }
 
 // persistedState is the on-disk JSON shape written and read at path.
@@ -183,19 +236,40 @@ type persistedState struct {
 	// Answers is an mcq attempt's selections; absent for hands-on
 	// attempts, which store nothing per question.
 	Answers map[string][]int `json:"answers,omitempty"`
-	// QuestionIDs is a pooled mcq attempt's drawn subset, in draw order;
-	// absent for hands-on attempts and for mcq attempts with no pooling.
+	// QuestionIDs is the attempt's drawn subset, in draw order; absent
+	// for an attempt started via plain Start, which draws no subset.
 	QuestionIDs []string `json:"questionIds,omitempty"`
+	// Seed, PoolDigest and DomainFilter are the draw's parameters,
+	// persisted so a resumed attempt can still say how it was drawn — and
+	// so grading can refuse when PoolDigest no longer describes the
+	// loaded bank (exam.CheckPool).
+	Seed         string   `json:"seed,omitempty"`
+	PoolDigest   string   `json:"poolDigest,omitempty"`
+	DomainFilter []string `json:"domainFilter,omitempty"`
+	// TimeSpent is qid → seconds accrued between focus reports. The OPEN
+	// interval is not part of it: focusSince is not persisted, so a
+	// restart bills nothing for the time the process was away.
+	TimeSpent map[string]int `json:"timeSpent,omitempty"`
 }
 
 // persistedVersion is the on-disk format this build reads and writes.
 // Version 1 files predate bank identity and attempt tokens; version 2
 // predates attempt modes; version 3 predates mcq answer storage; version
-// 4 predates a pooled mcq attempt's drawn question-id subset. All are
-// discarded on load by the existing version guard, which is the whole
-// migration: a discarded file starts the session idle, and an idle
-// session has no mode, answers, or question ids to migrate.
-const persistedVersion = 5
+// 4 predates a pooled mcq attempt's drawn question-id subset; version 5
+// predates the draw's seed, pool digest and domain filter, and per-
+// question focus time. All are discarded on load by the existing version
+// guard, which is the whole migration: a discarded file starts the
+// session idle, and an idle session has nothing to migrate.
+//
+// A bump costs whoever is mid-attempt their attempt, so the seed, the
+// digest, the domain filter and the focus accrual all arrived in this
+// one bump rather than in the two or three the work naturally split
+// into. Note that it does not cost anyone a graded RESULT: results are
+// stored as opaque json.RawMessage and served back verbatim (see the
+// Results field above), so a result from a build before any of these
+// fields existed survives every bump and arrives at the client with none
+// of them. Nothing downstream may assume otherwise.
+const persistedVersion = 6
 
 // New loads the session persisted at path, or starts idle if the file is
 // missing or unreadable/corrupt (any non-missing read or parse failure is
@@ -280,7 +354,13 @@ func New(path, bank string, dur time.Duration, clock func() time.Time, onExpire 
 	m.results = doc.Results
 	m.gradeError = doc.GradeError
 	m.answers = doc.Answers
-	m.questionIDs = doc.QuestionIDs
+	m.draw = Draw{
+		QuestionIDs:  doc.QuestionIDs,
+		Seed:         doc.Seed,
+		PoolDigest:   doc.PoolDigest,
+		DomainFilter: doc.DomainFilter,
+	}
+	m.timeSpent = doc.TimeSpent
 	if doc.EndedAt != nil {
 		m.endedAt = *doc.EndedAt
 	}
@@ -319,16 +399,15 @@ func New(path, bank string, dur time.Duration, clock func() time.Time, onExpire 
 // untimed. Passing an unknown mode is a programming error and is
 // rejected rather than silently treated as an exam.
 func (m *Manager) Start(mode string, dur time.Duration) (Snapshot, error) {
-	return m.StartMCQ(mode, dur, nil)
+	return m.StartDraw(mode, dur, Draw{})
 }
 
-// StartMCQ is Start plus a pooled mcq attempt's drawn question-id subset,
-// persisted so a resume (or a facilitator restart) shows the exact same
-// questions in the exact same order. questionIDs is nil for every
-// hands-on attempt and for an mcq attempt with no pooling configured —
-// "no subset" means "the whole bank", exactly what plain Start already
-// gives every existing bank.
-func (m *Manager) StartMCQ(mode string, dur time.Duration, questionIDs []string) (Snapshot, error) {
+// StartDraw is Start plus the attempt's drawn question set, persisted so
+// a resume (or a facilitator restart) shows the exact same questions in
+// the exact same order — and so the attempt can still say which seed,
+// pool and domain filter produced them. A zero Draw is what plain Start
+// passes: no subset, which means the whole bank.
+func (m *Manager) StartDraw(mode string, dur time.Duration, draw Draw) (Snapshot, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -350,11 +429,10 @@ func (m *Manager) StartMCQ(mode string, dur time.Duration, questionIDs []string)
 	m.results = nil
 	m.gradeError = ""
 	m.answers = nil
-	if len(questionIDs) == 0 {
-		m.questionIDs = nil
-	} else {
-		m.questionIDs = append([]string(nil), questionIDs...)
-	}
+	m.draw = cloneDraw(draw)
+	m.timeSpent = nil
+	m.focusQID = ""
+	m.focusSince = time.Time{}
 
 	if err := m.persistLocked(); err != nil {
 		m.restoreLocked(prev)
@@ -365,15 +443,105 @@ func (m *Manager) StartMCQ(mode string, dur time.Duration, questionIDs []string)
 	return m.snapshotLocked(), nil
 }
 
+// cloneDraw deep-copies d's slices so the caller cannot mutate an
+// attempt's record of itself after the fact. An empty QuestionIDs
+// normalizes to nil: "no subset" and "a subset of nothing" must not be
+// two different persisted states.
+func cloneDraw(d Draw) Draw {
+	out := Draw{Seed: d.Seed, PoolDigest: d.PoolDigest}
+	if len(d.QuestionIDs) > 0 {
+		out.QuestionIDs = append([]string(nil), d.QuestionIDs...)
+	}
+	if len(d.DomainFilter) > 0 {
+		out.DomainFilter = append([]string(nil), d.DomainFilter...)
+	}
+	return out
+}
+
 // QuestionIDs returns a copy of the current attempt's drawn subset, in
-// draw order — empty (never nil) when there is none (hands-on, an mcq
-// attempt started via plain Start, or no attempt at all).
+// draw order — empty (never nil) when there is none (an attempt started
+// via plain Start, or no attempt at all).
 func (m *Manager) QuestionIDs() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	out := make([]string, len(m.questionIDs))
-	copy(out, m.questionIDs)
+	out := make([]string, len(m.draw.QuestionIDs))
+	copy(out, m.draw.QuestionIDs)
+	return out
+}
+
+// Focus records that question qid is now the one on screen, accruing the
+// time since the previous report to whatever was on screen before it.
+//
+// The client reports a question id and nothing else; the server owns the
+// clock here exactly as it owns the countdown, so a client cannot
+// inflate (or a slow one under-report) how long it spent anywhere. A gap
+// contributes at most FocusGapCap however long it really was.
+//
+// Re-reporting the SAME question is the normal case — the poller repeats
+// the current one every interval — and is how time accumulates.
+// ErrConflict unless an attempt is running: time can only be spent
+// inside one.
+func (m *Manager) Focus(qid string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.state != stateRunning {
+		return fmt.Errorf("session: focus: %w", ErrConflict)
+	}
+
+	prev := m.captureLocked()
+	m.accrueFocusLocked()
+	m.focusQID = qid
+	m.focusSince = m.clock()
+
+	if err := m.persistLocked(); err != nil {
+		m.restoreLocked(prev)
+		return fmt.Errorf("session: focus: %w", err)
+	}
+	return nil
+}
+
+// accrueFocusLocked closes the open focus interval, adding its capped
+// duration to the question it belongs to and leaving no interval open.
+// The caller must hold m.mu.
+func (m *Manager) accrueFocusLocked() {
+	if m.focusQID == "" || m.focusSince.IsZero() {
+		return
+	}
+	qid := m.focusQID
+	gap := m.clock().Sub(m.focusSince)
+	if gap > FocusGapCap {
+		gap = FocusGapCap
+	}
+	m.focusQID, m.focusSince = "", time.Time{}
+
+	secs := int(gap.Seconds())
+	if secs <= 0 {
+		return
+	}
+	// Replaced, never mutated in place, so a captureLocked taken before
+	// this call still restores the pre-accrual map (see the field's
+	// comment on Manager).
+	next := make(map[string]int, len(m.timeSpent)+1)
+	for k, v := range m.timeSpent {
+		next[k] = v
+	}
+	next[qid] += secs
+	m.timeSpent = next
+}
+
+// TimeSpent returns a copy of the per-question accrual, qid → seconds.
+// The open interval is not included: it is credited when the next focus
+// report arrives, or when the attempt ends.
+func (m *Manager) TimeSpent() map[string]int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	out := make(map[string]int, len(m.timeSpent))
+	for k, v := range m.timeSpent {
+		out[k] = v
+	}
 	return out
 }
 
@@ -445,7 +613,10 @@ func (m *Manager) Reset() error {
 	m.results = nil
 	m.gradeError = ""
 	m.answers = nil
-	m.questionIDs = nil
+	m.draw = Draw{}
+	m.timeSpent = nil
+	m.focusQID = ""
+	m.focusSince = time.Time{}
 
 	if err := m.persistLocked(); err != nil {
 		m.restoreLocked(prev)
@@ -629,26 +800,33 @@ type mutableFields struct {
 	// The map pointer is enough: answers maps are replaced wholesale,
 	// never mutated in place (see the field's comment on Manager).
 	answers map[string][]int
-	// Likewise: questionIDs is replaced wholesale (set once at
-	// StartMCQ, cleared at Reset), never mutated in place.
-	questionIDs []string
+	// Likewise: the draw's slices are replaced wholesale (set once at
+	// StartDraw, cleared at Reset) and timeSpent is rebuilt on every
+	// accrual, never mutated in place.
+	draw       Draw
+	timeSpent  map[string]int
+	focusQID   string
+	focusSince time.Time
 }
 
 // captureLocked snapshots the fields a transition may need to roll back.
 // The caller must hold m.mu.
 func (m *Manager) captureLocked() mutableFields {
 	return mutableFields{
-		mode:        m.mode,
-		attemptDur:  m.attemptDur,
-		state:       m.state,
-		attempt:     m.attempt,
-		startedAt:   m.startedAt,
-		endedAt:     m.endedAt,
-		endReason:   m.endReason,
-		results:     m.results,
-		gradeError:  m.gradeError,
-		answers:     m.answers,
-		questionIDs: m.questionIDs,
+		mode:       m.mode,
+		attemptDur: m.attemptDur,
+		state:      m.state,
+		attempt:    m.attempt,
+		startedAt:  m.startedAt,
+		endedAt:    m.endedAt,
+		endReason:  m.endReason,
+		results:    m.results,
+		gradeError: m.gradeError,
+		answers:    m.answers,
+		draw:       m.draw,
+		timeSpent:  m.timeSpent,
+		focusQID:   m.focusQID,
+		focusSince: m.focusSince,
 	}
 }
 
@@ -665,7 +843,10 @@ func (m *Manager) restoreLocked(f mutableFields) {
 	m.results = f.results
 	m.gradeError = f.gradeError
 	m.answers = f.answers
-	m.questionIDs = f.questionIDs
+	m.draw = f.draw
+	m.timeSpent = f.timeSpent
+	m.focusQID = f.focusQID
+	m.focusSince = f.focusSince
 }
 
 // untimedLocked reports whether the current attempt has no deadline.
@@ -716,6 +897,11 @@ func (m *Manager) transitionToEndedLocked(reason string) error {
 	m.state = stateEnded
 	m.endedAt = m.clock()
 	m.endReason = reason
+	// Close the open focus interval before the attempt is over: without
+	// this the last question a candidate looked at loses everything since
+	// its final report, which on a question they submitted from is the
+	// only interval it ever had.
+	m.accrueFocusLocked()
 	if err := m.persistLocked(); err != nil {
 		m.restoreLocked(prev)
 		return err
@@ -785,11 +971,38 @@ func (m *Manager) snapshotLocked() Snapshot {
 		EndReason:       m.endReason,
 		Mode:            mode,
 		Untimed:         m.state != stateIdle && m.untimedLocked(),
+		ElapsedSeconds:  int(m.elapsedLocked().Seconds()),
+		Seed:            m.draw.Seed,
+		PoolDigest:      m.draw.PoolDigest,
+	}
+	if len(m.draw.DomainFilter) > 0 {
+		snap.DomainFilter = append([]string(nil), m.draw.DomainFilter...)
 	}
 	if m.state == stateRunning && !m.untimedLocked() {
 		snap.RemainingSeconds = int(m.remainingLocked().Seconds())
 	}
 	return snap
+}
+
+// elapsedLocked returns how long the attempt has been running, or ran:
+// clock() since startedAt while running, endedAt since startedAt once it
+// has ended, and zero when idle. Unlike remainingLocked it is meaningful
+// for an untimed attempt, which is the entire reason it exists — a
+// training attempt's duration and remaining are both 0, so their
+// difference says nothing. The caller must hold m.mu.
+func (m *Manager) elapsedLocked() time.Duration {
+	if m.state == stateIdle || m.startedAt.IsZero() {
+		return 0
+	}
+	end := m.clock()
+	if m.state == stateEnded && !m.endedAt.IsZero() {
+		end = m.endedAt
+	}
+	elapsed := end.Sub(m.startedAt)
+	if elapsed < 0 {
+		return 0
+	}
+	return elapsed
 }
 
 // persistLocked atomically writes the current in-memory state to m.path
@@ -811,7 +1024,11 @@ func (m *Manager) persistLocked() error {
 		Results:         m.results,
 		GradeError:      m.gradeError,
 		Answers:         m.answers,
-		QuestionIDs:     m.questionIDs,
+		QuestionIDs:     m.draw.QuestionIDs,
+		Seed:            m.draw.Seed,
+		PoolDigest:      m.draw.PoolDigest,
+		DomainFilter:    m.draw.DomainFilter,
+		TimeSpent:       m.timeSpent,
 	}
 	if !m.endedAt.IsZero() {
 		endedAt := m.endedAt

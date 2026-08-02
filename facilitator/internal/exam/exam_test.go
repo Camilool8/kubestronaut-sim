@@ -1,6 +1,7 @@
 package exam
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -348,7 +349,7 @@ func loadMCQDoc(t *testing.T, specExtra string, questions ...string) (*Exam, err
 
 // poolFixture builds an Exam with the given domain weights and, for each
 // domain, a pool of poolSizes[domain] questions in "<domain-initial><n>"
-// ids (e.g. "F1".."F6" for "Fundamentals") — plenty for DrawMCQ to
+// ids (e.g. "F1".."F6" for "Fundamentals") — plenty for Draw to
 // sample from without colliding with real bank ids in any test failure
 // message.
 func poolFixture(t *testing.T, order []string, weights map[string]int, poolSizes map[string]int, examLength int) *Exam {
@@ -426,20 +427,21 @@ func TestDomainTargetsMissingDomainErrors(t *testing.T) {
 	}
 }
 
-// DrawMCQ with no pooling configured (the default every bank has until
+// A draw with no pooling configured (the default every bank has until
 // it opts in) must return every question, unchanged, in bank order —
 // this is the backward-compatibility path every existing mcq bank and
 // the hidden smoke-mcq fixture rely on.
-func TestDrawMCQNoPoolingReturnsFullBankInOrder(t *testing.T) {
+func TestDrawNoPoolingReturnsFullBankInOrder(t *testing.T) {
 	e := poolFixture(t, kcnaDomainOrder, kcnaWeights,
 		map[string]int{
 			"Kubernetes Fundamentals": 3, "Container Orchestration": 2,
 			"Cloud Native Application Delivery": 2, "Cloud Native Architecture": 2,
 		}, 0)
-	ids, err := DrawMCQ(e)
+	res, err := Draw(e, DrawOptions{})
 	if err != nil {
-		t.Fatalf("DrawMCQ: %v", err)
+		t.Fatalf("Draw: %v", err)
 	}
+	ids := res.IDs
 	if len(ids) != len(e.Questions) {
 		t.Fatalf("len(ids) = %d, want %d (the full pool)", len(ids), len(e.Questions))
 	}
@@ -453,7 +455,7 @@ func TestDrawMCQNoPoolingReturnsFullBankInOrder(t *testing.T) {
 // A pooled draw must land exactly on domainTargets' per-domain counts —
 // not just approximately, every single time — and never repeat or
 // invent an id.
-func TestDrawMCQStratifiesExactlyByDomain(t *testing.T) {
+func TestDrawStratifiesExactlyByDomain(t *testing.T) {
 	poolSizes := map[string]int{
 		"Kubernetes Fundamentals": 40, "Container Orchestration": 30,
 		"Cloud Native Application Delivery": 16, "Cloud Native Architecture": 15,
@@ -465,10 +467,11 @@ func TestDrawMCQStratifiesExactlyByDomain(t *testing.T) {
 		byID[q.ID] = q
 	}
 
-	ids, err := DrawMCQ(e)
+	res, err := Draw(e, DrawOptions{})
 	if err != nil {
-		t.Fatalf("DrawMCQ: %v", err)
+		t.Fatalf("Draw: %v", err)
 	}
+	ids := res.IDs
 	if len(ids) != 65 {
 		t.Fatalf("len(ids) = %d, want 65", len(ids))
 	}
@@ -497,28 +500,31 @@ func TestDrawMCQStratifiesExactlyByDomain(t *testing.T) {
 	}
 }
 
-// Two draws from the same pool must (almost always) differ — otherwise
-// this "random" draw is a fixed sample wearing a randomizer's clothes.
-// The pool here is large enough that a coincidental match is
+// Two UNSEEDED draws from the same pool must (almost always) differ —
+// otherwise this "random" draw is a fixed sample wearing a randomizer's
+// clothes. The pool here is large enough that a coincidental match is
 // astronomically unlikely, so a match is treated as a real failure.
-func TestDrawMCQVariesBetweenAttempts(t *testing.T) {
+func TestDrawVariesBetweenAttempts(t *testing.T) {
 	poolSizes := map[string]int{
 		"Kubernetes Fundamentals": 40, "Container Orchestration": 30,
 		"Cloud Native Application Delivery": 16, "Cloud Native Architecture": 15,
 	}
 	e := poolFixture(t, kcnaDomainOrder, kcnaWeights, poolSizes, 65)
 
-	first, err := DrawMCQ(e)
+	first, err := Draw(e, DrawOptions{})
 	if err != nil {
-		t.Fatalf("DrawMCQ (first): %v", err)
+		t.Fatalf("Draw (first): %v", err)
 	}
-	second, err := DrawMCQ(e)
+	second, err := Draw(e, DrawOptions{})
 	if err != nil {
-		t.Fatalf("DrawMCQ (second): %v", err)
+		t.Fatalf("Draw (second): %v", err)
+	}
+	if first.Seed == second.Seed {
+		t.Error("two unseeded draws minted the same seed — the mint is not random")
 	}
 	same := true
-	for i := range first {
-		if first[i] != second[i] {
+	for i := range first.IDs {
+		if first.IDs[i] != second.IDs[i] {
 			same = false
 			break
 		}
@@ -529,8 +535,8 @@ func TestDrawMCQVariesBetweenAttempts(t *testing.T) {
 }
 
 // A domain whose authored pool is smaller than the draw needs is a bank
-// bug DrawMCQ must refuse rather than silently under-fill.
-func TestDrawMCQErrorsWhenADomainPoolIsTooShallow(t *testing.T) {
+// bug Draw must refuse rather than silently under-fill.
+func TestDrawErrorsWhenADomainPoolIsTooShallow(t *testing.T) {
 	// Every other domain's pool is generously oversized (so the total
 	// pool safely exceeds the 65-question draw and this actually
 	// exercises the per-domain check, not the "pool <= examLength, skip
@@ -542,8 +548,14 @@ func TestDrawMCQErrorsWhenADomainPoolIsTooShallow(t *testing.T) {
 		"Cloud Native Architecture":         7, // needs 8, only 7 authored
 	}
 	e := poolFixture(t, kcnaDomainOrder, kcnaWeights, poolSizes, 65)
-	if _, err := DrawMCQ(e); err == nil {
-		t.Error("DrawMCQ with a shallow Architecture pool: got nil error, want one naming the shortfall")
+	_, err := Draw(e, DrawOptions{})
+	if err == nil {
+		t.Fatal("Draw with a shallow Architecture pool: got nil error, want one naming the shortfall")
+	}
+	// A bank that cannot satisfy its own weights is an authoring bug, not
+	// a bad request, and the HTTP layer tells the two apart by this.
+	if errors.Is(err, ErrDrawRequest) {
+		t.Errorf("err = %v, want it NOT wrapped in ErrDrawRequest", err)
 	}
 }
 

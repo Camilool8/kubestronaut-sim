@@ -74,7 +74,16 @@ func (g *grader) Grade() {
 			}
 		}()
 
-		res := g.evaluateResults()
+		res, err := g.evaluateResults()
+		if err != nil {
+			// A refusal, not a crash: the attempt cannot be scored
+			// honestly, and the candidate is told so on /api/results
+			// rather than shown a confident number.
+			if setErr := g.mgr.SetGradeError(token, err.Error()); setErr != nil {
+				log.Printf("facilitator: record grade-refusal: %v", setErr)
+			}
+			return
+		}
 		data, err := json.Marshal(res)
 		if err != nil {
 			if setErr := g.mgr.SetGradeError(token, err.Error()); setErr != nil {
@@ -110,7 +119,10 @@ func (g *grader) PracticeGrade() (json.RawMessage, error) {
 	}
 	defer g.inFlight.Store(false)
 
-	res := g.evaluateResults()
+	res, err := g.evaluateResults()
+	if err != nil {
+		return nil, err
+	}
 	raw, err := json.Marshal(res)
 	if err != nil {
 		return nil, fmt.Errorf("marshal practice results: %w", err)
@@ -124,9 +136,34 @@ func (g *grader) PracticeGrade() (json.RawMessage, error) {
 // instant. Both return the same schema, which is why everything
 // downstream of this call is engine-agnostic, and both are scoped to the
 // attempt's drawn question ids rather than to the whole bank.
-func (g *grader) evaluateResults() *evaluate.Results {
-	if g.ex.Type == exam.TypeMCQ {
-		return mcqgrade.Grade(g.ex, g.bank, g.mgr.Answers(), g.mgr.QuestionIDs())
+//
+// It refuses outright when the attempt's pool digest no longer describes
+// the loaded bank. exam.Subset SILENTLY SKIPS ids the exam does not
+// declare, so a session whose drawn ids outlived their bank would
+// otherwise be scored on the intersection and reported with a plausible,
+// wrong Total — a candidate would read a confident score for an exam
+// they did not sit. An error message is the better outcome, and making
+// Subset intolerant instead would break the every-question-in-bank-order
+// path every unpooled attempt takes.
+func (g *grader) evaluateResults() (*evaluate.Results, error) {
+	snap := g.mgr.Snapshot()
+	if err := exam.CheckPool(g.ex, snap.PoolDigest); err != nil {
+		return nil, err
 	}
-	return evaluate.Grade(g.ex, g.bank, g.runner, g.timeout, g.mgr.QuestionIDs())
+
+	var res *evaluate.Results
+	if g.ex.Type == exam.TypeMCQ {
+		res = mcqgrade.Grade(g.ex, g.bank, g.mgr.Answers(), g.mgr.QuestionIDs())
+	} else {
+		res = evaluate.Grade(g.ex, g.bank, g.runner, g.timeout, g.mgr.QuestionIDs())
+	}
+	res.Describe(g.ex, evaluate.Attempt{
+		Mode:            snap.Mode,
+		Seed:            snap.Seed,
+		DomainFilter:    snap.DomainFilter,
+		DurationSeconds: snap.DurationSeconds,
+		ElapsedSeconds:  snap.ElapsedSeconds,
+		TimeSpent:       g.mgr.TimeSpent(),
+	})
+	return res, nil
 }

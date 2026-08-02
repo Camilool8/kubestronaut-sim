@@ -121,6 +121,63 @@ type Results struct {
 	// server's arithmetic and a second implementation of it would be a
 	// second answer. Omitted when nothing was graded.
 	Domains []DomainResult `json:"domains,omitempty"`
+
+	// Everything below describes the ATTEMPT rather than the score, and
+	// is copied on by Describe so a result can be read without the
+	// session that produced it — which is what an attempt history needs
+	// and what the results banner already wants. All omitempty, like
+	// every additive field before them: a result graded before they
+	// existed is persisted verbatim and served back unchanged after an
+	// upgrade, so no reader may assume they are present.
+	Mode string `json:"mode,omitempty"`
+	Seed string `json:"seed,omitempty"`
+	// DomainFilter is the domains the draw was narrowed to; absent means
+	// the whole curriculum.
+	DomainFilter []string `json:"domainFilter,omitempty"`
+	// DurationSeconds is the attempt's clock (0, hence absent, for an
+	// untimed one) and ElapsedSeconds what was used of it.
+	DurationSeconds int `json:"durationSeconds,omitempty"`
+	ElapsedSeconds  int `json:"elapsedSeconds,omitempty"`
+}
+
+// Attempt is how an attempt was run: the configuration a Results value
+// carries alongside the score so the two can be read together later.
+type Attempt struct {
+	Mode            string
+	Seed            string
+	DomainFilter    []string
+	DurationSeconds int
+	ElapsedSeconds  int
+	// TimeSpent is qid → seconds the question was on screen
+	// (session.Manager.TimeSpent). Absent entries are questions never
+	// reported as focused, which score exactly as they always did.
+	TimeSpent map[string]int
+}
+
+// Describe copies a's configuration onto r and fills in each question's
+// timing pair — how long it was open, and how long it was meant to take.
+//
+// Separate from Grade, and called after it, because none of this is
+// graded: both engines produce the same Results by completely different
+// routes and neither should have to carry an attempt description through
+// its scoring loop to hand back unchanged at the end.
+func (r *Results) Describe(ex *exam.Exam, a Attempt) {
+	r.Mode = a.Mode
+	r.Seed = a.Seed
+	r.DomainFilter = a.DomainFilter
+	r.DurationSeconds = a.DurationSeconds
+	r.ElapsedSeconds = a.ElapsedSeconds
+
+	byID := make(map[string]exam.Question, len(ex.Questions))
+	for _, q := range ex.Questions {
+		byID[q.ID] = q
+	}
+	for i, qr := range r.Questions {
+		r.Questions[i].TimeSpentSeconds = a.TimeSpent[qr.ID]
+		if q, ok := byID[qr.ID]; ok {
+			r.Questions[i].TargetSeconds, _ = exam.TargetSeconds(ex, q)
+		}
+	}
 }
 
 // DomainResult is one curriculum domain's slice of a graded attempt.
@@ -156,6 +213,17 @@ type QuestionResult struct {
 	// named here so the client is not the place that decides whether
 	// 8-of-9 reads as a pass.
 	Verdict string `json:"verdict"`
+
+	// TimeSpentSeconds is how long this question was on screen, and
+	// TargetSeconds the pacing budget to compare it against. Both are set
+	// by Describe, not by grading.
+	//
+	// The first measures the TASK PANE, not attention: a candidate
+	// reading the question while thinking in a terminal accrues time, and
+	// one who walked away accrues a capped amount of it too. Every label
+	// built from it has to say "open", never "spent" or "worked".
+	TimeSpentSeconds int `json:"timeSpentSeconds,omitempty"`
+	TargetSeconds    int `json:"targetSeconds,omitempty"`
 
 	// MCQ only, set by internal/mcqgrade and absent (omitempty) from
 	// hands-on results: the candidate's selections, the answer key, and
