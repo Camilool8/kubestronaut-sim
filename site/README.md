@@ -1,9 +1,17 @@
 # site/
 
 The repository landing page. A standalone static page for GitHub Pages —
-plain HTML and CSS, no JavaScript, no build tooling, no network requests
-at runtime. It is **not** part of the React app in `ui/` and shares no
-code with it.
+plain HTML and CSS, no build tooling, no network requests at runtime. It
+is **not** part of the React app in `ui/` and shares no code with it.
+
+There is exactly one script on the page, inline at the foot of
+`index.html` and about ten lines long. All it does is pause the hero's
+orbit animation while the hero is scrolled off screen, which CSS alone
+cannot detect. Nothing on the page depends on it running: no script, no
+`IntersectionObserver`, or a thrown error each leave the figure exactly
+as the stylesheet drew it. Keep it that way — if a second script is ever
+needed, that is the moment to ask whether this directory still wants to
+be static.
 
 ## Preview
 
@@ -44,6 +52,14 @@ in `DESIGN.md`, enforced by `ui/src/styles/mirrors.test.ts`):
 Run that alongside the other offline gates in `AGENTS.md`. A token change
 that has not reached the landing page is then a failure, not a slow drift.
 
+`--check` also re-derives the page's **figures** from `banks/*/exam.yaml`
+and fails if they disagree: the headline question total, each bank's
+share of it, and the drawn/pool pair of every pooled bank. `index.html`
+is written by hand and nothing regenerates it, so its numbers could only
+ever drift — and they had, for a whole wave, while a green CI step
+claimed to be catching exactly that. Break a figure and watch the gate
+fail before you trust it.
+
 ### Generated files — do not edit
 
 | File | Source |
@@ -66,6 +82,20 @@ and the page falls through the token stacks to `system-ui` and
 - **There is no theme toggle.** The page sets no `data-theme` attribute,
   so it follows `prefers-color-scheme` through the twin block in
   `tokens.css`.
+- **The hero orbit is a data figure, not an illustration.** Five rings,
+  one per certification on the Kubestronaut path; the two with a bank are
+  solid with a filled body, the three without are dashed with a hollow
+  one. Ring colour is `--exam-tint`, the same alias the exam cards use, so
+  a ring and its card cannot disagree about an engine's hue — and
+  `[data-engine="soon"]` is already the token system's answer for
+  "advertised, not runnable". When a bank lands, its ring changes
+  `data-state` and nothing else. State is on three channels (line style,
+  body fill, and the caption naming which is which) so it never rests on
+  hue alone.
+- **A code chip must never end a sentence.** `code` carries horizontal
+  padding, which pushes a following full stop a clear space away and
+  leaves the punctuation looking detached. Word around it. Three places
+  on the page used to get this wrong.
 - **Every figure on the page is countable.** Question counts come from
   `spec.questions` in `banks/*/exam.yaml`, durations and passing scores
   from `spec`, and the coming-soon reasons verbatim from

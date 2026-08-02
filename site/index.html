@@ -10,6 +10,27 @@
     />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 
+    <!-- The two theme colours are --bg's light and dark values from
+         tokens.css. They are the one place a literal colour is
+         unavoidable: <meta> takes no var(), and browser chrome is painted
+         before any stylesheet loads. Both are mirrored values, so they
+         move with the token — ui/src/styles/mirrors.test.ts covers the
+         three mirrors inside the app; this pair is this page's own. -->
+    <meta name="theme-color" content="#f6f8fc" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#101728" media="(prefers-color-scheme: dark)" />
+
+    <!-- Link-preview metadata. No og:image: this project has no artwork
+         to put behind one, and a generated placeholder would be the kind
+         of claim the rest of the page refuses to make. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="kubestronaut-sim" />
+    <meta
+      property="og:description"
+      content="A killer.sh-style rehearsal for the Kubernetes certifications, as a Docker Compose stack on your own machine. Deliberately harder than the real exams."
+    />
+    <meta property="og:url" content="https://camilool8.github.io/kubestronaut-sim/" />
+    <meta name="twitter:card" content="summary" />
+
     <!-- tokens.css is the app's own stylesheet, mirrored here by
          site/build.sh and loaded first so every value below resolves
          against the same source of truth the React app uses. It carries
@@ -34,6 +55,7 @@
           <ul class="site-nav">
             <li><a href="#track">Exams</a></li>
             <li><a href="#limits">Limits</a></li>
+            <li><a href="#docs">Docs</a></li>
             <li>
               <a href="https://github.com/Camilool8/kubestronaut-sim">GitHub</a>
             </li>
@@ -46,21 +68,11 @@
       <!-- ------------------------------------------------------- hero -->
       <section class="hero shell" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="eyebrow">Local exam simulator</p>
           <h1 id="hero-title">An exam simulator you run yourself.</h1>
           <p class="lede">
             A killer.sh-style rehearsal for the Kubernetes certifications, as a
-            Docker Compose stack on your own machine: a countdown that cannot be
-            paused, a real Linux desktop with terminals, a real two-node
-            Kubernetes cluster to act on, a per-check score with full solutions
-            afterwards, and a record of every graded attempt to measure the
-            next one against. Deliberately harder than the real exams.
-          </p>
-
-          <p class="hero-caveat">
-            Two banks ship today — CKAD hands-on and KCNA multiple-choice. CKA,
-            KCSA and CKS are listed in the catalog and cannot be sat, because
-            their banks are not written.
+            Docker Compose stack on your own machine. Deliberately harder than
+            the real exams.
           </p>
 
           <p class="hero-actions">
@@ -75,34 +87,140 @@
           </p>
         </div>
 
-        <!-- One column, not two grid items: the note belongs directly
-             under the terminal, and a grid item spanning both rows beside
-             them would push its surplus height into the terminal's row. -->
-        <div class="hero-side">
-        <!-- The quickstart terminal. This is a MACHINE surface, not a dark
-             card: --machine-* is the palette reserved for things that are
-             literally a computer, and it is identical in both themes on
-             purpose, because a terminal has no light mode. It keeps its own
-             titlebar, border and mono type so the boundary is legible in
-             dark mode too, where the page around it is also dark but
-             visibly blue where this is near-neutral. -->
-        <figure class="term">
-          <figcaption class="term-bar">
-            <span class="term-bar-dot" aria-hidden="true"></span>
-            <span class="term-bar-title">bash — quickstart</span>
+        <!-- The Kubestronaut path, drawn as the product mark at page scale.
+             favicon.svg is already "an orbit and two bodies on an ink
+             field", so this figure amplifies the mark rather than
+             inventing a second one.
+
+             It is a DATA figure, not decoration, and it is the only place
+             on the page that says what "Kubestronaut" means: five
+             certifications, and this repository has a bank for two of
+             them. Status is carried on three redundant channels — a solid
+             ring against a dashed one, a filled body against a hollow one,
+             and the caption naming which is which — so it never depends on
+             hue alone. Ring tint is the SAME data-engine alias the exam
+             cards below use, so a ring and its card agree by construction.
+
+             Ordered inner to outer by the CNCF's own tiering: the two
+             associate exams, then the two professional ones, then CKS,
+             which requires an active CKA. -->
+        <figure class="orbit">
+          <p class="orbit-title">The Kubestronaut path</p>
+
+          <svg
+            class="orbit-svg"
+            viewBox="0 0 320 320"
+            role="img"
+            aria-label="Five orbits, one per certification on the Kubestronaut path. KCNA and CKAD are drawn solid: each has a question bank you can sit today. KCSA, CKA and CKS are drawn dashed: they appear in the catalog but no bank is written for them."
+          >
+            <!-- Rings are static; only the bodies travel them. A rotating
+                 ring would read as a loading spinner, which is the one
+                 thing this figure must not be mistaken for. -->
+            <g class="orbit-ring" data-ring="kcna" data-engine="mcq" data-state="live">
+              <circle class="orbit-path" cx="160" cy="160" r="48" />
+              <g class="orbit-track">
+                <g transform="rotate(40 160 160)">
+                  <circle class="orbit-body" cx="160" cy="112" r="7" />
+                </g>
+              </g>
+              <text class="orbit-label" x="160" y="212">KCNA</text>
+            </g>
+
+            <g class="orbit-ring" data-ring="kcsa" data-engine="soon" data-state="soon">
+              <circle class="orbit-path" cx="160" cy="160" r="71" />
+              <g class="orbit-track">
+                <g transform="rotate(200 160 160)">
+                  <circle class="orbit-body" cx="160" cy="89" r="5" />
+                </g>
+              </g>
+              <text class="orbit-label" x="210" y="114">KCSA</text>
+            </g>
+
+            <g class="orbit-ring" data-ring="cka" data-engine="soon" data-state="soon">
+              <circle class="orbit-path" cx="160" cy="160" r="94" />
+              <g class="orbit-track">
+                <g transform="rotate(60 160 160)">
+                  <circle class="orbit-body" cx="160" cy="66" r="5" />
+                </g>
+              </g>
+              <text class="orbit-label" x="94" y="231">CKA</text>
+            </g>
+
+            <!-- No data-engine, exactly as the CKAD card below carries
+                 none: :root's alias already points --exam-tint at the
+                 practical blue, and spelling it out would be a second
+                 place for the two to disagree. -->
+            <g class="orbit-ring" data-ring="ckad" data-state="live">
+              <circle class="orbit-path" cx="160" cy="160" r="117" />
+              <g class="orbit-track">
+                <g transform="rotate(250 160 160)">
+                  <circle class="orbit-body" cx="160" cy="43" r="7" />
+                </g>
+              </g>
+              <text class="orbit-label" x="277" y="164">CKAD</text>
+            </g>
+
+            <g class="orbit-ring" data-ring="cks" data-engine="soon" data-state="soon">
+              <circle class="orbit-path" cx="160" cy="160" r="140" />
+              <g class="orbit-track">
+                <g transform="rotate(130 160 160)">
+                  <circle class="orbit-body" cx="160" cy="20" r="5" />
+                </g>
+              </g>
+              <text class="orbit-label" x="45" y="84">CKS</text>
+            </g>
+
+            <circle class="orbit-core" cx="160" cy="160" r="16" />
+          </svg>
+
+          <figcaption class="orbit-caption">
+            A Kubestronaut has passed all five. Two of them have a bank here
+            you can sit today — KCNA and CKAD. The three drawn dashed are in
+            the catalog with the reason they cannot be sat, rather than as
+            five working exams.
           </figcaption>
-          <pre class="term-body"><code><span class="term-prompt" aria-hidden="true">$ </span>./sim doctor    <span class="term-note"># optional preflight</span>
+        </figure>
+      </section>
+
+      <!-- -------------------------------------------------- quickstart -->
+      <section class="section quickstart" aria-labelledby="quickstart-title">
+        <div class="shell">
+          <div class="section-head">
+            <h2 id="quickstart-title">Three commands</h2>
+            <p class="section-lede">
+              Everything after <code>up</code> happens in the browser: a
+              countdown that cannot be paused, a real Linux desktop with
+              terminals, a real two-node Kubernetes cluster to act on, a
+              per-check score with full solutions afterwards, and a record of
+              every graded attempt to measure the next one against.
+            </p>
+          </div>
+
+          <div class="quickstart-run">
+            <!-- The quickstart terminal. This is a MACHINE surface, not a
+                 dark card: --machine-* is the palette reserved for things
+                 that are literally a computer, and it is identical in both
+                 themes on purpose, because a terminal has no light mode. It
+                 keeps its own titlebar, border and mono type so the boundary
+                 is legible in dark mode too, where the page around it is also
+                 dark but visibly blue where this is near-neutral. -->
+            <figure class="term">
+              <figcaption class="term-bar">
+                <span class="term-bar-dot" aria-hidden="true"></span>
+                <span class="term-bar-title">bash — quickstart</span>
+              </figcaption>
+              <pre class="term-body"><code><span class="term-prompt" aria-hidden="true">$ </span>./sim doctor    <span class="term-note"># optional preflight</span>
 <span class="term-prompt" aria-hidden="true">$ </span>./sim up        <span class="term-note"># first run: several minutes</span>
 <span class="term-prompt" aria-hidden="true">$ </span>open <span class="term-url">http://localhost:8080</span></code></pre>
-        </figure>
+            </figure>
 
-        <p class="hero-note">
-          Requires Docker Desktop (or docker + compose v2), python3, and about
-          9GB of free RAM — the XFCE desktop is inside that figure. Everything
-          after <code>up</code> happens in the browser. The UI comes up before
-          the cluster does, so the page shows the same boot progress the
-          terminal does.
-          </p>
+            <p class="quickstart-note">
+              Requires Docker Desktop (or docker + compose v2), python3, and
+              about 9GB of free RAM — the XFCE desktop is inside that figure.
+              The UI comes up before the cluster does, so the page shows the
+              same boot progress the terminal does.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -115,8 +233,8 @@
             <h3 class="stat-label">Questions written</h3>
             <p class="stat-note">
               22 hands-on for CKAD and 97 multiple-choice for KCNA, counted from
-              <code>spec.questions</code> in their <code>exam.yaml</code>. All
-              original: no third-party exam
+              the <code>spec.questions</code> list in each bank's
+              <code>exam.yaml</code> file. All original: no third-party exam
               dump may be committed here, because CC BY-SA 4.0 requires the
               banks to be ours to license.
             </p>
@@ -150,26 +268,9 @@
           <p class="section-lede">
             One bank is loaded at a time, because a bank is a Kubernetes cluster
             seeded for its questions — so choosing another one is a destructive
-            2–4 minute rebuild, and the app asks first. Your attempt record sits
+            2-4 minute rebuild, and the app asks first. Your attempt record sits
             on its own volume and survives it.
           </p>
-        </div>
-
-        <!-- The coverage capsule, one segment per card below, tinted like
-             its card. aria-hidden because the figure beside it already says
-             the same thing in words. -->
-        <div class="coverage">
-          <div class="coverage-figure">
-            <span class="coverage-label">Playable today</span>
-            <span class="coverage-value">2 of 5</span>
-          </div>
-          <div class="coverage-bar" aria-hidden="true">
-            <span></span>
-            <span data-engine="mcq"></span>
-            <span data-engine="soon"></span>
-            <span data-engine="soon"></span>
-            <span data-engine="soon"></span>
-          </div>
         </div>
 
         <!-- Two lists, two peer headings. Wording from the app's own
@@ -322,44 +423,89 @@
       </section>
 
       <!-- ------------------------------------------------------- modes -->
+      <!-- A matrix rather than three cards: what separates the modes is
+           four properties they each answer differently, and three prose
+           blocks make the reader hold those answers in their head to
+           compare them. What each one permits is defined once in
+           facilitator/internal/session and enforced there, so a column
+           here cannot advertise something the server then refuses. -->
       <section class="shell section" aria-labelledby="modes-title">
         <div class="section-head">
           <h2 id="modes-title">Three ways to run an attempt</h2>
           <p class="section-lede">
-            Offered gentlest first. What each one permits is defined once in the
-            server and enforced there, so a card cannot advertise something the
-            server then refuses. Being recorded is one of those permissions: a
-            Mastery or Exam run is kept as an attempt, a Training run is not.
+            Offered gentlest first. Being recorded is one of these permissions,
+            not a separate setting: a Mastery or Exam run is kept as an attempt,
+            a Training run is not.
           </p>
         </div>
 
-        <ul class="mode-grid">
-          <li class="mode">
-            <h3>Training</h3>
-            <p>
-              Untimed. Two-tier hints and solutions on demand, and scoring that
-              does not end the attempt. This is how the product meets WCAG 2.2.1
-              Timing Adjustable — the unpausable countdown stays the default,
-              but it is opted into rather than imposed.
-            </p>
-          </li>
-          <li class="mode">
-            <h3>Mastery</h3>
-            <p>
-              Half the bank's duration and no help: 60 minutes for CKAD, 45 for
-              KCNA. For a candidate who already knows the material and wants the
-              clock to hurt.
-            </p>
-          </li>
-          <li class="mode">
-            <h3>Exam</h3>
-            <p>
-              The bank's full duration and no help. The timer is server-side,
-              not in the tab, and it cannot be paused. At zero the exam ends and
-              grading starts by itself.
-            </p>
-          </li>
-        </ul>
+        <!-- Scroll-Inside: four columns of prose do not fit a phone, and
+             the house answer to that is a box that scrolls rather than a
+             page that does. -->
+        <div
+          class="mode-table-scroll"
+          role="region"
+          aria-labelledby="modes-title"
+          tabindex="0"
+        >
+          <table class="mode-table">
+            <caption class="sr-only">
+              What each mode permits, compared across Training, Mastery and Exam
+            </caption>
+            <thead>
+              <tr>
+                <td></td>
+                <th scope="col">Training</th>
+                <th scope="col">Mastery</th>
+                <th scope="col">Exam</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Clock</th>
+                <td>None. Untimed.</td>
+                <td>
+                  Half the bank's duration
+                  <span class="mode-sub">60 min CKAD, 45 min KCNA</span>
+                </td>
+                <td>
+                  The bank's full duration
+                  <span class="mode-sub">120 min CKAD, 90 min KCNA</span>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Help</th>
+                <td>Two-tier hints, and solutions on demand</td>
+                <td>None</td>
+                <td>None</td>
+              </tr>
+              <tr>
+                <th scope="row">Scoring</th>
+                <td>Does not end the attempt</td>
+                <td>Ends the attempt</td>
+                <td>Ends the attempt</td>
+              </tr>
+              <tr>
+                <th scope="row">Kept as an attempt</th>
+                <td>No</td>
+                <td>Yes</td>
+                <td>Yes</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mode-notes">
+          <p>
+            Training is how the product meets WCAG 2.2.1 Timing Adjustable. The
+            unpausable countdown stays the default, but it is opted into rather
+            than imposed.
+          </p>
+          <p>
+            The timer is server-side, not in the tab, and in Exam mode it cannot
+            be paused. At zero the exam ends and grading starts by itself.
+          </p>
+        </div>
       </section>
 
       <!-- ------------------------------------------------------ limits -->
@@ -386,7 +532,7 @@
                 field would be theatre; the only real control is which interface
                 it binds to. Ports bind to all interfaces by default, so on a
                 network you do not control, start it with
-                <code>SIM_BIND=127.0.0.1 ./sim up</code>.
+                <code>SIM_BIND=127.0.0.1 ./sim up</code> instead.
               </dd>
             </div>
             <div class="limit">
@@ -440,6 +586,9 @@
       </section>
 
       <!-- --------------------------------------------------- the cluster -->
+      <!-- Component on the left, what it buys the score on the right. These
+           are four pieces of evidence for one claim, not four features, and
+           a row list says that where a card grid would not. -->
       <section class="shell section" aria-labelledby="cluster-title">
         <div class="section-head">
           <h2 id="cluster-title">Why the score means something</h2>
@@ -452,40 +601,176 @@
           </p>
         </div>
 
-        <ul class="fact-list">
-          <li class="fact">
-            <h3>Calico, not kindnet</h3>
-            <p>
+        <dl class="evidence">
+          <div class="evidence-row">
+            <dt>Calico, not kindnet</dt>
+            <dd>
               NetworkPolicies are genuinely enforced, so a policy question can
               be graded on whether traffic is actually denied.
-            </p>
-          </li>
-          <li class="fact">
-            <h3>ingress-nginx</h3>
-            <p>
+            </dd>
+          </div>
+          <div class="evidence-row">
+            <dt>ingress-nginx</dt>
+            <dd>
               An Ingress question has a controller behind it, so the route
               either resolves or it does not.
-            </p>
-          </li>
-          <li class="fact">
-            <h3>A local Helm repository and registry</h3>
-            <p>
+            </dd>
+          </div>
+          <div class="evidence-row">
+            <dt>A local Helm repository and registry</dt>
+            <dd>
               Plain HTTP, on the cluster network, so the image-building and
               packaging half of the curriculum is answerable offline.
-            </p>
-          </li>
-          <li class="fact">
-            <h3>Weights the build checks, and the grader applies</h3>
-            <p>
+            </dd>
+          </div>
+          <div class="evidence-row">
+            <dt>Weights the build checks, and the grader applies</dt>
+            <dd>
               A domain's share of an exam's points is its published curriculum
               weight, and <code>tests/bank-weights.sh</code> fails the build if
               any domain drifts more than two percentage points from it. That
               gate certifies the authored bank, not a draw taken from one, so
               the grader weights the score directly as well, and reports the raw
               points beside it.
-            </p>
-          </li>
-        </ul>
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <!-- --------------------------------------------------------- docs -->
+      <!-- This page is a front door, and the thing behind it is the
+           repository. Everything here is a real file on main; the split is
+           the one docs/README.md already makes for itself, so the two
+           cannot drift into different taxonomies. -->
+      <section class="shell section" id="docs" aria-labelledby="docs-title">
+        <div class="section-head">
+          <h2 id="docs-title">Where to go next</h2>
+          <p class="section-lede">
+            Start with the README if you want to run an exam. The rest is for
+            changing the thing, or for writing questions for it.
+          </p>
+        </div>
+
+        <div class="docs-index">
+          <section class="docs-group" aria-labelledby="docs-run">
+            <h3 class="docs-group-title" id="docs-run">Running it</h3>
+            <dl>
+              <div class="docs-entry">
+                <dt>
+                  <a href="https://github.com/Camilool8/kubestronaut-sim#readme"
+                    >README</a
+                  >
+                </dt>
+                <dd>The quickstart, the requirements, and one attempt end to end.</dd>
+              </div>
+              <div class="docs-entry">
+                <dt>
+                  <a
+                    href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/cli.md"
+                    >CLI reference</a
+                  >
+                </dt>
+                <dd>
+                  Every <code>./sim</code> subcommand, environment variable, and
+                  published port.
+                </dd>
+              </div>
+              <div class="docs-entry">
+                <dt>
+                  <a
+                    href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/TROUBLESHOOTING.md"
+                    >Troubleshooting</a
+                  >
+                </dt>
+                <dd>
+                  Symptoms and fixes, from the preflight through boot, an
+                  attempt, and grading.
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="docs-group" aria-labelledby="docs-understand">
+            <h3 class="docs-group-title" id="docs-understand">Understanding it</h3>
+            <dl>
+              <div class="docs-entry">
+                <dt>
+                  <a
+                    href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/README.md"
+                    >Documentation index</a
+                  >
+                </dt>
+                <dd>Every page below, plus the API and the project's own state.</dd>
+              </div>
+              <div class="docs-entry">
+                <dt>
+                  <a
+                    href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/architecture.md"
+                    >Architecture</a
+                  >
+                </dt>
+                <dd>
+                  The containers, the networks, the boot sequence, and what
+                  happens during one attempt.
+                </dd>
+              </div>
+              <div class="docs-entry">
+                <dt>
+                  <a
+                    href="https://github.com/Camilool8/kubestronaut-sim/blob/main/SECURITY.md"
+                    >Threat model</a
+                  >
+                </dt>
+                <dd>
+                  What is defended, what is not, and why the conductor is the
+                  only real boundary.
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="docs-group" aria-labelledby="docs-build">
+            <h3 class="docs-group-title" id="docs-build">Changing it</h3>
+            <dl>
+              <div class="docs-entry">
+                <dt>
+                  <a
+                    href="https://github.com/Camilool8/kubestronaut-sim/blob/main/CONTRIBUTING.md"
+                    >Contributing</a
+                  >
+                </dt>
+                <dd>
+                  Set up, build, and the non-obvious rules that will otherwise
+                  cost you an afternoon.
+                </dd>
+              </div>
+              <div class="docs-entry">
+                <dt>
+                  <a
+                    href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/bank-spec.md"
+                    >Bank format</a
+                  >
+                </dt>
+                <dd>
+                  The question bank schema and the validator contract, for
+                  writing your own.
+                </dd>
+              </div>
+              <div class="docs-entry">
+                <dt>
+                  <a
+                    href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/testing.md"
+                    >Testing</a
+                  >
+                </dt>
+                <dd>
+                  What to run before pushing, what CI enforces, and what CI
+                  structurally cannot.
+                </dd>
+              </div>
+            </dl>
+          </section>
+        </div>
       </section>
     </main>
 
@@ -507,21 +792,14 @@
                 <a href="https://github.com/Camilool8/kubestronaut-sim">Source</a>
               </li>
               <li>
+                <a href="https://github.com/Camilool8/kubestronaut-sim/issues"
+                  >Issues</a
+                >
+              </li>
+              <li>
                 <a
                   href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/README.md"
                   >Documentation</a
-                >
-              </li>
-              <li>
-                <a
-                  href="https://github.com/Camilool8/kubestronaut-sim/blob/main/SECURITY.md"
-                  >Threat model</a
-                >
-              </li>
-              <li>
-                <a
-                  href="https://github.com/Camilool8/kubestronaut-sim/blob/main/CONTRIBUTING.md"
-                  >Contributing</a
                 >
               </li>
             </ul>
@@ -554,5 +832,25 @@
         </div>
       </div>
     </footer>
+
+    <!-- The page's only script, and the only thing it does is stop the one
+         animation on it from running while nobody can see it. Five orbits
+         turning forever behind the reader is battery spent on nothing, and
+         CSS alone cannot tell that the hero has scrolled away.
+
+         Progressive by construction: no script, no IntersectionObserver, or
+         a thrown error all leave the figure exactly as the stylesheet drew
+         it, which is a working page. The reduced-motion case never gets
+         here at all — that is handled in CSS, so a reader who asked for
+         less motion does not depend on this file having loaded. -->
+    <script>
+      (function () {
+        var orbit = document.querySelector(".orbit-svg");
+        if (!orbit || !window.IntersectionObserver) return;
+        new IntersectionObserver(function (entries) {
+          orbit.toggleAttribute("data-idle", !entries[0].isIntersecting);
+        }).observe(orbit);
+      })();
+    </script>
   </body>
 </html>

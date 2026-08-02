@@ -19,14 +19,19 @@
 
    RARE ACCENT. Blue arrives for four things only: focus, currency, the one
    filled primary button per screen, and links. `.btn-primary` is that one
-   button. Hover is a step of TONE, never the accent.
+   button. Hover is a step of TONE, never the accent. The orbit figure is
+   the one addition: its rings are CURRENCY — they carry which exams exist
+   — and they borrow the same --exam-tint alias the cards below use, so a
+   ring and its card cannot disagree about an engine's hue.
 
    TWO-TIER HAIRLINE. --border-strong for an edge that identifies a
    control's hit area (buttons); --border for structure (cards, rules).
 
    Motion is written additively inside prefers-reduced-motion:
    no-preference, animating only compositor properties, so a reduced-motion
-   reader never depends on an animation being correctly cancelled. */
+   reader never depends on an animation being correctly cancelled. There is
+   exactly one authored animation on this page — the orbit — and every
+   other moving thing is feedback on a control the reader just touched. */
 
 /* ------------------------------------------------------------------ base */
 
@@ -94,7 +99,13 @@ a:hover {
 }
 
 /* An inline code chip. --radius-xs and not --radius-s: a box sized to a
-   few characters needs a corner proportional to itself. */
+   few characters needs a corner proportional to itself.
+
+   The horizontal padding is the app's own value and stays, which carries
+   one authoring constraint with it: a chip must never END a sentence,
+   because its trailing padding pushes the full stop a clear space away
+   and the punctuation reads as detached. Word the sentence so something
+   follows the chip. Three places on this page used to get this wrong. */
 code {
   font-family: var(--font-mono);
   font-size: 0.92em;
@@ -293,48 +304,31 @@ img {
 
 .hero {
   display: grid;
-  gap: var(--space-6);
+  gap: var(--space-7);
   padding-block: var(--space-8) var(--space-7);
-}
-
-.eyebrow {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: var(--space-3);
 }
 
 /* --text-hero has exactly one site in the system and this is it. It
    clamps DOWN to --text-4xl on a narrow viewport rather than to an
-   invented value, so the ramp stays inside the scale. */
+   invented value, so the ramp stays inside the scale.
+
+   20ch, not 16ch: the sentence is two phrases of seventeen characters and
+   the tighter measure broke it across three lines, which is one more than
+   a headline gets. balance keeps the two lines even as the clamp moves. */
 .hero-copy h1 {
   font-size: clamp(var(--text-4xl), 5.2vw, var(--text-hero));
   line-height: 1.12;
   letter-spacing: -0.025em;
-  max-width: 16ch;
+  max-width: 20ch;
+  text-wrap: balance;
 }
 
 .lede {
   margin-top: var(--space-4);
-  max-width: 56ch;
+  max-width: 52ch;
   font-size: var(--text-xl);
   line-height: 1.55;
   color: var(--text-body);
-}
-
-/* The honesty line, given a left rule rather than a tint. A --warn-soft
-   wash would read as a caution about the software; this is not a warning,
-   it is the scope of what ships. */
-.hero-caveat {
-  margin-top: var(--space-5);
-  padding-left: var(--space-4);
-  border-left: 2px solid var(--border-strong);
-  max-width: 56ch;
-  font-size: var(--text-m);
-  color: var(--text-secondary);
 }
 
 .hero-actions {
@@ -344,16 +338,119 @@ img {
   margin-top: var(--space-6);
 }
 
-/* The terminal and the sentence that qualifies it, as one column. */
-.hero-side {
+/* ---------------------------------------------------------- the orbit */
+/* The Kubestronaut path as an instrument: five orbits, one per
+   certification, and a body on each. The two with a bank are drawn solid
+   with a filled body; the three without are dashed with a hollow one, and
+   the caption names which is which — three channels, so the state never
+   rests on hue alone.
+
+   Colour comes from --exam-tint, the same alias the exam cards use, and
+   [data-engine="soon"] in tokens.css is already the system's answer for
+   "advertised, not runnable". Nothing here invents a value. */
+
+.orbit {
+  margin: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-3);
   min-width: 0;
 }
 
-.hero-note {
-  max-width: 56ch;
+.orbit-title {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.orbit-svg {
+  display: block;
+  width: 100%;
+  max-width: 21rem;
+  height: auto;
+}
+
+/* The path is static. A rotating ring is a loading spinner, which is the
+   one thing this figure must never be mistaken for; the body travels and
+   the orbit stays put, which is also what actually happens. */
+.orbit-path {
+  fill: none;
+  stroke: var(--exam-tint);
+  stroke-width: 2;
+}
+
+[data-state="soon"] .orbit-path {
+  stroke-width: 1.25;
+  stroke-dasharray: 2 8;
+  stroke-linecap: round;
+}
+
+/* The --bg stroke is a knockout, not an outline: it punches the body
+   through its own orbit line so the two read as one object at a crossing
+   rather than as a dot resting ambiguously on a wire. */
+.orbit-body {
+  fill: var(--exam-tint);
+  stroke: var(--bg);
+  stroke-width: 3;
+}
+
+[data-state="soon"] .orbit-body {
+  fill: var(--bg);
+  stroke: var(--exam-tint);
+  stroke-width: 1.5;
+}
+
+/* Each label is centred ON its own ring, at an angle no other label
+   uses. That is what ties a name to a circle when five of them are
+   concentric: the label breaks the line it belongs to, the way a scale
+   is labelled. paint-order draws the --bg stroke first, so it knocks a
+   clean gap rather than colliding with the ring, and with every ring
+   outside it that the word happens to cross.
+
+   Ranged around the clock rather than stacked along one radius: five
+   names on a diagonal read as a caption in the corner, not as labels. */
+.orbit-label {
+  fill: var(--exam-tint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 5;
+  stroke-linejoin: round;
+}
+
+/* The destination. --ink is this product's raised voice and in dark mode
+   it steps UP to stay visible against the page, so the anchor holds in
+   both themes without a second rule. */
+.orbit-core {
+  fill: var(--ink);
+  stroke: var(--ink-border);
+  stroke-width: 1;
+}
+
+.orbit-caption {
+  max-width: 46ch;
+  font-size: var(--text-m);
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* ----------------------------------------------------------- quickstart */
+
+.quickstart-run {
+  display: grid;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.quickstart-note {
+  max-width: 46ch;
   font-size: var(--text-m);
   color: var(--text-muted);
 }
@@ -509,63 +606,10 @@ img {
   font-size: var(--text-2xl);
 }
 
-/* The first of the two list headings follows the coverage capsule, which
+/* The first of the two list headings follows the section head, which
    already supplies the gap. */
 .subhead-first {
   margin-top: 0;
-}
-
-/* ------------------------------------------------------------- coverage */
-/* How much of the path is playable: a figure plus one segment per card in
-   the grid below, each tinted like its card, so the capsule doubles as the
-   grid's legend. */
-
-.coverage {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-3) var(--space-4);
-  margin-bottom: var(--space-5);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-m);
-}
-
-.coverage-figure {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.coverage-label {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.coverage-value {
-  font-family: var(--font-mono);
-  font-size: var(--text-l);
-  font-weight: 600;
-  color: var(--text);
-  white-space: nowrap;
-}
-
-.coverage-bar {
-  display: flex;
-  gap: 4px;
-}
-
-/* The pill token, not a literal half-height: on a 6px box it draws the
-   same lozenge, and it is what every other bar in the system uses. */
-.coverage-bar > span {
-  width: 22px;
-  height: 6px;
-  border-radius: var(--radius-pill);
-  background: var(--exam-tint);
 }
 
 /* ------------------------------------------------------------ exam cards */
@@ -779,38 +823,88 @@ img {
   color: var(--text-muted);
 }
 
-/* ------------------------------------------------- modes and fact cards */
+/* --------------------------------------------------------- mode matrix */
+/* Four properties the three modes answer differently. A table, because
+   comparing them is the whole job, and three prose blocks make the reader
+   hold six answers in their head to do it. */
 
-.mode-grid,
-.fact-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
-  gap: var(--space-4);
+/* Scroll-Inside again: four columns of prose do not fit a phone, and the
+   house answer is a box that scrolls rather than a page that does. The
+   region is focusable in the markup so it can be scrolled from the
+   keyboard, which is what makes the pattern legitimate. */
+.mode-table-scroll {
+  overflow-x: auto;
 }
 
-/* Anchored to the page: tone and a hairline, no shadow. The Float-Only
-   Rule reserves elevation for what genuinely floats, and the exam cards
-   above are the only cards on this page that do. */
-.mode,
-.fact {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-5);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
+.mode-table {
+  width: 100%;
+  min-width: 44rem;
+  border-collapse: collapse;
+  text-align: left;
 }
 
-.mode h3,
-.fact h3 {
+.mode-table th,
+.mode-table td {
+  padding: var(--space-4) var(--space-4) var(--space-4) 0;
+  vertical-align: top;
+  border-top: 1px solid var(--border);
+}
+
+/* The column heads are the three mode names and carry the section's
+   weight; nothing rules above them because the section head already
+   separates this block from what precedes it. */
+.mode-table thead th,
+.mode-table thead td {
+  border-top: 0;
+  padding-top: 0;
+}
+
+/* Equal thirds. Left to content the Training column took half the table,
+   because its cells say the most — and three columns of different widths
+   stop reading as three peers being compared. */
+.mode-table thead th {
+  width: 26%;
   font-size: var(--text-xl);
+  color: var(--text);
+  letter-spacing: var(--tracking-tight);
 }
 
-.mode p,
-.fact p {
+/* The row labels are the axis, not content: quieter than the cells they
+   introduce, and fixed-width so the four rows align. */
+.mode-table tbody th {
+  width: 12rem;
+  font-size: var(--text-s);
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.mode-table tbody td {
   font-size: var(--text-m);
   color: var(--text-secondary);
+}
+
+/* The concrete minutes under a relative rule. Mono because they are
+   measurements, and tabular so the two columns' figures line up. */
+.mode-sub {
+  display: block;
+  margin-top: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.mode-notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(24rem, 100%), 1fr));
+  gap: var(--space-4) var(--space-6);
+  margin-top: var(--space-6);
+}
+
+.mode-notes p {
+  max-width: 56ch;
+  font-size: var(--text-m);
+  color: var(--text-muted);
 }
 
 /* ----------------------------------------------------------- ink band */
@@ -869,6 +963,77 @@ img {
   margin-top: var(--space-2);
   font-size: var(--text-m);
   color: var(--ink-muted);
+}
+
+/* -------------------------------------------------------- evidence rows */
+/* Four pieces of evidence for one claim, not four features. A row list
+   puts the component beside what it buys the score; a card grid would
+   have said "features" and lost the argument the section is making. */
+
+.evidence-row {
+  display: grid;
+  gap: var(--space-2) var(--space-6);
+  padding-block: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.evidence dt {
+  font-size: var(--text-l);
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: var(--tracking-tight);
+}
+
+.evidence dd {
+  max-width: 64ch;
+  font-size: var(--text-m);
+  color: var(--text-secondary);
+}
+
+/* ------------------------------------------------------------ docs index */
+/* The page is a front door and the repository is what is behind it. Three
+   groups, matching the split docs/README.md already makes for itself, so
+   the two cannot drift into different taxonomies. */
+
+.docs-index {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(17rem, 100%), 1fr));
+  gap: var(--space-6);
+}
+
+.docs-group-title {
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-s);
+  color: var(--text-muted);
+}
+
+.docs-entry + .docs-entry {
+  margin-top: var(--space-4);
+}
+
+.docs-entry dt {
+  font-size: var(--text-l);
+  font-weight: 600;
+}
+
+/* The link is the heading, so it carries no underline at rest — the
+   weight and the accent already say it is one. The underline arrives on
+   hover, where it confirms the target rather than decorating the list. */
+.docs-entry dt a {
+  text-decoration: none;
+}
+
+.docs-entry dt a:hover {
+  text-decoration: underline;
+}
+
+.docs-entry dd {
+  margin-top: var(--space-1);
+  max-width: 44ch;
+  font-size: var(--text-m);
+  color: var(--text-secondary);
 }
 
 /* --------------------------------------------------------------- footer */
@@ -933,15 +1098,32 @@ img {
 }
 
 /* ---------------------------------------------------------- responsive */
-/* Two breakpoints, each changing structure rather than scale, plus one
+/* Three breakpoints, each changing structure rather than scale, plus one
    keyed to pointer type. */
 
+@media (min-width: 760px) {
+  /* The component beside what it buys, rather than above it. */
+  .evidence-row {
+    grid-template-columns: 18rem 1fr;
+    align-items: baseline;
+  }
+}
+
 @media (min-width: 900px) {
+  /* The claim on the left, the figure that qualifies it on the right.
+     Centred rather than start-aligned: the figure is a disc, so its
+     optical centre is its geometric one and hanging it from the top
+     leaves the column bottom-heavy. */
   .hero {
-    grid-template-columns: 1.05fr 0.95fr;
-    gap: var(--space-7);
-    align-items: start;
+    grid-template-columns: 1fr minmax(0, 21rem);
+    gap: var(--space-8);
+    align-items: center;
     padding-block: var(--space-9) var(--space-8);
+  }
+
+  .quickstart-run {
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: var(--space-6);
   }
 }
 
@@ -980,7 +1162,9 @@ img {
 
 /* -------------------------------------------------------------- motion */
 /* Additive, never a default that a reduce-guard later neutralises. Layout
-   is identical either way; only colour and a 1px press move. */
+   is identical either way, and the orbit's bodies are placed at their
+   authored angles in the markup — so with motion off the figure is a
+   composed diagram rather than five dots stacked at twelve o'clock. */
 
 @media (prefers-reduced-motion: no-preference) {
   .btn,
@@ -996,16 +1180,62 @@ img {
     transform: translateY(1px);
     transition-duration: 50ms;
   }
+
+  /* The page's one authored animation.
+     transform-box: view-box puts the origin in the SVG's own coordinate
+     space, so every ring turns about the figure's centre rather than
+     about its own dot. Where that is unsupported the dot spins in place,
+     which is wrong but harmless.
+
+     Periods rise with radius, the way real ones do. They are also
+     mutually prime enough that the five never resolve into a pattern, so
+     the figure never looks like it is counting something. */
+  .orbit-track {
+    transform-box: view-box;
+    transform-origin: 160px 160px;
+    animation: orbit-turn linear infinite;
+    /* linear on purpose. An orbit that eases is a widget, not an orbit,
+       and this is the one place on the page where the literal reading is
+       also the correct one. */
+  }
+
+  [data-ring="kcna"] .orbit-track {
+    animation-duration: 54s;
+  }
+  [data-ring="kcsa"] .orbit-track {
+    animation-duration: 76s;
+  }
+  [data-ring="cka"] .orbit-track {
+    animation-duration: 98s;
+  }
+  [data-ring="ckad"] .orbit-track {
+    animation-duration: 124s;
+  }
+  [data-ring="cks"] .orbit-track {
+    animation-duration: 158s;
+  }
+
+  /* Set by the observer at the foot of index.html once the hero has
+     scrolled away. Five orbits turning behind the reader is battery spent
+     on something nobody is looking at. */
+  .orbit-svg[data-idle] .orbit-track {
+    animation-play-state: paused;
+  }
+}
+
+@keyframes orbit-turn {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Windows High Contrast drops box-shadow and overrides every colour we
    set, which costs the live/soon distinction its fill. The badge word and
-   the dashed edge survive; this restores the card boundary that does not. */
+   the dashed edge survive; this restores the card boundary that does not.
+   The orbit keeps its meaning there too: solid against dashed, and a
+   filled body against a hollow one, are both shape rather than colour. */
 @media (forced-colors: active) {
   .exam-card,
-  .mode,
-  .fact,
-  .coverage,
   .term {
     border-color: CanvasText;
   }
