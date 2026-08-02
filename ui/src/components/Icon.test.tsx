@@ -51,6 +51,7 @@ describe("Icon", () => {
       "flag",
       "flag-filled",
       "copy",
+      "grid",
       "keyboard",
       "theme-auto",
       "theme-light",

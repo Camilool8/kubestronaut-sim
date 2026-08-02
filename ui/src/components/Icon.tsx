@@ -37,6 +37,7 @@ export type IconName =
   | "flag"
   | "flag-filled"
   | "copy"
+  | "grid"
   | "keyboard"
   | "theme-auto"
   | "theme-light"
@@ -76,6 +77,19 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <rect x="9" y="9" width="11" height="11" rx="2" />
       <path d="M5 15.5A1.5 1.5 0 0 1 4 14V5.5A1.5 1.5 0 0 1 5.5 4H14a1.5 1.5 0 0 1 1.5 1.5" />
+    </>
+  ),
+  // The navigator trigger. The design draws this as ⊞, which is a boxed
+  // plus and reads as "add" at 14px; four cells say "every task at once",
+  // which is what the popover actually contains. Two rows of two rather
+  // than the popover's real ten columns — at 14px a 10-wide grid is a
+  // smear, and this is a signpost, not a diagram.
+  grid: (
+    <>
+      <rect x="4" y="4" width="7" height="7" rx="1.5" />
+      <rect x="13" y="4" width="7" height="7" rx="1.5" />
+      <rect x="4" y="13" width="7" height="7" rx="1.5" />
+      <rect x="13" y="13" width="7" height="7" rx="1.5" />
     </>
   ),
   // Same 24 grid, same round caps: a key row and a space bar, which reads

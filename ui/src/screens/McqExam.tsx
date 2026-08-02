@@ -587,7 +587,7 @@ function McqQuestion({
             aria-expanded={jumpOpen}
             aria-controls={jumpOpen ? "mcq-jump" : undefined}
           >
-            <Icon name="chevron-down" className="disclosure-chevron" />
+            <Icon name="grid" className="trigger-glyph" />
             {strings.mcq.navigator}
             <kbd className="key-hint" aria-hidden="true">
               {strings.navigator.keyGridKey}

@@ -83,6 +83,18 @@
   color: var(--text-muted);
 }
 
+/* A glyph that names what a trigger opens rather than signalling whether
+   it is open — the navigator button's grid. Deliberately NOT
+   .disclosure-chevron: rotating a grid 180 degrees says nothing, and
+   these two triggers already carry their open state as a filled
+   background and a stronger border (.task-nav-jump[aria-expanded="true"],
+   .mcq-jump-trigger[aria-expanded="true"]), so nothing is lost by not
+   turning. */
+.trigger-glyph {
+  margin-left: var(--space-1);
+  color: var(--text-muted);
+}
+
 [aria-expanded="true"] > .disclosure-chevron,
 [open] > summary .disclosure-chevron {
   transform: rotate(180deg);

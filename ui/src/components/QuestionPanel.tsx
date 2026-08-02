@@ -265,7 +265,7 @@ export function QuestionPanel({
               aria-controls={jumpOpen ? "question-jump" : undefined}
               disabled={!selected}
             >
-              <Icon name="chevron-down" className="disclosure-chevron" />
+              <Icon name="grid" className="trigger-glyph" />
               {strings.questionPanel.allTasks}
               <kbd className="key-hint" aria-hidden="true">
                 {strings.navigator.keyGridKey}
