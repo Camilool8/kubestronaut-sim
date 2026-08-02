@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>kubestronaut-sim — a local exam simulator for the Kubestronaut certifications</title>
+    <meta
+      name="description"
+      content="Open-source, killer.sh-style exam simulator for the Kubestronaut certifications, run locally as a Docker Compose stack. Two banks ship today: CKAD hands-on and KCNA multiple-choice."
+    />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+
+    <!-- tokens.css is the app's own stylesheet, mirrored here by
+         site/build.sh and loaded first so every value below resolves
+         against the same source of truth the React app uses. It carries
+         the :root light default, the [data-theme="dark"] block and the
+         verbatim prefers-color-scheme twin; this page sets no data-theme
+         attribute and has no toggle, so it follows the OS. -->
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="fonts.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header">
+      <div class="shell site-header-inner">
+        <span class="brand">
+          <img class="brand-mark" src="favicon.svg" alt="" width="26" height="26" />
+          <span class="brand-word">kubestronaut<span class="brand-word-tail">-sim</span></span>
+        </span>
+        <nav aria-label="Project">
+          <ul class="site-nav">
+            <li><a href="#track">Exams</a></li>
+            <li><a href="#limits">Limits</a></li>
+            <li>
+              <a href="https://github.com/Camilool8/kubestronaut-sim">GitHub</a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- ------------------------------------------------------- hero -->
+      <section class="hero shell" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">Local exam simulator</p>
+          <h1 id="hero-title">An exam simulator you run yourself.</h1>
+          <p class="lede">
+            A killer.sh-style rehearsal for the Kubernetes certifications, as a
+            Docker Compose stack on your own machine: a countdown that cannot be
+            paused, a real Linux desktop with terminals, a real two-node
+            Kubernetes cluster to act on, and a per-check score with full
+            solutions afterwards. Deliberately harder than the real exams.
+          </p>
+
+          <p class="hero-caveat">
+            Two banks ship today — CKAD hands-on and KCNA multiple-choice. CKA,
+            KCSA and CKS are listed in the catalog and cannot be sat, because
+            their banks are not written.
+          </p>
+
+          <p class="hero-actions">
+            <a class="btn btn-primary" href="https://github.com/Camilool8/kubestronaut-sim"
+              >View the repository</a
+            >
+            <a
+              class="btn"
+              href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/README.md"
+              >Documentation</a
+            >
+          </p>
+        </div>
+
+        <!-- One column, not two grid items: the note belongs directly
+             under the terminal, and a grid item spanning both rows beside
+             them would push its surplus height into the terminal's row. -->
+        <div class="hero-side">
+        <!-- The quickstart terminal. This is a MACHINE surface, not a dark
+             card: --machine-* is the palette reserved for things that are
+             literally a computer, and it is identical in both themes on
+             purpose, because a terminal has no light mode. It keeps its own
+             titlebar, border and mono type so the boundary is legible in
+             dark mode too, where the page around it is also dark but
+             visibly blue where this is near-neutral. -->
+        <figure class="term">
+          <figcaption class="term-bar">
+            <span class="term-bar-dot" aria-hidden="true"></span>
+            <span class="term-bar-title">bash — quickstart</span>
+          </figcaption>
+          <pre class="term-body"><code><span class="term-prompt" aria-hidden="true">$ </span>./sim doctor    <span class="term-note"># optional preflight</span>
+<span class="term-prompt" aria-hidden="true">$ </span>./sim up        <span class="term-note"># first run: several minutes</span>
+<span class="term-prompt" aria-hidden="true">$ </span>open <span class="term-url">http://localhost:8080</span></code></pre>
+        </figure>
+
+        <p class="hero-note">
+          Requires Docker Desktop (or docker + compose v2), python3, and about
+          9GB of free RAM — the XFCE desktop is inside that figure. Everything
+          after <code>up</code> happens in the browser. The UI comes up before
+          the cluster does, so the page shows the same boot progress the
+          terminal does.
+          </p>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------ stats -->
+      <section class="shell stats" aria-labelledby="stats-title">
+        <h2 id="stats-title" class="sr-only">The numbers behind it</h2>
+        <ul class="stat-grid">
+          <li class="stat">
+            <p class="stat-figure">119</p>
+            <h3 class="stat-label">Questions written</h3>
+            <p class="stat-note">
+              22 hands-on for CKAD and 97 multiple-choice for KCNA, counted from
+              <code>banks/*/exam.yaml</code>. All original: no third-party exam
+              dump may be committed here, because CC BY-SA 4.0 requires the
+              banks to be ours to license.
+            </p>
+          </li>
+          <li class="stat">
+            <p class="stat-figure">2 <span class="stat-figure-of">of 5</span></p>
+            <h3 class="stat-label">Certifications with a bank</h3>
+            <p class="stat-note">
+              The other three are shown in the catalog with the reason they
+              cannot be sat, rather than as five working exams. A bank that
+              cannot produce a meaningful score is not offered at all.
+            </p>
+          </li>
+          <li class="stat">
+            <p class="stat-figure">0 <span class="stat-figure-of">/ 100%</span></p>
+            <h3 class="stat-label">The two grading gates</h3>
+            <p class="stat-note">
+              A fresh environment must score 0 and the reference solutions must
+              score 100%. <code>tests/smoke.sh</code> asserts both against a
+              real stack; CI cannot run it, so it is run by hand for any change
+              that could affect grading.
+            </p>
+          </li>
+        </ul>
+      </section>
+
+      <!-- ------------------------------------------- certification track -->
+      <section class="shell section" id="track" aria-labelledby="track-title">
+        <div class="section-head">
+          <h2 id="track-title">The certification track</h2>
+          <p class="section-lede">
+            One bank is loaded at a time, because a bank is a Kubernetes cluster
+            seeded for its questions — so choosing another one is a destructive
+            2–4 minute rebuild, and the app asks first.
+          </p>
+        </div>
+
+        <!-- The coverage capsule, one segment per card below, tinted like
+             its card. aria-hidden because the figure beside it already says
+             the same thing in words. -->
+        <div class="coverage">
+          <div class="coverage-figure">
+            <span class="coverage-label">Playable today</span>
+            <span class="coverage-value">2 of 5</span>
+          </div>
+          <div class="coverage-bar" aria-hidden="true">
+            <span></span>
+            <span data-engine="mcq"></span>
+            <span data-engine="soon"></span>
+            <span data-engine="soon"></span>
+            <span data-engine="soon"></span>
+          </div>
+        </div>
+
+        <!-- Two lists, two peer headings. Wording from the app's own
+             lobby (ui/src/strings.ts: liveListLabel / soonListLabel). -->
+        <h3 class="subhead subhead-first">Exams you can sit</h3>
+
+        <ul class="exam-grid">
+          <!-- The exam tint is keyed on the ENGINE, not the certification:
+               a practical exam takes the action blue, a multiple-choice one
+               the progress cyan. Absent data-engine, :root's alias points
+               --exam-tint at --accent, which is the practical case. -->
+          <li class="exam-card">
+            <div class="exam-card-head">
+              <span class="exam-avatar" aria-hidden="true">CKAD</span>
+              <div class="exam-card-name">
+                <h4>CKAD Mock Exam 01</h4>
+                <p>Certified Kubernetes Application Developer</p>
+              </div>
+              <span class="exam-badge exam-badge-live">Live</span>
+            </div>
+
+            <!-- Labels and values are the app's own vocabulary, from
+                 ui/src/strings.ts: a hands-on bank counts "Tasks", an mcq
+                 one "Questions", and the engine cell reads "Practical" or
+                 "MCQ" rather than the longer phrase, which wrapped to two
+                 lines on the KCNA card alone and pushed its hairline out
+                 of line with this one. -->
+            <dl class="exam-stats">
+              <div><dt>Duration</dt><dd>2h</dd></div>
+              <div><dt>Tasks</dt><dd>22</dd></div>
+              <div><dt>To pass</dt><dd>66%</dd></div>
+              <div><dt>Engine</dt><dd class="exam-stat-engine">Practical</dd></div>
+            </dl>
+
+            <p class="exam-desc">
+              Developer-track exercises across the full CKAD curriculum:
+              workloads and multi-container design, deployments and
+              configuration, security contexts, observability, and services,
+              ingress and network policy. Two instances, kind-backed cluster,
+              Kubernetes 1.35.
+            </p>
+
+            <div class="domains">
+              <p class="domains-title">Domains, at the published weights</p>
+              <!-- Tags, not chips: nothing filters anything here, so nothing
+                   wears a control's border, hover or cursor. -->
+              <ul class="tag-row" aria-label="Curriculum domains and their weights">
+                <li class="tag">Application Design and Build <b>20%</b></li>
+                <li class="tag">Application Deployment <b>20%</b></li>
+                <li class="tag">
+                  Application Environment, Configuration and Security <b>25%</b>
+                </li>
+                <li class="tag">
+                  Application Observability and Maintenance <b>15%</b>
+                </li>
+                <li class="tag">Services and Networking <b>20%</b></li>
+              </ul>
+            </div>
+          </li>
+
+          <li class="exam-card" data-engine="mcq">
+            <div class="exam-card-head">
+              <span class="exam-avatar" aria-hidden="true">KCNA</span>
+              <div class="exam-card-name">
+                <h4>KCNA Mock Exam</h4>
+                <p>Kubernetes and Cloud Native Associate</p>
+              </div>
+              <span class="exam-badge exam-badge-live">Live</span>
+            </div>
+
+            <dl class="exam-stats">
+              <div><dt>Duration</dt><dd>1h 30m</dd></div>
+              <!-- The pool pair, and its label, appear only when the two
+                   numbers differ. A card reading "22 / 22" would advertise
+                   a random draw that bank does not do, which is why the
+                   CKAD card says "Tasks, 22" instead. -->
+              <div>
+                <dt>Drawn / pool</dt>
+                <dd>65 <span class="exam-stat-of">/ 97</span></dd>
+              </div>
+              <div><dt>To pass</dt><dd>75%</dd></div>
+              <div><dt>Engine</dt><dd class="exam-stat-engine">MCQ</dd></div>
+            </dl>
+
+            <p class="exam-desc">
+              65 questions drawn each attempt from a 97-question pool, in the
+              real exam's shape: 90 minutes, 75% to pass, weighted across the
+              four KCNA curriculum domains on every draw. Single-answer and
+              select-all-that-apply items, each with a full explanation for
+              review. No cluster involved, so an attempt starts before the
+              environment finishes booting and works on a phone.
+            </p>
+
+            <div class="domains">
+              <p class="domains-title">Domains, at the published weights</p>
+              <ul class="tag-row" aria-label="Curriculum domains and their weights">
+                <li class="tag">Kubernetes Fundamentals <b>44%</b></li>
+                <li class="tag">Container Orchestration <b>28%</b></li>
+                <li class="tag">Cloud Native Application Delivery <b>16%</b></li>
+                <li class="tag">Cloud Native Architecture <b>12%</b></li>
+              </ul>
+            </div>
+          </li>
+        </ul>
+
+        <h3 class="subhead">Advertised, and not runnable</h3>
+        <p class="section-lede section-lede-tight">
+          These three appear in the catalog so the path is complete, and each
+          one says why it cannot be sat. An unavailable exam is a refusal with a
+          reason, not a disabled button.
+        </p>
+
+        <ul class="exam-grid exam-grid-soon">
+          <li class="exam-card exam-card-soon" data-engine="soon">
+            <div class="exam-card-head">
+              <span class="exam-avatar" aria-hidden="true">CKA</span>
+              <div class="exam-card-name">
+                <h4>CKA Mock Exam</h4>
+              </div>
+              <span class="exam-badge">Soon</span>
+            </div>
+            <p class="exam-note">Administrator-track bank not written yet.</p>
+          </li>
+
+          <li class="exam-card exam-card-soon" data-engine="soon">
+            <div class="exam-card-head">
+              <span class="exam-avatar" aria-hidden="true">KCSA</span>
+              <div class="exam-card-name">
+                <h4>KCSA Mock Exam</h4>
+              </div>
+              <span class="exam-badge">Soon</span>
+            </div>
+            <p class="exam-note">Bank not written yet.</p>
+          </li>
+
+          <li class="exam-card exam-card-soon" data-engine="soon">
+            <div class="exam-card-head">
+              <span class="exam-avatar" aria-hidden="true">CKS</span>
+              <div class="exam-card-name">
+                <h4>CKS Mock Exam</h4>
+              </div>
+              <span class="exam-badge">Soon</span>
+            </div>
+            <p class="exam-note">
+              Requires security add-ons (AppArmor, Falco) not in the kind
+              environment yet.
+            </p>
+          </li>
+        </ul>
+      </section>
+
+      <!-- ------------------------------------------------------- modes -->
+      <section class="shell section" aria-labelledby="modes-title">
+        <div class="section-head">
+          <h2 id="modes-title">Three ways to run an attempt</h2>
+          <p class="section-lede">
+            Offered gentlest first. What each one permits is defined once in the
+            server and enforced there, so a card cannot advertise something the
+            server then refuses.
+          </p>
+        </div>
+
+        <ul class="mode-grid">
+          <li class="mode">
+            <h3>Training</h3>
+            <p>
+              Untimed. Two-tier hints and solutions on demand, and scoring that
+              does not end the attempt. This is how the product meets WCAG 2.2.1
+              Timing Adjustable — the unpausable countdown stays the default,
+              but it is opted into rather than imposed.
+            </p>
+          </li>
+          <li class="mode">
+            <h3>Mastery</h3>
+            <p>
+              Half the bank's duration and no help: 60 minutes for CKAD, 45 for
+              KCNA. For a candidate who already knows the material and wants the
+              clock to hurt.
+            </p>
+          </li>
+          <li class="mode">
+            <h3>Exam</h3>
+            <p>
+              The bank's full duration and no help. The timer is server-side,
+              not in the tab, and it cannot be paused. At zero the exam ends and
+              grading starts by itself.
+            </p>
+          </li>
+        </ul>
+      </section>
+
+      <!-- ------------------------------------------------------ limits -->
+      <!-- The one --ink band on the page. --ink is not the machine palette:
+           it is this product raising its voice, and the section where it
+           says what it does not do is the right place to raise it. In dark
+           mode --ink inverts to a RAISED surface so the band still reads as
+           a band against the page. -->
+      <section class="limits" id="limits" aria-labelledby="limits-title">
+        <div class="shell">
+          <div class="section-head">
+            <h2 id="limits-title">What this is not</h2>
+            <p class="section-lede">
+              Stated rather than implied, because the alternative is letting a
+              reader infer something the software does not do.
+            </p>
+          </div>
+
+          <dl class="limit-list">
+            <div class="limit">
+              <dt>No accounts, and no authentication anywhere.</dt>
+              <dd>
+                Permanently. This is a local single-user tool and a password
+                field would be theatre; the only real control is which interface
+                it binds to. Ports bind to all interfaces by default, so on a
+                network you do not control, start it with
+                <code>SIM_BIND=127.0.0.1 ./sim up</code>.
+              </dd>
+            </div>
+            <div class="limit">
+              <dt>No hosted version.</dt>
+              <dd>
+                There is nothing to sign up for and nothing is uploaded. Local
+                single-user is the permanent model, not a stage before a
+                service, so hosting, accounts and multi-user separation are out
+                of scope rather than unbuilt.
+              </dd>
+            </div>
+            <div class="limit">
+              <dt>No adoption numbers, testimonials, or pass-rate claims.</dt>
+              <dd>
+                There are none to report. A score here measures practice
+                progress; it does not predict a real exam result.
+              </dd>
+            </div>
+            <div class="limit">
+              <dt>No attempt history.</dt>
+              <dd>
+                One session at a time, and one attempt record overwritten per
+                attempt. There is no cross-attempt analytics and nothing here
+                promises progress over time.
+              </dd>
+            </div>
+            <div class="limit">
+              <dt>No third-party exam dumps.</dt>
+              <dd>
+                Every question is original. The banks are CC BY-SA 4.0, which
+                requires them to be ours to license, so a dump could never be
+                committed here.
+              </dd>
+            </div>
+            <div class="limit">
+              <dt>No hands-on exam on a phone.</dt>
+              <dd>
+                The desktop requirement is functional, not a styling shortcut:
+                the answer surface is a real remote desktop. Small screens get
+                an explanation instead of a broken layout. A KCNA attempt does
+                work on a phone, because the multiple-choice engine never
+                touches the cluster.
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <!-- --------------------------------------------------- the cluster -->
+      <section class="shell section" aria-labelledby="cluster-title">
+        <div class="section-head">
+          <h2 id="cluster-title">Why the score means something</h2>
+          <p class="section-lede">
+            Hands-on questions are graded on behaviour wherever behaviour is the
+            point — a policy that actually denies, an Ingress the controller
+            really routes — not on the shape of your YAML. That is only possible
+            because the environment is complete enough to test an answer the way
+            the real exam expects.
+          </p>
+        </div>
+
+        <ul class="fact-list">
+          <li class="fact">
+            <h3>Calico, not kindnet</h3>
+            <p>
+              NetworkPolicies are genuinely enforced, so a policy question can
+              be graded on whether traffic is actually denied.
+            </p>
+          </li>
+          <li class="fact">
+            <h3>ingress-nginx</h3>
+            <p>
+              An Ingress question has a controller behind it, so the route
+              either resolves or it does not.
+            </p>
+          </li>
+          <li class="fact">
+            <h3>A local Helm repository and registry</h3>
+            <p>
+              Plain HTTP, on the cluster network, so the image-building and
+              packaging half of the curriculum is answerable offline.
+            </p>
+          </li>
+          <li class="fact">
+            <h3>Weights the build checks</h3>
+            <p>
+              A domain's share of an exam's points is its published curriculum
+              weight, and <code>tests/bank-weights.sh</code> fails the build if
+              any domain drifts more than two percentage points from it.
+            </p>
+          </li>
+        </ul>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell">
+        <div class="footer-cols">
+          <div class="footer-col">
+            <h2 class="footer-title">kubestronaut-sim</h2>
+            <p class="footer-text">
+              Open source, run locally, and honest about the difference between
+              this and a real sitting.
+            </p>
+          </div>
+
+          <div class="footer-col">
+            <h2 class="footer-title">Repository</h2>
+            <ul class="footer-links">
+              <li>
+                <a href="https://github.com/Camilool8/kubestronaut-sim">Source</a>
+              </li>
+              <li>
+                <a
+                  href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/README.md"
+                  >Documentation</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://github.com/Camilool8/kubestronaut-sim/blob/main/SECURITY.md"
+                  >Threat model</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://github.com/Camilool8/kubestronaut-sim/blob/main/CONTRIBUTING.md"
+                  >Contributing</a
+                >
+              </li>
+            </ul>
+          </div>
+
+          <div class="footer-col">
+            <h2 class="footer-title">Licensing</h2>
+            <p class="footer-text">
+              Simulator code: Apache License 2.0.<br />
+              Question banks: Creative Commons BY-SA 4.0.
+            </p>
+          </div>
+        </div>
+
+        <!-- The non-affiliation notice. Binding on every surface that names
+             a certification, and this one names all five. Wording is the
+             app's own (ui/src/strings.ts, info.disclaimerBody), which is
+             also where the README's shorter form comes from — the same
+             notice lives in the app's About panel beside a real-exam
+             comparison table. -->
+        <div class="disclaimer">
+          <h2 class="disclaimer-title">Independent project</h2>
+          <p>
+            Kubestronaut Sim is an independent open-source study tool. It is not
+            affiliated with, endorsed by, or associated with the Cloud Native
+            Computing Foundation, The Linux Foundation, PSI, or killer.sh.
+            Kubernetes and the certification names (CKA, CKAD, CKS, KCNA, KCSA)
+            are trademarks of The Linux Foundation.
+          </p>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

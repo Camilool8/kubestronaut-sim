@@ -1,0 +1,522 @@
+/* GENERATED FILE - DO NOT EDIT.
+   Verbatim copy of ui/src/styles/tokens.css, written by site/build.sh.
+   Edit the source and re-run the script; `site/build.sh --check` fails
+   the moment these two disagree. */
+
+/* Design tokens — the single source of truth for color, type, spacing,
+   radius, elevation, motion, and layering. Light is the :root default;
+   dark is applied by explicit [data-theme="dark"] or, for the "system"
+   choice (no data-theme attribute), by prefers-color-scheme. Values
+   exist for BOTH themes for every semantic token — components never
+   hardcode a color.
+
+   Identity: cool ink neutrals, one blue for action, one cyan for
+   progress. No Kubernetes or CNCF logo, wordmark or mark appears
+   anywhere in this product, and the non-affiliation notice stays in the
+   footer and the About panel. The accent is no longer the official
+   Kubernetes blue — the product has its own.
+
+   THE MACHINE IS NOT THE APP. The --machine-* family below is a set of
+   dark surfaces that appear in BOTH themes, and they are reserved for
+   one thing: anything that is literally a computer rather than this
+   product. The VNC desktop and its chrome, the ssh block on a task, the
+   quickstart terminal, the two YAML panes in a state diff. In light
+   mode the distinction is obvious. In dark mode it is carried by hue
+   and framing instead: the app's surfaces are visibly blue where the
+   machine's are near-neutral, and every machine surface keeps its own
+   titlebar, border and mono type. Never style an app surface with a
+   --machine-* token to "make it look technical".
+
+   Every text pair below is checked against WCAG 2.1 AA (4.5:1) and
+   every state-bearing border against 1.4.11 (3:1). The axe suite cannot
+   catch contrast — jsdom has no layout engine, so the color-contrast
+   rule is skipped there — so the ratios are recorded here and
+   re-checked by hand when a value changes. Ratios below are the WORST
+   case across every fill the token can rest on, named where it matters.
+
+   Three mirrors of these values live outside this file and must move
+   with it: the Go locked page (facilitator/internal/desktop/proxy.go),
+   the favicon (ui/public/favicon.svg), and the exam terminal's palette
+   (images/desktop/assets/terminalrc + its xfconf twin). Not every token
+   is in every mirror — grep the hex before assuming. */
+
+:root {
+  color-scheme: light;
+
+  /* surfaces */
+  --bg: #f6f8fc;
+  --surface: #ffffff;
+  --surface-raised: #eef1f6;
+  --overlay: rgba(16, 23, 40, 0.55);
+
+  /* borders, in two tiers. One token cannot do both jobs, and this is
+     the one place the design brief had to bend: it draws every border
+     at #e2e7f0/#d7dde8, which measure 1.10:1 and 1.20:1 on
+     --surface-raised — a third of WCAG 1.4.11's 3:1 floor for a
+     boundary that identifies a control.
+
+     --border        structural. Container edges, table rules, hr,
+                     blockquotes, panel and topbar dividers, card
+                     outlines. Not state-bearing, so 1.4.11 does not
+                     reach it, and it takes the brief's value as drawn:
+                     1.36:1 on --surface, 1.28:1 on --bg, 1.20:1 on
+                     --surface-raised.
+     --border-strong control edges and any border that carries a state.
+                     3.98:1 on --surface, 3.74:1 on --bg, 3.52:1 on
+                     --surface-raised, 3.36:1 on --accent-soft, 3.27:1
+                     on --surface-hover, 3.21:1 on --raised-hover —
+                     clears 3:1 on every fill a control can rest on.
+     The two are 2.93:1 apart. That gap is wider than the design draws
+     and it is deliberate: it is the difference between a border you can
+     see and one you can only infer. */
+  --border: #d7dde8;
+  --border-strong: #708197;
+
+  /* hover fills. Hover is a step of TONE, never the accent — see the
+     Rare Accent Rule in DESIGN.md. --surface-hover is for controls
+     resting on --surface, --bg or nothing; --raised-hover for controls
+     resting on --surface-raised. Every text token below is measured
+     against both. */
+  --surface-hover: #e4e9f2;
+  --raised-hover: #e2e7f0;
+
+  /* text — five steps where there used to be three, because the brief
+     leans on a finer ramp than a three-step scale can carry. Worst-case
+     ratio across --bg, --surface, --surface-raised and both hover fills:
+       --text            14.40:1   headings, figures, anything load-bearing
+       --text-body        9.93:1   prose and question bodies
+       --text-secondary   6.06:1   supporting copy, card descriptions
+       --text-muted       4.80:1   meta lines, captions
+       --text-subtle      4.54:1   the smallest labels that still mean something
+     The brief sets its smallest labels in #8b95a6, which is 3.02:1 on
+     white and fails AA at the 11px it draws them. That value survives
+     here only as --text-decorative. */
+  --text: #101728;
+  --text-body: #2c3546;
+  --text-secondary: #4a5568;
+  --text-muted: #5a6478;
+  --text-subtle: #5e6878;
+
+  /* A genuinely inoperable control's own label. 3.40:1 on --surface,
+     3.20:1 on --bg, 3.00:1 on --surface-raised, 2.74:1 on --raised-hover
+     — deliberately under 4.5:1 and permitted there: WCAG 1.4.3 and
+     1.4.11 both except inactive components. It is NOT for an unavailable
+     exam card, whose reason line is the point of rendering it at all and
+     stays --text-muted. */
+  --text-disabled: #818c9e;
+
+  /* Non-essential marks only: a legend swatch that repeats its own
+     label, a decorative rule, the dimmed half of a figure whose value
+     is printed beside it. 3.02:1 on --surface. If removing it would
+     cost the reader information, it is the wrong token. */
+  --text-decorative: #8b95a6;
+
+  /* brand + state.
+     The old palette needed an --accent-strong substitution for accent
+     TEXT on tinted fills, because the old accent fell under 4.5:1 there.
+     This one does not: --accent clears the floor on every fill in the
+     product (worst 4.52:1, on --raised-hover), so that whole rule is
+     retired. --accent-strong survives for a different job — hover and
+     pressed emphasis, and the link hover the brief draws.
+       --accent           4.52:1 worst, 5.61:1 on --surface
+       --accent-strong    7.67:1 worst, 9.52:1 on --surface
+       --accent-contrast  5.61:1 on --accent (the primary button) */
+  --accent: #2b5fd9;
+  --accent-strong: #1e3f96;
+  --accent-soft: #e5ecfd;
+  --accent-contrast: #ffffff;
+
+  /* The second signal. Blue means "you can act on this"; cyan means
+     "this is moving" — live progress, an in-flight attempt, the MCQ
+     engine's tint. Two tokens because a bar and a label answer to
+     different floors:
+       --progress         graphics only — bars, tracks, dots. 3.21:1 on
+                          --surface-raised, the track it fills. Never
+                          use it for text.
+       --progress-strong  any cyan text. 4.50:1 worst, incl. on
+                          --progress-soft. */
+  --progress: #0d93ac;
+  --progress-strong: #0a7285;
+  --progress-soft: #e2f4f8;
+
+  /* Verdict colours. Same split as progress wherever the brief uses one
+     hue for both a bar and a label:
+       --success          graphics. 3.51:1 worst, 4.36:1 on --surface
+       --success-strong   text, incl. on --success-soft. 4.53:1 worst
+       --danger           text and graphics both. 4.53:1 worst
+       --warn             graphics. 3.87:1 worst
+       --warn-strong      text, incl. on --warn-soft. 4.52:1 worst
+     --danger-row and the soft fills are row tints, not text fills.
+     --danger-bar (2.81:1) and --warn-marker (1.68:1) are decorative:
+     both always sit beside the number they describe, and --warn-marker
+     is drawn on --ink, where it reads 10.67:1. */
+  --success: #1f8a54;
+  --success-strong: #1b7648;
+  --success-soft: #e7f5ee;
+  --danger: #bc382a;
+  --danger-soft: #fdf0ee;
+  --danger-row: #fffbfa;
+  --danger-bar: #d9846f;
+  --warn: #a1642a;
+  --warn-strong: #925b26;
+  --warn-soft: #fdf7ea;
+  --warn-border: #e8d6ae;
+  --warn-marker: #e8c46a;
+  --neutral-soft: #eef1f6;
+  --muted-soft: #e4e9f1;
+
+  /* Ink — a near-black band used INSIDE light mode to frame a headline:
+     the landing hero, the results banner, a primary dark button, the
+     current tile in the navigator. It is not the machine; it is this
+     product raising its voice. In dark mode it inverts role and becomes
+     a RAISED surface, so the band still reads as a band.
+       --ink-text    17.87:1 on --ink
+       --ink-muted    8.36:1
+       --ink-faint    5.91:1
+       --ink-accent   7.38:1 */
+  --ink: #101728;
+  --ink-text: #ffffff;
+  --ink-muted: #a8b2c4;
+  --ink-faint: #8b95a6;
+  --ink-accent: #7fa6f5;
+  --ink-border: rgba(255, 255, 255, 0.12);
+  --ink-raised: rgba(255, 255, 255, 0.05);
+
+  /* syntax highlighting — the value side of a fenced block.
+     Keys/keywords use --accent-strong. These are the two hues the exam
+     terminal already uses for the same job (green for strings, amber for
+     numbers), one step darker here so they clear the floor on a light
+     fenced block. 5.59:1 and 5.53:1 on --surface-raised. */
+  --syntax-string: #146c43;
+  --syntax-number: #8a5200;
+
+  --focus-ring: #2b5fd9;
+
+  /* elevation (tinted to the page, never pure black) */
+  --shadow-1: 0 2px 8px rgba(16, 23, 40, 0.07);
+  --shadow-2: 0 8px 26px rgba(16, 23, 40, 0.13);
+  --shadow-3: 0 18px 40px rgba(16, 23, 40, 0.18);
+  /* The one accent-tinted shadow, for the single recommended card on a
+     screen of choices. Tinting a shadow is a way of saying "this one" —
+     which is why there is exactly one. */
+  --shadow-accent: 0 6px 20px rgba(43, 95, 217, 0.14);
+  /* Windows drawn inside the VNC canvas. Black, not ink-tinted, because
+     they float over a machine and not over the page. */
+  --shadow-machine: 0 22px 54px rgba(0, 0, 0, 0.55);
+
+  /* type */
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
+    monospace;
+
+  /* An eleven-step ramp, because the brief distinguishes sizes a
+     seven-step scale collapses — a 10px mono eyebrow and an 11px stat
+     label do different jobs on the same card. Body is --text-m. */
+  --text-2xs: 0.625rem; /* 10px — mono eyebrow labels, uppercase */
+  --text-xs: 0.6875rem; /* 11px — stat labels, legends */
+  --text-s: 0.78125rem; /* 12.5px — meta, chips, table cells */
+  --text-m: 0.84375rem; /* 13.5px — body */
+  --text-l: 0.90625rem; /* 14.5px — emphasised body, option text */
+  --text-xl: 1.0625rem; /* 17px — card titles */
+  --text-2xl: 1.1875rem; /* 19px — section headings */
+  --text-3xl: 1.375rem; /* 22px — screen headings */
+  --text-4xl: 1.625rem; /* 26px — page titles */
+  --text-5xl: 1.875rem; /* 30px — the results verdict, as prose */
+  --text-6xl: 2.125rem; /* 34px — the results figure, as data */
+  --text-hero: 2.625rem; /* 42px — landing headline only */
+
+  /* Tracking. Headings tighten; mono labels open up. Both are the
+     brief's values and both are load-bearing — an uppercase mono label
+     at --text-2xs is unreadable without --tracking-label. */
+  --tracking-tight: -0.02em;
+  --tracking-label: 0.09em;
+
+  /* spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 2.5rem;
+  --space-8: 3rem;
+  --space-9: 4rem;
+
+  /* radius — one soft system everywhere; pill for badges only.
+     --radius-xs exists for one shape: the inline code chip, which is
+     ~19px tall against the ~40px controls --radius-s was chosen for.
+     Radius reads relative to the box it rounds, so reusing 6px there
+     does not look consistent, it looks over-rounded. */
+  --radius-xs: 4px;
+  --radius-s: 6px;
+  --radius-m: 8px;
+  --radius-l: 10px;
+  --radius-xl: 12px;
+  --radius-pill: 999px;
+
+  /* motion — durations short enough to feel immediate, and an easing
+     curve that decelerates without overshoot. This product is an
+     instrument panel for people about to sit a proctored exam; a spring
+     or a bounce reads as unserious.
+     There is no exit duration and no ease-in curve: nothing in this
+     product animates out. Dialogs, toasts and screens disappear on
+     unmount, which needs orchestration the design does not ask for, so
+     the tokens for it were deleted rather than left declared and unused.
+     Every use is gated on prefers-reduced-motion (see base.css). */
+  --dur-quick: 160ms;
+  --dur-base: 220ms;
+  --dur-modal-in: 280ms;
+  --dur-progress: 400ms;
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+
+  /* layering — the control overlay sits ABOVE dialogs and drawers: it
+     blocks a destructive operation and must survive every screen
+     transition underneath it. It previously sat below them, so an open
+     About drawer covered the rebuild it was blocking. Toasts stay above
+     the overlay so a confirmation is never rendered invisible. */
+  --z-panel: 10;
+  --z-dialog: 20;
+  --z-overlay: 30;
+  --z-toast: 40;
+
+  /* Fixed measures the design specifies by number rather than by ratio.
+     --task-pane-width is only the DEFAULT — PanelResizer still clamps
+     280-600px and persists the candidate's choice. */
+  --task-pane-width: 420px;
+  --mcq-measure: 720px;
+  --page-max: 1160px;
+  --results-sidebar: 340px;
+}
+
+/* The machine. Identical in both themes on purpose: a terminal does not
+   have a light mode, and the whole point of this family is that it does
+   not follow the app.
+     --machine-text        10.41:1 worst across the three fills
+     --machine-muted        6.92:1
+     --machine-faint        5.41:1
+     --machine-green        9.25:1
+     --machine-green-soft   9.92:1
+     --machine-blue         6.26:1
+     --machine-amber       10.07:1
+   --machine-dim and --machine-comment are DECORATIVE (3.5:1 and 2.7:1):
+   they exist for the illustrative terminal renders, where the dimmed
+   text is a picture of output rather than output. Real de-emphasised
+   text on a machine surface takes --machine-faint. */
+:root {
+  --machine-bg: #0b0f16;
+  --machine-surface: #0d1320;
+  --machine-raised: #161d2b;
+  --machine-chrome: #1b2331;
+  --machine-border: #232e40;
+  --machine-border-strong: #2a3546;
+  --machine-text: #c3ccd9;
+  --machine-muted: #9aa7ba;
+  --machine-faint: #8593a8;
+  --machine-dim: #6b7a90;
+  --machine-comment: #5d6b7f;
+  --machine-green: #63d68a;
+  --machine-green-soft: #8fd6a8;
+  --machine-blue: #6f9cf8;
+  --machine-amber: #e8c46a;
+
+  /* State-diff highlighting, drawn on a machine surface in both themes.
+     Backgrounds are washes over the pane, foregrounds carry the text:
+     --diff-add-fg 9.92:1 and --diff-del-fg 8.28:1, worst case across the
+     three machine fills. */
+  --diff-add-bg: rgba(99, 214, 138, 0.14);
+  --diff-add-fg: #8fd6a8;
+  --diff-del-bg: rgba(226, 112, 95, 0.14);
+  --diff-del-fg: #f0a294;
+}
+
+/* The exam tint — an exam card's avatar, its engine cell, and later its
+   domain chips.
+
+   Keyed on the ENGINE, not the certification. The design draws CKAD in
+   the action blue and KCNA in the progress cyan, and those are exactly
+   the two engines: a practical exam and a multiple-choice one. Keying on
+   the engine means the hue carries the same information the card's own
+   "Engine" cell spells out in words, and it extends without invention —
+   CKA and CKS arrive blue, KCSA cyan — where five per-certification hues
+   would have been five colours that differ without meaning anything.
+   (The plan called this `data-exam`; `data-engine` is what it turned out
+   to key on, and the attribute should say so.)
+
+   These are the one token family with no dark twin and no measured
+   ratio, because they hold no colour of their own: each is an alias, and
+   `var()` in a custom property is substituted at use time, so
+   --exam-tint on a dark page resolves through the dark --accent. The
+   aliases are all text-grade tokens on their paired soft fill — a
+   pairing contrast.test.ts asserts rather than trusts. */
+:root {
+  --exam-tint: var(--accent);
+  --exam-tint-soft: var(--accent-soft);
+}
+
+[data-engine="mcq"] {
+  --exam-tint: var(--progress-strong);
+  --exam-tint-soft: var(--progress-soft);
+}
+
+/* Not an engine — a bank whose engine exists but whose questions do not.
+   It is deliberately outside the hue system: a coming-soon card must not
+   look like a card you can sit. */
+[data-engine="soon"] {
+  --exam-tint: var(--text-muted);
+  --exam-tint-soft: var(--muted-soft);
+}
+
+/* Dark theme values — explicit user choice. The "system" choice sets no
+   data-theme attribute at all and is covered by the media query below
+   (same declarations; CSS has no mixins). */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* --bg is --ink. The band that frames a headline in light mode is the
+     page itself in dark mode, and --ink steps UP to stay a band. */
+  --bg: #101728;
+  --surface: #182033;
+  --surface-raised: #212a40;
+  --overlay: rgba(2, 6, 16, 0.7);
+
+  /* --border        1.55:1 on --surface, 1.73:1 on --bg, 1.35:1 on --surface-raised
+     --border-strong 3.15:1 worst (on --raised-hover), 4.02:1 on --surface */
+  --border: #3a4560;
+  --border-strong: #6f7d9f;
+  --surface-hover: #1e2739;
+  --raised-hover: #283148;
+
+  /* worst-case across --bg, --surface, --surface-raised and both hovers:
+     10.21 / 8.40 / 5.98 / 4.89 / 4.54 */
+  --text: #dfe5ee;
+  --text-body: #c8d1de;
+  --text-secondary: #a7b1c2;
+  --text-muted: #94a0b2;
+  --text-subtle: #8e9aac;
+  --text-disabled: #727d90; /* 3.11:1 worst — inactive controls are excepted */
+  --text-decorative: #7e8a9d;
+
+  /* --accent 5.20:1 worst, 6.92:1 on --surface; --accent-strong 7.37:1
+     worst; --accent-contrast 7.18:1 on --accent. Dark needs no
+     accent-on-wash substitution and neither does light any more. */
+  --accent: #7ba3f8;
+  --accent-strong: #a8c4fc;
+  --accent-soft: #1b2a4c;
+  --accent-contrast: #101728;
+
+  /* --progress is still graphics-only for symmetry with light, though
+     dark clears 4.5:1 on its own (6.56:1 worst). Keeping the split means
+     a component never has to know which theme it is in. */
+  --progress: #3fc9e0;
+  --progress-strong: #7fdcec;
+  --progress-soft: #0e2e38;
+
+  /* 6.69 / 8.20 / 4.53 / 6.09 / 7.80 worst, same order as light */
+  --success: #57d183;
+  --success-strong: #8ae0a9;
+  --success-soft: #12301f;
+  --danger: #e97772;
+  --danger-soft: #361a17;
+  --danger-row: #231517;
+  --danger-bar: #d9846f;
+  --warn: #e0a850;
+  --warn-strong: #eec27f;
+  --warn-soft: #31260f;
+  --warn-border: #5c4820;
+  --warn-marker: #e8c46a;
+  --neutral-soft: #212a40;
+  --muted-soft: #283148;
+
+  /* Ink inverts: a raised band above --bg rather than a dark one below
+     --surface. --ink-text 12.04:1, --ink-accent 7.14:1 on it. */
+  --ink: #262f47;
+  --ink-text: #f0f4fa;
+  --ink-muted: #b7c0d0;
+  --ink-faint: #98a3b6;
+  --ink-accent: #9dbcff;
+  --ink-border: rgba(255, 255, 255, 0.14);
+  --ink-raised: rgba(255, 255, 255, 0.06);
+
+  /* Literally --machine-green and --machine-amber, which are literally
+     the exam terminal's green and amber (images/desktop/assets/terminalrc
+     and its xfconf twin), so a YAML block in the question panel and the
+     same YAML in the candidate's vim are the same two colours.
+     7.83:1 and 8.53:1 on --surface-raised. */
+  --syntax-string: #63d68a;
+  --syntax-number: #e8c46a;
+
+  --focus-ring: #7ba3f8;
+
+  --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.45);
+  --shadow-2: 0 8px 26px rgba(0, 0, 0, 0.55);
+  --shadow-3: 0 18px 40px rgba(0, 0, 0, 0.62);
+  --shadow-accent: 0 6px 20px rgba(43, 95, 217, 0.4);
+  --shadow-machine: 0 22px 54px rgba(0, 0, 0, 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    color-scheme: dark;
+
+    --bg: #101728;
+    --surface: #182033;
+    --surface-raised: #212a40;
+    --overlay: rgba(2, 6, 16, 0.7);
+
+    --border: #3a4560;
+    --border-strong: #6f7d9f;
+    --surface-hover: #1e2739;
+    --raised-hover: #283148;
+
+    --text: #dfe5ee;
+    --text-body: #c8d1de;
+    --text-secondary: #a7b1c2;
+    --text-muted: #94a0b2;
+    --text-subtle: #8e9aac;
+    --text-disabled: #727d90;
+    --text-decorative: #7e8a9d;
+
+    --accent: #7ba3f8;
+    --accent-strong: #a8c4fc;
+    --accent-soft: #1b2a4c;
+    --accent-contrast: #101728;
+
+    --progress: #3fc9e0;
+    --progress-strong: #7fdcec;
+    --progress-soft: #0e2e38;
+
+    --success: #57d183;
+    --success-strong: #8ae0a9;
+    --success-soft: #12301f;
+    --danger: #e97772;
+    --danger-soft: #361a17;
+    --danger-row: #231517;
+    --danger-bar: #d9846f;
+    --warn: #e0a850;
+    --warn-strong: #eec27f;
+    --warn-soft: #31260f;
+    --warn-border: #5c4820;
+    --warn-marker: #e8c46a;
+    --neutral-soft: #212a40;
+    --muted-soft: #283148;
+
+    --ink: #262f47;
+    --ink-text: #f0f4fa;
+    --ink-muted: #b7c0d0;
+    --ink-faint: #98a3b6;
+    --ink-accent: #9dbcff;
+    --ink-border: rgba(255, 255, 255, 0.14);
+    --ink-raised: rgba(255, 255, 255, 0.06);
+
+    --syntax-string: #63d68a;
+    --syntax-number: #e8c46a;
+
+    --focus-ring: #7ba3f8;
+
+    --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.45);
+    --shadow-2: 0 8px 26px rgba(0, 0, 0, 0.55);
+    --shadow-3: 0 18px 40px rgba(0, 0, 0, 0.62);
+    --shadow-accent: 0 6px 20px rgba(43, 95, 217, 0.4);
+    --shadow-machine: 0 22px 54px rgba(0, 0, 0, 0.6);
+  }
+}
