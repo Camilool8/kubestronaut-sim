@@ -409,7 +409,11 @@
 .coverage-bar > span {
   width: 22px;
   height: 6px;
-  border-radius: 3px;
+  /* The pill token, not a literal half-height: on a 6px box it draws the
+     same lozenge, and it is what every other bar in the system uses
+     (.domain-bar, .pending-bar, .job-chip-bar). A 3px literal only
+     stays correct while the height never changes. */
+  border-radius: var(--radius-pill);
   background: var(--exam-tint);
 }
 
