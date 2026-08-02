@@ -452,17 +452,25 @@ function QuestionSkeleton() {
 /**
  * The panel's questions as the shared navigator wants them.
  *
- * The tile prints the bank id, because that is what this screen's own
- * navigator trigger names the question — the mcq screen is the one that
- * must not (see McqExam.tsx). Everything the old four-per-row grid drew on
- * the tile — the bank's title, the domain, the instance, the points —
- * moves into the spoken detail: at ten tiles to a row there is one line,
- * and it belongs to the number.
+ * The tile prints the task's POSITION, not the bank id. It printed the id
+ * until the pane's identity block started counting "Task 01 / 22", which
+ * left the grid as the only surface here still naming questions the way
+ * the bank does — and made the tiles disagree with the counter directly
+ * above them. The mcq screen has always done it this way; the reason is
+ * the same on both, and gets sharper once a hands-on draw is a subset of
+ * the bank rather than all of it.
+ *
+ * Everything the old four-per-row grid drew on the tile — the bank's
+ * title, the domain, the instance, the points — moves into the spoken
+ * detail: at ten tiles to a row there is one line, and it belongs to the
+ * number.
  */
 function toNavigator(questions: ExamQuestionInfo[]): NavigatorQuestion[] {
-  return questions.map((q) => ({
+  return questions.map((q, i) => ({
     id: q.id,
-    label: q.id,
+    // Zero-padded to match the identity block's counter, so a tile and
+    // the heading above it read as the same number.
+    label: String(i + 1).padStart(String(questions.length).length, "0"),
     detail: [q.title, q.domain, q.instance, strings.questionPanel.points(q.totalPoints)]
       .filter(Boolean)
       .join(", "),

@@ -258,9 +258,20 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
   // store is only read here, and re-rendering the whole exam screen on
   // every mark toggle would be a lot of work for a list nobody is
   // looking at yet.
-  const questionIds = exam?.questions.map((q) => q.id) ?? [];
-  const reviewMarked = confirmOpen ? questionIds.filter((id) => marksStore.isMarked(id)) : [];
-  const reviewUnseen = confirmOpen ? questionIds.filter((id) => !marksStore.isViewed(id)) : [];
+  // Listed as attempt positions ("Task 4"), never bank ids — the same
+  // rule the mcq screen follows, and for the same reason: the ids are an
+  // artifact of the draw, and every other part of this screen counts
+  // tasks.
+  const reviewMarked = confirmOpen
+    ? (exam?.questions ?? []).flatMap((q, i) =>
+        marksStore.isMarked(q.id) ? [strings.exam.taskNumber(i + 1)] : [],
+      )
+    : [];
+  const reviewUnseen = confirmOpen
+    ? (exam?.questions ?? []).flatMap((q, i) =>
+        marksStore.isViewed(q.id) ? [] : [strings.exam.taskNumber(i + 1)],
+      )
+    : [];
 
   const handleConfirmEnd = async () => {
     setEnding(true);

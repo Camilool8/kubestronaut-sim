@@ -174,12 +174,24 @@ export const strings = {
     // question.
     confirmTitle: (mode: string) =>
       mode === "training" ? "Submit this training session?" : "Submit the exam?",
+    // "Task", not "question": this screen counts "Task 01 / 22", flags a
+    // task, and opens "All tasks". The dialog was the last place still
+    // calling them questions.
     reviewMarked: (n: number) =>
-      n === 1 ? "1 question is marked for review:" : `${n} questions are marked for review:`,
+      n === 1 ? "1 task is marked for review:" : `${n} tasks are marked for review:`,
     // "Never opened" rather than "unanswered": the UI knows it rendered
     // the text, not whether the work was done.
     reviewUnseen: (n: number) =>
-      n === 1 ? "1 question was never opened:" : `${n} questions were never opened:`,
+      n === 1 ? "1 task was never opened:" : `${n} tasks were never opened:`,
+    // How a task is named in prose — the review lists above.
+    //
+    // A POSITION, never the bank id. The ids are an artifact of the draw
+    // and appear nowhere else on this screen; listing "q02, q03" beside a
+    // pane that says "Task 01 / 22" asks the candidate to map between two
+    // numbering schemes to find the task they skipped. Today the two
+    // happen to line up on an unpooled bank — once a hands-on draw is a
+    // subset, they will not.
+    taskNumber: (n: number) => `Task ${n}`,
     confirmBody: (mode: string) =>
       mode === "training"
         ? "This ends the session for good; the desktop locks and your work is scored. A training score is feedback on where you stand, not an exam result."

@@ -183,42 +183,47 @@ describe("QuestionPanel jump grid", () => {
 
   test("every question is reachable at once", async () => {
     const grid = await openGrid("q01");
-    for (const id of ["q01", "q02", "q03"]) {
-      expect(grid.getByRole("button", { name: new RegExp(`^${id}`) })).toBeInTheDocument();
+    for (const n of ["1", "2", "3"]) {
+      expect(grid.getByRole("button", { name: new RegExp(`^${n}\\b`) })).toBeInTheDocument();
     }
   });
 
   test("what the tile has no room to draw is still said", async () => {
     const grid = await openGrid("q01");
-    // Ten tiles to a row leaves one line and it belongs to the id, so the
-    // bank's title, the domain, the instance and the points all travel in
-    // the button's accessible name rather than being dropped.
-    const tile = grid.getByRole("button", { name: /^q01/ });
+    // Ten tiles to a row leaves one line and it belongs to the number, so
+    // the bank's title, the domain, the instance and the points all travel
+    // in the button's accessible name rather than being dropped.
+    const tile = grid.getByRole("button", { name: /^1\b/ });
     expect(tile).toHaveAccessibleName(/Namespaces & quotas/);
     expect(tile).toHaveAccessibleName(/Config/);
     expect(tile).toHaveAccessibleName(/instance-1/);
     expect(tile).toHaveAccessibleName(/5 pts/);
   });
 
-  test("the hands-on grid prints bank ids, because its header does too", async () => {
+  test("the grid prints task positions, the same as the counter above it", async () => {
     const grid = await openGrid("q01");
-    // The mcq screen is the one that must show positions instead: there
-    // the id is an artifact of the pool a random draw sampled from.
-    expect(grid.getByRole("button", { name: /^q02/ })).toBeInTheDocument();
-    expect(grid.queryByRole("button", { name: /^Q2\b/ })).toBeNull();
+    // This test used to assert the opposite, on the grounds that the
+    // panel's header printed bank ids too. It stopped doing that when the
+    // identity block started counting "Task 01 / 22", which left the grid
+    // as the only surface here still naming tasks the way the bank does —
+    // disagreeing with the heading directly above it. The mcq screen has
+    // always printed positions; the reason holds on both, and gets
+    // sharper once a hands-on draw is a subset rather than the whole bank.
+    expect(grid.getByRole("button", { name: /^2\b/ })).toBeInTheDocument();
+    expect(grid.queryByRole("button", { name: /^q02/ })).toBeNull();
   });
 
   test("the current question is announced as current, not just drawn as selected", async () => {
     const grid = await openGrid("q02");
-    expect(grid.getByRole("button", { name: /^q02/ })).toHaveAttribute("aria-current", "true");
-    expect(grid.getByRole("button", { name: /^q01/ })).not.toHaveAttribute("aria-current");
+    expect(grid.getByRole("button", { name: /^2\b/ })).toHaveAttribute("aria-current", "true");
+    expect(grid.getByRole("button", { name: /^1\b/ })).not.toHaveAttribute("aria-current");
   });
 
   test("picking a question closes the grid and hands focus back", async () => {
     const selected: string[] = [];
     const grid = await openGrid("q01", (id) => void selected.push(id));
 
-    await userEvent.click(grid.getByRole("button", { name: /^q03/ }));
+    await userEvent.click(grid.getByRole("button", { name: /^3\b/ }));
 
     expect(selected).toEqual(["q03"]);
     expect(document.querySelector("#question-jump")).toBeNull();
