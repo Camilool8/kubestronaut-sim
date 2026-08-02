@@ -47,6 +47,49 @@ SOFT = [
      "fixed [0] index — prefer selecting by name/content; add '# lint: allow-index' if the list is pinned to one element"),
 ]
 
+# The one shape get-yaml stands aside for. `-o yaml` is banned because
+# SCORING on a serialisation grades the candidate's spelling; showing one
+# is the opposite errand — the explanation screen's "YOUR CLUSTER STATE"
+# pane needs a whole document, and there is no other way to produce one.
+#
+# The conjunction is the safety, not a proof. The pipe into k8s_clean
+# and the show_ call have to be on the same line, so the ordinary way to
+# smuggle a serialisation into a comparison — capture it in a variable,
+# compare it below — still fails the gate. Someone determined could
+# arrange both on one line and compare on the next; the point is that it
+# would take arranging, which is what review is for. Anything else still
+# needs the ordinary '# lint: allow-get-yaml' and the argument that goes
+# with it.
+EXEMPT = {
+    "get-yaml": re.compile(r"show_(?:actual|expected)\b.*\|\s*k8s_clean\b"),
+}
+
+# Rules that fire when a line is RECOGNISED but MALFORMED, rather than
+# when a banned pattern appears. Each is (rule, trigger, well_formed, msg):
+# an error when trigger matches and well_formed does not.
+#
+# Both of these exist because the artifact protocol degrades silently by
+# design. A malformed sentinel costs the candidate nothing at grade time
+# — evaluate/artifact.go discards the block rather than failing a check a
+# candidate is mid-exam on — which also means a bank author gets no
+# signal at all that their evidence never arrived. Offline is the only
+# place this can be noticed.
+SHAPE = [
+    ("artifact-sentinel",
+     re.compile(r"^---8<--- sim:artifact"),
+     re.compile(r"^---8<--- sim:artifact (actual|expected|why) [A-Za-z0-9_+-]{1,16}$"),
+     "malformed artifact sentinel — the grammar is exactly "
+     "'---8<--- sim:artifact <actual|expected|why> <lang>', one space between fields and "
+     "nothing after the lang. Emit it with show_actual/show_expected/show_why from "
+     "_lib/checks.sh rather than by hand"),
+    ("artifact-call",
+     re.compile(r"(?<![\w-])show_(?:actual|expected|why)(?![\w-])"),
+     re.compile(r"(?<![\w-])(?:show_(?:actual|expected)\s+[A-Za-z0-9_+-]+\s+\S|show_why\s+\S)"),
+     "show_actual/show_expected take a literal lang then a body/file ("
+     "show_actual yaml \"$(...)\"); show_why takes the note. A lang built from a "
+     "variable, or a missing one, produces a sentinel the grader drops on the floor"),
+]
+
 POINTS_OK = re.compile(r"^# points: (0|[1-9][0-9]*)$")
 
 # Helpers defined by banks/_lib/checks.sh. Calling one without sourcing
@@ -58,9 +101,16 @@ POINTS_OK = re.compile(r"^# points: (0|[1-9][0-9]*)$")
 #
 # Nothing offline could catch it before this rule: the script parses, the
 # jsonpath is fine, and the failure only exists at runtime.
+#
+# The list is derived from the library rather than written down, so a
+# helper added there is protected the day it lands. The trailing context
+# accepts a closing paren and end-of-line as well as whitespace: the
+# artifact helpers' natural shape ends a pipeline inside a command
+# substitution — `"$(kubectl ... | k8s_clean)"` — and requiring a space
+# after the name would have exempted exactly that call.
 LIB = pathlib.Path("banks/_lib/checks.sh")
 HELPERS = sorted(set(re.findall(r"^([a-z_][a-z0-9_]*)\(\)", LIB.read_text(), re.MULTILINE))) if LIB.is_file() else []
-CALLS = re.compile(r"(?:^|[|&;(]|\$\(|\s)(" + "|".join(HELPERS) + r")\s") if HELPERS else None
+CALLS = re.compile(r"(?:^|[|&;(]|\$\(|\s)(" + "|".join(HELPERS) + r")(?=\s|$|[)|;&])") if HELPERS else None
 
 errors, warnings = [], []
 
@@ -108,8 +158,19 @@ for path in scripts:
         if stripped.startswith("#"):
             continue  # a comment explaining a rule is not a violation of it
         for rule, pat, msg in HARD:
-            if pat.search(line) and f"lint: allow-{rule}" not in line:
-                errors.append((path, i, rule, msg))
+            if not pat.search(line) or f"lint: allow-{rule}" in line:
+                continue
+            if rule in EXEMPT and EXEMPT[rule].search(line):
+                continue
+            errors.append((path, i, rule, msg))
+        # A local definition is not a call. q07 carries its own milli/mib
+        # for the same reason, and the unsourced-helper rule already
+        # allows it; a shape rule must not disagree.
+        if not re.match(r"^\s*[a-z_][a-z0-9_]*\(\)", line):
+            for rule, trigger, well_formed, msg in SHAPE:
+                if trigger.search(line) and not well_formed.search(line) \
+                        and f"lint: allow-{rule}" not in line:
+                    errors.append((path, i, rule, msg))
         for rule, pat, msg in SOFT:
             if pat.search(line) and f"lint: allow-{rule}" not in line:
                 warnings.append((path, i, rule, msg))

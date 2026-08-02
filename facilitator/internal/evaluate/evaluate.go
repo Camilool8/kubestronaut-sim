@@ -252,6 +252,15 @@ type CheckResult struct {
 	// points 0, message "", indistinguishable from a failure the
 	// candidate should study.
 	Skipped bool `json:"skipped,omitempty"`
+
+	// Artifacts is the evidence the check attached to its own stdout —
+	// what the cluster looked like, what it should have looked like, and
+	// why the two differ. See artifact.go for the protocol. Present only
+	// on a check that FAILED: a correct answer has nothing to explain,
+	// and these documents are persisted by session.Manager.SetResults and
+	// served back verbatim on every /api/results, so keeping them would
+	// leave a copy of the cluster's state in the session file forever.
+	Artifacts []CheckArtifact `json:"artifacts,omitempty"`
 }
 
 // Grade runs every check in ex against r, scoping each to checkTimeout,
@@ -486,6 +495,11 @@ func verdict(earned, total int) string {
 // reports err's text; otherwise ok determines pass/fail, with out
 // (trimmed of trailing newlines, matching bash's $(...) command
 // substitution) as the message either way.
+//
+// Artifacts exist only on that last path, and only when the check failed.
+// The two error paths never touch out at all — a timed-out check's
+// partial stdout is not evidence of anything, and neither is whatever a
+// broken ssh happened to print.
 func gradeCheck(r Runner, bank string, q exam.Question, c exam.Check, checkTimeout time.Duration) CheckResult {
 	ctx, cancel := context.WithTimeout(context.Background(), checkTimeout)
 	defer cancel()
@@ -506,10 +520,13 @@ func gradeCheck(r Runner, bank string, q exam.Question, c exam.Check, checkTimeo
 	case err != nil:
 		cr.Message = err.Error()
 	default:
-		cr.Message = strings.TrimRight(out, "\n")
+		var artifacts []CheckArtifact
+		cr.Message, artifacts = splitArtifacts(out)
 		if ok {
 			cr.Passed = true
 			cr.Earned = c.Points
+		} else {
+			cr.Artifacts = artifacts
 		}
 	}
 	return cr

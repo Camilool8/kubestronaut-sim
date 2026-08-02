@@ -90,6 +90,92 @@ succeeds "semver_ge equal"   semver_ge 1.2.0 1.2.0
 succeeds "semver_ge greater" semver_ge 1.10.0 1.9.0
 fails    "semver_ge lesser"  semver_ge 1.9.0 1.10.0
 
+# --- show_*: the artifact wire shape -----------------------------------
+#
+# The grader parses this byte for byte
+# (facilitator/internal/evaluate/artifact.go). A sentinel that drifts by
+# one character is not an error anywhere at runtime — the block is simply
+# discarded and the candidate is back to a bare message — so the exact
+# spelling is asserted here or nowhere.
+ok "show_actual"   "$(show_actual yaml 'kind: Service')"  "$(printf -- '---8<--- sim:artifact actual yaml\nkind: Service')"
+ok "show_why"      "$(show_why 'The selector matches no Pod.')" "$(printf -- '---8<--- sim:artifact why text\nThe selector matches no Pod.')"
+# Multi-line bodies keep their newlines and nothing is indented: the
+# sentinel is only recognised at column 0, and so is the next one.
+ok "show_actual multiline" "$(show_actual yaml "$(printf 'a: 1\nb: 2')")" \
+   "$(printf -- '---8<--- sim:artifact actual yaml\na: 1\nb: 2')"
+# An empty pane says less than no pane, so an empty body emits nothing.
+ok "show_actual empty body" "$(show_actual yaml '')" ""
+succeeds "show_actual empty body succeeds" show_actual yaml ''
+# A body is data, not a format string. `%s` in a ConfigMap value used to
+# be the kind of thing that turned a check's evidence into garbage.
+ok "show_why printf-safe" "$(show_why 'literal %s and \n stay put')" \
+   "$(printf -- '---8<--- sim:artifact why text\nliteral %%s and \\n stay put')"
+
+printf 'kind: Service\nspec:\n  selector:\n    app: inventory\n' > "$tmp/expected.yaml"
+ok "show_expected reads the file" "$(show_expected yaml "$tmp/expected.yaml")" \
+   "$(printf -- '---8<--- sim:artifact expected yaml\nkind: Service\nspec:\n  selector:\n    app: inventory')"
+# A question that has not been given an expected document degrades to the
+# message it always had, never to a broken check.
+ok "show_expected missing file" "$(show_expected yaml "$tmp/nope.yaml")" ""
+succeeds "show_expected missing file succeeds" show_expected yaml "$tmp/nope.yaml"
+
+# --- k8s_clean ---------------------------------------------------------
+#
+# yq is on the instances (images/instance/Dockerfile), which is where
+# checks run, but it is not a declared dependency of this gate's host —
+# so this block skips rather than failing a machine that is fine.
+if command -v yq >/dev/null 2>&1; then
+  printf '%s\n' \
+    'apiVersion: v1' \
+    'kind: Service' \
+    'metadata:' \
+    '  annotations:' \
+    '    kubectl.kubernetes.io/last-applied-configuration: "{}"' \
+    '  creationTimestamp: "2026-01-01T00:00:00Z"' \
+    '  generation: 3' \
+    '  managedFields: [{manager: kubectl}]' \
+    '  name: inventory' \
+    '  resourceVersion: "12345"' \
+    '  uid: aaaa-bbbb' \
+    'spec:' \
+    '  selector: {app: inventory}' \
+    'status:' \
+    '  loadBalancer: {}' > "$tmp/live.yaml"
+  cleaned=$(k8s_clean < "$tmp/live.yaml")
+  for noise in managedFields creationTimestamp resourceVersion uid generation status last-applied-configuration; do
+    case "$cleaned" in
+      *"$noise"*) echo "FAIL: k8s_clean left '$noise' behind"; FAIL=$((FAIL+1)) ;;
+      *)          PASS=$((PASS+1)) ;;
+    esac
+  done
+  # It strips the noise and nothing else — an object with its identity
+  # removed is not evidence of anything.
+  ok "k8s_clean keeps the object" "$cleaned" \
+     "$(printf 'apiVersion: v1\nkind: Service\nmetadata:\n  name: inventory\nspec:\n  selector: {app: inventory}')"
+  # `kubectl get pods -o yaml` (no name) is a List, and the noise is one
+  # level down. Cleaning only the outer document would have left every
+  # item's managedFields in place, which is most of the bytes.
+  printf '%s\n' \
+    'apiVersion: v1' \
+    'kind: List' \
+    'items:' \
+    '- kind: Pod' \
+    '  metadata:' \
+    '    managedFields: [{manager: kubelet}]' \
+    '    name: p1' \
+    '  status: {phase: Running}' > "$tmp/list.yaml"
+  case "$(k8s_clean < "$tmp/list.yaml")" in
+    *managedFields*|*phase*) echo "FAIL: k8s_clean did not descend into a List's items"; FAIL=$((FAIL+1)) ;;
+    *)                       PASS=$((PASS+1)) ;;
+  esac
+  # Not-YAML in, nothing out. Passing the raw text through instead would
+  # put a wall of managedFields on the explanation screen, which is worse
+  # evidence than none.
+  ok "k8s_clean rejects garbage" "$(printf 'not: [valid\n' | k8s_clean)" ""
+else
+  echo "note: yq not installed — skipped the k8s_clean cases"
+fi
+
 rm -rf "$tmp"
 echo
 echo "check-lib: ${PASS} passed, ${FAIL} failed"

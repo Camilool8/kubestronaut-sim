@@ -148,6 +148,7 @@ no curriculum, stays green.
 | `question.md` | Statement shown to the candidate. Name the instance and any artifact paths (`/opt/course/<n>/...`) |
 | `setup.sh` | Seeds cluster pre-state. Runs inside `k8s-env` as root with the admin `KUBECONFIG` |
 | `files/` | Optional. Copied into `/opt/course/<n>/` on every instance at start, owned by `candidate` |
+| `expected/` | Optional. Documents a failed check shows beside the candidate's cluster state, read by `show_expected` — see [the artifact protocol](#showing-your-work-the-artifact-protocol). Generated from the reference solution, never hand-written |
 | `hints.md` | Optional two-tier hints, shown in Training mode |
 | `validate.d/NN_name.sh` | One scoring criterion each, run in lexical order |
 | `solution.md` | Full walkthrough, shown after the exam |
@@ -287,10 +288,102 @@ study tool. A heredoc wrapping a manifest (`k apply -f - <<'EOF'` … `EOF`) is 
 - Carries the header comments the grader parses: `# points: <int>` and
   `# desc: <one line>`.
 - Sources `/banks/_lib/checks.sh` and uses its helpers.
-- Exit 0 = criterion met, non-zero = failed, stdout = short message.
+- Exit 0 = criterion met, non-zero = failed, stdout = short message, optionally
+  followed by an [artifact trailer](#showing-your-work-the-artifact-protocol).
 - Never mutates the cluster or the filesystem.
 - Finishes within 30 seconds. The facilitator kills a check that passes its 30s
   deadline and scores it failed with "check timed out".
+
+### Showing your work: the artifact protocol
+
+A failed check that says only *that* the candidate was wrong makes them go and
+look. The explanation screen wants the looking done for them: **YOUR CLUSTER
+STATE** beside **EXPECTED**, and a sentence on why the two differ. A check
+supplies those by appending a trailer to its own stdout.
+
+```
+selector is 'app=inventory-api', want app=inventory
+---8<--- sim:artifact actual yaml
+apiVersion: v1
+kind: Service
+spec:
+  selector:
+    app: inventory-api
+---8<--- sim:artifact why text
+A Service finds its Pods by label, never by name. While spec.selector
+matches no Pod, the Service has no endpoints at all.
+```
+
+Everything before the first sentinel line is the message, unchanged. Each
+sentinel opens a body running to the next sentinel or to EOF. Emit them with
+the [\_lib/checks.sh](../banks/_lib/checks.sh) helpers rather than by hand:
+
+```bash
+[ "$sel" = "app=inventory" ] || {
+  echo "selector is '$sel', want app=inventory"
+  show_actual yaml "$(kubectl -n serpens get svc inventory -o yaml | k8s_clean)"
+  show_expected yaml "/banks/${BANK:-ckad-mock-01}/q19/expected/service.yaml"
+  show_why "A Service finds its Pods by label, never by name."
+  exit 1
+}
+```
+
+Call them **after** the failure message and **before** `exit 1`.
+[q19/10\_service.sh](../banks/ckad-mock-01/q19/validate.d/10_service.sh) and
+[q16/10\_probes.sh](../banks/ckad-mock-01/q16/validate.d/10_probes.sh) are the
+two worked examples.
+
+The rules the grader
+([evaluate/artifact.go](../facilitator/internal/evaluate/artifact.go)) applies:
+
+| | |
+|---|---|
+| `kind` | Exactly `actual`, `expected` or `why`. A closed set: each names a region of the explanation screen, and a fourth value would arrive at a client with nowhere to put it |
+| `lang` | Required in the sentinel, a highlighter tag (`yaml`, `json`, `text`), 1-16 characters of `[A-Za-z0-9_+-]` |
+| Column 0 | The sentinel is recognised only at the start of a line. This is also the escape hatch: a check whose real output must contain that string indents it one space |
+| A malformed sentinel | Discards **that block only** and parses on. Never fails the check — the candidate is mid-exam and a bank bug must not cost them points. The message still ends at the first sentinel-prefixed line, so a typo degrades to "no evidence" rather than pasting a Deployment into a one-line message. `tests/check-lint.sh` is where an author is meant to find out |
+| A check that passed | Loses its artifacts entirely. A correct answer has nothing to explain, and results are persisted in the session file and served back on every `/api/results` |
+| Size | 8 KiB per artifact, 24 KiB per check, 8 artifacts per check. Over any of them the body is cut and a `[truncated by the grader: …]` line is appended — visibly, never silently |
+| A check that emits none | Produces a **byte-identical** message to one written before the protocol existed. All 75 shipped CKAD checks rely on this and none was edited for it (`evaluate/artifact_test.go`) |
+
+Collision is vanishingly unlikely rather than impossible. `---8<---` is the
+conventional cut-here scissors and nothing `kubectl`, `jq` or `yq` emits, and
+YAML indents block-scalar content so an embedded copy is never at column 0 —
+but a check that `cat`s a file quoting this page could produce one, and the
+one-space indent is the answer.
+
+#### Expected documents
+
+`show_expected` reads a file and nothing else, on purpose. Expected documents
+live at `banks/<bank-id>/<qid>/expected/<name>` and are **generated from the
+reference solution, never hand-written** — a hand-written "expected" drifts
+from what `tests/solutions/<bank>/<qid>.sh` actually produces and then teaches
+the candidate something false, which is the same failure as a check that grades
+spelling. Regenerate one by solving the question and re-running the check's own
+`show_actual` pipeline against the result:
+
+```bash
+docker compose exec -T instance-1 su - candidate \
+  -c 'bash /tests/solutions/ckad-mock-01/q19.sh'
+docker compose exec -T instance-1 bash -c '. /banks/_lib/checks.sh
+  kubectl -n serpens get svc inventory -o yaml | k8s_clean | yq "<the check's filter>"' \
+  > banks/ckad-mock-01/q19/expected/service.yaml
+```
+
+Filter both panes identically, and filter out whatever the API server assigns
+rather than the candidate: a `clusterIP` in the EXPECTED pane is an address
+they never had, and showing it teaches them it was part of the answer.
+`k8s_clean` removes the noise every object carries (`managedFields`, `status`,
+`resourceVersion`, `uid`, `generation`, `creationTimestamp`, the
+`last-applied-configuration` annotation); anything else the question is not
+about is the check's own `yq`/`jq` filter to remove.
+
+A question with no `expected/` document is fine — `show_expected` emits
+nothing and the candidate gets the message they always had. Prefer that to
+inventing one. `q19/20_reachable.sh` deliberately has none: an EndpointSlice is
+written by a controller, with a random name suffix and Pod IPs for addresses,
+so an authored "expected" one would only teach a candidate to look for numbers
+that were never going to be theirs.
 
 ### Grade behaviour, not spelling
 
@@ -327,11 +420,34 @@ set -uo pipefail
 | `kubectl-run` | error | `kubectl ... run` |
 | `grep-qx` | error | `grep -qx`, which fails on a trailing space or a CRLF |
 | `unsourced-helper` | error | Calls a `_lib/checks.sh` helper without sourcing the library or defining the function locally |
+| `artifact-sentinel` | error | A hand-written `---8<--- sim:artifact` line that is not exactly `<kind> <lang>` with one space between fields |
+| `artifact-call` | error | `show_actual`/`show_expected` without a literal lang then a body, or `show_why` with no note |
 | `index` | warning | A fixed `[0]` index |
 
 Opt a line out with `# lint: allow-<rule>` where the pattern is genuinely
 correct. Every rule above honours it except `points` and `unsourced-helper`,
 which have no escape hatch, and comment lines are never linted.
+
+The two `artifact-*` rules exist because the protocol degrades silently by
+design: a malformed sentinel costs the candidate nothing at grade time, which
+also means the author gets no signal that their evidence never arrived.
+Offline is the only place it can be noticed.
+
+`get-yaml` has one structural exemption rather than an escape hatch: a
+`-o yaml` piped straight into `k8s_clean` and handed to
+`show_actual`/`show_expected` **on the same line**. Scoring on a serialisation
+grades spelling; showing one is the opposite errand, and there is no other way
+to produce a whole document for the pane. Capture the same pipeline into a
+variable and the rule fires again, because there is then something to compare
+it to.
+
+`diff` gets no such exemption, and the artifact protocol is not a loophole in
+it. **A grader emits what it found and what it wanted; it never emits a
+diff.** The explanation screen's side-by-side is *rendered* client-side from
+the `actual` and `expected` documents, after grading, where being wrong costs
+nothing. The ban is on `diff` deciding a *score*, and that reason is untouched:
+line order and whitespace are not the candidate's answer, and a check that
+scores them fails correct work.
 
 ## What the cluster provides
 
