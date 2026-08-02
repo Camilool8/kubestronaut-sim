@@ -142,7 +142,7 @@ the cold boot and defaults to 3600 seconds (tests/smoke.sh:42).
 | Session lifecycle: start, a countdown that decreases, desktop unlock, submit, results polling, and the solution and desktop gates re-locking | tests/smoke.sh:250-416 |
 | Solving all 22 questions of ckad-mock-01, each on the instance its `exam.yaml` entry names | tests/smoke.sh:331-356 |
 | Warm restart keeping the score, and `./sim reset` returning it to 0 with `/opt/course` re-created empty | tests/smoke.sh:418-440 |
-| A bank round trip, CKAD to the hidden `smoke-01` fixture and back, including its one question and the fixture staying out of the lobby list | tests/smoke.sh:442-538 |
+| A bank round trip, CKAD to the hidden `smoke-01` fixture and back, including its one question and the fixture staying out of the exam selector's list | tests/smoke.sh:442-538 |
 | Switching to a coming-soon certification refused with 400 | tests/smoke.sh:470-473 |
 | A bank id or question id that is not a slug refused with 400, so neither reaches a filesystem path | tests/smoke.sh:476, tests/smoke.sh:582 |
 | Training mode: hint tiers served one at a time, solutions readable mid-attempt, a practice grade that never becomes a result — and every one of those endpoints 403 in an exam attempt | tests/smoke.sh:540-602 |

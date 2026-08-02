@@ -32,13 +32,18 @@ const (
 // Exam is a fully loaded exam: its metadata plus every question and the
 // checks that grade it.
 type Exam struct {
-	Name              string
-	Title             string
+	Name  string
+	Title string
+	// Certification is metadata.certification, e.g. "CKAD" — the exam
+	// this bank rehearses, as opposed to Title, which names the bank
+	// ("CKAD Mock Exam 01"). Optional: a bank need not claim one, and a
+	// UI that has none falls back to the title.
+	Certification string
 	// Type is spec.examType, normalized: TypeHandsOn or TypeMCQ. Any
 	// other value is a load error — the conductor should never have made
 	// such a bank active, and the facilitator must not guess.
-	Type              string
-	Duration          time.Duration // parsed from spec.duration, e.g. "120m"
+	Type     string
+	Duration time.Duration // parsed from spec.duration, e.g. "120m"
 	// SpeedDuration is the compressed clock for a speed attempt. A bank
 	// may set spec.speedDuration; otherwise it is half Duration, which is
 	// the point of the mode — same questions, materially less time.
@@ -96,8 +101,9 @@ type Check struct {
 // exam.yaml. Only the fields Load needs are declared.
 type examDoc struct {
 	Metadata struct {
-		Name  string `json:"name"`
-		Title string `json:"title"`
+		Name          string `json:"name"`
+		Title         string `json:"title"`
+		Certification string `json:"certification"`
 	} `json:"metadata"`
 	Spec struct {
 		ExamType          string         `json:"examType"`
@@ -160,6 +166,7 @@ func Load(examJSONPath, bankDir string) (*Exam, error) {
 	e := &Exam{
 		Name:              doc.Metadata.Name,
 		Title:             doc.Metadata.Title,
+		Certification:     doc.Metadata.Certification,
 		Type:              examType,
 		Duration:          dur,
 		SpeedDuration:     speed,

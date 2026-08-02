@@ -55,7 +55,7 @@ end-session, wipe-instances, recreate-cluster, restart-instances and
 verify (`conductor/internal/control/control.go:109-117`).
 
 Cached images are kept, so a reset needs no network. Bank switching is
-not available here — use the lobby, or see [BANK](#bank).
+not available here — use the exam selector, or see [BANK](#bank).
 
 ### Choosing between down, reset and purge
 
@@ -117,7 +117,7 @@ active bank and `BANK` is ignored.
 ./sim up ckad-mock-01           # same as BANK=ckad-mock-01 ./sim up
 ```
 
-Switch banks from the lobby. To make the argument matter again, run
+Switch banks from the exam selector. To make the argument matter again, run
 `./sim purge` first: that deletes the volume `/shared/bank` lives on.
 
 ### PRELOAD
@@ -136,7 +136,7 @@ docker build --build-arg PRELOAD=none -t sim-k8s-env images/k8s-env
 ### SESSION_DURATION_OVERRIDE
 
 Replaces the bank's exam duration with any Go duration string. It
-reaches Exam and Speed attempts and deliberately not Training, which
+reaches `exam` and `speed` attempts and deliberately not Training, which
 has no clock to override
 (`facilitator/cmd/facilitator/main.go:112-123`).
 

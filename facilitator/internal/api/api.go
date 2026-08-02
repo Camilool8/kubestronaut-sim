@@ -37,11 +37,11 @@ type PracticeGrader func() (json.RawMessage, error)
 // server holds every dependency the HTTP handlers need. It is
 // unexported; New is the only way to obtain the http.Handler it backs.
 type server struct {
-	ex      *exam.Exam
-	bankDir string
-	mgr     *session.Manager
-	grade   Grader
-	desktop http.Handler
+	ex       *exam.Exam
+	bankDir  string
+	mgr      *session.Manager
+	grade    Grader
+	desktop  http.Handler
 	ui       fs.FS
 	boot     *bootstate.Reader
 	practice PracticeGrader
@@ -114,12 +114,18 @@ func handleHealthz(w http.ResponseWriter, r *http.Request) {
 
 // examResponse is the GET /api/exam JSON shape.
 type examResponse struct {
-	Name              string             `json:"name"`
-	Title             string             `json:"title"`
-	ExamType          string             `json:"examType"`
-	DurationSeconds   int                `json:"durationSeconds"`
-	PassingScore      int                `json:"passingScore"`
-	KubernetesVersion string             `json:"kubernetesVersion"`
+	Name  string `json:"name"`
+	Title string `json:"title"`
+	// Certification names the exam this bank rehearses ("CKAD"), where
+	// Title names the bank ("CKAD Mock Exam 01"). The mode screen and its
+	// header both describe the LOADED exam, so they read it from here
+	// rather than from the conductor's catalog — one fetch, and no
+	// dependency on having visited the exam selector first.
+	Certification     string `json:"certification,omitempty"`
+	ExamType          string `json:"examType"`
+	DurationSeconds   int    `json:"durationSeconds"`
+	PassingScore      int    `json:"passingScore"`
+	KubernetesVersion string `json:"kubernetesVersion"`
 	// QuestionCount is the exam's declared length — ex.ExamLength for a
 	// pooled mcq bank, otherwise len(Questions) — and is what the lobby
 	// and the bank-switch cards must show. It is deliberately NOT always
@@ -183,6 +189,7 @@ func (s *server) handleExam(w http.ResponseWriter, r *http.Request) {
 	resp := examResponse{
 		Name:              s.ex.Name,
 		Title:             s.ex.Title,
+		Certification:     s.ex.Certification,
 		ExamType:          s.ex.Type,
 		DurationSeconds:   int(s.ex.Duration.Seconds()),
 		PassingScore:      s.ex.PassingScore,

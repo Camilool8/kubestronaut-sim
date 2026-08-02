@@ -27,12 +27,107 @@ export const strings = {
     crumbResults: "Results",
   },
 
-  start: {
-    fallbackTitle: "kubestronaut-sim",
+  // 1b, the exam selector. The screen a candidate lands on.
+  exams: {
+    title: "Path to Kubestronaut",
+    lead: "Five certifications. Pick one to drill, or resume where you stopped.",
+    // The capsule beside the title. It counts what you can SIT today, not
+    // what you have passed — passing needs the attempt history, which
+    // does not exist yet. When it does, the number changes meaning and
+    // this label changes with it; the five segments are the same five
+    // exams either way.
+    coverageLabel: "Exams",
+    coverage: (live: number, total: number) => `${live} of ${total} live`,
+    live: "Live",
+    soon: "Soon",
+    unavailable: "Unavailable",
+    liveListLabel: "Exams you can sit",
+    soonListLabel: "Exams not built yet",
+    // The stat strip under each card's title.
     durationLabel: "Duration",
-    passingScoreLabel: "Passing score",
+    passingLabel: "To pass",
+    engineLabel: "Engine",
+    // Only for a pooled bank, where the two numbers genuinely differ.
+    drawnLabel: "Drawn / pool",
+    tasksLabel: "Tasks",
     questionsLabel: "Questions",
-    kubernetesLabel: "Kubernetes",
+    enginePractical: "Practical",
+    // "MCQ", not "Multiple choice": the strip's four cells are equal
+    // width, and the longer phrase wrapped to two lines on the KCNA card
+    // alone — which put that card's hairline 22px below CKAD's and made
+    // two cards that should read as a matched pair look misaligned.
+    // MCQ is also what the rest of this product calls it.
+    engineMcq: "MCQ",
+    engineUnknown: "Not built",
+    // The card's primary action, on both the loaded exam and the others.
+    // Deliberately identical wording: picking an exam is one act, and the
+    // rebuild it may cost is the dialog's job to disclose, not a
+    // different verb's.
+    choose: "Choose a mode",
+    // Expansions of the five certification acronyms. Copy, not data: they
+    // are the same five strings for every bank that will ever carry them,
+    // and a bank whose certification is not one of these falls back to
+    // its own title.
+    certNames: {
+      CKAD: "Certified Kubernetes Application Developer",
+      CKA: "Certified Kubernetes Administrator",
+      CKS: "Certified Kubernetes Security Specialist",
+      KCNA: "Kubernetes and Cloud Native Associate",
+      KCSA: "Kubernetes and Cloud Native Security Associate",
+    } as Record<string, string>,
+    catalogErrorTitle: "Couldn't load the exam catalog",
+    catalogErrorBody: (detail: string) =>
+      `The control plane did not answer (${detail}). This list comes from the conductor container; check it is up with \`docker compose ps conductor\`.`,
+    catalogRetry: "Retry",
+    // The catalog answered with nothing at all. Distinct from a failure:
+    // the request worked, so the fix is a missing mount, not a dead
+    // container.
+    empty: "No exams are installed. The banks directory is mounted read-only into the conductor; check it is not empty.",
+  },
+
+  // 1c, the mode selector. Everything on it is a promise the server
+  // enforces — see the mode predicates in facilitator/internal/session.
+  mode: {
+    title: "How do you want to sit it?",
+    lead: "Every mode uses the same tasks and the same grader. What changes is the clock and what you're allowed to lean on.",
+    // The clock figure on a Training card. Not "0:00", which reads as an
+    // attempt that already ran out.
+    untimed: "No limit",
+    // Beside a shortened clock, so half an exam is legible as half of
+    // something. Said in words rather than drawn as a strikethrough —
+    // a line through a number is a visual-only signal.
+    fullClock: (full: string) => `${full} in the real exam`,
+    recommended: "Recommended",
+    // One row per server-enforced permission. Each is rendered with a
+    // tick or a dash, and the sr-only word beside it is what carries the
+    // state to a screen reader — the glyph is decoration.
+    capHelp: "Hints and reference solutions",
+    capGrade: "Grade your work without ending the attempt",
+    capRecorded: "Kept as an attempt",
+    capYes: "Yes:",
+    capNo: "No:",
+    capListLabel: "What this mode allows",
+    start: (label: string) => `Start ${label}`,
+    starting: "Starting…",
+    // The draw panel. It describes the questions this exam asks; the
+    // domain list is a summary today and becomes a filter in a later
+    // milestone, so nothing in here is drawn as a control.
+    drawTitle: "What you'll be asked",
+    drawPooled: (drawn: number, pool: number) =>
+      `${drawn} drawn at random from ${pool}, weighted to the published domain split. A different set every attempt.`,
+    drawAll: (n: number) =>
+      `All ${n}, every attempt. This bank has no larger pool behind it yet, so the set does not change between sessions.`,
+    domainsPool: "Domains in the pool",
+    domainsExam: "Domains in this exam",
+    examFailed: (detail: string) =>
+      `Couldn't load this exam (${detail}). The facilitator may still be starting; check it with \`docker compose ps facilitator\`.`,
+    // The route named an exam that is not the loaded one — a stale
+    // bookmark, or a switch that failed. Sending them back to the
+    // selector is the only honest move: the modes on this screen would
+    // start the OTHER exam.
+    wrongExam: "That exam isn't loaded any more. Back to the exam list…",
+    // Fine print for the attempt ahead. It sits after the mode cards, not
+    // before them: it qualifies the act rather than gating it.
     tips: [
       "Solve questions over SSH on the named instance (user: candidate).",
       "The desktop's Firefox reaches allowlisted documentation sites only.",
@@ -45,29 +140,10 @@ export const strings = {
       "Multi-select questions score all-or-nothing: every correct option, nothing else.",
       "You can change any answer until you submit or time runs out.",
     ],
-    // The clock tip follows the chosen mode: "cannot be paused" printed
-    // under a selected, untimed Training row was the lobby contradicting
-    // itself (#22's last holdout, caught in the browser pass).
-    tipTimer: (mode: string) =>
-      mode === "training"
-        ? "Training is untimed. Exam and Mastery start their clock the moment you click Start."
-        : "The timer starts the moment you click Start and cannot be paused.",
-    // The catalog and the exam summary are separate endpoints, so one can
-    // fail while the other renders. Say which one, and that the button
-    // below is the thing that will not work.
-    examFailed: (detail: string) =>
-      `Couldn't load this exam's summary (${detail}). The facilitator may still be starting; check it with \`docker compose ps facilitator\`.`,
-    modeLegend: "How do you want to run this?",
-    // The button names what the chosen mode starts. "Start Exam" over a
-    // selected Training row promised the wrong thing at the exact moment
-    // of commitment (#22).
-    start: (mode: string) =>
-      mode === "training" ? "Start Training" : mode === "speed" ? "Start Mastery Run" : "Start Exam",
-    starting: "Starting…",
-    catalogErrorTitle: "Couldn't load the exam catalog",
-    catalogErrorBody: (detail: string) =>
-      `The control plane did not answer (${detail}). Your current exam below still works. The list of other exams needs the conductor container.`,
-    catalogRetry: "Retry",
+    // Every card is on screen at once now, so this is stated once for all
+    // three rather than tracking a selection.
+    tipTimer:
+      "Training is untimed. Exam and Mastery start their clock the moment you start, and it cannot be paused.",
   },
 
   exam: {
@@ -250,22 +326,14 @@ export const strings = {
     skip: "Skip past the exam desktop (it captures Tab while focused)",
   },
 
+  // Choosing an exam that is not the loaded one is not a navigation — it
+  // is a 2-4 minute destructive rebuild, and it stays behind a
+  // confirmation for that reason alone.
   lobby: {
-    // Names what the card's h1 is, now that the catalog lives at the
-    // bottom of the card: this exam is loaded and Start acts on it.
-    activeExam: "Active exam",
-    // The catalog's heading. "Choose your exam" read as the card's
-    // primary act; switching is the secondary one, and an exam is
-    // already chosen the moment the lobby renders.
-    switchExam: "Switch exam",
-    active: "Active",
-    comingSoon: "Coming soon",
-    unavailable: "Unavailable",
-    questions: (n: number) => `${n} questions`,
-    switchConfirmTitle: (title: string) => `Switch to ${title}?`,
+    switchConfirmTitle: (title: string) => `Load ${title}?`,
     switchConfirmBody:
-      "This wipes all cluster and instance state and rebuilds from scratch. It usually takes about 2-4 minutes.",
-    switchConfirm: "Switch exam",
+      "Only one exam can be loaded at a time. Switching wipes all cluster and instance state and rebuilds from scratch, which usually takes about 2-4 minutes. You can leave the tab open while it runs.",
+    switchConfirm: "Load it",
     cancel: "Cancel",
   },
 

@@ -50,9 +50,11 @@ network topology, and [SECURITY.md](SECURITY.md) for the threat model.
 
 The parts that constrain product decisions:
 
-- The session arc is lobby catalog, timed exam view, submit or expiry,
-  score, then a new attempt or an exam switch — the last two rebuild the
-  whole environment behind a live progress checklist.
+- The session arc is exam selector, mode selector, timed exam view,
+  submit or expiry, score, then a new attempt or an exam switch — the
+  last two rebuild the whole environment behind a live progress
+  checklist. Only the first two are addressed by a URL fragment; every
+  other screen is a pure function of the server's session state.
 - The exam desktop is XFCE with a terminal already open, Firefox
   restricted to a documentation allowlist, ssh to named instances as
   `candidate`, and a `/opt/course/<n>` working directory per question.
@@ -80,10 +82,15 @@ The parts that constrain product decisions:
   **mcq** (answers stored in the session, graded in the facilitator —
   no cluster involvement, so an mcq attempt starts before the
   environment finishes booting and works on a phone).
-- Three ways to run an attempt: **Exam** (the bank's duration, no help),
-  **Training** (untimed, two-tier hints and solutions on demand, and
-  scoring that does not end the attempt) and **Speed** (half the
-  duration, no help).
+- Three ways to run an attempt, offered gentlest first: **Training**
+  (untimed, two-tier hints and solutions on demand, and scoring that
+  does not end the attempt), **Mastery** (half the duration, no help)
+  and **Exam** (the bank's duration, no help). What each one permits is
+  defined once, in `facilitator/internal/session`, and both described to
+  the UI and enforced by the handlers from there — so a mode card cannot
+  advertise something the server then refuses.
+  - Mastery is the wire id `speed`, and stays that way: renaming it
+    would invalidate every persisted session and every stored attempt.
 
 **Durable constraints**
 

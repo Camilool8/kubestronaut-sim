@@ -36,9 +36,19 @@ type Entry struct {
 	PassingScore      int    `json:"passingScore,omitempty"`
 	KubernetesVersion string `json:"kubernetesVersion,omitempty"`
 	QuestionCount     int    `json:"questionCount,omitempty"`
-	Available         bool   `json:"available"`
-	ComingSoon        bool   `json:"comingSoon,omitempty"`
-	Note              string `json:"note,omitempty"`
+	// PoolCount is how many questions the bank AUTHORS; QuestionCount is
+	// how many one attempt draws. They differ only for a pooled bank, and
+	// the exam card renders the pair ("65 / 97") only when they do — a
+	// card reading "22 / 22" would advertise a pool that is not one.
+	//
+	// The facilitator already knows this for the ACTIVE bank (its
+	// /api/exam serves the full question list), but the catalog is the
+	// only place that knows it for the others, and the exam selector
+	// draws every bank side by side.
+	PoolCount  int    `json:"poolCount,omitempty"`
+	Available  bool   `json:"available"`
+	ComingSoon bool   `json:"comingSoon,omitempty"`
+	Note       string `json:"note,omitempty"`
 
 	// Hidden keeps a bank out of List — and therefore out of the lobby —
 	// without making it unswitchable. It exists for exactly one caller:
@@ -189,6 +199,7 @@ func buildEntry(id string, raw []byte) (Entry, error) {
 		PassingScore:      doc.Spec.PassingScore,
 		KubernetesVersion: doc.Spec.KubernetesVersion,
 		QuestionCount:     declaredQuestionCount(doc.Spec.ExamLength, len(doc.Spec.Questions)),
+		PoolCount:         len(doc.Spec.Questions),
 		Available:         true,
 		Hidden:            doc.Metadata.Hidden,
 	}

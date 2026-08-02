@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
-import { Start } from "./screens/Start";
+import { Exams } from "./screens/Exams";
+import { Mode } from "./screens/Mode";
 import { Score } from "./screens/Score";
 import { ControlProgress } from "./components/ControlProgress";
 import { BootProgress } from "./screens/BootProgress";
@@ -39,11 +40,45 @@ const AXE_OPTS = {
 const examJSON = {
   name: "ckad-mock-01",
   title: "CKAD Mock Exam 01",
+  certification: "CKAD",
+  examType: "hands-on",
   durationSeconds: 7200,
   passingScore: 66,
   kubernetesVersion: "1.35",
+  questionCount: 1,
   questions: [
     { id: "q01", instance: "instance-1", domain: "Config", weight: 5, totalPoints: 5, hintCount: 0 },
+  ],
+  // The mode screen renders one card per entry and one capability row
+  // per flag, so the scan needs all three or it covers a third of it.
+  modes: [
+    {
+      id: "training",
+      durationSeconds: 0,
+      untimed: true,
+      helpAllowed: true,
+      gradesPerTask: true,
+      recorded: false,
+      recommended: false,
+    },
+    {
+      id: "speed",
+      durationSeconds: 3600,
+      untimed: false,
+      helpAllowed: false,
+      gradesPerTask: false,
+      recorded: true,
+      recommended: true,
+    },
+    {
+      id: "exam",
+      durationSeconds: 7200,
+      untimed: false,
+      helpAllowed: false,
+      gradesPerTask: false,
+      recorded: true,
+      recommended: false,
+    },
   ],
 };
 
@@ -234,34 +269,38 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  test("lobby (Start)", async () => {
+  test("exam selector", async () => {
     const { container } = render(
-      <Start
-        onSessionChange={() => {}}
-        onControlStart={() => {}}
-        catalogVersion={0}
-        onBanksLoaded={() => {}}
-      />,
+      <Exams onControlStart={() => {}} catalogVersion={0} onBanksLoaded={() => {}} />,
     );
-    await screen.findByText("CKAD Mock Exam 01", { selector: "h1" });
+    await screen.findByText("CKAD", { selector: "h2" });
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  // Three mode cards, each with a capability list whose state is carried
+  // by an sr-only word beside a decorative glyph. If that word were ever
+  // dropped the list would say nothing at all to a screen reader, and a
+  // scan of a single card would not show it.
+  test("mode selector", async () => {
+    const { container } = render(
+      <Mode bankId="ckad-mock-01" catalogVersion={0} onSessionChange={() => {}} />,
+    );
+    await screen.findByRole("button", { name: /start exam/i });
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
   // The switch-confirm used to be hand-rolled divs with no role, no
   // aria-modal and no focus trap, and this suite never caught it because
-  // the lobby scan never opened it. Scan it open.
-  test("lobby with the switch-confirm dialog open", async () => {
+  // the selector scan never opened it. Scan it open.
+  test("exam selector with the switch-confirm dialog open", async () => {
     const user = userEvent.setup();
     const { container } = render(
-      <Start
-        onSessionChange={() => {}}
-        onControlStart={() => {}}
-        catalogVersion={0}
-        onBanksLoaded={() => {}}
-      />,
+      <Exams onControlStart={() => {}} catalogVersion={0} onBanksLoaded={() => {}} />,
     );
-    await screen.findByText("CKAD Mock Exam 01", { selector: "h1" });
-    await user.click(screen.getByRole("button", { name: /CKA Mock Exam 01/ }));
+    await screen.findByText("CKA", { selector: "h2" });
+    // The second live card is not the active bank, so choosing it is a
+    // rebuild and must go through the dialog.
+    await user.click(screen.getAllByRole("button", { name: /choose a mode/i })[1]);
     // Assert it actually opened — a disabled card would leave this suite
     // silently scanning a closed dialog, which is how the original gap
     // survived.
@@ -273,7 +312,7 @@ describe("axe: no WCAG violations", () => {
   // Async's comment on why its error prop is mandatory. This suite never
   // scanned that state, so the role="alert" card's name/role/value
   // (title, body, dynamic Retry button) never had an axe pass.
-  test("lobby catalog error card", async () => {
+  test("exam selector catalog error card", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
@@ -286,12 +325,7 @@ describe("axe: no WCAG violations", () => {
       }),
     );
     const { container } = render(
-      <Start
-        onSessionChange={() => {}}
-        onControlStart={() => {}}
-        catalogVersion={0}
-        onBanksLoaded={() => {}}
-      />,
+      <Exams onControlStart={() => {}} catalogVersion={0} onBanksLoaded={() => {}} />,
     );
     // Confirm the error card is actually the thing on screen, not a
     // loading or empty state a mis-routed mock would leave behind.

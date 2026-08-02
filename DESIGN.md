@@ -1,6 +1,6 @@
 ---
 name: kubestronaut-sim
-description: A calm instrument panel for a timed Kubernetes certification exam — Kubernetes blue on cool slate, in matched light and dark themes.
+description: A calm instrument panel for a timed Kubernetes certification exam — one blue for action, one cyan for progress, on cool slate, in matched light and dark themes.
 colors:
   bg: "#f6f8fc"
   surface: "#ffffff"
@@ -172,11 +172,24 @@ components:
   progress-fill:
     backgroundColor: "{colors.progress}"
     rounded: "{rounded.pill}"
-  bank-card:
-    backgroundColor: "{colors.bg}"
+  exam-card:
+    backgroundColor: "{colors.surface}"
     textColor: "{colors.text}"
-    rounded: "{rounded.s}"
-    padding: "0.75rem 1rem"
+    rounded: "{rounded.xl}"
+    padding: "{spacing.5}"
+  exam-card-soon:
+    backgroundColor: "{colors.bg}"
+    textColor: "{colors.text-secondary}"
+    rounded: "{rounded.xl}"
+    padding: "{spacing.5}"
+  exam-avatar-practical:
+    backgroundColor: "{colors.accent-soft}"
+    textColor: "{colors.accent}"
+    rounded: "{rounded.l}"
+  exam-avatar-mcq:
+    backgroundColor: "{colors.progress-soft}"
+    textColor: "{colors.progress-strong}"
+    rounded: "{rounded.l}"
   question-tile:
     textColor: "{colors.text}"
     rounded: "{rounded.s}"
@@ -198,11 +211,16 @@ components:
     textColor: "{colors.text}"
     rounded: "{rounded.s}"
     padding: "0.75rem"
-  bank-card-active:
-    backgroundColor: "{colors.accent-soft}"
+  mode-card:
+    backgroundColor: "{colors.surface}"
     textColor: "{colors.text}"
-    rounded: "{rounded.s}"
-    padding: "0.75rem 1rem"
+    rounded: "{rounded.xl}"
+    padding: "{spacing.5}"
+  mode-card-on:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.xl}"
+    padding: "{spacing.5}"
   badge:
     backgroundColor: "transparent"
     textColor: "{colors.accent}"
@@ -300,6 +318,23 @@ Softs and row tints (`--success-soft`, `--danger-soft`, `--danger-row`,
 `--warn-soft`, `--neutral-soft`, `--muted-soft`) are fills only; the
 token that reads on each is named in `tokens.css`.
 
+**The exam tint names the engine.** `--exam-tint` and `--exam-tint-soft`
+are the one alias family in the system: they hold no colour of their own
+and are repointed by a `data-engine` attribute on the card. A practical
+exam takes the action blue, a multiple-choice one the progress cyan, and
+an exam nobody can sit yet is outside the hue system entirely
+(`--text-muted` on `--muted-soft`).
+
+Keyed on the engine rather than the certification on purpose. Five
+per-certification hues would be five colours that differ without meaning
+anything; two engine hues say the same thing the card's own Engine cell
+says in words, and they extend without invention when CKA, CKS and KCSA
+arrive. Being aliases, they need no dark twin — `var()` in a custom
+property is substituted at use time, so the tint resolves through
+whichever `--accent` the theme has. `contrast.test.ts` asserts each
+variant's foreground reads as text on its own fill, because a variant
+repointed at a graphics-only token would be silent everywhere else.
+
 The rules that govern them:
 
 | Named rule | Statement |
@@ -365,13 +400,15 @@ reads identically in the question panel and in the candidate's vim.
 
 Two panes and a stack: a resizable question panel beside a fluid desktop
 viewport under a wrapping topbar, and a single centred column everywhere
-else. There are six full-page surfaces — `screens/Start.tsx`,
-`screens/Exam.tsx`, `screens/McqExam.tsx`, `screens/Score.tsx`,
-`screens/BootProgress.tsx` and `components/DesktopRequired.tsx`.
+else. There are seven full-page surfaces — `screens/Exams.tsx`,
+`screens/Mode.tsx`, `screens/Exam.tsx`, `screens/McqExam.tsx`,
+`screens/Score.tsx`, `screens/BootProgress.tsx` and
+`components/DesktopRequired.tsx` — the first two under `.app-header`,
+the rest owning their whole viewport.
 
 | Surface | Width |
 |---|---|
-| Lobby card | `min(680px, 100%)` |
+| Exam and mode pages | `--page-max` (1160px), centred |
 | MCQ question column | `max-width: 760px` |
 | Score page | `max-width: 820px` |
 | About drawer | `min(480px, 92vw)` |
@@ -383,11 +420,12 @@ else. There are six full-page surfaces — `screens/Start.tsx`,
 | Clipboard panel, keyboard popover | `min(92vw, 380px)` |
 | Toast layer | `min(380px, calc(100vw - 2rem))` |
 
-**Spacing** is six steps, `--space-1` to `--space-6`: 0.25 / 0.5 / 0.75 /
-1 / 1.5 / 2rem. Cards take `--space-6` and drop to `--space-4` below
-600px, dialogs take `--space-5`, dense rows `--space-1`–`--space-2`.
-Density is deliberately higher inside the exam than on the lobby and
-score screens: one is a working surface, the others are reading surfaces.
+**Spacing** is nine steps, `--space-1` to `--space-9`: 0.25 / 0.5 / 0.75 /
+1 / 1.5 / 2 / 2.5 / 3 / 4rem. Cards and dialogs take `--space-5`, page
+gutters `--space-5` closing to `--space-4` below 600px, dense rows
+`--space-1`–`--space-2`. Density is deliberately higher inside the exam
+than on the selector and score screens: one is a working surface, the
+others are reading surfaces.
 
 **The panel edge is draggable.** `.question-panel` is `clamp(280px,
 var(--panel-width, 360px), min(600px, 50vw))`, and `PanelResizer` — a
@@ -412,7 +450,7 @@ Three breakpoints, each changing structure rather than scale:
 | Query | Change |
 |---|---|
 | `max-width: 900px` | the question panel leaves the flow and becomes an overlay drawer at `min(85vw, 360px)` with `--shadow-3`, over a 36px collapsed rail |
-| `max-width: 600px` | dialogs and the boot panel go full-bleed (width 100%, `max-height: 100dvh`, radius 0), the clipboard panel and keyboard popover become bottom sheets, lobby actions stack, and the domain table's cells become blocks |
+| `max-width: 600px` | dialogs and the boot panel go full-bleed (width 100%, `max-height: 100dvh`, radius 0), the clipboard panel and keyboard popover become bottom sheets, the page gutters close a step, the mode screen's fine print stacks, and the domain table's cells become blocks |
 | `any-pointer: coarse` | icon controls and the panel's `--control-size` go from 28px to a 44px minimum. Keyed to pointer type, not width |
 
 Four structural rules constrain all of it:
@@ -433,8 +471,8 @@ three roles with black at 0.30–0.55 alpha.
 
 | Token | Sites |
 |---|---|
-| `--shadow-1` | `.score-banner` |
-| `--shadow-2` | `.start-card`, `.boot-panel`, `.toast`, `.desktop-required-card`, `.job-chip` |
+| `--shadow-1` | `.score-banner`, `.exam-card` — what lifts a card whose edge is only structural |
+| `--shadow-2` | `.boot-panel`, `.toast`, `.desktop-required-card`, `.job-chip` |
 | `--shadow-3` | `.confirm-dialog`, `.control-dialog`, `.info-drawer`, `.clipboard-panel` / `.keyboard-popover`, and `.question-panel` once it becomes an overlay under 900px |
 | `--shadow-accent` | the single recommended card on a screen of choices. Tinting a shadow says "this one", which is why there is exactly one |
 | `--shadow-machine` | windows drawn inside the VNC canvas. Black rather than ink-tinted, because they float over a machine and not over the page |
@@ -459,11 +497,11 @@ above the overlay so a confirmation is never rendered invisible.
 | Token | Value | Use |
 |---|---|---|
 | `--radius-xs` | 4px | inline `code`, which is also every click-to-copy value, and small status pills. A box sized to a few characters needs a corner proportional to itself; nothing with real height takes it |
-| `--radius-s` | 6px | anchored things: buttons, bank cards, inset panels, code blocks, question rows and tiles, the timer chip, toasts, mode options, clipboard fields |
+| `--radius-s` | 6px | anchored things: buttons, inset panels, code blocks, question rows and tiles, the timer chip, toasts, clipboard fields |
 | `--radius-m` | 8px | grouped containers: option rows, inset panels, machine surfaces, the navigator popover |
-| `--radius-l` | 10px | floating things: `.start-card`, `.confirm-dialog`, `.control-dialog`, `.boot-panel`, `.desktop-required-card`, `.score-banner`, `.clipboard-panel` / `.keyboard-popover` |
+| `--radius-l` | 10px | floating things: `.draw-panel`, the exam avatar, `.confirm-dialog`, `.control-dialog`, `.boot-panel`, `.desktop-required-card`, `.score-banner`, `.clipboard-panel` / `.keyboard-popover` |
 | `--radius-xl` | 12px | the largest cards — exam cards and mode cards, which are big enough that 10px reads as square |
-| `--radius-pill` | 999px | status objects read rather than pressed: `.bank-badge`, `.question-points`, `.instance-chip`, `.mode-chip`, `.domain-bar`, `.pending-bar`, `.job-chip-bar`, plus `.info-button` (28×28, so genuinely circular) and `.theme-toggle` (pill radius on `0.25em 0.9em` of padding, so a lozenge) |
+| `--radius-pill` | 999px | status objects read rather than pressed: `.question-points`, `.instance-chip`, `.mode-chip`, `.domain-bar`, `.pending-bar`, `.job-chip-bar`, plus `.info-button` (28×28, so genuinely circular) and `.theme-toggle` (pill radius on `0.25em 0.9em` of padding, so a lozenge) |
 
 A new component picks from those four. One departure: below 600px,
 full-bleed sheets drop to radius 0, because a sheet that reaches every
@@ -497,27 +535,29 @@ own type, weight 600.
 | Component | Treatment |
 |---|---|
 | Instance chip | which box to ssh into, the most load-bearing fact per question. Mono, accent text on `--accent-soft`, accent border, pill — the only pill with a full accent treatment |
-| Bank badge | `--text-xs` uppercase, pill, accent text and border, and no background of its own: it sits on the card's fill. `--accent-strong` on the active card, where the wash drops plain accent to 4.0:1; muted ink and `--border` on an unavailable one |
+| Exam badge | `--text-2xs` mono uppercase at `--tracking-label`, `--radius-xs`, on a fill of its own: `--success-soft`/`--success-strong` for LIVE, `--muted-soft`/`--text-muted` for SOON. A live and a coming-soon card must be told apart by a word, never only by a hue |
 | Points counter | mono, muted ink, hairline on the page fill, pill. Goes accent when its row is selected |
 | Mode chip | the topbar's name for any attempt that is not a plain exam, so a training result is never mistaken for a real one |
 | Card fill | `--surface` for cards that float, `--bg` for panels inset *within* a card — an inversion that reads correctly because the page tone is darker than the card in light and lighter in dark |
-| Card padding | `--space-6` on the lobby card, `--space-5` on dialogs and the drawer, `--space-3`/`--space-4` on dense containers; one step less below 600px |
-| Bank card states | rest on the page fill with a `--border-strong` hairline, hover steps the fill, and the active exam takes an accent border, `--accent-soft` *and* a 3px inset bar |
-| Bank description | `.bank-desc` — the bank's one-line pitch at `--text-s` muted, two-line clamped, visible on the card rather than hidden in a `title=` tooltip touch devices never see |
-| Lobby order | the card reads as one decision: an "Active exam" `.start-eyebrow` (the `--text-xs` label recipe) over the h1, stats, mode picker, Start — then tips as fine print, then the catalog demoted to "Switch exam" at the bottom |
-| The Legible Refusal | an unavailable exam is not a disabled control but a refusal with a reason, and the reason is the point of rendering it. `--text` for the title, `--text-muted` for the meta and reason line, and unavailability marked by `disabled`, `cursor: default`, a muted badge and an italic reason — never by opacity |
+| Card padding | `--space-5` on exam and mode cards, `--space-5` on dialogs and the drawer, `--space-3`/`--space-4` on dense containers; page gutters close a step below 600px |
+| Exam card | `--surface` under a `--border` hairline at `--radius-xl` with `--shadow-1`. A card is not a control, so its edge is structural and takes the weaker tier; what lifts it is the shadow. A coming-soon card drops the shadow, dashes the border and sits on `--bg` |
+| Exam description | `.exam-desc` — the bank's one-line pitch at `--text-s`, three-line clamped, visible on the card rather than hidden in a `title=` tooltip touch devices never see. It occupies the slot the attempt-history bar will take |
+| Mode card | one column of three, `--radius-xl`, with an edge-to-edge start button as its footer (the card's `overflow: hidden` supplies the corners, so the button never has to know the radius). The recommended card takes a 2px accent edge, `--shadow-accent` **and** the word "Recommended" — two of the three are colour, and colour alone is one channel |
+| The Legible Refusal | an unavailable exam is not a disabled control but a refusal with a reason, and the reason is the point of rendering it. `--text-secondary` for the title, `--text-muted` for the reason, and unavailability marked by a dashed edge, a SOON badge and the absence of any action — never by opacity, and never by dimming the reason below the AA floor |
 
 ### Form controls
 
-Four exist. The candidate's real input surface is the terminal, so the
+Three exist. The candidate's real input surface is the terminal, so the
 browser UI only starts, ends, navigates and reports; a new screen
-reaching for a field is probably solving the wrong problem. All four
-borrow the anchored idioms — 6px corners, a hairline border, a
-`--surface-raised` fill, the global focus ring — and a fifth would too.
+reaching for a field is probably solving the wrong problem. (There used
+to be a fourth: the lobby's mode radio group. Choosing a mode is now
+three cards each carrying its own start button, so there is no selection
+to hold and then commit — the choice and the act are one press.) All
+three borrow the anchored idioms — 6px corners, a hairline border, a
+`--surface-raised` fill, the global focus ring — and a fourth would too.
 
 | Control | Site | Treatment |
 |---|---|---|
-| Radio group | mode picker, `screens/Start.tsx` | native `<input type="radio">` inside a `<label>` row, in a borderless `<fieldset>` whose `legend` is `--text-s` muted. `.mode-option` is 6px on `--border`, hover steps the fill, and the chosen row takes the full three-channel selection: accent border, `--accent-soft`, 3px inset bar |
 | Textarea | clipboard panel, `components/ClipboardPanel.tsx:87` | `.clipboard-input` — mono at `--text-s`, `--surface-raised` fill, `--border` hairline, 6px, `resize: vertical` |
 | Checkbox ×2 | keyboard settings, `components/KeyboardSettings.tsx:49` and `:60` | native and unstyled, in a `.keyboard-row` flex row beside a `--text-s` label. The second is `disabled` while the first is off |
 
@@ -556,7 +596,7 @@ There is no site nav. What stands in for it:
 | Topbar (exam only) | `--surface` under a hairline bottom border, wrapping rather than compressing, title flexing from an 8rem basis and ellipsing |
 | Question navigator | one header row — prev, the current question's id and points, next — above the pane, with the bank's optional question title (`.question-nav-title`, the one flex item in the row allowed to ellipse), the instance chip and the review-mark toggle on a second row |
 | Jump grid | a full-panel disclosure of every question as mono tiles auto-filled from a 4.25rem minimum, grouped under their curriculum domain, which is where the long domain string gets a full line. A bank that ships question titles adds a muted sans line per tile and widens every grid to a 7.5rem minimum as a set (`.question-grid-titled`). No scrim, no `role="dialog"`, no focus trap: dimming a live remote desktop to pick question 12 would read as a fault |
-| Floating controls | theme toggle and info button, fixed top-right in one flex cluster so their spacing comes from layout rather than a guessed offset |
+| App header | `.app-header`, 56px, on every screen that is a PAGE and deliberately not on the exam (which has a topbar carrying a clock and a submit button) or the boot screen. Two variants of one component: `brand` leads with the mark and wordmark, `back` replaces both with a labelled way out for a screen reached FROM another. `flex-shrink: 0` is load-bearing — as a flex item its `height` is only a base size, and a tall page squashed it to its min-content height |
 | Skip link | the `.sr-only` clip idiom, never a transform; on focus it becomes `position: fixed`, so its visible state is anchored to the viewport rather than to the pane it lives in |
 
 **Tile states — four states, four channels, no two sharing a value.**
@@ -576,6 +616,31 @@ stand down on `target?.closest("input, textarea, [contenteditable]")`
 the RFB canvas owns the keyboard, and while a dialog is open. Alt+arrows
 were rejected: those are Back/Forward on Windows and Linux, and in a
 router-less SPA Back leaves a running exam.
+
+### The exam and mode selectors
+
+Two steps before a session exists, and the only two screens addressed by
+a URL fragment (`#/exams`, `#/exams/<id>/mode`). `session.state` is
+still the outer switch — it is server truth and no bookmark may
+contradict it — and the route only chooses between views inside one
+state.
+
+| Element | Treatment |
+|---|---|
+| `.page` | the shared root of both: `min-height: 100%`, centred at `--page-max`, and it scrolls the *document* rather than a box of its own. A nested scrollbar under a 56px fixed header is the failure the score screen has its own override to avoid |
+| Coverage capsule | how much of the path is playable, as a figure plus one segment per card in the grid below, each tinted like its card. The bar is `aria-hidden`: the figure beside it already says the same thing in words, and empty list items announce as nothing at all |
+| Exam grid | `auto-fit` from a 330px minimum for live exams, 240px for coming-soon ones. Two columns at `--page-max` today because there are two live exams, not because two is specified |
+| Stat strip | four cells between two hairlines: duration, draw, passing score, engine. A `<dl>` with `dt` before `dd` as the grammar requires, drawn figure-above-label by `column-reverse` — a visual order only, so a screen reader still hears "Duration, 2h" |
+| The pool pair | "65 / 97" appears only when the two numbers differ. A card reading "22 / 22" would advertise a random draw that bank does not do |
+| Mode capability rows | one row per server-enforced permission, generated from the `helpAllowed` / `gradesPerTask` / `recorded` flags on `GET /api/exam` — never restated client-side, so a card cannot advertise something the server then refuses. The tick and cross are decoration; an `.sr-only` "Yes:"/"No:" carries the state |
+| Draw panel | what the exam will ask, as tags rather than chips. Nothing filters anything yet, so nothing wears a control's border, hover or cursor — a chip that looks clickable and is not is worse than a plain tag |
+
+**Choosing an exam is not a navigation.** Only one bank is loaded at a
+time, because a bank is a Kubernetes cluster seeded for its questions,
+so picking any other one is a 2–4 minute destructive rebuild. Every card
+carries the same verb; a card that is not the active bank goes through a
+confirmation first, and the mode screen it was meant to reach opens by
+itself once the rebuild lands.
 
 ### The MCQ exam surface
 
@@ -702,7 +767,7 @@ region rather than a pending one once the pulse is off.
 - **Don't** build overlay tutorials, spotlight tours, or coach marks
   measured against live layout. Explain a screen with a self-contained
   drawing that holds its own proportions.
-- **Don't** let the score page or the lobby drift toward a dashboard — dense
+- **Don't** let the score page or the selector screens drift toward a dashboard — dense
   chrome, charts for their own sake, cards competing for attention. The
   score page is one column, and one number matters.
 - **Don't** hide an element with a `transform` when it must be

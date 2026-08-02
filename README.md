@@ -48,17 +48,19 @@ for the full command and configuration reference.
 
 ## What the exam feels like
 
-1. **Lobby** — the exam catalog, duration and passing-score stats, and
-   the Start button. Pick Exam (the bank's duration, no help), Training
-   (untimed, two-tier hints, solutions on demand) or Speed (half the
-   clock).
-2. **Exam view** — a timer bar with warnings at a quarter, an eighth
+1. **Exams** — every certification on the Kubestronaut path, with each
+   live bank's duration, draw size, passing score and engine. Choosing
+   one that is not loaded rebuilds the environment, so it asks first.
+2. **Mode** — Training (untimed, two-tier hints, solutions on demand),
+   Mastery (half the clock, no help) or Exam (the bank's duration, no
+   help). Each card lists what the server will actually allow.
+3. **Exam view** — a timer bar with warnings at a quarter, an eighth
    and a twenty-fourth of the attempt, the question panel, and the exam
    desktop rendered by a built-in VNC client. The terminal is already
    open; Firefox is restricted to a documentation allowlist.
-3. **End** — submit early or let the timer expire. The desktop locks
+4. **End** — submit early or let the timer expire. The desktop locks
    immediately and grading runs in the background.
-4. **Score** — percent, pass/fail, expandable per-question checks, full
+5. **Score** — percent, pass/fail, expandable per-question checks, full
    solutions, and a New attempt button.
 
 Anything you copy reaches the exam desktop automatically — highlight text

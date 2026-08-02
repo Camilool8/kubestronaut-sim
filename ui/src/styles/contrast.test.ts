@@ -117,6 +117,23 @@ const ON_INK: Record<string, number> = {
   "warn-marker": 3,
 };
 
+// The exam tint is a family of ALIASES — --exam-tint: var(--accent) —
+// so no measured ratio sits beside it in the ledger and the sweeps below
+// cannot see it. What has to hold is the pairing: an exam card's avatar
+// prints two letters in --exam-tint on --exam-tint-soft, which is text.
+// Repointing a variant at a graphics-only token (--progress, --success)
+// would be silent everywhere else.
+const TINTS: [string, string][] = [
+  ["practical", ":root"],
+  ["mcq", '[data-engine="mcq"]'],
+  ["coming soon", '[data-engine="soon"]'],
+];
+
+/** "var(--accent)" -> "accent". Anything else comes back unchanged. */
+function dealias(value: string): string {
+  return value.replace(/^var\(\s*--([a-z0-9-]+)\s*\)$/, "$1");
+}
+
 const MACHINE_FILLS = ["machine-bg", "machine-surface", "machine-raised"];
 const ON_MACHINE = [
   "machine-text",
@@ -172,6 +189,20 @@ describe.each([
 
   it("the two border tiers stay far enough apart to read as two", () => {
     expect(contrast(t.border, t["border-strong"])).toBeGreaterThan(1.5);
+  });
+
+  it.each(TINTS)("the %s exam tint reads as text on its own fill", (_name, selector) => {
+    const rule = collect(css, (s) => s === selector);
+    const fg = dealias(rule["exam-tint"] ?? "");
+    const bg = dealias(rule["exam-tint-soft"] ?? "");
+    expect(t[fg], `--exam-tint aliases --${fg}, which is not a declared colour`).toBeTruthy();
+    expect(t[bg], `--exam-tint-soft aliases --${bg}, which is not a declared colour`).toBeTruthy();
+
+    const ratio = contrast(t[fg], t[bg]);
+    expect(
+      ratio,
+      `--${fg} is ${ratio.toFixed(2)}:1 on --${bg}`,
+    ).toBeGreaterThanOrEqual(4.5);
   });
 });
 

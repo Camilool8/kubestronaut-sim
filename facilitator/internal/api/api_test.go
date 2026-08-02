@@ -148,6 +148,7 @@ func TestHealthz(t *testing.T) {
 type examResponse struct {
 	Name              string `json:"name"`
 	Title             string `json:"title"`
+	Certification     string `json:"certification"`
 	DurationSeconds   int    `json:"durationSeconds"`
 	PassingScore      int    `json:"passingScore"`
 	KubernetesVersion string `json:"kubernetesVersion"`
@@ -175,6 +176,11 @@ func TestExam(t *testing.T) {
 	}
 	if got.Title != "Test Exam" {
 		t.Errorf("Title = %q, want %q", got.Title, "Test Exam")
+	}
+	// Distinct from Title, and the mode screen's header reads it: a bank
+	// names both the certification it rehearses and its own edition.
+	if got.Certification != "TEST" {
+		t.Errorf("Certification = %q, want %q", got.Certification, "TEST")
 	}
 	if got.DurationSeconds != 600 {
 		t.Errorf("DurationSeconds = %d, want 600", got.DurationSeconds)

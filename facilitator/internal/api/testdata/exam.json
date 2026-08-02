@@ -3,7 +3,8 @@
   "kind": "Exam",
   "metadata": {
     "name": "test-bank",
-    "title": "Test Exam"
+    "title": "Test Exam",
+    "certification": "TEST"
   },
   "spec": {
     "duration": "10m",

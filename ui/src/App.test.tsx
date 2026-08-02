@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
 import type { ControlJob, ControlStatus, SessionSnapshot } from "./api";
@@ -138,15 +138,16 @@ describe("App control polling", () => {
   test("re-polls immediately when a job starts instead of waiting out the idle timer", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByText("CKAD Mock Exam 01", { selector: "h1" });
+    await screen.findByText("Path to Kubestronaut", { selector: "h1" });
 
     // Let the mount-time poll settle so the idle 15s timer is the one armed.
     await waitFor(() => expect(statusPolls).toBeGreaterThan(0));
     const pollsBeforeSwitch = statusPolls;
     controlStatus = runningStatus;
 
-    await user.click(screen.getByRole("button", { name: /CKA Mock Exam 01/ }));
-    await user.click(screen.getByRole("button", { name: "Switch exam" }));
+    const card = screen.getByRole("heading", { name: "CKA Mock Exam 01" }).closest("article") as HTMLElement;
+    await user.click(within(card).getByRole("button", { name: "Choose a mode" }));
+    await user.click(screen.getByRole("button", { name: "Load it" }));
 
     // The user-visible symptom: the checklist must reach the real state
     // promptly. Without a forced re-poll the optimistic all-pending
@@ -287,14 +288,15 @@ describe("App control failures", () => {
     );
 
     render(<App />);
-    await screen.findByText("CKAD Mock Exam 01", { selector: "h1" });
-    await user.click(screen.getByRole("button", { name: /CKA Mock Exam 01/ }));
-    await user.click(screen.getByRole("button", { name: "Switch exam" }));
+    await screen.findByText("Path to Kubestronaut", { selector: "h1" });
+    const card = screen.getByRole("heading", { name: "CKA Mock Exam 01" }).closest("article") as HTMLElement;
+    await user.click(within(card).getByRole("button", { name: "Choose a mode" }));
+    await user.click(screen.getByRole("button", { name: "Load it" }));
 
     expect(await screen.findByText(/control plane/i)).toBeInTheDocument();
     // The dialog stays open and re-armed, so the user can try again once
     // they have acted on what the toast told them.
-    const confirm = screen.getByRole("button", { name: "Switch exam" });
+    const confirm = screen.getByRole("button", { name: "Load it" });
     expect(confirm).toBeInTheDocument();
     await waitFor(() => expect(confirm).not.toBeDisabled());
   });
@@ -326,7 +328,7 @@ describe("App session polling", () => {
     );
 
     render(<App />);
-    await screen.findByText("CKAD Mock Exam 01", { selector: "h1" });
+    await screen.findByText("Path to Kubestronaut", { selector: "h1" });
 
     // pollSession refetches on window focus as well as on its 10s timer —
     // the same path a candidate takes returning to the tab.
@@ -461,7 +463,7 @@ describe("App boot gate", () => {
     stubBoot(readyBoot);
     render(<App />);
 
-    await screen.findByText("CKAD Mock Exam 01", { selector: "h1" });
+    await screen.findByText("Path to Kubestronaut", { selector: "h1" });
     expect(screen.queryByText("Building your exam environment")).not.toBeInTheDocument();
   });
 

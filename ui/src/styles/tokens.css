@@ -324,6 +324,43 @@
   --diff-del-fg: #f0a294;
 }
 
+/* The exam tint — an exam card's avatar, its engine cell, and later its
+   domain chips.
+
+   Keyed on the ENGINE, not the certification. The design draws CKAD in
+   the action blue and KCNA in the progress cyan, and those are exactly
+   the two engines: a practical exam and a multiple-choice one. Keying on
+   the engine means the hue carries the same information the card's own
+   "Engine" cell spells out in words, and it extends without invention —
+   CKA and CKS arrive blue, KCSA cyan — where five per-certification hues
+   would have been five colours that differ without meaning anything.
+   (The plan called this `data-exam`; `data-engine` is what it turned out
+   to key on, and the attribute should say so.)
+
+   These are the one token family with no dark twin and no measured
+   ratio, because they hold no colour of their own: each is an alias, and
+   `var()` in a custom property is substituted at use time, so
+   --exam-tint on a dark page resolves through the dark --accent. The
+   aliases are all text-grade tokens on their paired soft fill — a
+   pairing contrast.test.ts asserts rather than trusts. */
+:root {
+  --exam-tint: var(--accent);
+  --exam-tint-soft: var(--accent-soft);
+}
+
+[data-engine="mcq"] {
+  --exam-tint: var(--progress-strong);
+  --exam-tint-soft: var(--progress-soft);
+}
+
+/* Not an engine — a bank whose engine exists but whose questions do not.
+   It is deliberately outside the hue system: a coming-soon card must not
+   look like a card you can sit. */
+[data-engine="soon"] {
+  --exam-tint: var(--text-muted);
+  --exam-tint-soft: var(--muted-soft);
+}
+
 /* Dark theme values — explicit user choice. The "system" choice sets no
    data-theme attribute at all and is covered by the media query below
    (same declarations; CSS has no mixins). */

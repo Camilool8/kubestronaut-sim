@@ -81,8 +81,46 @@ func TestLoadBuildsEntriesFromBankJSON(t *testing.T) {
 	if e.QuestionCount != 3 {
 		t.Errorf("QuestionCount = %d, want 3", e.QuestionCount)
 	}
+	if e.PoolCount != 3 {
+		t.Errorf("PoolCount = %d, want 3", e.PoolCount)
+	}
 	if e.ExamType != "hands-on" {
 		t.Errorf("ExamType = %q (empty spec.examType must default to hands-on elsewhere; explicit here)", e.ExamType)
+	}
+}
+
+// The two counts are separate numbers and the exam card prints them as a
+// pair, so a bank that draws a subset must report both. Getting this
+// wrong in the direction that matters — PoolCount collapsing to the draw
+// size — would make a 97-question pool advertise itself as 65 with no
+// visible symptom anywhere.
+func TestPooledBankReportsDrawSizeAndPoolSeparately(t *testing.T) {
+	dir := t.TempDir()
+	pooled := `{
+  "metadata": {"name": "kcna-pooled", "title": "KCNA Pooled", "certification": "KCNA"},
+  "spec": {
+    "examType": "mcq",
+    "duration": "90m",
+    "examLength": 2,
+    "questions": [{"id": "q01"}, {"id": "q02"}, {"id": "q03"}, {"id": "q04"}]
+  }
+}`
+	if err := os.WriteFile(filepath.Join(dir, "kcna-pooled.json"), []byte(pooled), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	c, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	e, ok := c.Get("kcna-pooled")
+	if !ok {
+		t.Fatal("kcna-pooled missing from catalog")
+	}
+	if e.QuestionCount != 2 {
+		t.Errorf("QuestionCount = %d, want 2 (the declared draw size)", e.QuestionCount)
+	}
+	if e.PoolCount != 4 {
+		t.Errorf("PoolCount = %d, want 4 (every authored question)", e.PoolCount)
 	}
 }
 

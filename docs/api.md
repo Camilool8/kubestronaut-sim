@@ -60,7 +60,7 @@ closes every mode-based gate below while idle.
 **The solutions gate is not "403 until the session has ended".** The
 condition is `snap.State != "ended" && snap.Mode != session.ModeTraining`,
 so a *running* Training attempt gets 200 — `tests/smoke.sh:560-561`
-asserts exactly that. A running Exam or Speed attempt gets 403, and so
+asserts exactly that. A running `exam` or `speed` attempt gets 403, and so
 does an idle session, whose mode is empty whatever the last attempt
 was.
 
@@ -110,6 +110,7 @@ selectable modes. Always 200.
 {
   "name": "ckad-mock-01",
   "title": "CKAD Mock Exam 01",
+  "certification": "CKAD",
   "examType": "hands-on",
   "durationSeconds": 7200,
   "passingScore": 66,
@@ -144,11 +145,17 @@ Mode **labels** are deliberately not in this response. A mode's name is
 user-facing copy and lives in `ui/src/strings.ts`; its permissions are
 facts only the server knows.
 
+`certification` names the exam this bank rehearses ("CKAD"), where
+`title` names the bank ("CKAD Mock Exam 01"). Omitted when the bank
+declares none. The mode screen and its header read it from here rather
+than from the conductor's catalog, so a deep link into that screen
+needs no prior call to `GET /api/control/banks`.
+
 `examType` is `hands-on` or `mcq` (`facilitator/internal/exam/exam.go`
 normalizes an absent `spec.examType` to `hands-on`). For hands-on,
 `totalPoints` sums the question's checks, excluding any whose
 `# points:` header was malformed
-(`facilitator/internal/api/api.go:191-199`). For mcq questions the
+(`facilitator/internal/api/api.go:239-250`). For mcq questions the
 entry is `{"id", "domain", "weight", "totalPoints", "hintCount",
 "multi"}` — no `instance`, `totalPoints` equals `weight`, and `multi`
 marks a select-all-that-apply question. `questions` marshals as `[]`,
@@ -165,7 +172,7 @@ question needs no restart.
 
 For an mcq exam the response instead carries the choices — never the
 answer key, which reaches the client only inside graded results
-(`facilitator/internal/api/api.go:217-221`):
+(`facilitator/internal/api/api.go:318-322`):
 
 ```json
 {"id": "q01", "domain": "Kubernetes Fundamentals", "markdown": "...", "options": ["...", "...", "...", "..."], "multi": false}
@@ -522,23 +529,33 @@ pattern says it is well-formed, the catalog says it is real.
 
 ### GET /api/control/banks
 
-The exam catalog the lobby renders. Always 200.
+The exam catalog the exam selector renders. Always 200.
 
 ```json
 {
   "active": "ckad-mock-01",
   "banks": [
-    {"id": "ckad-mock-01", "title": "CKAD Mock Exam 01", "certification": "CKAD", "description": "Developer-track exercises...", "examType": "hands-on", "durationSeconds": 7200, "passingScore": 66, "kubernetesVersion": "1.35", "questionCount": 22, "available": true},
-    {"id": "kcna-mock", "title": "KCNA Mock Exam", "certification": "KCNA", "examType": "mcq", "available": false, "comingSoon": true, "note": "Multiple-choice engine not built yet"}
+    {"id": "ckad-mock-01", "title": "CKAD Mock Exam 01", "certification": "CKAD", "description": "Developer-track exercises...", "examType": "hands-on", "durationSeconds": 7200, "passingScore": 66, "kubernetesVersion": "1.35", "questionCount": 22, "poolCount": 22, "available": true},
+    {"id": "kcna-mock", "title": "KCNA Mock Exam", "certification": "KCNA", "description": "65 questions drawn each attempt...", "examType": "mcq", "durationSeconds": 5400, "passingScore": 75, "questionCount": 65, "poolCount": 97, "available": true},
+    {"id": "cks-mock", "title": "CKS Mock Exam", "certification": "CKS", "examType": "hands-on", "available": false, "comingSoon": true, "note": "Requires security add-ons not in the kind environment yet"}
   ]
 }
 ```
+
+`questionCount` is how many questions ONE ATTEMPT draws; `poolCount` is
+how many the bank authors. They differ only for a pooled bank, and the
+exam card prints them as a pair ("65 / 97") only when they do — a card
+reading "22 / 22" would advertise a pool that is not one. The
+facilitator knows both for the *active* bank (`GET /api/exam` serves
+the whole question list), but the catalog is the only place that knows
+them for the others, and the exam selector draws every bank side by
+side.
 
 `active` is read from `/shared/bank` at call time, so it is correct the
 instant a switch rewrites it. `available` is false for a coming-soon
 entry, a non-`hands-on` exam type, or a bank whose topology does not
 fit the fixed `instance-1`/`instance-2` layout; `note` gives the reason
-(`conductor/internal/catalog/catalog.go:187-210`).
+(`conductor/internal/catalog/catalog.go:213-248`).
 
 ### POST /api/control/switch
 

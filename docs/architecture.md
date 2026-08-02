@@ -245,7 +245,7 @@ through.
 
 | Step | Owner | What happens |
 |---|---|---|
-| Lobby | facilitator | Serves the embedded UI, the bank catalog through the control proxy, and `GET /api/exam`. |
+| Choose an exam, then a mode | facilitator | Serves the embedded UI, the bank catalog through the control proxy, and `GET /api/exam`. |
 | Start | facilitator | `POST /api/session/start` moves idle -> running and arms an expiry timer. 409 until k8s-env is ready (hands-on banks only — see below). |
 | Work | desktop, instances | The candidate drives Xfce over noVNC, reaches `instance-1` and `instance-2` over ssh, and reads docs through docs-proxy. |
 | End | facilitator | Submit, or the timer expires. running -> ended, and the desktop locks. |
@@ -320,7 +320,7 @@ boot from the `BANK` environment default
 a bank switch rewrites the file and re-runs bootstrap. Every bank-aware
 entrypoint prefers the file over the compose-time environment variable,
 so `./sim up <other-bank>` against a warm stack keeps the bank that is
-already active. Switch banks from the lobby.
+already active. Switch banks from the exam selector.
 
 | Command | Volumes | Effect on the next boot |
 |---|---|---|

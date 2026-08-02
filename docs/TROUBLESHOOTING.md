@@ -37,7 +37,7 @@ twenty minutes in.
 | `The environment failed to start:` then an error | `/api/boot` reported `failed` (`sim:53-59`) | Read the printed error, then `docker compose logs k8s-env` for the rest |
 | `Gave up waiting after 3600s.` | The boot budget elapsed. The environment may still be working (`sim:31-37`) | `docker compose logs -f k8s-env` to see whether it is progressing. Raise it with `SIM_BOOT_BUDGET=<seconds> ./sim up` |
 | `up` prints no phase lines and never finishes | `python3` is missing, so every poll yields an empty state | Install `python3`; see the row above |
-| The UI loads but shows boot progress rather than the lobby | Expected. The facilitator answers before the cluster is ready | Wait. The page shows the same phases the terminal does |
+| The UI loads but shows boot progress rather than the exam selector | Expected. The facilitator answers before the cluster is ready | Wait. The page shows the same phases the terminal does |
 | Boot succeeds, then the next `up` rebuilds from scratch | The volumes were removed — `./sim purge` does this, `./sim down` does not | Use `down` to stop and resume; see [Choosing between down, reset and purge](cli.md#choosing-between-down-reset-and-purge) |
 
 ## During an attempt

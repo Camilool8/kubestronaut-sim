@@ -2,7 +2,7 @@
 
 A bank lives at `banks/<bank-id>/` and holds `exam.yaml` plus one directory
 per question. The conductor scans every `banks/*/exam.yaml` into the catalog
-the lobby renders; [banks/catalog.yaml](../banks/catalog.yaml) adds
+the exam selector renders; [banks/catalog.yaml](../banks/catalog.yaml) adds
 coming-soon entries whose exam engine does not exist yet.
 
 Five gates decide whether a bank ships —
@@ -87,17 +87,17 @@ both gate regexes tolerate it there and nowhere else.
 | Field | Meaning and status |
 |---|---|
 | `metadata.name` | Bank id. Convention: the conductor rejects a mismatch with the directory name only when the field is non-empty ([catalog.go:159](../conductor/internal/catalog/catalog.go)) |
-| `metadata.title`, `.certification`, `.description` | Lobby card title, badge (`CKAD`/`CKA`/`CKS`) and one-line blurb |
-| `metadata.hidden` | Keeps the bank out of the lobby while leaving it a legal `switch` target. Exists for `smoke-01`; a bank worth shipping is worth listing |
+| `metadata.title`, `.certification`, `.description` | The exam card's fallback title, its heading and tinted avatar (`CKAD`/`CKA`/`CKS`), and its one-line blurb. `certification` also reaches `GET /api/exam`, where the mode screen's header reads it |
+| `metadata.hidden` | Keeps the bank out of the exam selector while leaving it a legal `switch` target. Exists for `smoke-01`; a bank worth shipping is worth listing |
 | `spec.examType` | `hands-on` (the default when absent, [catalog.go:164-166](../conductor/internal/catalog/catalog.go)) or `mcq`; any other value lists the bank disabled with a "no engine yet" note |
 | `spec.duration` | The Exam clock. Enforced: the facilitator ends the session at 0:00 |
-| `spec.speedDuration` | The Speed clock, defaulting to half `spec.duration` ([exam.go:105-110](../facilitator/internal/exam/exam.go)). A malformed value fails the load |
+| `spec.speedDuration` | The clock for the `speed` mode — shown to candidates as Mastery — defaulting to half `spec.duration` ([exam.go:105-110](../facilitator/internal/exam/exam.go)). A malformed value fails the load |
 | `spec.passingScore` | Percent. Enforced by the facilitator's `Results.Passed` |
 | `spec.kubernetesVersion` | Informational; shown on the catalog card |
 | `spec.domainWeights` | The certification's published weights. Read by no Go code — only by [bank-weights.sh](../tests/bank-weights.sh) |
 | `spec.environment.provider`, `.nodes` | Informational; read by nothing |
 | `spec.environment.allowedDomains` | Domain suffixes the desktop browser may reach through the docs proxy, subdomains included ([proxy/entrypoint.sh](../proxy/entrypoint.sh)). Omit it to inherit `allow.DefaultDomains` ([allow.go](../proxy/internal/allow/allow.go)), the smallest set that leaves the documentation sites usable |
-| `spec.instances` | 1 or 2 entries. Convention: names outside `instance-1`/`instance-2` only mark the bank unavailable in the lobby ([catalog.go:199-210](../conductor/internal/catalog/catalog.go)), and the facilitator's exam loader never parses the block at all |
+| `spec.instances` | 1 or 2 entries. Convention: names outside `instance-1`/`instance-2` only mark the bank unavailable in the exam selector ([catalog.go:218-230](../conductor/internal/catalog/catalog.go)), and the facilitator's exam loader never parses the block at all |
 | `spec.questions[].id`, `.instance` | Question directory name, and the ssh host the grader runs its checks on |
 | `spec.questions[].title` | Optional short label shown in the question navigator, the jump grid and the score review. Absent, the UI falls back to the id (hands-on) or the attempt position (mcq) |
 | `spec.questions[].domain` | Must match a `domainWeights` key |
@@ -431,9 +431,9 @@ gated on the attempt being in Training mode.
 
 ## Attempt modes
 
-Every bank runs in three. Exam uses `spec.duration`, Speed uses
-`spec.speedDuration`, and Training has no clock at all — which is also the
-project's answer to WCAG 2.2.1 Timing Adjustable.
+Every bank runs in three. Exam uses `spec.duration`, `speed` (labelled
+Mastery in the UI) uses `spec.speedDuration`, and Training has no clock at
+all — which is also the project's answer to WCAG 2.2.1 Timing Adjustable.
 
 ## Conventions nothing enforces
 
@@ -448,5 +448,5 @@ that every test passes.
 - `# desc:` is parsed ([exam.go:169,192](../facilitator/internal/exam/exam.go))
   and never validated, so a missing one ships an empty description to the score
   screen in silence.
-- `spec.instances` feeds only the lobby's availability flag;
+- `spec.instances` feeds only the exam selector's availability flag;
   `spec.questions[].instance` is what decides where a check actually runs.

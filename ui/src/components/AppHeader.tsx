@@ -33,7 +33,7 @@ export interface NavItem {
   current?: boolean;
 }
 
-interface AppHeaderProps {
+export interface AppHeaderProps {
   /**
    * "brand" leads with the product mark and wordmark: the top of the
    * app, where a candidate has not chosen anything yet.

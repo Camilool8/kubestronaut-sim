@@ -68,6 +68,12 @@ export interface ExamMode {
 export interface ExamInfo {
   name: string;
   title: string;
+  /**
+   * The certification this bank rehearses ("CKAD"), where `title` names
+   * the bank ("CKAD Mock Exam 01"). Optional — a bank need not claim
+   * one, and every display falls back to the title.
+   */
+  certification?: string;
   examType: ExamType;
   durationSeconds: number;
   passingScore: number;
@@ -481,7 +487,12 @@ export async function getControlLog(signal?: AbortSignal): Promise<ControlLog> {
   if (!res.ok) {
     throw new Error(await readError(res));
   }
-  return (await res.json()) as ControlLog;
+  const body = (await res.json()) as Partial<ControlLog>;
+  // `lines ?? []`, the same guard getAnswers uses: a 200 whose body is
+  // missing the array crashed ControlProgress outright (`logLines.length`
+  // on undefined) — the type said it could not happen and the cast said
+  // so louder. A rebuild's log pane is the wrong place to find out.
+  return { jobId: body.jobId ?? "", lines: body.lines ?? [] };
 }
 
 export type ControlActionResponse =
@@ -506,7 +517,15 @@ export interface BankEntry {
   durationSeconds?: number;
   passingScore?: number;
   kubernetesVersion?: string;
+  /** How many questions ONE ATTEMPT draws. */
   questionCount?: number;
+  /**
+   * How many questions the bank authors. Larger than `questionCount`
+   * only for a pooled bank; the exam card prints the pair ("65 / 97")
+   * only when they differ, because "22 / 22" advertises a pool that is
+   * not one.
+   */
+  poolCount?: number;
   available: boolean;
   comingSoon?: boolean;
   note?: string;

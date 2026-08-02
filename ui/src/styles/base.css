@@ -7,7 +7,7 @@
 
 /* The full-height chain, unbroken from the viewport to the screen. Every
    screen root asserts a height against it — `.exam-layout` and
-   `.score-screen` at 100%, `.start-screen` at min-height 100% — and a
+   `.score-screen` at 100%, `.page` at min-height 100% — and a
    percentage height resolves to `auto` the moment ONE ancestor in the
    chain is content-sized. `main` was once the missing link: the lobby
    stopped centering, the score page scrolled the body instead of itself,
@@ -109,7 +109,7 @@ h3 {
    rectangles. */
 @media (forced-colors: active) {
   .question-tile[aria-current="true"],
-  .bank-card.bank-active,
+  .mode-card-on,
   .question-mark[aria-pressed="true"] {
     outline: 2px solid Highlight;
     outline-offset: -3px;
@@ -117,7 +117,6 @@ h3 {
 
   /* --text-disabled is overridden away; GrayText is the system's own. */
   .btn:disabled,
-  .bank-card:disabled,
   .question-nav-step:disabled {
     color: GrayText;
   }

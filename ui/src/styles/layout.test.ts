@@ -48,7 +48,12 @@ describe("full-height chain", () => {
     // percentage — as a floor, not a cap.
     expect(ruleBody(css, ".score-screen")).toContain("min-height: 100%");
     expect(ruleBody(css, ".score-screen")).not.toContain("overflow-y: auto");
-    expect(ruleBody(css, ".start-screen")).toContain("min-height: 100%");
+    // `.page` is the shared root of every screen that is a PAGE — the
+    // exam selector and the mode selector today. Same reading as
+    // .score-screen: a floor, not a cap, so a page taller than the
+    // viewport scrolls the document rather than a box inside it.
+    expect(ruleBody(css, ".page")).toContain("min-height: 100%");
+    expect(ruleBody(css, ".page")).not.toContain("overflow-y: auto");
   });
 
   // The wrapper is height: 100% for the exam's benefit; without this
