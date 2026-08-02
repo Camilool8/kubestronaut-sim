@@ -2,9 +2,13 @@
 # points: 1
 # desc: the hardened Pod actually runs
 set -uo pipefail
+. /banks/_lib/checks.sh
 # Every setting above can be present in a Pod that never starts —
 # readOnlyRootFilesystem in particular breaks images that write at boot.
 phase=$(kubectl -n cygnus get pod vault-agent -o jsonpath='{.status.phase}' 2>/dev/null)
-[ "$phase" = "Running" ] \
-  && echo "running" \
-  || { echo "phase is '$phase', want Running"; exit 1; }
+[ "$phase" = "Running" ] && echo "running" || {
+  echo "phase is '$phase', want Running"
+  show_actual json "$(kubectl -n cygnus get pod vault-agent -o json 2>/dev/null | jq '{phase: .status.phase, containers: [.status.containerStatuses[]? | {name, ready, restartCount, state}]}')"
+  show_why "Every setting the checks above look for can be present in a Pod that never runs, which is why this is graded separately. A read-only root filesystem is the usual cause: an image that writes to a temporary directory at startup cannot, and crashes. runAsNonRoot is the other — it refuses outright to start an image whose configured user is root. The container's state above names which of the two happened."
+  exit 1
+}

@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: helios-routes
+  namespace: helios
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: helios.sim.local
+      http:
+        paths:
+          - backend:
+              service:
+                name: checkout
+                port:
+                  number: 80
+            path: /checkout
+            pathType: Prefix
+          - backend:
+              service:
+                name: storefront
+                port:
+                  number: 80
+            path: /
+            pathType: Prefix

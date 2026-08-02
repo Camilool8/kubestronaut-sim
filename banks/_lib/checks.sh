@@ -200,13 +200,43 @@ show_why() { _artifact why text "$1"; }
 # comparable: yq re-emits each in its own layout, so what survives on
 # screen is a real difference and not two spellings of one object.
 #
+# CLUSTER-ASSIGNED ADDRESSES GO TOO, and for a reason the fields above do
+# not share. An EXPECTED document is generated once, on one cluster, and
+# then read by every candidate on theirs — so a clusterIP baked into it
+# disagrees with the live object every single time. The explanation
+# screen marks disagreeing lines as the ones that are WRONG, which would
+# teach a candidate who answered perfectly that their Service has the
+# wrong address. A field nobody typed cannot be a field anybody got
+# wrong.
+#
+# `clusterIP: None` survives, because that one IS typed: it is how a
+# headless Service is declared, it is frequently the point of the
+# question, and deleting it would hide the answer being graded.
+#
+# The same test decides the rest of the Service block below: a field goes
+# only when it still holds the value the API server would have written
+# unasked. `sessionAffinity: None` is a default and noise;
+# `sessionAffinity: ClientIP` is somebody's answer. Guarding on the value
+# rather than the key is what lets one filter serve both.
+#
 # Empty output when the input is not YAML, or when yq is missing. A wall
 # of managedFields is worse evidence than none.
+#
+# A call site may still filter harder — a question about a Service's
+# ports has no use for its ipFamilies whatever they say. What must never
+# happen is the reverse: a pane that hides a field the check grades.
 k8s_clean() {
   yq '(., (select(has("items")) | .items[])) |= (
         del(.metadata.managedFields, .metadata.creationTimestamp, .metadata.resourceVersion,
             .metadata.uid, .metadata.generation, .status,
             .metadata.annotations."kubectl.kubernetes.io/last-applied-configuration")
+        | del(.spec.clusterIP  | select(. != "None"))
+        | del(.spec.clusterIPs | select(.[0] != "None"))
+        | del(.spec.internalTrafficPolicy | select(. == "Cluster"))
+        | del(.spec.externalTrafficPolicy | select(. == "Cluster"))
+        | del(.spec.sessionAffinity       | select(. == "None"))
+        | del(.spec.ipFamilyPolicy        | select(. == "SingleStack"))
+        | del(.spec.ipFamilies            | select(length == 1 and .[0] == "IPv4"))
         | del(.metadata.annotations | select(length == 0))
         | del(.metadata | select(length == 0)))' - 2>/dev/null
 }

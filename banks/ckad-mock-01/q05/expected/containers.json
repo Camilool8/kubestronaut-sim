@@ -1,0 +1,17 @@
+{
+  "initContainers": [
+    {
+      "name": "wait-for-source",
+      "restartPolicy": null
+    },
+    {
+      "name": "shipper",
+      "restartPolicy": "Always"
+    }
+  ],
+  "containers": [
+    {
+      "name": "writer"
+    }
+  ]
+}

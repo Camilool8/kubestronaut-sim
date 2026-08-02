@@ -21,7 +21,7 @@ set -uo pipefail
 defaults='del(.spec.clusterIP, .spec.clusterIPs, .spec.internalTrafficPolicy,
               .spec.ipFamilies, .spec.ipFamilyPolicy, .spec.sessionAffinity)'
 evidence() {
-  show_actual yaml "$(kubectl -n serpens get svc inventory -o yaml | k8s_clean | yq "$defaults")"
+  show_actual yaml "$(kubectl -n serpens get svc inventory -o yaml 2>/dev/null | k8s_clean | yq "$defaults")"
   show_expected yaml "/banks/${BANK:-ckad-mock-01}/q19/expected/service.yaml"
   show_why "$1"
 }

@@ -152,6 +152,31 @@ if command -v yq >/dev/null 2>&1; then
   # removed is not evidence of anything.
   ok "k8s_clean keeps the object" "$cleaned" \
      "$(printf 'apiVersion: v1\nkind: Service\nmetadata:\n  name: inventory\nspec:\n  selector: {app: inventory}')"
+  # An allocated clusterIP differs on every cluster, so an EXPECTED
+  # document generated once would disagree with the live object always —
+  # and the explanation screen marks a disagreeing line as the one that
+  # is wrong. This is the pair that made it necessary: same Service,
+  # different address, and nothing a candidate did.
+  ok "k8s_clean drops an allocated clusterIP" \
+     "$(printf 'apiVersion: v1\nkind: Service\nspec:\n  clusterIP: 10.96.248.74\n  clusterIPs: [10.96.248.74]\n  selector: {app: inventory}\n' | k8s_clean)" \
+     "$(printf 'apiVersion: v1\nkind: Service\nspec:\n  selector: {app: inventory}')"
+  # `None` is the one value a human types, and on a headless Service it
+  # is usually the whole answer. Stripping it would delete the field
+  # being graded.
+  ok "k8s_clean keeps a headless clusterIP" \
+     "$(printf 'apiVersion: v1\nkind: Service\nspec:\n  clusterIP: None\n  clusterIPs: [None]\n  selector: {app: db}\n' | k8s_clean)" \
+     "$(printf 'apiVersion: v1\nkind: Service\nspec:\n  clusterIP: None\n  clusterIPs: [None]\n  selector: {app: db}')"
+  # The rest of the Service block the API server fills in unasked. Two
+  # questions had grown identical local copies of this filter, which is
+  # the point at which it belongs to the library instead.
+  ok "k8s_clean drops the Service defaults" \
+     "$(printf 'apiVersion: v1\nkind: Service\nspec:\n  internalTrafficPolicy: Cluster\n  externalTrafficPolicy: Cluster\n  sessionAffinity: None\n  ipFamilyPolicy: SingleStack\n  ipFamilies: [IPv4]\n  type: NodePort\n' | k8s_clean)" \
+     "$(printf 'apiVersion: v1\nkind: Service\nspec:\n  type: NodePort')"
+  # The same keys, none of them holding a default. Every one is somebody's
+  # answer, and a pane that hid them would be hiding the graded field.
+  ok "k8s_clean keeps authored Service policies" \
+     "$(printf 'apiVersion: v1\nkind: Service\nspec:\n  internalTrafficPolicy: Local\n  externalTrafficPolicy: Local\n  sessionAffinity: ClientIP\n  ipFamilyPolicy: RequireDualStack\n  ipFamilies: [IPv4, IPv6]\n' | k8s_clean)" \
+     "$(printf 'apiVersion: v1\nkind: Service\nspec:\n  internalTrafficPolicy: Local\n  externalTrafficPolicy: Local\n  sessionAffinity: ClientIP\n  ipFamilyPolicy: RequireDualStack\n  ipFamilies: [IPv4, IPv6]')"
   # `kubectl get pods -o yaml` (no name) is a List, and the noise is one
   # level down. Cleaning only the outer document would have left every
   # item's managedFields in place, which is most of the bytes.
