@@ -175,6 +175,22 @@ export interface SolutionDetail {
   markdown: string;
 }
 
+/**
+ * A document a check chose to show alongside its verdict: what it found,
+ * what it wanted, or why the difference matters.
+ *
+ * Checks emit these through a sentinel-delimited trailer on stdout, so a
+ * check that emits nothing produces a byte-identical `message` and needs
+ * no edit. `kind` is closed at three values for the same reason `Verdict`
+ * is: the explanation screen has exactly three places to put one.
+ */
+export interface CheckArtifact {
+  kind: "actual" | "expected" | "why";
+  /** For syntax highlighting: "yaml", "text", … Absent means plain text. */
+  lang?: string;
+  body: string;
+}
+
 export interface CheckResult {
   name: string;
   desc: string;
@@ -187,6 +203,12 @@ export interface CheckResult {
    * malformed in the bank. Rendered as "not graded", never as a failure.
    */
   skipped?: boolean;
+  /**
+   * Evidence for the explanation screen, dropped from checks that passed
+   * — a correct answer has nothing to explain, and keeping the documents
+   * would put a copy of the cluster's state in every session file.
+   */
+  artifacts?: CheckArtifact[];
 }
 
 /** The three states a graded question can be in. Server-decided. */
@@ -830,4 +852,178 @@ export async function reseedQuestion(
     return { ok: false, error: await readError(res) };
   }
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------
+// Attempt history and the exam catalog
+//
+// History is the first thing this product keeps across attempts. It lives
+// server-side in a Docker volume, NOT in localStorage — the facilitator is
+// the only process that can see every attempt, and a record that vanished
+// when the candidate opened a different browser would not be a record.
+// Wherever the design brief says "stored in this browser", the copy has to
+// say "stored on this machine".
+// ---------------------------------------------------------------------
+
+/**
+ * One domain's standing, rolled up across attempts rather than within one.
+ * `percent` is points earned over points available in that domain — raw,
+ * not curriculum-weighted, because this ranks a candidate's own domains
+ * against each other and the curriculum's weight is not part of that
+ * question.
+ */
+export interface DomainSummary {
+  domain: string;
+  earned: number;
+  total: number;
+  percent: number;
+  /** How many counted attempts contributed. One weak run is not a trend. */
+  attempts: number;
+}
+
+/**
+ * A graded attempt, kept forever.
+ *
+ * Deliberately SELF-CONTAINED: the certification, the exam title, the
+ * passing score and the domain rollup are copied in, never referenced.
+ * The dashboard shows all five certifications while only one bank is
+ * loadable at a time, so a record that pointed at its bank for the
+ * details would render as blanks for every exam except the current one.
+ */
+export interface AttemptRecord {
+  id: string;
+  bank: string;
+  certification?: string;
+  examTitle?: string;
+  examType: ExamType;
+  mode: SessionMode;
+  startedAt: string;
+  gradedAt: string;
+  seed?: string;
+  domainFilter?: string[];
+  durationSeconds?: number;
+  elapsedSeconds?: number;
+  questionCount: number;
+  earned: number;
+  total: number;
+  /** The weighted score, the same number the results banner shows. */
+  percent: number;
+  pointsPercent?: number;
+  passingScore: number;
+  passed: boolean;
+  /**
+   * Whether this attempt counts toward `best` and `passed`.
+   *
+   * False for a domain-filtered or short draw: 100% on a ten-task drill of
+   * one domain is a good session, but it is not a CKAD pass, and letting it
+   * light up the certification path would make the dashboard lie.
+   */
+  counted: boolean;
+  domains?: DomainResult[];
+}
+
+/** One exam's standing, derived from its counted attempts. */
+export interface ExamProgress {
+  attempts: number;
+  counted: number;
+  bestPercent?: number;
+  passed: boolean;
+  lastAttemptAt?: string;
+  /** Weakest first. Empty until at least one attempt has been graded. */
+  weakDomains: DomainSummary[];
+}
+
+/** A catalog row: everything the bank declares, plus how it has gone. */
+export interface CatalogExam extends BankEntry {
+  progress: ExamProgress;
+}
+
+export interface HistorySummary {
+  attempts: number;
+  /** Distinct certifications with a counted, passing attempt. The path figure. */
+  passedCount: number;
+  /** How many certifications the path has in it — the denominator. */
+  trackCount: number;
+  /** Weakest first, across every exam. Backs "drill my weak domains". */
+  weakDomains: DomainSummary[];
+}
+
+/**
+ * GET /api/catalog — the bank list joined to attempt history.
+ *
+ * Served by the facilitator rather than the conductor, for two reasons:
+ * the conductor has no access to the state volume, and LOOKING at the
+ * exam list must never be able to trigger a rebuild.
+ */
+export interface CatalogResponse {
+  active: string;
+  exams: CatalogExam[];
+  summary: HistorySummary;
+}
+
+export async function getCatalog(signal?: AbortSignal): Promise<CatalogResponse> {
+  const res = await request("/api/catalog", { signal });
+  if (!res.ok) {
+    throw new Error(await readError(res));
+  }
+  return (await res.json()) as CatalogResponse;
+}
+
+export interface HistoryResponse {
+  /** Most recent first. */
+  attempts: AttemptRecord[];
+  summary: HistorySummary;
+}
+
+export async function getHistory(signal?: AbortSignal): Promise<HistoryResponse> {
+  const res = await request("/api/history", { signal });
+  if (!res.ok) {
+    throw new Error(await readError(res));
+  }
+  return (await res.json()) as HistoryResponse;
+}
+
+/**
+ * DELETE /api/history — erase every attempt. There is no undo and no
+ * server-side backup, so the caller owns the confirmation.
+ */
+export async function deleteHistory(
+  signal?: AbortSignal,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await request("/api/history", { method: "DELETE", signal });
+  if (!res.ok) {
+    return { ok: false, error: await readError(res) };
+  }
+  return { ok: true };
+}
+
+/**
+ * The export document's URL. A plain link rather than a fetch: the browser
+ * saves it under the filename the server names, and no blob is built in
+ * memory to do it.
+ */
+export const historyExportURL = "/api/history/export";
+
+/**
+ * POST /api/history/import — merge an exported document into the record.
+ *
+ * Merge, not replace: importing a backup must never be a way to silently
+ * lose the attempts made since it was taken. Records already present (by
+ * `id`) are left alone, so importing the same file twice is a no-op.
+ */
+export async function importHistory(
+  document: string,
+  signal?: AbortSignal,
+): Promise<{ ok: true; imported: number; skipped: number } | { ok: false; error: string }> {
+  const res = await request("/api/history/import", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: document,
+    signal,
+  });
+  if (!res.ok) {
+    return { ok: false, error: await readError(res) };
+  }
+  const body = (await res.json()) as { imported: number; skipped: number };
+  return { ok: true, imported: body.imported, skipped: body.skipped };
 }
