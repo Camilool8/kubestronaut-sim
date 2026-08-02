@@ -48,13 +48,14 @@ closes every mode-based gate below while idle.
 
 | Gate | Open when | Closed response | Source |
 |---|---|---|---|
-| Solutions | `state == "ended"`, **or** `HelpAllowed(mode)` | 403 | `facilitator/internal/api/api.go:465-469` |
-| Hints | `HelpAllowed(mode)` and `state != "idle"` | 403 | `facilitator/internal/api/api.go:523-531` |
-| Mid-attempt score | `GradesPerTask(mode)` and `state == "running"` | 403 on mode, 409 on state | `facilitator/internal/api/api.go:645-652` |
-| Answer writes (mcq) | `state == "running"` | 409 | `facilitator/internal/api/api.go:578-581` |
-| Focus reports | `state == "running"` | 409 | `facilitator/internal/api/api.go:823-826` |
+| Solutions | `state == "ended"`, **or** `HelpAllowed(mode)` | 403 | `facilitator/internal/api/api.go:478-481` |
+| Hints | `HelpAllowed(mode)` and `state != "idle"` | 403 | `facilitator/internal/api/api.go:536-543` |
+| Mid-attempt score | `GradesPerTask(mode)` and `state == "running"` | 403 on mode, 409 on state | `facilitator/internal/api/api.go:658-665` |
+| Answer writes (mcq) | `state == "running"` | 409 | `facilitator/internal/api/api.go:590-593` |
+| Focus reports | `state == "running"` | 409 | `facilitator/internal/api/api.go:906-909` |
 | Desktop | `state == "running"`, any mode | 403 | `facilitator/cmd/facilitator/main.go:196-198` |
 | Re-seed | `mode == "training"` and `state == "running"` | 403 | `conductor/internal/control/reseed.go:92-98` |
+| Seed | `state != "running"` | 409 | `conductor/internal/control/seed.go` |
 | Bank switch | `state != "running"` | 409 | `conductor/internal/control/control.go:253-259` |
 | Reset | Always open | — | `conductor/internal/control/control.go:26-30` |
 
@@ -256,7 +257,7 @@ over the `hintCount` reported by `GET /api/exam`.
 | Code | When |
 |---|---|
 | 200 | Training attempt, known `id`, `n` in range. |
-| 403 | Not a training attempt, or no attempt at all (`facilitator/internal/api/api.go:523-531`). |
+| 403 | Not a training attempt, or no attempt at all (`facilitator/internal/api/api.go:536-543`). |
 | 404 | Unknown `id`, or `n` outside 1..`hintCount` (`facilitator/internal/api/api.go:534-555`). |
 | 500 | `hints.md` could not be read (`facilitator/internal/api/api.go:546-550`). |
 
@@ -284,7 +285,7 @@ echoes the stored (sorted) selection.
 | 200 | Stored (`facilitator/internal/api/api.go:625`). |
 | 400 | Not an mcq exam, the body is not `{"selected":[...]}`, an index is out of range or duplicated, or more than one index on a single-answer question (`facilitator/internal/api/api.go:574-612`). |
 | 404 | Unknown `id` (`facilitator/internal/api/api.go:584-588`). |
-| 409 | No attempt is running (`facilitator/internal/api/api.go:578-581`, re-checked at the write: `:616-620`). |
+| 409 | No attempt is running (`facilitator/internal/api/api.go:590-593`, re-checked at the write: `:616-620`). |
 
 The 409 is checked before the id lookup, matching the solution
 handler's ordering. Selections are persisted in the session file
@@ -321,10 +322,12 @@ one field appears here and nowhere else.
 
 | Code | When |
 |---|---|
-| 200 | Started (`facilitator/internal/api/api.go:792-795`). |
-| 400 | `mode` is not `exam`, `training` or `speed` (`:751-753`); the body is non-empty and not JSON (`:744-746`); `seed` is not six lowercase hex digits, or `domains` names a domain the bank does not have (`:768-770`). |
-| 409 | The environment is still starting (`facilitator/internal/api/api.go:734-737`), or a session is already running or ended (`:788-790`). |
-| 500 | The bank's pool cannot satisfy its own `domainWeights` at this draw size (`:771-773`) — an authoring bug `tests/bank-mcq.sh` should have caught first. |
+| 200 | Started. The clock is running. |
+| 202 | **Drawn, not started** — a pooled hands-on bank only. The cluster is being prepared for the questions just drawn and the clock has not begun. See [Preparing an attempt](#preparing-an-attempt). |
+| 400 | `mode` is not `exam`, `training` or `speed`; the body is non-empty and not JSON; `seed` is not six lowercase hex digits, or `domains` names a domain the bank does not have. |
+| 409 | The environment is still starting; a session is already running or ended; a preparation is already in flight; or the conductor refused or could not be reached (the body carries its own words). |
+| 500 | The bank's pool cannot satisfy its own `domainWeights` at this draw size — an authoring bug `tests/bank-weights.sh` should have caught first. |
+| 503 | This build has no route to the conductor, so a pooled hands-on bank's cluster cannot be prepared. |
 
 The readiness gate is what stops a 120-minute clock starting against a
 half-built environment: the facilitator answers long before the cluster
@@ -332,6 +335,58 @@ is usable. **An mcq exam skips the readiness gate** — it needs no
 cluster, no instances and no desktop, so the attempt starts the moment
 the facilitator can answer, while the environment finishes booting in
 the background (`facilitator/internal/api/api.go:733-737`).
+
+### Preparing an attempt
+
+Only a **pooled hands-on bank** produces this, and no bank in this repo is
+one — every bank here takes the 200 path. It exists because such a bank's
+cluster is deliberately empty at boot: the draw decides what to seed, so
+seeding cannot happen until the draw has.
+
+The 202 body is a preparation, not a session:
+
+```json
+{"state": "preparing", "bank": "ckad-mock-01", "mode": "exam", "jobId": "job-7",
+ "questionCount": 16, "seed": "a1b2c3", "poolDigest": "0f1e2d3c4b5a",
+ "domainFilter": ["Services and Networking"], "poolChanged": true}
+```
+
+`domainFilter` is omitted for a whole-curriculum draw and `poolChanged`
+when false. **Branch on the status code, not the body's shape**: 202 also
+passes an `ok` check, and read as a session it looks like an attempt in
+state `preparing` with a zero clock.
+
+Meanwhile `GET /api/session` reports `state: "idle"` with two extra
+fields — `preparing` (`jobId`, `mode`, `questionCount`, `startedAt`,
+`seed`, `poolDigest`) and, after a failure, `prepareError`. `state` stays
+a strict three-way on purpose: a client that has never heard of pooling
+keeps reading a response that is true, and `DELETE /api/session` still
+cancels.
+
+**The terminal condition is `preparing` disappearing from
+`GET /api/session`. It is not `controlStatus.busy` going false.** The seed
+job settles in the conductor up to a poll before the facilitator starts
+the clock; a watcher keyed on the job sees `idle` inside that window and
+sends the candidate back to the lobby with their exam already running. The
+server starts the session first and clears `preparing` second, so a reader
+watching that field never observes a moment with neither.
+
+While it is present, `GET /api/control/status` reports an ordinary job
+with `op: "seed"` and one phase, `seed-questions`, whose `detail` counts
+`question N of M`; `GET /api/control/log` carries the `setup.sh` output.
+When `preparing` goes:
+
+- `state: "running"` — the attempt is the draw that was seeded, same seed
+  and same ids. Route into it.
+- `state: "idle"` with `prepareError` — show it and stay put. No clock
+  ever started, so nothing was lost.
+- `state: "idle"` with no `prepareError` — cancelled, or the facilitator
+  restarted mid-preparation. Return to the lobby silently; this is not an
+  error.
+
+`DELETE /api/session` cancels and guarantees no attempt starts. It cannot
+stop the conductor's job, so the overlay runs to completion — harmless,
+because `setup.sh` is an idempotent apply.
 
 ### The draw
 
@@ -402,7 +457,7 @@ countdown, so a client cannot inflate how long it spent anywhere.
 | 200 | Recorded (`facilitator/internal/api/api.go:852`). |
 | 400 | The body is not JSON, or `question` is empty (`facilitator/internal/api/api.go:831-833`). |
 | 404 | `question` is outside this attempt's drawn subset (`facilitator/internal/api/api.go:838-840`). |
-| 409 | No attempt is running (`facilitator/internal/api/api.go:823-826`). |
+| 409 | No attempt is running (`facilitator/internal/api/api.go:906-909`). |
 
 Time accrues to the **previously** reported question when a new report
 arrives, so the first report of an attempt credits nothing and the
@@ -433,7 +488,7 @@ question's `timeSpentSeconds`.
 ### GET /api/session
 
 Current session state. Always 200
-(`facilitator/internal/api/api.go:871-872`).
+(`facilitator/internal/api/api.go:965-967`).
 
 ```json
 {
@@ -450,6 +505,11 @@ Current session state. Always 200
   "poolDigest": "3f9c1a2b7e04"
 }
 ```
+
+Two further fields appear only for a pooled hands-on bank, and only
+between a draw and its clock: `preparing` and `prepareError`. Both are
+described under [Preparing an attempt](#preparing-an-attempt); `state`
+stays `idle` while `preparing` is set.
 
 `endReason` is `""`, `submitted` or `expired`. `startedAt` is RFC 3339
 with nanoseconds, or `""` when the session has never started. Branch on
@@ -960,8 +1020,8 @@ The single in-flight control job and the last finished one. Always 200.
 }
 ```
 
-`op` is `reset` or `switch`; `bank` is a switch's target and `""` for a
-reset. A phase `state` is `pending`, `running`, `done` or `failed`, and
+`op` is `reset`, `switch` or `seed`; `bank` is a switch's target and `""`
+for a reset. A phase `state` is `pending`, `running`, `done` or `failed`, and
 `detail` is a one-line tail of that phase's command output capped at
 160 bytes (`conductor/internal/control/control.go:479-482`). A failed
 job carries `error` and keeps the failed phase in `lastJob`. `job` and
@@ -1008,6 +1068,32 @@ rebuild needs.
 
 The id passes two gates because it ends up inside a shell command: the
 pattern says it is well-formed, the catalog says it is real.
+
+### POST /api/control/seed
+
+Runs `setup.sh` for a list of questions, as a job. The facilitator calls
+this — no browser does — when a pooled hands-on bank's attempt has been
+drawn and its cluster has to be prepared for that draw. See
+[Preparing an attempt](#preparing-an-attempt).
+
+```json
+{"questions": ["q03", "q07", "q11"]}
+```
+
+Unlike `reseed`, it takes the hard single-job lock: this is minutes of
+work against the cluster a reset would rebuild, and it *should* raise the
+full-screen overlay. One phase, `seed-questions`, whose `detail` counts
+`question N of M`. One exec per question, so a failure names the question
+and the loop stops there — a cluster prepared for two questions of sixteen
+must not become an exam.
+
+| Code | When |
+|---|---|
+| 202 | Job accepted; the body is `{"job": {...}}` with `op: "seed"`. |
+| 400 | Empty list, more than 200 ids, a duplicate id, an id that fails the `^q[0-9]{1,3}$` shape check or the active bank's allowlist, or an mcq bank (nothing to seed). |
+| 409 | An attempt is running, or another control job is in flight. |
+
+Every id passes the same two gates `reseed` uses, for the same reason.
 
 ### GET /api/control/banks
 

@@ -171,7 +171,7 @@ k8s-env reports eight phases (images/k8s-env/phase.sh:23).
 | 4 | `api-server` | Wait for `/readyz` | `bootstrap.sh` |
 | 5 | `cni` | Apply Calico, wait for nodes Ready | `bootstrap.sh` |
 | 6 | `ingress` | Label the control plane, apply ingress-nginx | `bootstrap.sh` |
-| 7 | `seed` | Run each question's `setup.sh` | `bootstrap.sh` |
+| 7 | `seed` | Run each question's `setup.sh` — skipped for an mcq bank (nothing to seed), for a resumed cluster (it would overwrite candidate work), and for a **pooled** hands-on bank (the draw has not happened yet, so there is nothing to seed *for*) | `bootstrap.sh` |
 | 8 | `finalize` | Touch `/shared/ready` | `bootstrap.sh` |
 
 `phase.sh` renders the current phase to `/shared/boot.json` with jq and
@@ -359,3 +359,22 @@ A resumed cluster is never re-seeded. bootstrap.sh runs the bank's
 `setup.sh` scripts only for a cluster it created in this run, because
 re-seeding would overwrite candidate work
 (images/k8s-env/bootstrap.sh:157-175).
+
+### Where seeding happens, and why it can move
+
+For every bank in this repo, seeding happens at boot, in phase 7, inside
+the progress screen a cold start already shows. A **pooled** hands-on bank
+(`spec.examLength`, see [bank-spec.md](bank-spec.md)) cannot work that way:
+which questions an attempt asks is decided by the draw, and the draw
+happens when the candidate presses Start. So its boot skips the seed loop
+and the drawn questions are seeded then instead — `POST /api/session/start`
+answers 202, the facilitator asks the conductor for a `seed` job, and the
+clock does not start until that job succeeds.
+
+That is the facilitator's **second** server-side call to the conductor,
+after the bank-list fetch behind `GET /api/catalog`, and the first one that
+*starts work* rather than reading. It is worth naming against the principle
+directly above it — looking at the exam catalog must never be able to
+trigger a rebuild — because this is the deliberate exception: the request
+that begins an attempt is exactly the request that is allowed to prepare
+one. Reading endpoints still cannot.

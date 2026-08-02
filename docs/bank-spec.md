@@ -95,6 +95,7 @@ both gate regexes tolerate it there and nowhere else.
 | `spec.passingScore` | Percent. Enforced by the facilitator's `Results.Passed` |
 | `spec.kubernetesVersion` | Informational; shown on the catalog card |
 | `spec.domainWeights` | The certification's published weights, and a runtime value in three places: `exam.Load` builds `Exam.Domains` from it, `exam.Draw` stratifies a pooled or filtered draw by it, and both graders weight the final score by it. [bank-weights.sh](../tests/bank-weights.sh) still gates it too. Getting it wrong now moves real scores, not just a build check |
+| `spec.examLength` | Optional, **both engines**. Pools the bank: author more questions than one attempt should ask, set this to the smaller per-attempt count, and `exam.Draw` takes a fresh domain-stratified subset every start. Must be positive and no larger than the pool — `exam.Load` rejects both, because an `examLength` typo that silently turns pooling *off* is worse than one that fails the boot. A pooled bank must declare `spec.domainWeights`; the draw stratifies against them and errors without. Absent or `>=` the pool means no pooling, which is every bank in this repo. **A pooled hands-on bank also changes when its cluster is seeded** — see below |
 | `spec.environment.provider`, `.nodes` | Informational; read by nothing |
 | `spec.environment.allowedDomains` | Domain suffixes the desktop browser may reach through the docs proxy, subdomains included ([proxy/entrypoint.sh](../proxy/entrypoint.sh)). Omit it to inherit `allow.DefaultDomains` ([allow.go](../proxy/internal/allow/allow.go)), the smallest set that leaves the documentation sites usable |
 | `spec.instances` | 1 or 2 entries. Convention: names outside `instance-1`/`instance-2` only mark the bank unavailable in the exam selector ([catalog.go:218-230](../conductor/internal/catalog/catalog.go)), and the facilitator's exam loader never parses the block at all |
@@ -103,6 +104,39 @@ both gate regexes tolerate it there and nowhere else.
 | `spec.questions[].domain` | Must match a `domainWeights` key |
 | `spec.questions[].weight` | Must equal the sum of this question's `# points:` headers |
 | `spec.questions[].targetSeconds` | Optional pacing budget, in seconds, shown on the task chip. Absent, the facilitator derives one from the question's weight's share of the exam clock ([exam.go](../facilitator/internal/exam/exam.go), `TargetSeconds`) and flags it `targetDerived` on `GET /api/exam`, so a derived figure is never presented as the author's judgement — neither shipped bank sets it. It is a budget, never a limit: nothing enforces it and running over costs no points. Write it as the **last** key of the question block, after `weight:` (hands-on) or `correct:` (mcq); both gate regexes end there, and a `targetSeconds:` line above them hides the question from the gate |
+
+## Pooling a bank: `spec.examLength`
+
+Set it and one attempt asks a subset instead of the whole bank, drawn
+fresh each start and stratified so each domain contributes exactly its
+`domainWeights` share (largest-remainder rounding) rather than whatever
+chance produced. The subset is persisted with the session — it survives a
+resume and a facilitator restart — and grading, `GET /api/exam` and every
+single-question endpoint are scoped to it, so a pool question outside the
+draw is a 404 rather than merely ungraded. The same seed against the same
+pool reproduces the same draw; `poolDigest` travels beside it so "same
+seed, different questions" reports as a changed bank rather than a
+mystery.
+
+**For a hands-on bank, pooling also moves when the cluster is seeded, and
+that is the part to understand before opting in.** An unpooled hands-on
+bank seeds every question at boot, inside the long progress screen a cold
+start already shows. A pooled one cannot: the draw has not happened yet at
+boot time, and seeding all of a large pool would be pointless work. So
+[bootstrap.sh](../images/k8s-env/bootstrap.sh) skips its seed loop
+entirely for a pooled bank (it still pre-pulls the bank's images, which is
+the slow, network-fragile half and is identical whatever gets drawn), and
+the drawn questions are seeded when the attempt starts instead:
+`POST /api/session/start` answers **202** with a conductor job to watch,
+and the candidate's clock does not begin until that job succeeds. See
+[api.md](api.md) for the contract.
+
+The consequence for an author: pooling is a good trade when the pool is
+much larger than an attempt, and a bad one when it is not. A bank that
+pools 22 down to 20 has moved four minutes of seeding out of the boot
+screen and into the moment the candidate presses Start, and gained almost
+no variety for it. Neither shipped bank pools its hands-on questions;
+CKAD draws all 22.
 
 ## Points and domain weights
 
@@ -204,20 +238,6 @@ spec:
 
 Differences from the hands-on shape:
 
-- **`spec.examLength` (optional) pools the bank.** Author more questions
-  than a single attempt should ask, set `examLength` to the smaller
-  per-attempt count, and `session.Manager.StartMCQ` draws a fresh,
-  random subset on every `Start` ([exam.go](../facilitator/internal/exam/exam.go),
-  `DrawMCQ`) — stratified so each domain contributes exactly its
-  `domainWeights` share of `examLength` (largest-remainder rounding),
-  never left to chance. Absent, zero, or `>=` the pool's own size means
-  no pooling: every question is served, in bank order, exactly as an
-  mcq bank behaved before this field existed — the hidden `smoke-mcq`
-  fixture and any bank that has not opted in take this path. The drawn
-  subset is persisted with the session (survives a resume or a
-  facilitator restart) and is what grading, `GET /api/exam`, and every
-  single-question endpoint are scoped to for that attempt — a pool
-  question outside the draw is a 404, not merely ungraded.
 - **No `spec.instances`.** Declaring any marks the bank unavailable
   ([catalog.go](../conductor/internal/catalog/catalog.go)) — nothing
   would ever ssh to them.
@@ -259,9 +279,10 @@ of the pool's own points must sit within 2 percentage points of its
 target — the pool IS the exam. With a smaller `examLength`, that
 check instead requires each domain's POOL to be at least as deep as the
 per-domain count a stratified draw of that size would need (the same
-largest-remainder rounding `exam.DrawMCQ` uses) — the pool's own ratio
+largest-remainder rounding `exam.Draw` uses) — the pool's own ratio
 is free to differ, since every draw is stratified to the target
-regardless.
+regardless. [bank-weights.sh](../tests/bank-weights.sh) applies the same
+two modes to a hands-on bank.
 
 One trade-off to know when editing a shipped bank: answers are stored
 by option index, so reordering or editing `options` mid-attempt

@@ -79,7 +79,12 @@ The parts that constrain product decisions:
 
 - One hands-on bank: CKAD Mock Exam 01, 22 questions across all five
   curriculum domains. 120 minutes, 66% to pass, Kubernetes 1.35, two
-  instances, kind two-node cluster.
+  instances, kind two-node cluster. Every attempt asks all 22 — that is a
+  property of this bank, not of the engine. Pooling (`spec.examLength`)
+  now works on both engines; a hands-on bank that opts in has its cluster
+  seeded for the drawn subset when the attempt starts rather than for
+  everything at boot, which is the trade that makes a large hands-on pool
+  possible and is not worth taking for 22.
 - One multiple-choice bank: KCNA Mock Exam, 97 original questions
   pooled down to 65 per attempt (`spec.examLength`), in the real exam's
   shape — 90 minutes, 75% to pass, weighted to the post-November-2025

@@ -46,13 +46,21 @@ Recorded because each has been proposed at least once and is settled.
 - **No authentication, permanently.** See [../SECURITY.md](../SECURITY.md).
   Notes elsewhere of the form "needs auth once hosted" describe a
   scenario that is not planned.
-- **No attempt history and no cross-attempt analytics.** One attempt
-  record, overwritten per attempt. [../PRODUCT.md](../PRODUCT.md) states
-  this as a durable constraint, so proposals that depend on a history
-  store are out of scope rather than pending.
+- ~~**No attempt history and no cross-attempt analytics.**~~ **Overturned,
+  deliberately.** This was a durable constraint until the design brief
+  made cross-attempt progress a product goal, and it is now built: every
+  graded attempt in a recorded mode is appended to `/state/history.json`
+  in its own volume, and `GET /api/catalog` joins that record to the bank
+  list. See [../PRODUCT.md](../PRODUCT.md) for the rules that came with it
+  — recorded is not the same as counted, and only the candidate's own
+  machine ever holds it. The *live session* file is unchanged: it still
+  holds exactly one attempt and is still overwritten by the next.
+  Struck through rather than deleted, because this entry was cited as
+  settled and a reader who remembers it needs to find out it was reversed
+  rather than simply not find it.
 - ~~**`spec.domainWeights` is read by no Go code.**~~ **No longer true.**
   It is now a runtime value in three places: `exam.Load` derives
-  `Exam.Domains` from it, `exam.DrawMCQ` stratifies a pooled draw by it,
+  `Exam.Domains` from it, `exam.Draw` stratifies a pooled or filtered draw by it,
   and both graders weight the final score by it. Kept here struck through
   rather than deleted because this entry was cited as settled, and a
   reader who remembers it needs to know it was overturned rather than

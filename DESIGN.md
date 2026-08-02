@@ -549,28 +549,30 @@ own type, weight 600.
 
 ### Form controls
 
-Three exist. The candidate's real input surface is the terminal, so the
-browser UI only starts, ends, navigates and reports; a new screen
-reaching for a field is probably solving the wrong problem. (There used
-to be a fourth: the lobby's mode radio group. Choosing a mode is now
-three cards each carrying its own start button, so there is no selection
-to hold and then commit — the choice and the act are one press.) All
-three borrow the anchored idioms — 6px corners, a hairline border, a
-`--surface-raised` fill, the global focus ring — and a fourth would too.
+Four exist, and only three of them are visible. The candidate's real
+input surface is the terminal, so the browser UI only starts, ends,
+navigates and reports; a new screen reaching for a field is probably
+solving the wrong problem. (There used to be another: the lobby's mode
+radio group. Choosing a mode is now three cards each carrying its own
+start button, so there is no selection to hold and then commit — the
+choice and the act are one press.) The visible ones borrow the anchored
+idioms — 6px corners, a hairline border, a `--surface-raised` fill, the
+global focus ring — and the next would too.
 
 | Control | Site | Treatment |
 |---|---|---|
 | Textarea | clipboard panel, `components/ClipboardPanel.tsx:87` | `.clipboard-input` — mono at `--text-s`, `--surface-raised` fill, `--border` hairline, 6px, `resize: vertical` |
 | Checkbox ×2 | keyboard settings, `components/KeyboardSettings.tsx:49` and `:60` | native and unstyled, in a `.keyboard-row` flex row beside a `--text-s` label. The second is `disabled` while the first is off |
+| File input | progress dashboard, `screens/Progress.tsx` | **Never drawn.** Held in the `.sr-only` clip and opened by an ordinary button, because a file picker is the only way a browser can hand a document back and importing a history export needs one. It is the mechanism; the button is the control. Counted here so the next reader knows it exists, not as licence for a visible one |
 
 ### Icons
 
-Thirteen hand-authored SVGs in `ui/src/components/Icon.tsx` on a 24 grid,
+Fourteen hand-authored SVGs in `ui/src/components/Icon.tsx` on a 24 grid,
 `fill: none`, `stroke: currentColor`, stroke-width 1.75, round caps and
 joins — the conventions `ui/public/favicon.svg` was already drawn with:
 `chevron-left`, `chevron-right`, `chevron-down`, `check`, `cross`,
-`flag`, `flag-filled`, `copy`, `keyboard`, `theme-auto`, `theme-light`,
-`theme-dark`, `help`.
+`flag`, `flag-filled`, `grid`, `copy`, `keyboard`, `theme-auto`,
+`theme-light`, `theme-dark`, `help`.
 
 Sized on `1em`, so an icon rides the type it sits in, and `currentColor`
 throughout, so both themes and every state colour come free. Always
@@ -631,7 +633,7 @@ state.
 | Element | Treatment |
 |---|---|
 | `.page` | the shared root of both: `min-height: 100%`, centred at `--page-max`, and it scrolls the *document* rather than a box of its own. A nested scrollbar under a 56px fixed header is the failure the score screen has its own override to avoid |
-| Coverage capsule | how much of the path is playable, as a figure plus one segment per card in the grid below, each tinted like its card. The bar is `aria-hidden`: the figure beside it already says the same thing in words, and empty list items announce as nothing at all |
+| Progress capsule | how far along the path you are — certifications passed over certifications on it, as a figure plus one segment per card in the grid below. It used to count what was *playable* and double as the grid's engine legend, because nothing recorded an attempt; the segments now carry pass state instead, so they are no longer a key to the card hues. The bar is `aria-hidden`: the figure beside it already says the same thing in words, and empty list items announce as nothing at all |
 | Exam grid | `auto-fit` from a 330px minimum for live exams, 240px for coming-soon ones. Two columns at `--page-max` today because there are two live exams, not because two is specified |
 | Stat strip | four cells between two hairlines: duration, draw, passing score, engine. A `<dl>` with `dt` before `dd` as the grammar requires, drawn figure-above-label by `column-reverse` — a visual order only, so a screen reader still hears "Duration, 2h" |
 | The pool pair | "65 / 97" appears only when the two numbers differ. A card reading "22 / 22" would advertise a random draw that bank does not do |
@@ -679,6 +681,9 @@ dialog.
 | `Toast` | two fixed-position live regions — polite for info (5s TTL), assertive for warnings (which persist and carry a `!` mark as the non-colour channel) — above every overlay, so a confirmation is never rendered invisible |
 | `ExamIntro` | the how-this-works card: a self-contained `role="img"` schematic with numbered 50% circles and a prose legend, deliberately not an overlay tour measured against live layout |
 | `.control-log-pane` | the rebuild dialog's build log: retained command output in mono `--text-xs` on `--surface-raised`, scrolling inside its own 12rem box (Scroll-Inside), following the newest line unless the reader scrolls up |
+| `Explain` | the per-task deep dive, opened from a verdict row. Its centrepiece is two `--machine-*` document panes side by side — the one place machine surfaces appear outside the VNC canvas, because what they show is the cluster and not the app. Changed lines carry an ASCII `-`/`+` gutter as well as a `--diff-*` wash, so the comparison survives greyscale, and a legend under the panes names the glyphs rather than assuming diff literacy. Below 1100px they stack in reading order, each keeping the title that says which it is. Most tasks have no captured documents at all — evidence is emitted only by checks that ask for it — so the ordinary shape of this screen is checks, a failure message and the reference solution, and it is designed to be good in that shape |
+| `.weak-rows` | the dashboard's weakest-domain ranking, capped at six. The bars are `--accent`, not `--danger`: the panel ranks a candidate's domains against *each other*, and reddening 92% because it sorted last would say something untrue. The heading and the order carry "weakest" |
+| `.path-card` | one certification's standing: acronym, status word, best score, bar, meta line. The word is the channel and the card's tint is the second signal — a passed card and an untouched one must never differ by hue alone |
 
 ## Motion
 
@@ -786,8 +791,8 @@ region rather than a pending one once the pulse is off.
   absolutely positioned so noVNC's `ResizeObserver` cannot enter a resize
   feedback loop; that is structural, not stylistic.
 - **Don't** add a form control without first checking whether the
-  interaction belongs in the terminal. Four exist, and each earned its
-  place.
+  interaction belongs in the terminal. Four exist, one of them never
+  drawn, and each earned its place.
 - **Don't** reach for a dropdown, select or menu. The navigator is this
   product's disclosure pattern and already carries more per option than a
   native select can render — four states each on two channels, live
@@ -797,13 +802,18 @@ region rather than a pending one once the pulse is off.
   the focus ring along with the label, and composites to a ratio nobody
   measured. Use `--text-disabled`.
 - **Don't** draw a control for something the product cannot yet do. Say it
-  in prose instead and let the control arrive with the capability. Three
-  places have wanted one and taken prose: the mode screen's domain summary
-  before the draw was configurable, the results screen's "drill your weak
-  domains" card while nothing sends `StartOptions.domains`, and its task
-  rows while the explanation screen does not exist. A control that looks
-  live and does nothing is worse than no control, because the candidate
-  spends their trust before they find out.
+  in prose instead and let the control arrive with the capability. A
+  control that looks live and does nothing is worse than no control,
+  because the candidate spends their trust before they find out.
+
+  Three places took prose under this rule, and all three have since become
+  controls — the mode screen's domain summary once the draw was
+  configurable, the results screen's "drill your weak domains" card once
+  something sent `StartOptions.domains`, and its task rows once the
+  explanation screen existed. That is the rule working rather than
+  expiring: each waited for its capability and arrived with it, and none
+  of them shipped a period of looking live and doing nothing. Keep the
+  rule; the examples are its record, not its scope.
 
 ## Enforcement
 
