@@ -112,4 +112,17 @@ describe("mirror: the favicon", () => {
       expect(svg, `favicon should use --${token} (${light[token]})`).toContain(light[token]);
     }
   });
+
+  // It shipped malformed and nothing noticed: the header comment named
+  // its tokens the CSS way, and XML forbids a double hyphen inside a
+  // comment. A `link rel=icon` is lenient enough to render it anyway, so
+  // the break only showed when the landing page used it as an img
+  // source. The test above greps hexes and cannot see this at all.
+  it("is well-formed XML, not just the right colours", async () => {
+    const svg = await readSrcFile("..", "public", "favicon.svg");
+    const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
+    const error = doc.querySelector("parsererror");
+    expect(error?.textContent ?? "").toBe("");
+    expect(doc.documentElement.tagName).toBe("svg");
+  });
 });
