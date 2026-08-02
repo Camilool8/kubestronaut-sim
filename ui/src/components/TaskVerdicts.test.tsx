@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TaskVerdicts } from "./TaskVerdicts";
@@ -21,8 +21,8 @@ const graded: QuestionResult[] = [
   task({ id: "q03", title: "NetworkPolicy", earned: 0, total: 6, verdict: "failed" }),
 ];
 
-// By class, not by role: a row is a <details> and so is the solution
-// disclosure nested inside it, so `getAllByRole("group")` counts both.
+// By class, not by role: `getAllByRole("group")` matches every <details>
+// on screen, and what these assertions count is rows specifically.
 const rows = () => [...document.querySelectorAll(".tv-row")];
 
 beforeEach(() => {
@@ -44,6 +44,35 @@ describe("TaskVerdicts rows", () => {
     render(<TaskVerdicts questions={graded} />);
     const first = screen.getByText("Namespaces").closest("summary");
     expect(first).toHaveTextContent("q01");
+  });
+
+  // The domain had a 150px column and no name in this bank fits one:
+  // "Application Environment, Configuration and Security" wrapped to
+  // three lines there while the title beside it was cut to an ellipsis.
+  // It rides the task's own meta line now, which is why the assertion is
+  // about WHERE it renders and not merely that it renders.
+  test("carries the id and the domain on the task's meta line, in full", () => {
+    render(
+      <TaskVerdicts
+        questions={[
+          task({
+            id: "q06",
+            title: "ConfigMaps, as env and as a volume",
+            domain: "Application Environment, Configuration and Security",
+          }),
+        ]}
+      />,
+    );
+
+    const meta = document.querySelector(".tv-task-meta");
+    expect(meta).not.toBeNull();
+    expect(meta).toHaveTextContent("q06");
+    // Whole, not shortened: the string the candidate reads is the string
+    // the bank published.
+    expect(meta).toHaveTextContent("Application Environment, Configuration and Security");
+    // Inside the task cell, not in a column of its own beside it.
+    expect(meta?.closest(".tv-task")).not.toBeNull();
+    expect(screen.queryByText("Domain")).toBeNull();
   });
 
   // Hands-on rows fall back to the id when the bank ships no title; the
@@ -84,6 +113,30 @@ describe("TaskVerdicts rows", () => {
 
     expect(row).toHaveAttribute("open");
     expect(screen.getByText("Namespace exists")).toBeInTheDocument();
+  });
+
+  // The row used to disclose the reference solution as well, fetching it
+  // on first open. The deep dive renders the same solution eagerly, so
+  // an opened row and the screen it links to said the same thing twice —
+  // and every row a candidate opened cost a request for prose they had
+  // already been shown a way to. Both halves are pinned: no control for
+  // it, and no fetch behind it. (Nothing stubs fetch in this file, so a
+  // regression here fails as an unhandled request rather than quietly
+  // passing.)
+  test("a row offers no solution of its own, and asks for none", async () => {
+    const user = userEvent.setup();
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    render(<TaskVerdicts questions={graded} />);
+    await user.click(screen.getByText("Namespaces"));
+
+    expect(screen.getByText("Namespaces").closest("details")).toHaveAttribute("open");
+    expect(screen.queryByText(/show solution/i)).toBeNull();
+    expect(document.querySelector(".solution-details")).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
   });
 
   // The link lives INSIDE the disclosure, not on the row itself: a

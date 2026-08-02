@@ -6,6 +6,7 @@ import {
   type QuestionResult,
   type Results,
   type SolutionDetail,
+  type SolutionDoc,
 } from "../api";
 import { CheckList } from "../components/CheckList";
 import { Icon } from "../components/Icon";
@@ -32,13 +33,31 @@ import { strings } from "../strings";
  * as broken on twenty tasks out of twenty-two has failed however well the
  * two lucky ones look.
  *
- * WHAT IS DELIBERATELY ABSENT. The brief draws a third link in the why
- * card's footer — "kubernetes.io/docs · Ingress path types ↗". Nothing in
- * the data model carries an upstream URL: not `QuestionResult`, not
- * `CheckResult`, not `CheckArtifact`, and not the bank format behind
- * them. Inventing the link here would mean guessing a URL per task and
- * shipping a link that is wrong for some of them, which on a study tool
- * is worse than no link at all. It arrives when a bank field does.
+ * WHERE THE SOLUTION LIVES. Here, and only here. The verdict row on the
+ * results table used to carry a disclosure with the same markdown in it,
+ * so the one document that says how the task should have been done was
+ * read twice or not at all. This section is now the screen's
+ * destination: its prose is capped at a reading measure while its
+ * listings and tables keep the full card, because a `kubectl` line and a
+ * paragraph do not want the same width.
+ *
+ * WHAT IS DELIBERATELY ABSENT. The brief's "Add 2 similar tasks to my
+ * drill list" button. There is no drill list — nothing in this product
+ * accumulates tasks for later — and the capability that genuinely exists
+ * is a different one: starting a fresh attempt narrowed to the domains
+ * you scored worst in, offered from the Score screen's sidebar beside
+ * the ranking that justifies it. A second entry point here would be
+ * scoped to one task's domain, which is a worse drill than the one
+ * already on offer, and a button for a list that does not exist is the
+ * failure DESIGN.md's last "don't" is about. It arrives with the list.
+ *
+ * The brief's upstream link — "kubernetes.io/docs · Ingress path types
+ * ↗" — is no longer absent, but it moved: `docs` hangs off
+ * `SolutionDetail`, which is per QUESTION, so the links are the
+ * solution's footer rather than a why card's. A check that wanted
+ * reading of its own would need a field on `CheckArtifact`, and no bank
+ * has asked for one. Most questions carry no `docs` at all today, and
+ * the footer is simply not drawn then — see SolutionDocs.
  *
  * Routing lives in Score.tsx, not App.tsx: the visible screen is a
  * function of `session.state` first, and this view exists only inside
@@ -197,20 +216,28 @@ export function Explain({ results, questionId }: ExplainProps) {
               body={strings.explain.noEvidenceBody}
             />
           ) : (
-            evidence.map((e) => <EvidenceBlock key={e.check.name} evidence={e} />)
+            <EvidenceSection evidence={evidence} />
           ))}
 
-        <section className="explain-section">
+        <section className="explain-section explain-solution">
           <h2 className="explain-section-title">
             {isMcq ? strings.mcq.explanation : strings.explain.solutionTitle}
           </h2>
-          {solution !== null ? (
-            <Markdown>{solution.markdown}</Markdown>
-          ) : solutionError !== null ? (
-            <p className="error-text">{strings.explain.solutionFailed(solutionError)}</p>
-          ) : (
-            <p className="explain-note">{strings.explain.solutionLoading}</p>
-          )}
+          {/* The box, not its contents, carries the floor height. A
+              one-line "Loading…" in a section that then grows to forty
+              lines of markdown is a jump the reader's eye has to
+              re-acquire; reserving the shortest solution's worth of room
+              means the arrival fills a space that was already there. */}
+          <div className="explain-solution-body">
+            {solution !== null ? (
+              <Markdown>{solution.markdown}</Markdown>
+            ) : solutionError !== null ? (
+              <p className="error-text">{strings.explain.solutionFailed(solutionError)}</p>
+            ) : (
+              <p className="explain-note">{strings.explain.solutionLoading}</p>
+            )}
+          </div>
+          {solution !== null && <SolutionDocs docs={solution.docs} />}
         </section>
       </article>
     </div>
@@ -259,6 +286,73 @@ function NoteSection({ title, body }: { title: string; body: string }) {
 }
 
 /**
+ * The upstream reading a bank author attached to this question, as the
+ * solution's footer.
+ *
+ * ABSENT IS THE ORDINARY CASE, and it renders as nothing at all. `docs`
+ * is an authoring task the banks have barely started, so most questions
+ * arrive with the field missing or empty, and the section simply ends
+ * after the prose. There is no "no links for this task" note and no
+ * empty rail waiting to be filled: an absence the reader was never
+ * promised cannot read as a failure, whereas a placeholder for one
+ * announces a gap that is not there. Same discipline the evidence panes
+ * take, and for the same reason.
+ *
+ * These leave the app. The candidate opens them from their own browser,
+ * not from the exam desktop behind its documentation allowlist proxy, so
+ * they are treated as external links properly: a new tab, `noreferrer
+ * noopener`, and the host printed beside the label so the destination is
+ * visible before the click rather than only in the status bar.
+ */
+function SolutionDocs({ docs }: { docs?: SolutionDoc[] }) {
+  const links = (docs ?? [])
+    .map((doc) => ({ doc, host: externalHost(doc.url) }))
+    .filter((link): link is { doc: SolutionDoc; host: string } => link.host !== null);
+  if (links.length === 0) return null;
+
+  return (
+    <footer className="explain-docs">
+      <p className="explain-docs-title">{strings.explain.docsTitle}</p>
+      <ul className="explain-docs-list">
+        {links.map(({ doc, host }) => (
+          <li key={doc.url}>
+            <a className="explain-doc" href={doc.url} target="_blank" rel="noreferrer noopener">
+              <span className="explain-doc-label">{doc.label}</span>
+              <span className="explain-doc-host">{host}</span>
+              <span className="sr-only"> ({strings.explain.docsNewTab})</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </footer>
+  );
+}
+
+/**
+ * The host of an http(s) URL, or null for anything else.
+ *
+ * Two jobs in one function, and the second is why it is not a one-liner.
+ * It is the visible affordance — the host prints beside the label, and
+ * nothing here invents it: whatever the server sent is what shows. And
+ * it is the gate. A `docs` entry is bank content reaching an `href`,
+ * which is one of the few places a string out of a file becomes
+ * executable, so a `javascript:` or `data:` URL is DROPPED rather than
+ * rendered inert; a link that visibly does nothing spends the
+ * candidate's trust, and one that is not there costs nothing.
+ */
+function externalHost(url: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    // A relative path, or not a URL at all. Nothing on this screen can
+    // resolve it, so nothing on this screen should link to it.
+    return null;
+  }
+  return parsed.protocol === "https:" || parsed.protocol === "http:" ? parsed.host : null;
+}
+
+/**
  * One check's captured documents, grouped BY THE CHECK that captured
  * them.
  *
@@ -292,20 +386,60 @@ function collectEvidence(checks: CheckResult[]): Evidence[] {
   return out;
 }
 
-function EvidenceBlock({ evidence }: { evidence: Evidence }) {
-  const { check, actual, expected, why } = evidence;
-
+/**
+ * Every capturing check's evidence, under ONE section heading.
+ *
+ * The grouping is the whole design of this section. Each check keeps its
+ * own sub-heading and its own panes — flattening them would teach the
+ * candidate that q19's Service is missing fields its EndpointSlice never
+ * had — but the chrome AROUND them is hoisted and drawn once: the
+ * heading that says these are captures, and the legend that says how to
+ * read a marked line. Both used to be per-block, which on a task with
+ * three capturing checks meant the same four words and the same
+ * 180-character key three times. Most CKAD questions are being taught to
+ * capture this wave, so three blocks is the shape to design for and one
+ * block is the easy case, not the other way round.
+ */
+function EvidenceSection({ evidence }: { evidence: Evidence[] }) {
   // Computed HERE, in the client, and deliberately. The grader emits two
   // documents and never a diff: docs/bank-spec.md:324 bans `diff` inside
   // a validator because SCORING on line order fails a correct answer that
   // is merely ordered differently. Rendering has no such property, so the
   // highlight is a view concern and the ban upstream stays intact.
-  const diff = actual && expected ? diffDocuments(actual.body, expected.body) : null;
+  const blocks = evidence.map((e) => ({
+    ...e,
+    diff: e.actual && e.expected ? diffDocuments(e.actual.body, e.expected.body) : null,
+  }));
+
+  // The legend is a key to a notation, so it is drawn if ANY comparison
+  // below actually marked something, and never once per comparison. It
+  // sits above the first pane pair rather than under the last, because a
+  // key read after the thing it decodes has been read too late.
+  const marksAnything = blocks.some(
+    (b) => b.diff !== null && b.diff.compared && b.diff.changedLines > 0,
+  );
 
   return (
     <section className="explain-section explain-evidence">
-      <p className="explain-evidence-eyebrow">{strings.explain.evidenceEyebrow}</p>
-      <h2 className="explain-section-title">{check.desc}</h2>
+      <h2 className="explain-section-title">{strings.explain.evidenceTitle(evidence.length)}</h2>
+      {marksAnything && <p className="explain-note">{strings.explain.diffLegend}</p>}
+      <div className="explain-checks">
+        {blocks.map((block) => (
+          <EvidenceBlock key={block.check.name} block={block} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+type EvidenceBlockData = Evidence & { diff: ReturnType<typeof diffDocuments> | null };
+
+function EvidenceBlock({ block }: { block: EvidenceBlockData }) {
+  const { check, actual, expected, why, diff } = block;
+
+  return (
+    <article className="explain-check">
+      <h3 className="explain-check-title">{check.desc}</h3>
 
       {(actual || expected) && (
         <div className="explain-panes">
@@ -328,13 +462,11 @@ function EvidenceBlock({ evidence }: { evidence: Evidence }) {
         </div>
       )}
 
-      {/* The panes carry a red tint and a green tint and nothing else in
-          the brief, which puts the whole meaning of the screen in one
-          channel. The "-"/"+" gutter is the second channel and this
-          legend is what makes it legible without one. */}
-      {diff !== null && diff.compared && diff.changedLines > 0 && (
-        <p className="explain-note">{strings.explain.diffLegend}</p>
-      )}
+      {/* What remains here is what is true of THIS pair and not of the
+          section: that these two documents agreed, that they were too
+          long to compare, that this capture has no counterpart. The key
+          to the "-"/"+" notation is hoisted to EvidenceSection, because
+          it is the same sentence every time. */}
       {diff !== null && diff.compared && diff.changedLines === 0 && (
         <p className="explain-note">{strings.explain.diffIdentical}</p>
       )}
@@ -342,14 +474,21 @@ function EvidenceBlock({ evidence }: { evidence: Evidence }) {
         <p className="explain-note">{strings.explain.diffTooLong}</p>
       )}
       {actual && !expected && <p className="explain-note">{strings.explain.actualOnlyNote}</p>}
+      {expected && !actual && <p className="explain-note">{strings.explain.expectedOnlyNote}</p>}
 
+      {/* A caption, not a heading. `show_why` output is an ARTIFACT this
+          check emitted, exactly as the panes beside it are, and the
+          screen's rule is that mono eyebrows label artifacts while sans
+          headings label sections. Demoting it also keeps the outline to
+          two levels under the h1 — a screen with three capturing checks
+          was otherwise announcing six headings for two ideas. */}
       {why && (
         <div className="explain-why">
-          <h3 className="explain-why-title">{strings.explain.whyTitle}</h3>
+          <p className="explain-why-title">{strings.explain.whyTitle}</p>
           <p className="explain-why-body">{why.body}</p>
         </div>
       )}
-    </section>
+    </article>
   );
 }
 

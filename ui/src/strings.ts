@@ -970,8 +970,13 @@ export const strings = {
     // ---- the task verdicts table ----
 
     verdictsTitle: "Task verdicts",
+    // Two surfaces, said in one sentence. A row opens for the checks —
+    // that is the comparison this table exists to let you make — and the
+    // full explanation is where the reference solution and the captured
+    // cluster state live. The row used to carry a solution of its own and
+    // this line used to promise one; it does not any more.
     verdictsHint:
-      "Open a row for the grader's checks and the reference solution. Each row also opens in full, with whatever state its checks captured.",
+      "Open a row to read the grader's checks against each other. Open a task in full for its reference solution and whatever state its checks captured.",
     // The link out of an opened row and into the deep dive (1j). Numbered
     // rather than a bare "Open the full explanation" because twenty rows
     // produce twenty of these, and twenty links sharing one accessible
@@ -985,10 +990,14 @@ export const strings = {
     filterEmpty: "Nothing matches that filter.",
     colNum: "#",
     colTask: "Task",
-    colDomain: "Domain",
     colWeight: "Weight",
     colTime: "Time",
     colVerdict: "Verdict",
+    // Between the question directory and the domain on a row's meta line.
+    // The same middle dot the banner eyebrow joins with, and spaced for
+    // the same reason: it has to read as a separator to a screen reader
+    // walking the line as one string, not weld two values together.
+    metaSeparator: " · ",
     // The visible column strip is aria-hidden: this is a list of
     // disclosures, not a table, so nothing associates a header with a
     // cell. Each cell names itself instead.
@@ -1023,8 +1032,11 @@ export const strings = {
     // the bank — so rendering it like a failure would send the candidate
     // to study something the grader never measured. Say whose fault it is.
     checkSkippedMessage: "Not graded: this check's points header is malformed in the bank.",
-    showSolution: "Show solution",
-    loadingSolution: "Loading solution…",
+    // `showSolution` and `loadingSolution` used to live here, for a
+    // disclosure inside every verdict row. The deep dive renders the same
+    // solution eagerly and has the width for it, so the row's copy went
+    // with the row's copy of the solution. (hints.showSolution is a
+    // different string, on the training hint tray, and stays.)
   },
 
   // 1j, the explanation deep dive: one task, opened from a verdict row.
@@ -1073,10 +1085,15 @@ export const strings = {
     // showed the points; this says why there is nothing under them.
     checksNone: "The grader recorded no checks for this task.",
 
-    // Each evidence block is headed by the check that captured it: two
-    // checks on one task capture two different objects, and stacking
-    // their panes under one heading would invite reading them as one.
-    evidenceEyebrow: "What this check saw",
+    // One heading over the whole captured-state section, and then one
+    // sub-heading per check inside it. It used to be a mono eyebrow
+    // repeated above every block, which said the same four words two or
+    // three times on a task with several capturing checks. The plural is
+    // the honest form of the same sentence, and each check keeps its own
+    // description as a heading — q19's two checks capture a Service and an
+    // EndpointSlice, and nothing here may invite reading them as one.
+    evidenceTitle: (checks: number) =>
+      checks === 1 ? "What this check saw" : "What these checks saw",
     // The panes. Titled as the brief titles them, because the distinction
     // they draw is the whole point: one is what the cluster had, the
     // other is what the check wanted.
@@ -1089,6 +1106,10 @@ export const strings = {
     // flag is drawn rather than typed). This legend is also the reason
     // the marks can carry the change on their own — the tint beside them
     // is the second channel, never the first.
+    //
+    // Drawn ONCE for the section, above the first comparison, and not
+    // under every pane pair: it is a key to a notation, and a key repeated
+    // three times on one screen stops being read the first time.
     diffLegend:
       "Lines marked - are in your state and not in the expected document; lines marked + are in the expected document and not in yours.",
     // Announced before a marked line, so the reading is not carried by a
@@ -1108,6 +1129,13 @@ export const strings = {
     // shape.
     actualOnlyNote:
       "This is what the check read off the cluster. It has no authored counterpart to sit beside, so compare it against the reference solution below.",
+    // The mirror image, and it means something specific: the check had an
+    // authored document to compare against and captured nothing to
+    // compare with. An empty capture is what an absent object looks like,
+    // so saying "nothing was found" is more useful than an empty pane
+    // labelled YOUR CLUSTER STATE beside a full one.
+    expectedOnlyNote:
+      "This is what the check was looking for. Nothing was captured from your cluster to sit beside it, which usually means the object does not exist yet.",
 
     // The task passed. There is genuinely nothing to explain, and
     // inventing a section for it would be worse than saying so.
@@ -1126,6 +1154,22 @@ export const strings = {
     solutionTitle: "Reference solution",
     solutionLoading: "Loading the reference solution…",
     solutionFailed: (detail: string) => `Couldn't load the reference solution (${detail}).`,
+
+    // The upstream reading a bank author attached to this task
+    // (`SolutionDetail.docs`). Most questions carry none, and the footer
+    // is simply absent then — there is no empty state, because a footer
+    // nobody was promised cannot read as missing.
+    //
+    // "Upstream" and not "Further reading": these point at kubernetes.io
+    // and its neighbours, which is the documentation the real exam allows
+    // — the word is the one that tells a candidate these are the pages
+    // they may open on exam day.
+    docsTitle: "Upstream documentation",
+    // Appended to each link's accessible name. The visible channel is the
+    // host printed beside the label: these open in a new tab, from the
+    // candidate's own browser and not the exam desktop, so the reader is
+    // told where they are going before they go.
+    docsNewTab: "opens in a new tab",
     // The screen was deep-linked to a question that is not in this
     // attempt — a bookmark from an earlier draw, most likely. It is the
     // screen's h1, so it is written as a whole sentence.

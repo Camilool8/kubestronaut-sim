@@ -1,8 +1,7 @@
-import { useState, useSyncExternalStore, type SyntheticEvent } from "react";
-import { getSolution, type QuestionResult, type SolutionDetail } from "../api";
+import { useState, useSyncExternalStore } from "react";
+import { type QuestionResult } from "../api";
 import { CheckList } from "./CheckList";
 import { Icon } from "./Icon";
-import { Markdown } from "./Markdown";
 import { marksStore } from "./marksStore";
 import { McqAnswerReview } from "./McqAnswerReview";
 import { verdictOf, type Verdict } from "./resultsModel";
@@ -20,26 +19,39 @@ interface Row {
 }
 
 /**
- * Every graded task in one strip: number, task, domain, weight, time and
- * verdict, filtered by what went wrong.
+ * Every graded task in one strip: number, task, weight, time and verdict,
+ * filtered by what went wrong.
  *
- * A row is BOTH a disclosure and a way into the deep dive, which is a
- * change from what this comment used to say. It used to record that the
- * row expands because screens/Explain.tsx did not exist and a row that
- * looked like a link and went nowhere was worse than one that opened.
- * Explain.tsx exists now, and the row still expands, for a different
- * reason: this table is a SCANNING surface — twenty rows, read against
- * each other — and the deep dive is a reading surface for one task. A
- * candidate comparing why check 2 failed on three tasks should not have
- * to make three navigations and lose the table each time. So the checks
- * stay in place and each opened row carries a link into its own full
- * explanation, which is where the captured cluster state, the grader's
- * "why", and the roomy reference solution live.
+ * Two surfaces, two jobs, and that division decides everything below.
+ * This table is a SCANNING surface — twenty rows read against each other
+ * — and screens/Explain.tsx is a READING surface for one task.
  *
- * The link is inside the disclosure and not on the row itself because a
+ * A row is a disclosure because of the scanning job: a candidate
+ * comparing why check 2 failed on three tasks should not have to make
+ * three navigations and lose the table each time, so the grader's checks
+ * (for mcq, the answer review) open in place. What a row no longer
+ * discloses is the reference solution. It used to, and the deep dive
+ * renders the same solution eagerly, so an opened row and the screen it
+ * links to said the same thing twice — the second time in a column
+ * narrow enough that a fenced block scrolled sideways. A solution is
+ * prose, YAML and commands; it belongs to the surface built for reading.
+ *
+ * So an opened row is its checks and one way out. The link is drawn
+ * AFTER the checks now: it led the disclosure only because a link buried
+ * under a check list and a solution disclosure is a link nobody finds,
+ * and with the solution gone the row reads in its natural order — you
+ * opened it for the checks, and the link is the step after them. It
+ * stays inside the disclosure rather than on the row itself because a
  * <summary> is an interactive element: an <a> inside one is nested
  * interactive content, which is both an axe violation and a genuinely
  * ambiguous click target.
+ *
+ * The domain is not a column either. It had one, 150px wide, and not one
+ * name in this bank fits it — "Application Environment, Configuration
+ * and Security" is fifty characters, and it wrapped to three lines in
+ * that column while the title beside it was being cut to an ellipsis. It
+ * rides the task's own meta line now, in full, and the title gets the
+ * width back.
  *
  * It is deliberately NOT a <table>: a row has to be a <details> to
  * disclose its checks, and a <details> cannot be a <tr>. The visible
@@ -139,9 +151,11 @@ export function TaskVerdicts({ questions }: { questions: QuestionResult[] }) {
         <div className="tv-head" aria-hidden="true">
           <span>{strings.score.colNum}</span>
           <span>{strings.score.colTask}</span>
-          <span>{strings.score.colDomain}</span>
-          {weighted && <span>{strings.score.colWeight}</span>}
-          {timed && <span>{strings.score.colTime}</span>}
+          {/* The two figure columns are flush right, so their labels are
+              too — a heading left-aligned over a right-aligned column is
+              two objects, not one. */}
+          {weighted && <span className="tv-head-figure">{strings.score.colWeight}</span>}
+          {timed && <span className="tv-head-figure">{strings.score.colTime}</span>}
           <span>{strings.score.colVerdict}</span>
         </div>
         {visible.map((row) => (
@@ -178,26 +192,6 @@ export const VERDICT_WORD: Record<Verdict, string> = {
 
 function TaskRow({ row, weighted, timed }: { row: Row; weighted: boolean; timed: boolean }) {
   const { question, n, verdict, flagged } = row;
-  const [solution, setSolution] = useState<SolutionDetail | null>(null);
-  const [solutionError, setSolutionError] = useState<string | null>(null);
-  const [loadingSolution, setLoadingSolution] = useState(false);
-  const [fetched, setFetched] = useState(false);
-
-  const handleToggle = (event: SyntheticEvent<HTMLDetailsElement>) => {
-    if (!event.currentTarget.open || fetched) return;
-    setFetched(true);
-    setLoadingSolution(true);
-    getSolution(question.id)
-      .then((r) => {
-        if (r.ok) {
-          setSolution(r.solution);
-        } else {
-          setSolutionError(r.error);
-        }
-      })
-      .catch((err) => setSolutionError(String(err)))
-      .finally(() => setLoadingSolution(false));
-  };
 
   // mcq results carry the option texts; hands-on results never do. That
   // presence is the branch — no examType prop needed, the results
@@ -220,15 +214,28 @@ function TaskRow({ row, weighted, timed }: { row: Row; weighted: boolean; timed:
         </span>
         <span className="tv-task">
           <span className="tv-task-name">{name}</span>
-          {trailingId && <span className="tv-task-id">{trailingId}</span>}
           {flagged && (
             <>
               <Icon name="flag-filled" className="tv-flag" />
               <span className="sr-only">{strings.score.filterFlagged}</span>
             </>
           )}
+          {/* The row's second line. Rendered only when it would carry
+              something: an mcq row has no ssh-able id, and a result from
+              a bank that classified nothing has no domain either, and an
+              empty line still costs a line. */}
+          {(trailingId || question.domain) && (
+            <span className="tv-task-meta">
+              {trailingId && (
+                <>
+                  <span className="tv-task-id">{trailingId}</span>
+                  {question.domain ? strings.score.metaSeparator : null}
+                </>
+              )}
+              {question.domain}
+            </span>
+          )}
         </span>
-        <span className="tv-domain">{question.domain}</span>
         {weighted && (
           <span className="tv-weight">
             <span className="sr-only">{strings.score.srWeight}: </span>
@@ -245,28 +252,21 @@ function TaskRow({ row, weighted, timed }: { row: Row; weighted: boolean; timed:
           </span>
         </span>
       </summary>
-      {/* First inside the disclosure, not last: once a row is open this is
-          the row's primary action, and a link buried under a check list
-          and a solution disclosure is a link nobody finds. It is a real
-          anchor rather than a click handler — the route is a fragment, so
-          the browser's own navigation, middle-click and back button all
-          work without this component importing a router. */}
-      <p className="tv-more">
-        <a className="tv-open" href={`#/results/${question.id}`}>
-          {strings.score.openExplain(n)}
-          <Icon name="chevron-right" />
-        </a>
-      </p>
-      {isMcq ? <McqAnswerReview question={question} /> : <CheckList checks={question.checks} />}
-      <details className="solution-details" onToggle={handleToggle}>
-        <summary>
-          <Icon name="chevron-down" className="disclosure-chevron" />
-          {isMcq ? strings.mcq.explanation : strings.score.showSolution}
-        </summary>
-        {loadingSolution && <p>{strings.score.loadingSolution}</p>}
-        {solutionError && <p className="error-text">{solutionError}</p>}
-        {solution && <Markdown>{solution.markdown}</Markdown>}
-      </details>
+      {/* One inset panel, not three things loose in the row. What the row
+          discloses is the evidence, and then the way to the rest of it. */}
+      <div className="tv-detail">
+        {isMcq ? <McqAnswerReview question={question} /> : <CheckList checks={question.checks} />}
+        {/* A real anchor rather than a click handler — the route is a
+            fragment, so the browser's own navigation, middle-click and
+            back button all work without this component importing a
+            router. */}
+        <p className="tv-more">
+          <a className="tv-open" href={`#/results/${question.id}`}>
+            {strings.score.openExplain(n)}
+            <Icon name="chevron-right" />
+          </a>
+        </p>
+      </div>
     </details>
   );
 }

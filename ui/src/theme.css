@@ -2510,23 +2510,38 @@
 .verdict-table {
   /* One template, four shapes. WEIGHT and TIME are both absent on a
      result graded before they existed, and a column of dashes costs
-     width to say nothing. */
-  --tv-cols: 44px minmax(0, 1fr) 150px 96px;
+     width to say nothing.
+
+     There is no DOMAIN column any more. It was a fixed 150px and no name
+     in this bank fits it — at --results-sidebar plus this table's own
+     gutters the whole strip has about 700px to spend, and 150px of it
+     bought three wrapped lines of "Application Environment,
+     Configuration and Security" beside a title cut to an ellipsis. The
+     domain rides the task's meta line now, which hands 160px back to the
+     column a candidate is actually scanning. */
+  --tv-cols: 44px minmax(0, 1fr) 104px;
+  /* The height of a row's FIRST line, shared by every cell in the strip.
+     A title that wraps makes rows unequal, so the cells can no longer
+     centre against the row — they align to its TOP, and without a band
+     they would each start at their own font's line box and the numbers
+     would sit on five different baselines. Each cell sets this as its
+     line-height, or as a min-height it centres inside. */
+  --tv-line: 1.375rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
   overflow: hidden;
 }
 
 .verdict-table.has-weight {
-  --tv-cols: 44px minmax(0, 1fr) 150px 74px 96px;
+  --tv-cols: 44px minmax(0, 1fr) 74px 104px;
 }
 
 .verdict-table.has-time {
-  --tv-cols: 44px minmax(0, 1fr) 150px 116px 96px;
+  --tv-cols: 44px minmax(0, 1fr) 116px 104px;
 }
 
 .verdict-table.has-weight.has-time {
-  --tv-cols: 44px minmax(0, 1fr) 150px 74px 116px 96px;
+  --tv-cols: 44px minmax(0, 1fr) 74px 116px 104px;
 }
 
 .tv-head {
@@ -2544,6 +2559,11 @@
   color: var(--text-muted);
 }
 
+/* Over a flush-right figure column. */
+.tv-head-figure {
+  text-align: right;
+}
+
 /* A row is a <details>, not a <tr>: it has to disclose its grader checks
    in place, and a <details> cannot be a table row. It still expands now
    that the deep dive exists — this table is the scanning surface and
@@ -2558,11 +2578,17 @@
   border-bottom: 0;
 }
 
+/* `start`, not `center`. Once the title wraps, rows have unequal heights
+   and centring would float the number, the figures and the verdict to
+   each row's own middle — the strip would drift up and down the table
+   and stop being a column you can run an eye down. Top-aligned, every
+   cell begins in the same band (--tv-line) at the top of its row,
+   whatever the title below it does. */
 .tv-row > summary {
   display: grid;
   grid-template-columns: var(--tv-cols);
   gap: var(--space-3);
-  align-items: center;
+  align-items: start;
   padding: var(--space-3) var(--space-4);
   margin-inline: calc(var(--space-4) * -1);
   cursor: pointer;
@@ -2587,10 +2613,14 @@
   background: var(--danger-row);
 }
 
+/* The chevron and the number centre against each other inside the band,
+   so the pair sits on the title's first line rather than on the top of a
+   three-line row. */
 .tv-num {
   display: flex;
   align-items: center;
   gap: var(--space-1);
+  min-height: var(--tv-line);
   font-family: var(--font-mono);
   font-size: var(--text-s);
   font-weight: 600;
@@ -2598,28 +2628,36 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Two lines by construction: the title, with the review flag riding its
+   first baseline, and a meta line under it. The break is the meta's 100%
+   flex basis rather than a second wrapper element — which also means a
+   row with nothing to put on the meta line simply has one line. */
 .tv-task {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--space-2);
+  column-gap: var(--space-2);
+  row-gap: var(--space-1);
   min-width: 0;
   font-weight: 500;
 }
 
+/* It WRAPS. This was `white-space: nowrap` with an ellipsis, and it cut
+   the one string a candidate comes to this table to find: "Secrets, and
+   a Deployment that cannot read one" arrived as "Secrets, and a Deplo…",
+   which is not enough to pick a task out of twenty-two. With the domain
+   off the strip every title in the bank fits one line, and a longer one
+   from a future bank takes a second rather than losing its end.
+   `break-word` is the backstop for a pathological unbroken id: the
+   column is minmax(0, 1fr) precisely so a long task title can never push
+   the table past the card, and a single unbreakable word is the one
+   thing that still could. */
 .tv-task-name {
+  flex: 0 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* The hands-on id is the real ssh-able question directory, so it stays
-   on screen beside the bank's title rather than being replaced by it. */
-.tv-task-id {
-  flex: none;
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  color: var(--text-muted);
+  line-height: var(--tv-line);
+  overflow-wrap: break-word;
+  text-wrap: pretty;
 }
 
 .tv-flag {
@@ -2627,20 +2665,41 @@
   color: var(--warn-strong);
 }
 
-.tv-domain,
-.tv-weight,
-.tv-time {
-  font-family: var(--font-mono);
+/* The row's second line: the ssh-able question directory and the
+   curriculum domain, in full and at the title's own left edge, so it
+   reads as this task's provenance rather than as two more columns. */
+.tv-task-meta {
+  flex: 1 0 100%;
   font-size: var(--text-xs);
+  font-weight: 400;
+  line-height: 1.5;
   color: var(--text-muted);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
+/* Mono because it is a path — the id IS the question directory a
+   candidate can ssh into. The domain beside it is prose and keeps the
+   sans face, matching .domain-name in the sidebar: a curriculum domain
+   is not something anyone types or compares digit by digit. */
+.tv-task-id {
+  font-family: var(--font-mono);
+}
+
+/* Flush right, because they are figures. Mono and tabular already, but
+   what actually lets 7% be read against 12% down twenty rows is a shared
+   right edge; the head labels move with them.
+   No ellipsis: neither ever had `white-space: nowrap`, so the
+   `text-overflow` these carried could not fire — an over-target time
+   long enough to need the width wraps into the room the title's line
+   already left, and a clipped duration is a lost measurement. */
 .tv-weight,
 .tv-time {
+  min-width: 0;
+  line-height: var(--tv-line);
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
 }
 
 /* Over the pacing budget. The tint is the second signal; the "+2m 15s"
@@ -2653,12 +2712,17 @@
   margin-left: var(--space-1);
 }
 
+/* The pill's height is the band rather than its own padding: with the
+   row top-aligned, 4px of vertical padding put the pill 2px proud of the
+   line every other cell sits on, which is exactly the drift the band
+   exists to stop. Same drawn height, held to the strip. */
 .tv-verdict {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
+  min-height: var(--tv-line);
+  padding: 0 var(--space-2);
   border-radius: var(--radius-xs);
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
@@ -2704,16 +2768,45 @@
   margin: var(--space-3) 0 0;
 }
 
-/* An open row's disclosed content is inset to the row's own gutters, so
-   the check list lines up with the TASK column rather than with the
-   card's edge. The bottom padding only exists while the row is open. */
+/* The bottom padding only exists while the row is open. */
 .tv-row[open] {
-  padding-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+}
+
+/* What an opened row discloses, as ONE inset panel rather than as loose
+   blocks in the row. The row used to end in a second disclosure, and
+   that summary was what gave the open state an edge; with the solution
+   gone the checks needed a container of their own or an opened row read
+   as a row with a hole in it.
+   --bg inside a --surface card is the documented inversion — the page
+   tone is darker than the card in light and lighter in dark — so this
+   reads as inset in both themes without a border or a shadow.
+   No margin-top: .question-result[open] > summary already sets the gap
+   under the trigger, and two would be one too many. */
+.tv-detail {
+  padding: var(--space-3);
+  border-radius: var(--radius-s);
+  background: var(--bg);
+}
+
+/* The panel supplies the inset; the check list's own margins would sit
+   inside it and double the gap. Scoped, because .check-list is shared
+   with the exam screen and the deep dive. */
+.tv-detail > :first-child {
+  margin-top: 0;
+}
+
+.tv-detail .check-list {
+  margin: 0;
 }
 
 /* The way out of the table and into the deep dive (screens/Explain.tsx),
-   drawn first inside an opened row. A link, not a button: it navigates,
-   and the fragment router means it can be an ordinary anchor. */
+   and now the row's only action. Drawn AFTER the checks: it led the
+   disclosure only because a link buried under a check list AND a
+   solution disclosure is a link nobody finds, and the row is short
+   enough now to read in its natural order. A link, not a button: it
+   navigates, and the fragment router means it can be an ordinary
+   anchor. */
 .tv-more {
   margin: var(--space-3) 0 0;
 }
@@ -2779,17 +2872,20 @@
   color: var(--text-muted);
 }
 
-/* Real separation from the check list above. The summary below carries a
-   hover fill, and a fill that begins where the previous block ends reads
-   as one merged object rather than as a control of its own. */
-.solution-details {
-  margin-top: var(--space-4);
-}
+/* .solution-details has ONE call site left: the training mode's
+   check-answer disclosure on the mcq exam screen
+   (screens/McqExam.tsx:703, `solution-details mcq-check-answer`). The
+   verdict row used to be the other one, and this block stays here — in
+   the score screen's section, where the shared `.tv-row > summary`
+   groupings above it also live — rather than moving to the mcq section
+   and colliding with work in flight there.
+   Its own `margin-top` rule went with the verdict row: .mcq-check-answer
+   already declares the identical --space-4 for the remaining call site.
 
-/* --accent-strong, not --accent: this sits inside .question-result, whose
-   own fill is --surface, but a hovered summary puts it on --surface-hover
-   where plain --accent measures 3.8:1.
-   Same inline-only margin as the summary above, and the same reason. */
+   --accent-strong, not --accent: the summary's resting fill is
+   --surface, but hovering puts this label on --surface-hover where plain
+   --accent measures 3.8:1. The inline-only negative margin lets the
+   hover band reach the container's gutters without the label moving. */
 .solution-details summary {
   display: flex;
   align-items: center;
@@ -5260,7 +5356,17 @@
   max-width: 960px;
 }
 
+/* ONE prose measure for the whole screen, declared once so the three
+   places that read at it — the notes, a check's `show_why` text, and the
+   reference solution's paragraphs — are provably the same width rather
+   than three copies of the same number that drift apart.
+
+   It is a `ch`, so it is substituted at use time and resolves against
+   each user's own font-size. Every site below is --text-m, so they agree;
+   a future site at another size would get the same MEASURE rather than
+   the same pixels, which is the behaviour worth having. */
 .explain {
+  --explain-measure: 72ch;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -5295,6 +5401,11 @@
   overflow: hidden;
 }
 
+/* align-items: flex-start is load-bearing, not tidiness: a three-line
+   title has to grow DOWNWARDS past the steppers rather than centring
+   them against it, so the nav keeps its line with the eyebrow whatever
+   the title does. The pair of them wrap onto separate rows before either
+   is squeezed — see .explain-nav. */
 .explain-head {
   display: flex;
   align-items: flex-start;
@@ -5313,6 +5424,12 @@
   min-width: 0;
 }
 
+/* Wraps. "Task 07 · Application Environment, Configuration and Security ·
+   weight 9%" is a real eyebrow on this bank, and uppercase at
+   --tracking-label it is wider than the lead column at every width this
+   card has. It breaks at the separators, which is the good outcome; what
+   it must never do is take an ellipsis, because the domain is the half
+   that would be cut. */
 .explain-eyebrow {
   margin: 0;
   font-family: var(--font-mono);
@@ -5321,6 +5438,7 @@
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
   color: var(--text-muted);
+  overflow-wrap: break-word;
 }
 
 /* --text-3xl and not the --text-4xl DESIGN.md gives screen titles: this
@@ -5328,13 +5446,21 @@
    Ingress with a path rewrite"), not a two-word screen name, and 26px
    takes three lines of it in a 960px column under a mono eyebrow. One
    step up from the task pane's own --text-2xl title says "the same task,
-   read rather than worked" without shouting. */
+   read rather than worked" without shouting.
+
+   THREE LINES IS A SUPPORTED OUTCOME. There is no ellipsis, no nowrap
+   and no height here on purpose: the title is the one thing on this
+   screen that says which task is being explained, and half of it is
+   worse than a tall header. `overflow-wrap: break-word` is the last
+   resort for a bank that writes an unbroken /opt/course/... path into a
+   title — it breaks the path rather than letting it run past the card. */
 .explain-title {
   margin: 0;
   font-size: var(--text-3xl);
   font-weight: 600;
   letter-spacing: var(--tracking-tight);
   color: var(--text);
+  overflow-wrap: break-word;
 }
 
 .explain-pills {
@@ -5393,9 +5519,17 @@
 }
 
 /* Right-aligned as a group, so the pair does not shift when the first or
-   last task drops one half of it. */
+   last task drops one half of it.
+
+   flex: 0 0 auto is the fix for the long-title case. As a shrinkable
+   item the nav gave width back to a wrapping title until "Task 12" broke
+   across two lines inside its own button — a control deformed by its
+   neighbour's content. Refusing to shrink means the head's own
+   flex-wrap resolves the conflict instead, and the steppers drop to a
+   row of their own at full size. */
 .explain-nav {
   display: flex;
+  flex: 0 0 auto;
   gap: var(--space-2);
   flex-wrap: wrap;
   margin-left: auto;
@@ -5427,11 +5561,12 @@
 .explain-section-title {
   margin: 0 0 var(--space-3);
   font-size: var(--text-2xl);
+  overflow-wrap: break-word;
 }
 
 .explain-note {
   margin: 0;
-  max-width: 72ch;
+  max-width: var(--explain-measure);
   font-size: var(--text-m);
   line-height: 1.65;
   color: var(--text-secondary);
@@ -5445,18 +5580,46 @@
   margin-top: var(--space-3);
 }
 
-/* Mono eyebrows label ARTIFACTS on this screen — the captured document,
-   the check that captured it. Sans headings label SECTIONS. Keeping the
-   two apart is what lets a check's own description sit as an <h2>
-   without reading like a column header. */
-.explain-evidence-eyebrow {
-  margin: 0 0 var(--space-1);
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
+/* One section, one heading, and the capturing checks as items inside it.
+   The eyebrow that used to head every block ("WHAT THIS CHECK SAW") is
+   gone: it said the same four words above each of q19's two checks, and
+   the section heading now says it once in the plural. Mono eyebrows
+   still label ARTIFACTS on this screen — the pane captions, the why
+   note — and sans headings still label SECTIONS; what changed is that a
+   check is now an item within a section rather than a section of its
+   own. */
+.explain-checks {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Divided by a hairline rather than by a gap, which is the card's own
+   idiom one level down: this is still one object about one task. The
+   rule reads as "and the next check", where empty space would read as
+   "and now something else". */
+.explain-check + .explain-check {
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+/* The diff legend, when it is drawn, sits between the heading and the
+   first check and needs its own air below it. */
+.explain-note + .explain-checks {
+  margin-top: var(--space-4);
+}
+
+/* A check's own description, one step under the section heading. It is a
+   bank-authored sentence ("Service selects the Deployment's pods"), so
+   it wraps for the same reason .explain-title does and takes no ellipsis
+   for the same reason. */
+.explain-check-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xl);
   font-weight: 600;
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--text-muted);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+  overflow-wrap: break-word;
 }
 
 /* minmax(0, 1fr), not 1fr: a grid track's default min-content floor is
@@ -5469,6 +5632,15 @@
   gap: var(--space-4);
 }
 
+/* A capture with no counterpart takes the whole row rather than sitting
+   in the left column with the right one empty. This is the MAJORITY
+   case, not an edge: most checks show what they read off the cluster and
+   have no authored document to compare it against, and a half-width pane
+   beside dead space reads as a missing pane rather than a whole one. */
+.explain-pane:only-child {
+  grid-column: 1 / -1;
+}
+
 .explain-pane {
   display: flex;
   flex-direction: column;
@@ -5477,10 +5649,16 @@
   min-width: 0;
 }
 
+/* flex-wrap, because a caption is text: below 1100px the panes stack and
+   run the full card, but inside the 1100-960px band each is ~450px and
+   "YOUR CLUSTER STATE" uppercase at --tracking-label plus a language
+   chip is close enough to that to matter. The chip drops to its own line
+   rather than squeezing the caption. */
 .explain-pane-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--space-2);
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
@@ -5570,9 +5748,19 @@
   background: var(--bg);
 }
 
+/* A mono caption and no longer a heading. `show_why` output is an
+   artifact the check emitted, exactly as the two panes above it are, and
+   on this screen mono eyebrows label artifacts. It also takes a level
+   out of the outline: a task with three capturing checks was announcing
+   six headings for two ideas. */
 .explain-why-title {
   margin: 0 0 var(--space-2);
-  font-size: var(--text-l);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 /* pre-line: show_why takes free text and a bank author may well write two
@@ -5580,11 +5768,143 @@
    is not, because the string arrives out of a shell heredoc. */
 .explain-why-body {
   margin: 0;
-  max-width: 72ch;
+  max-width: var(--explain-measure);
   font-size: var(--text-m);
   line-height: 1.75;
   color: var(--text-body);
   white-space: pre-line;
+}
+
+/* ---- the reference solution ----
+   The screen's destination, and since the verdict row's duplicate
+   disclosure went away, the only place in the product that says how the
+   task should have been done. It is given the extra vertical room the
+   other sections do not get: the sections above are things you check,
+   this is a thing you read, and uniform bands would say they are all the
+   same kind of object. */
+.explain-solution {
+  padding-block: var(--space-6);
+}
+
+/* A floor under the region, not a height on it. The fetch resolves after
+   first paint, so without this the section is one line of "Loading the
+   reference solution…" and then forty lines of markdown, and the reader
+   loses the place they had just found. 10rem is about the shortest
+   solution in the CKAD bank, so short answers land inside the reserved
+   room and long ones grow from a box that already looked like content.
+
+   No skeleton beside the note: DESIGN.md allows exactly one mechanism
+   per wait, and the sentence is already the non-motion channel. */
+.explain-solution-body {
+  min-height: 10rem;
+}
+
+/* THE MEASURE APPLIES TO PROSE AND NOT TO LISTINGS. A paragraph set
+   across the full 960px card is ~115 characters a line, well past where
+   the eye stops finding the next line reliably; a `kubectl create ... `
+   invocation or a three-column table wants every pixel the card has.
+   Capping the sentences and letting the code run full width is what the
+   width is actually good for once the panes are done with it.
+
+   Left-aligned, not centred: the section heading, the panes above and
+   every note on this screen share one left edge, and a centred column
+   would be the one element that does not.
+
+   Written as a child selector list rather than as a grid on purpose. A
+   grid would stop the `.md` scale's top and bottom margins collapsing
+   into each other and silently loosen a rhythm that is tuned in the
+   question-and-solution-prose block far above — which this section
+   borrows and must not fight. */
+.explain-solution .md > p,
+.explain-solution .md > ul,
+.explain-solution .md > ol,
+.explain-solution .md > blockquote,
+.explain-solution .md > h1,
+.explain-solution .md > h2,
+.explain-solution .md > h3,
+.explain-solution .md > h4,
+.explain-solution .md > h5,
+.explain-solution .md > h6 {
+  max-width: var(--explain-measure);
+}
+
+/* base.css sets the document to 1.55 and `.md` never overrode it, so the
+   longest read on the screen ran tighter than the two short ones beside
+   it — .explain-note is authored at 1.65 and .explain-why-body at 1.75.
+   Scoped to the sentences for the same reason the measure is: a fenced
+   listing at 1.7 is airy rather than readable, and its own line-height
+   belongs to the block it shares with the question panel. */
+.explain-solution .md > p,
+.explain-solution .md > ul,
+.explain-solution .md > ol,
+.explain-solution .md > blockquote {
+  line-height: 1.7;
+}
+
+/* ---- upstream documentation ----
+   The solution's footer, drawn only when the bank shipped links. There
+   is no empty state and no reserved rail: most questions carry none, and
+   a placeholder would announce a gap that is not there. */
+.explain-docs {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.explain-docs-title {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.explain-docs-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A link, which is the fourth of the Rare Accent Rule's four permitted
+   uses of blue and the only other one on this screen. flex-wrap so a
+   long label and its host stack rather than the host being pushed off
+   the measure. */
+.explain-doc {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  max-width: var(--explain-measure);
+  font-size: var(--text-s);
+  color: var(--accent-strong);
+  text-decoration: none;
+}
+
+.explain-doc:hover .explain-doc-label,
+.explain-doc:focus-visible .explain-doc-label {
+  text-decoration: underline;
+}
+
+.explain-doc-label {
+  font-weight: 600;
+}
+
+/* The visible "this leaves the app" channel, and the reason no arrow
+   glyph is typed here: ↗ is outside both bundled faces' unicode-range
+   and would fall through to whatever the OS has, which is the failure
+   Icon.tsx was written to end. A host is better than an arrow anyway —
+   it says WHERE the link goes, not merely that it goes somewhere. Mono
+   because it is a destination a candidate could type into their own
+   browser, which is what the Mono-For-Truth Rule is for. */
+.explain-doc-host {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
 }
 
 .explain-unknown {
@@ -5607,6 +5927,15 @@
   .explain-head,
   .explain-section {
     padding: var(--space-4);
+  }
+
+  /* Explicitly, and not as a side effect of the shorthand above: the
+     solution keeps MORE room than its neighbours at every width, because
+     that difference is what says it is the thing to read rather than one
+     more band. It just keeps less of it on a phone, where vertical space
+     is the scarce axis. */
+  .explain-solution {
+    padding-block: var(--space-5);
   }
 
   /* The steppers stop competing with the title for the top-right corner

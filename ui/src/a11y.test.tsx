@@ -277,6 +277,10 @@ describe("axe: no WCAG violations", () => {
     vi.unstubAllGlobals();
     toastStore.clear();
     marksStore.reset();
+    // jsdom keeps one location for the whole file. The deep-dive scan
+    // navigates by fragment, and a fragment left behind would put every
+    // Score render after it on the deep dive instead of the results body.
+    window.location.hash = "";
   });
 
   // The exam screen was the one surface this suite never scanned, which is
@@ -423,20 +427,33 @@ describe("axe: no WCAG violations", () => {
   });
 
   // Solutions used to render through a bare, unstyled ReactMarkdown and this
-  // suite never scanned one open, so the shared renderer's code-block chrome
+  // suite never scanned one, so the shared renderer's code-block chrome
   // (figure/figcaption, a copy button with a dynamic per-language aria-label,
-  // and inline CopyableCode buttons) never had an axe pass. It also nests a
-  // <details> (solution) inside a <details> (question), each with its own
-  // interactive summary and now buttons inside both — exactly the shape
-  // nested-interactive-content violations hide in. Assert both disclosures
-  // are actually expanded before scanning, not merely present in the DOM.
-  test("score screen with an open solution", async () => {
+  // and inline CopyableCode buttons) never had an axe pass.
+  //
+  // That chrome used to be reached by opening a disclosure inside a verdict
+  // row, and the old comment here justified the scan partly by the shape:
+  // a <details> (solution) inside a <details> (row), each with its own
+  // interactive summary and buttons inside both. The row carries no
+  // solution any more — it belongs to the screen with room for it — so
+  // that justification is gone and should not be quietly inherited: the
+  // deep dive renders the solution in a plain <section>, with no
+  // disclosure around it and nothing nested to hide a
+  // nested-interactive violation in.
+  //
+  // What the scan still buys is the chrome itself, on the screen the
+  // product actually renders it on, reached the way the product reaches
+  // it — Score owns `#/results/<id>` and the row's own anchor is the
+  // route in. Explain.test.tsx scans that component in isolation; this
+  // covers what Score assembles around it, which is the composition a
+  // candidate meets.
+  test("score screen deep dive, with the reference solution rendered", async () => {
     const user = userEvent.setup();
     const { container } = render(<Score onNewAttempt={() => {}} endReason="submitted" />);
     await screen.findByRole("heading", { level: 1, name: /passed/i });
 
     await user.click(screen.getByText("q01"));
-    await user.click(screen.getByText(/show solution/i));
+    await user.click(screen.getByRole("link", { name: /full explanation/i }));
 
     // The shared renderer's code-block chrome, present only once the
     // solution has actually loaded and rendered.

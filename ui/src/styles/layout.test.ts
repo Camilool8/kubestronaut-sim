@@ -107,6 +107,110 @@ describe("desktop viewport", () => {
   });
 });
 
+// Moved here from screens/Explain.test.tsx, where they were written only
+// because a file-lane boundary once separated theme.css from this file.
+// Every declaration below is load-bearing rather than cosmetic, none is
+// visible to a render test, and each target selector appears verbatim at
+// the top level of theme.css.
+//
+// `ruleBody` finds the FIRST rule whose selector list matches, and it is
+// blind to nesting — an @media block is not a boundary to it, only a
+// later position in the file. Two of the selectors below (.explain-nav,
+// .explain-solution) also have a twin inside the 600px query, and both
+// twins sit AFTER their base rule, so the base rule is what is read. If
+// that section is ever reordered, assert on a selector that has no twin
+// rather than on the one that moved.
+describe("the explanation deep dive", () => {
+  test("the document panes stay on the machine palette", async () => {
+    const css = await readThemeCss();
+    // THE MACHINE IS NOT THE APP. These panes show a cluster, so they are
+    // dark in BOTH themes; repointing them at --surface would make the
+    // one surface in the product that must not follow the theme follow it.
+    expect(ruleBody(css, ".explain-pane-body")).toContain("background: var(--machine-bg)");
+  });
+
+  test("a highlighted line spans the whole scroll width, not the visible box", async () => {
+    const css = await readThemeCss();
+    // A block child of an overflow-x box is only as wide as the visible
+    // box, so without this every tint is cut off at the scroll edge and a
+    // long line reads as half-changed.
+    expect(ruleBody(css, ".explain-pane-body code")).toContain("min-width: 100%");
+    expect(ruleBody(css, ".explain-line")).toContain("display: block");
+  });
+
+  test("the diff gutter is not part of what a candidate copies out", async () => {
+    const css = await readThemeCss();
+    // The expected pane is a document people will paste into a file.
+    expect(ruleBody(css, ".explain-line-mark")).toContain("user-select: none");
+  });
+
+  // A bank writes the titles, and CKAD's are sentences: "Expose a
+  // Deployment through an Ingress with a path rewrite" is three lines in
+  // this column, and the domain that rides the eyebrow above it is
+  // "Application Environment, Configuration and Security". Every one of
+  // these is the only thing on screen saying which task is being read, so
+  // none of them may be cut. jsdom cannot see an ellipsis; the
+  // declaration's absence is the only automated check there is.
+  test("nothing that names a task is allowed to truncate", async () => {
+    const css = await readThemeCss();
+    for (const selector of [
+      ".explain-title",
+      ".explain-eyebrow",
+      ".explain-section-title",
+      ".explain-check-title",
+    ]) {
+      const body = ruleBody(css, selector);
+      expect(body, `${selector} was renamed or removed`).not.toBeNull();
+      expect(body, `${selector} must not clip a bank-authored string`).not.toContain(
+        "text-overflow",
+      );
+      expect(body).not.toContain("white-space: nowrap");
+      expect(body).not.toContain("line-clamp");
+    }
+  });
+
+  // The other half of the same rule. The header is a flex row with the
+  // title block on the left and the prev/next steppers on the right; as a
+  // shrinkable item the nav gave its width back to a wrapping title until
+  // "Task 12" broke across two lines inside its own button. Refusing to
+  // shrink hands the conflict to the row's own flex-wrap instead.
+  test("a three-line title cannot squeeze the steppers", async () => {
+    const css = await readThemeCss();
+    expect(ruleBody(css, ".explain-head")).toContain("flex-wrap: wrap");
+    expect(ruleBody(css, ".explain-head")).toContain("align-items: flex-start");
+    expect(ruleBody(css, ".explain-nav")).toContain("flex: 0 0 auto");
+  });
+
+  // The reference solution is the only place in the product that says how
+  // a task should have been done, and the card it sits in is 960px — a
+  // measure the panes above it need and prose does not. The cap is on the
+  // PROSE children only, so listings and tables keep the full width.
+  test("the solution's sentences are capped at a measure and its listings are not", async () => {
+    const css = await readThemeCss();
+    const prose = ruleBody(
+      css,
+      `.explain-solution .md > p,
+       .explain-solution .md > ul,
+       .explain-solution .md > ol,
+       .explain-solution .md > blockquote,
+       .explain-solution .md > h1,
+       .explain-solution .md > h2,
+       .explain-solution .md > h3,
+       .explain-solution .md > h4,
+       .explain-solution .md > h5,
+       .explain-solution .md > h6`,
+    );
+
+    expect(prose, "the solution's prose measure rule was renamed or removed").not.toBeNull();
+    expect(prose).toContain("max-width: var(--explain-measure)");
+    // Declared once on the screen root, so the three places that read at
+    // this measure cannot drift apart.
+    expect(ruleBody(css, ".explain")).toContain("--explain-measure");
+    // A cap on `.md` itself would take the code blocks with it.
+    expect(ruleBody(css, ".explain-solution")).not.toContain("max-width");
+  });
+});
+
 // The chip row is written by the bank, and a bank writes what it likes.
 // `.task-chip` sets `white-space: nowrap`, which is right for "Weight 5%"
 // and wrong for the domain: CKAD ships "Application Environment,
