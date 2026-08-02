@@ -148,7 +148,18 @@ case "$cmd" in
     # owns the reset sequence; this is just a thin trigger + progress
     # poll against the facilitator's /api/control proxy.
     echo "Resetting exam state via conductor (cluster + instances, cached images kept)..."
-    curl -fsS -X POST "${UI}/api/control/reset" >/dev/null
+    # The conductor refuses a reset while another job holds it: a bank
+    # switch, a reseed, or — since pooling — the seed job that prepares a
+    # pooled bank's cluster for the questions an attempt just drew. Bare
+    # `curl -fsS` exits 22 there and `set -e` takes this script with it,
+    # printing nothing at all, which reads as "reset does nothing".
+    if ! reset_err=$(curl -fsS -X POST "${UI}/api/control/reset" 2>&1 >/dev/null); then
+      echo "The conductor would not accept a reset: ${reset_err:-no answer from ${UI}}"
+      echo "It is busy while a bank switch, a reseed, or the preparation of a drawn"
+      echo "attempt is running. See what it is doing with:"
+      echo "  curl -s ${UI}/api/control/status"
+      exit 1
+    fi
     while :; do
       sleep 3
       status=$(curl -fsS "${UI}/api/control/status" 2>/dev/null) || continue
