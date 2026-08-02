@@ -94,7 +94,7 @@ both gate regexes tolerate it there and nowhere else.
 | `spec.speedDuration` | The clock for the `speed` mode — shown to candidates as Mastery — defaulting to half `spec.duration` ([exam.go:105-110](../facilitator/internal/exam/exam.go)). A malformed value fails the load |
 | `spec.passingScore` | Percent. Enforced by the facilitator's `Results.Passed` |
 | `spec.kubernetesVersion` | Informational; shown on the catalog card |
-| `spec.domainWeights` | The certification's published weights. Read by no Go code — only by [bank-weights.sh](../tests/bank-weights.sh) |
+| `spec.domainWeights` | The certification's published weights, and a runtime value in three places: `exam.Load` builds `Exam.Domains` from it, `exam.Draw` stratifies a pooled or filtered draw by it, and both graders weight the final score by it. [bank-weights.sh](../tests/bank-weights.sh) still gates it too. Getting it wrong now moves real scores, not just a build check |
 | `spec.environment.provider`, `.nodes` | Informational; read by nothing |
 | `spec.environment.allowedDomains` | Domain suffixes the desktop browser may reach through the docs proxy, subdomains included ([proxy/entrypoint.sh](../proxy/entrypoint.sh)). Omit it to inherit `allow.DefaultDomains` ([allow.go](../proxy/internal/allow/allow.go)), the smallest set that leaves the documentation sites usable |
 | `spec.instances` | 1 or 2 entries. Convention: names outside `instance-1`/`instance-2` only mark the bank unavailable in the exam selector ([catalog.go:218-230](../conductor/internal/catalog/catalog.go)), and the facilitator's exam loader never parses the block at all |
