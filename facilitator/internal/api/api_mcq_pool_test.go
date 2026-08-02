@@ -176,3 +176,46 @@ func TestMCQPoolAnswerEndLifecycleReachesGrading(t *testing.T) {
 		t.Errorf("grader.calls = %d, want 1 (End must kick grading exactly once)", ts.grader.calls)
 	}
 }
+
+// The mcq engine has no cluster, so nothing about seeding — the 202, the
+// preparation, the guard that refuses a second draw into a dirty
+// environment — may ever reach it. A pooled mcq bank draws a fresh
+// subset on every start, forever, with a seeder wired and a conductor
+// listening.
+func TestMCQPoolRepeatedAttemptsNeverSeedOrGate(t *testing.T) {
+	ex, err := exam.Load(mcqPoolExamJSON, mcqPoolBankDir)
+	if err != nil {
+		t.Fatalf("exam.Load: %v", err)
+	}
+	clock, _ := fakeClock(epoch)
+	mgr, err := session.New(t.TempDir()+"/session.json", ex.Name, ex.Duration, clock, func() {})
+	if err != nil {
+		t.Fatalf("session.New: %v", err)
+	}
+	grader := &fakeGrader{}
+	seeder := newFakeSeeder()
+	conductor := &conductorStub{status: `{"busy":true,"job":{"id":"job-7","op":"seed"}}`}
+	h := api.New(ex, mcqPoolBankDir, mgr, grader.Grade, fakeDesktop, conductor, fstest.MapFS{}, nil, nil,
+		api.WithSeeder(seeder))
+	ts := &testServer{handler: h, mgr: mgr, grader: grader}
+
+	for i := 1; i <= 3; i++ {
+		rec := ts.doJSON(t, http.MethodPost, "/api/session/start", `{"mode":"exam"}`)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("start %d: status = %d, want 200, body=%s", i, rec.Code, rec.Body.String())
+		}
+		if got := ts.session(t); got.Preparing != nil || got.PrepareError != "" {
+			t.Fatalf("start %d: preparing = %+v, prepareError = %q; an mcq bank has neither",
+				i, got.Preparing, got.PrepareError)
+		}
+		if rec := ts.do(t, http.MethodDelete, "/api/session"); rec.Code != http.StatusNoContent {
+			t.Fatalf("delete %d: status = %d, want 204", i, rec.Code)
+		}
+	}
+	if n := seeder.starts(); n != 0 {
+		t.Errorf("seeder was asked to prepare a cluster %d times for an mcq bank", n)
+	}
+	if conductor.asked("/api/control/status") {
+		t.Error("an mcq bank asked the conductor about seed jobs")
+	}
+}

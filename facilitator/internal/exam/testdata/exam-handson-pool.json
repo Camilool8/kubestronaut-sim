@@ -19,7 +19,8 @@
     },
     "examLength": 3,
     "questions": [
-      { "id": "q01", "instance": "instance-1", "domain": "Domain A", "weight": 4 },
+      { "id": "q01", "instance": "instance-1", "domain": "Domain A", "weight": 4,
+        "docs": [{ "label": "Persistent volumes", "url": "https://kubernetes.io/docs/concepts/storage/persistent-volumes/" }] },
       { "id": "q02", "instance": "instance-1", "domain": "Domain A", "weight": 4 },
       { "id": "q03", "instance": "instance-1", "domain": "Domain A", "weight": 4 },
       { "id": "q04", "instance": "instance-1", "domain": "Domain A", "weight": 4 },

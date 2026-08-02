@@ -55,16 +55,27 @@ type server struct {
 	hist  *history.Store
 	banks BanksFetcher
 
+	// control is the conductor passthrough, kept as well as mounted:
+	// the conductor is unreachable from this process by any other route,
+	// and two things about a pooled hands-on bank depend on asking it or
+	// on watching what goes through it. See controlProxy and probeSeeded
+	// in prepare.go.
+	control http.Handler
+
 	// seeder prepares the exam cluster for a pooled hands-on bank's drawn
 	// questions, and is nil everywhere else — see WithSeeder in
 	// prepare.go. prep/prepError/prepGen are the in-flight preparation
-	// that seeder is running, guarded by prepMu; they are the only mutable
-	// state this server holds, and they are deliberately not persisted.
+	// that seeder is running and seeded is what the cluster already holds
+	// because of an earlier one, all guarded by prepMu; they are the only
+	// mutable state this server holds, and they are deliberately not
+	// persisted.
 	seeder    Seeder
 	prepMu    sync.Mutex
 	prep      *prep
 	prepError string
 	prepGen   uint64
+	seeded    *seededSet
+	probeOnce sync.Once
 }
 
 // New builds the facilitator's complete HTTP handler: the /api/*
@@ -88,9 +99,21 @@ type server struct {
 // eleventh positional argument would have made every existing call site
 // — five test files and main — restate nils they do not care about.
 func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desktop, control http.Handler, ui fs.FS, boot *bootstate.Reader, practice PracticeGrader, opts ...Option) http.Handler {
-	s := &server{ex: ex, bankDir: bankDir, mgr: mgr, grade: grade, desktop: desktop, ui: ui, boot: boot, practice: practice}
+	s := &server{ex: ex, bankDir: bankDir, mgr: mgr, grade: grade, desktop: desktop, control: control, ui: ui, boot: boot, practice: practice}
 	for _, opt := range opts {
 		opt(s)
+	}
+	// What the exam cluster is already holding, on the one bank shape
+	// where it holds anything: a pooled hands-on attempt seeded its own
+	// drawn questions, and a facilitator that restarted would otherwise
+	// come back believing the cluster was empty. The persisted draw is
+	// read here rather than a second copy being written, which is also
+	// why this can be exact without any new on-disk state: an attempt's
+	// question ids are the ids its seeding created objects for.
+	if s.seedRequired() {
+		if ids := mgr.QuestionIDs(); len(ids) > 0 {
+			s.seeded = newSeededSet(ids)
+		}
 	}
 
 	mux := http.NewServeMux()
@@ -134,8 +157,10 @@ func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desk
 	// catalog). The subtree pattern is more specific than "/", so the
 	// SPA fallback's /api/* 404 guard is unaffected; the conductor sees
 	// the full, unstripped /api/control/... path — its own mux registers
-	// the same paths.
-	mux.Handle("/api/control/", control)
+	// the same paths. Wrapped, not mounted bare, so this server can see
+	// the one thing passing through it that changes an answer it gives:
+	// see controlProxy.
+	mux.Handle("/api/control/", s.controlProxy())
 
 	// Registered as both the exact path and the subtree so every
 	// "/desktop" and "/desktop/*" request reaches desktop with its
@@ -464,6 +489,17 @@ func (s *server) handleQuestion(w http.ResponseWriter, r *http.Request) {
 type solutionResponse struct {
 	ID       string `json:"id"`
 	Markdown string `json:"markdown"`
+	// Docs is the question's upstream reading, in bank order. Omitted
+	// entirely when the bank declares none — which is most questions —
+	// so the client's optional field is genuinely absent rather than an
+	// empty array it has to test the length of.
+	Docs []solutionDoc `json:"docs,omitempty"`
+}
+
+// solutionDoc is one entry of that list.
+type solutionDoc struct {
+	Label string `json:"label"`
+	URL   string `json:"url"`
 }
 
 func (s *server) handleSolution(w http.ResponseWriter, r *http.Request) {
@@ -481,7 +517,8 @@ func (s *server) handleSolution(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := r.PathValue("id")
-	if _, ok := s.findQuestion(id); !ok {
+	q, ok := s.findQuestion(id)
+	if !ok {
 		writeJSONError(w, http.StatusNotFound, "unknown question "+id)
 		return
 	}
@@ -492,7 +529,11 @@ func (s *server) handleSolution(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, solutionResponse{ID: id, Markdown: string(md)})
+	resp := solutionResponse{ID: id, Markdown: string(md)}
+	for _, d := range q.Docs {
+		resp.Docs = append(resp.Docs, solutionDoc{Label: d.Label, URL: d.URL})
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // durationFor resolves an attempt's clock from its mode.
@@ -851,6 +892,14 @@ func (s *server) startPrepared(w http.ResponseWriter, r *http.Request, mode stri
 		writeJSONError(w, http.StatusConflict, "session: start: invalid state transition")
 		return
 	}
+	// An idle session is not an empty cluster. The previous attempt's
+	// questions are still in there until something rebuilds it, and
+	// seeding a different draw on top of them is what checkClusterFree
+	// exists to refuse.
+	if err := s.checkClusterFree(draw.QuestionIDs); err != nil {
+		writeJSONError(w, http.StatusConflict, err.Error())
+		return
+	}
 
 	p, err := s.beginPrepare(r.Context(), mode, s.durationFor(mode), draw)
 	if err != nil {
@@ -963,6 +1012,12 @@ func (s *server) handleBoot(w http.ResponseWriter, r *http.Request) {
 // every client that has never heard of pooling keeps reading a response
 // that is true.
 func (s *server) handleSessionGet(w http.ResponseWriter, r *http.Request) {
+	// The one place a lost preparation can be noticed, for the same
+	// reason `preparing` is reported here and nowhere else: this is the
+	// endpoint a client polls. It never blocks this response — the answer
+	// lands in prepareError and rides the next poll a second later.
+	s.startSeedProbe()
+
 	resp := toSessionResponse(s.mgr.Snapshot())
 	resp.Preparing, resp.PrepareError = s.prepSnapshot()
 	writeJSON(w, http.StatusOK, resp)

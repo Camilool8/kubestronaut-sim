@@ -1,10 +1,14 @@
 package api
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
+	"sort"
 	"time"
 
 	"kubestronaut-sim/facilitator/internal/exam"
@@ -22,6 +26,17 @@ var errPreparing = errors.New("an attempt is already being prepared")
 // flight. Also 409: the caller's attempt did not happen, and the reason
 // is that something else deliberately cancelled it.
 var errPreparingCancelled = errors.New("the attempt was cancelled while its environment was being prepared")
+
+// errClusterHoldsAnotherDraw refuses to seed a second draw into a
+// cluster still holding the first. Mapped to 409, like every other
+// start refusal: it is a conflict with state that exists, and the
+// message names the operation that resolves it.
+var errClusterHoldsAnotherDraw = errors.New("the exam environment is still set up for an earlier attempt's questions; reset the environment before starting a different attempt")
+
+// errPreparationLost reports, after the fact, that an attempt was being
+// prepared when this process went away. It rides prepareError, which the
+// client already renders. See probeSeeded.
+var errPreparationLost = errors.New("the exam service restarted while an attempt's environment was being prepared, and that attempt cannot be resumed — reset the environment before starting a new one")
 
 // SeedState is where a seed job has got to, as the facilitator needs to
 // read it. Deliberately not the conductor's job.Snapshot: this side of
@@ -107,8 +122,10 @@ const prepPollTimeout = 15 * time.Second
 // attempt. Persisting it would mean a fourth session state on disk (and
 // the version bump that discards everyone's in-flight attempt) to buy
 // recovery for a window that only exists between two clicks. A
-// facilitator restart during preparation therefore abandons it: the
-// session is idle, which is true, and the candidate presses Start again.
+// facilitator restart during preparation therefore abandons it — the
+// draw is gone with the process that made it and no attempt can be
+// resumed from it. What the restart must NOT do is abandon it in
+// silence, which is what probeSeeded is for.
 type prep struct {
 	// gen is the stale-goroutine guard, in the same spirit as the job
 	// store's currentIfLocked: a watcher acts only while the preparation
@@ -199,6 +216,13 @@ func (s *server) beginPrepare(ctx context.Context, mode string, dur time.Duratio
 		s.clearPrep(gen, "")
 		return prep{}, err
 	}
+	// From here the cluster is being written to, and stays written to
+	// whatever happens next: a cancelled preparation, a failed one, or a
+	// seed job that dies half way still leaves objects behind. So this is
+	// recorded on the job being ACCEPTED rather than on it succeeding —
+	// the question this answers is "what is in the cluster", not "what
+	// worked".
+	s.markSeeded(draw.QuestionIDs)
 
 	s.prepMu.Lock()
 	// Still ours? A DELETE /api/session between the two locks cancelled
@@ -322,10 +346,12 @@ func (s *server) prepIsCurrent(gen uint64) bool {
 // failure. Called by DELETE /api/session, which is the one operation
 // that means "forget about this attempt".
 //
-// It cannot stop the conductor's job, and does not try: seeding is an
-// idempotent apply of setup.sh scripts, so the worst it leaves behind is
-// a cluster prepared for questions nobody drew, which the next start
-// seeds over and the next reset rebuilds away.
+// It cannot stop the conductor's job, and does not try. What it
+// deliberately does NOT do is forget what that job put in the cluster:
+// the seeded set outlives the preparation that asked for it, because the
+// objects do. Forgetting here is precisely the defect checkClusterFree
+// exists to close — DELETE followed by a fresh start used to seed a
+// second draw on top of the first.
 func (s *server) cancelPrep() {
 	s.prepMu.Lock()
 	defer s.prepMu.Unlock()
@@ -334,6 +360,308 @@ func (s *server) cancelPrep() {
 	s.prepError = ""
 	s.prepGen++
 }
+
+// seededSet is what the exam cluster is known to be holding: the
+// questions some seed job has already run setup.sh for, since the last
+// time the environment was rebuilt.
+//
+// In memory, like prep, but for a different reason: this describes the
+// CLUSTER, and a note about the cluster written into the facilitator's
+// session file would be a claim this process cannot keep true — a reset,
+// a `./sim down`, a rebuild triggered by anything at all changes the fact
+// without touching the file. What it can do instead is be honest about
+// how much it knows, which is what ids/named below are for. It does not
+// need persisting to survive a restart either: an attempt's own drawn
+// questions ARE what its seeding created, and those are persisted with
+// the session (see New).
+type seededSet struct {
+	// ids is the seeded question ids, sorted, so a draw is compared by
+	// the set it is rather than the order it happens to be in — the
+	// cluster cannot tell the difference and neither should this.
+	ids []string
+	// named is false when the cluster holds a draw this process cannot
+	// enumerate (see probeSeeded). Such a set matches nothing: "there is
+	// something in there and I do not know what" is a reason to rebuild,
+	// never a reason to proceed.
+	named bool
+}
+
+// newSeededSet records ids as the cluster's contents.
+func newSeededSet(ids []string) *seededSet {
+	sorted := append([]string(nil), ids...)
+	sort.Strings(sorted)
+	return &seededSet{ids: sorted, named: true}
+}
+
+// matches reports whether ids is exactly the set already seeded. A nil
+// set is a cluster nothing has been seeded into, which anything may be
+// seeded into.
+func (s *seededSet) matches(ids []string) bool {
+	if s == nil {
+		return true
+	}
+	if !s.named || len(s.ids) != len(ids) {
+		return false
+	}
+	sorted := append([]string(nil), ids...)
+	sort.Strings(sorted)
+	for i := range sorted {
+		if sorted[i] != s.ids[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// checkClusterFree refuses to prepare ids in a cluster that is already
+// prepared for something else.
+//
+// The defect it closes: seeding runs each drawn question's setup.sh and
+// nothing anywhere runs a teardown, so DELETE /api/session followed by a
+// fresh POST /api/session/start — which starts a new attempt without
+// rebuilding anything — seeds draw B over every object draw A created.
+// Grading is scoped to B, so the SCORE stays honest; the exam does not.
+// A candidate can be handed a task that is already half done, a
+// namespace that already exists, or a Service that fails for a reason
+// nothing on their screen explains. The UI never reaches this (its "New
+// attempt" resets the environment first), the API does.
+//
+// Refusing is the whole fix, and the trade-off accepted with it is that
+// the facilitator does not clean up: it can ask the conductor to CREATE
+// cluster state and has no way to remove it, so the only honest answer
+// is to name the operation that does and stop. The error is a 409 with
+// that instruction in it.
+//
+// An identical set is allowed straight through, because re-running the
+// same setup.sh scripts over their own output is the idempotent apply
+// the conductor's seed job already is. That is what keeps "the seeding
+// failed, start again with the same seed" a retry rather than a second
+// refusal.
+func (s *server) checkClusterFree(ids []string) error {
+	s.prepMu.Lock()
+	defer s.prepMu.Unlock()
+
+	if s.seeded.matches(ids) {
+		return nil
+	}
+	return errClusterHoldsAnotherDraw
+}
+
+// markSeeded records ids as the cluster's contents.
+func (s *server) markSeeded(ids []string) {
+	s.prepMu.Lock()
+	defer s.prepMu.Unlock()
+	s.seeded = newSeededSet(ids)
+}
+
+// clearSeeded records that the cluster has been rebuilt and holds
+// nothing.
+func (s *server) clearSeeded() {
+	s.prepMu.Lock()
+	defer s.prepMu.Unlock()
+	s.seeded = nil
+}
+
+// controlProxy is the conductor passthrough, wrapped so this server sees
+// the operations that empty the exam cluster.
+//
+// Watching the proxy is how the facilitator learns a rebuild happened,
+// and it is not a shortcut: the conductor's job store is unreachable
+// from this process except through this handler, and a rebuilt cluster
+// leaves no trace in the session file. Every reset in the product does
+// come through here — the UI's "New attempt" and `./sim reset` both POST
+// to /api/control/reset on :8080, the conductor being reachable from
+// nowhere else — so this sees all of them.
+//
+// The trade-off: the seeded set is dropped when the job is ACCEPTED, not
+// when it finishes, because nothing reports the finish back to this
+// process. A reset that is accepted and then fails therefore stands the
+// guard down over a cluster that may still be dirty. That direction is
+// deliberate. The guard's own error tells a candidate to reset, so a
+// guard their reset could not clear would be one no action of theirs
+// could ever clear — and a start during the rebuild itself is refused
+// twice over anyway, by the boot gate and by the conductor's single-job
+// lock.
+func (s *server) controlProxy() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !rebuildsCluster(r) {
+			s.control.ServeHTTP(w, r)
+			return
+		}
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		s.control.ServeHTTP(rec, r)
+		// Only on the conductor's acceptance: a 409 (a job already in
+		// flight) or a 400 changed nothing about the cluster.
+		if rec.status >= 200 && rec.status < 300 {
+			s.clearSeeded()
+		}
+	})
+}
+
+// rebuildsCluster reports whether r is a request for one of the two
+// conductor operations that recreate the cluster. A switch qualifies as
+// much as a reset: it re-bootstraps for the incoming bank.
+func rebuildsCluster(r *http.Request) bool {
+	if r.Method != http.MethodPost {
+		return false
+	}
+	return r.URL.Path == "/api/control/reset" || r.URL.Path == "/api/control/switch"
+}
+
+// statusRecorder notes the status a handler wrote, and is otherwise the
+// ResponseWriter it wraps. Unwrap keeps http.ResponseController working
+// through it, which the reverse proxy underneath uses to flush.
+type statusRecorder struct {
+	http.ResponseWriter
+	status  int
+	written bool
+}
+
+func (w *statusRecorder) WriteHeader(status int) {
+	if !w.written {
+		w.status, w.written = status, true
+	}
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *statusRecorder) Write(b []byte) (int, error) {
+	w.written = true
+	return w.ResponseWriter.Write(b)
+}
+
+func (w *statusRecorder) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+// startSeedProbe runs probeSeeded once per process, off the request
+// goroutine that triggered it.
+func (s *server) startSeedProbe() {
+	if !s.seedRequired() || s.control == nil {
+		return
+	}
+	s.probeOnce.Do(func() { go s.probeSeeded() })
+}
+
+// probeSeeded asks the conductor whether the cluster was seeded for an
+// attempt this process knows nothing about, and says so if it was.
+//
+// The gap it closes: a preparation lives in memory (see prep), so a
+// facilitator that restarts mid-preparation comes back with an idle
+// session, no `preparing`, no error, and a candidate watching a poller
+// that will never change again. The attempt itself cannot be recovered —
+// the draw died with the process — but the situation can be stated, and
+// a stated dead end is a different thing from a hang.
+//
+// The signal is the conductor's own job store: a SEED job that is
+// running, or that ran and was never displaced by a reset, against a
+// session here that is idle. The session file is what makes that
+// unambiguous rather than merely suggestive — a preparation that had
+// succeeded would have started an attempt, and an attempt is persisted.
+// So an idle session plus a seed job means the seeding was done for an
+// attempt that no longer exists.
+//
+// Best-effort throughout, and silent when it cannot tell: an unreachable
+// conductor, an old build, a status shape it cannot parse all leave the
+// old silent behaviour exactly as it was, which is the worst this can do
+// and is no worse than not being here.
+func (s *server) probeSeeded() {
+	// The reverse proxy underneath aborts a failed copy by panicking with
+	// http.ErrAbortHandler, which is a server's business and not this
+	// goroutine's — recovering keeps a conductor that hangs up mid-answer
+	// from taking the facilitator with it.
+	defer func() { _ = recover() }()
+
+	// Only ever true before this process has begun a preparation of its
+	// own: prepGen counts them, so a nonzero one means any seed job the
+	// conductor is holding is this process's, and there is nothing to
+	// reconcile.
+	s.prepMu.Lock()
+	fresh := s.prepGen == 0 && s.prep == nil && s.prepError == ""
+	s.prepMu.Unlock()
+	if !fresh || s.mgr.Snapshot().State != "idle" {
+		return
+	}
+
+	if !s.conductorHeldSeedJob() {
+		return
+	}
+	s.prepMu.Lock()
+	defer s.prepMu.Unlock()
+	// Re-checked under the lock, because asking the conductor took a round
+	// trip and a start may have begun during it. Writing either half after
+	// that would be this goroutine reporting on a preparation that is
+	// alive and well, and clobbering the seeded set that start just
+	// recorded.
+	if s.prepGen != 0 || s.prep != nil || s.prepError != "" {
+		return
+	}
+	log.Printf("facilitator: %v", errPreparationLost)
+	// Both halves of the answer. The message is for the candidate, who
+	// would otherwise be told nothing at all; the unknown seeded set is
+	// for the next start, which must not seed a fresh draw into whatever
+	// that job created — the one thing this process cannot enumerate.
+	s.seeded = &seededSet{}
+	s.prepError = errPreparationLost.Error()
+}
+
+// conductorHeldSeedJob reports whether the conductor's in-flight or last
+// job is a seed.
+//
+// It goes through the same proxy handler the browser's control requests
+// take, because that handler IS this process's only route to the
+// conductor — the address it points at is main's to know, not this
+// package's.
+func (s *server) conductorHeldSeedJob() bool {
+	ctx, cancel := context.WithTimeout(context.Background(), prepPollTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "/api/control/status", nil)
+	if err != nil {
+		return false
+	}
+	rec := &bodyRecorder{header: http.Header{}, status: http.StatusOK}
+	s.control.ServeHTTP(rec, req)
+	if rec.status != http.StatusOK {
+		return false
+	}
+
+	// Only the two fields that matter; the conductor's job record carries
+	// a dozen more and none of them changes this answer.
+	var snap struct {
+		Job *struct {
+			Op string `json:"op"`
+		} `json:"job"`
+		LastJob *struct {
+			Op string `json:"op"`
+		} `json:"lastJob"`
+	}
+	if err := json.Unmarshal(rec.body.Bytes(), &snap); err != nil {
+		return false
+	}
+	if snap.Job != nil && snap.Job.Op == seedJobOp {
+		return true
+	}
+	// A settled seed job counts as much as a running one: the seeding may
+	// simply have finished while this process was away, and the objects
+	// it made are just as present. A reset or a switch since then would
+	// have displaced it — the store keeps exactly one last job — which is
+	// what stops this firing on the ordinary post-attempt path.
+	return snap.LastJob != nil && snap.LastJob.Op == seedJobOp
+}
+
+// seedJobOp is the conductor's name for a seeding job (job.Job.Op).
+const seedJobOp = "seed"
+
+// bodyRecorder captures a handler's whole response in memory. The
+// conductor's status body is a few hundred bytes and this is called once
+// per process.
+type bodyRecorder struct {
+	header http.Header
+	body   bytes.Buffer
+	status int
+}
+
+func (w *bodyRecorder) Header() http.Header         { return w.header }
+func (w *bodyRecorder) WriteHeader(status int)      { w.status = status }
+func (w *bodyRecorder) Write(b []byte) (int, error) { return w.body.Write(b) }
 
 // prepSnapshot returns the in-flight preparation (nil when there is
 // none) and the last failure message.

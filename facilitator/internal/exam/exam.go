@@ -17,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -126,12 +127,31 @@ type Question struct {
 	// the exam clock. It is a pacing budget, never a limit: nothing
 	// enforces it and running over costs no points.
 	TargetSeconds int
+	// Docs is spec.questions[].docs: upstream reading for this question's
+	// subject. Optional, usually absent, and served only with the
+	// solution — the deep dive a candidate reads after the attempt, in
+	// their own browser. Never with the question: the exam desktop
+	// browses through an allowlist proxy and a link out of the exam is
+	// not something an exam offers.
+	Docs []Doc
 
 	// MCQ only. Correct holds strictly increasing indices into Options
 	// and is never serialized to the client before grading.
 	Options []string
 	Correct []int
 	Multi   bool // true = "select all that apply"
+}
+
+// Doc is one upstream documentation link: the concept it names, and the
+// page that explains it.
+//
+// Label is the concept ("Ingress path types"), never the URL. A link
+// list is read as a list of things to go and learn, and a column of
+// bare kubernetes.io paths is neither readable nor honest about which
+// of them is the one worth opening.
+type Doc struct {
+	Label string
+	URL   string
 }
 
 // Check is one scoring criterion for a question, backed by a single
@@ -168,9 +188,16 @@ type examDoc struct {
 			TargetSeconds int      `json:"targetSeconds"`
 			Options       []string `json:"options"`
 			Correct       []int    `json:"correct"`
-			Multi         bool     `json:"multi"`
+			Multi         bool          `json:"multi"`
+			Docs          []examDocLink `json:"docs"`
 		} `json:"questions"`
 	} `json:"spec"`
+}
+
+// examDocLink mirrors one spec.questions[].docs entry.
+type examDocLink struct {
+	Label string `json:"label"`
+	URL   string `json:"url"`
 }
 
 // Load reads the exam JSON at examJSONPath and, for each question it
@@ -235,6 +262,7 @@ func Load(examJSONPath, bankDir string) (*Exam, error) {
 			Weight:        q.Weight,
 			TargetSeconds: q.TargetSeconds,
 			HintCount:     countHints(bankDir, q.ID),
+			Docs:          loadDocs(q.ID, q.Docs),
 		}
 		switch examType {
 		case TypeMCQ:
@@ -353,6 +381,68 @@ func validateMCQ(qid string, options []string, correct []int, multi bool) error 
 	}
 	if multi && len(correct) >= len(options) {
 		return fmt.Errorf("exam: multi-select question %s must declare fewer than all options as correct", qid)
+	}
+	return nil
+}
+
+// loadDocs validates a question's declared documentation links, keeping
+// the ones that are usable and dropping the rest.
+//
+// A bad entry is DROPPED, never fatal, and that asymmetry is the whole
+// point of this function. Every other load error in this package refuses
+// the bank, because every other one is about the exam: a question with
+// no checks cannot be scored, an out-of-range answer key grades a
+// candidate wrongly. A docs link is a study aid read after the attempt
+// is over, so the worst a typo can do is leave a reader one link short —
+// while failing the boot over it would stop a candidate sitting the exam
+// at all. The dropped entry is logged so the author finds out.
+//
+// "Usable" is a link a browser can be handed: an https URL that parses
+// and names a host, under a label that says what it is. http is refused
+// rather than upgraded — the pages worth linking all serve https, and
+// quietly rewriting an author's URL is how a link ends up pointing
+// somewhere they never checked.
+func loadDocs(qid string, declared []examDocLink) []Doc {
+	if len(declared) == 0 {
+		return nil
+	}
+	out := make([]Doc, 0, len(declared))
+	for _, d := range declared {
+		label := strings.TrimSpace(d.Label)
+		raw := strings.TrimSpace(d.URL)
+		if err := validateDocLink(label, raw); err != nil {
+			fmt.Fprintf(os.Stderr, "exam: question %s: dropping docs link %q: %v\n", qid, raw, err)
+			continue
+		}
+		out = append(out, Doc{Label: label, URL: raw})
+	}
+	if len(out) == 0 {
+		// Nil, not an empty slice: "this question declared nothing usable"
+		// and "this question declared nothing" reach the client as the same
+		// absent field, and every consumer already handles the second.
+		return nil
+	}
+	return out
+}
+
+// validateDocLink states what a usable documentation link is. See
+// loadDocs for why a failure here is not a load error.
+func validateDocLink(label, raw string) error {
+	if label == "" {
+		return errors.New("no label")
+	}
+	if raw == "" {
+		return errors.New("no url")
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return err
+	}
+	if u.Scheme != "https" {
+		return fmt.Errorf("scheme %q is not https", u.Scheme)
+	}
+	if u.Host == "" {
+		return errors.New("no host")
 	}
 	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -263,6 +264,10 @@ func TestQuestionUnknown(t *testing.T) {
 type solutionResponse struct {
 	ID       string `json:"id"`
 	Markdown string `json:"markdown"`
+	Docs     []struct {
+		Label string `json:"label"`
+		URL   string `json:"url"`
+	} `json:"docs"`
 }
 
 func TestSolutionGatedWhileIdle(t *testing.T) {
@@ -326,6 +331,55 @@ func TestSolutionAvailableAfterEnd(t *testing.T) {
 	rec2 := ts.do(t, http.MethodGet, "/api/questions/q99/solution")
 	if rec2.Code != http.StatusNotFound {
 		t.Errorf("unknown id after ended: status = %d, want 404, body=%s", rec2.Code, rec2.Body.String())
+	}
+}
+
+// The deep dive's footer reading. The fixture's q01 declares two links,
+// one of them unusable, so this covers the whole path at once: the bank
+// loaded despite the bad entry, and only the good one reaches the wire.
+func TestSolutionCarriesDocs(t *testing.T) {
+	ts := newTestServer(t)
+	if _, err := ts.mgr.Start(session.ModeExam, time.Hour); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if err := ts.mgr.End("submitted"); err != nil {
+		t.Fatalf("End: %v", err)
+	}
+
+	rec := ts.do(t, http.MethodGet, "/api/questions/q01/solution")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200, body=%s", rec.Code, rec.Body.String())
+	}
+	got := decodeJSON[solutionResponse](t, rec)
+	if len(got.Docs) != 1 {
+		t.Fatalf("Docs = %+v, want exactly the one usable entry", got.Docs)
+	}
+	if got.Docs[0].Label != "Ingress path types" {
+		t.Errorf("Docs[0].Label = %q, want %q", got.Docs[0].Label, "Ingress path types")
+	}
+	if got.Docs[0].URL != "https://kubernetes.io/docs/concepts/services-networking/ingress/" {
+		t.Errorf("Docs[0].URL = %q, want it served verbatim", got.Docs[0].URL)
+	}
+}
+
+// A question with no docs must omit the key entirely rather than send an
+// empty array: the client's field is optional, and `docs: []` would make
+// "no reading" a thing it has to measure the length of.
+func TestSolutionOmitsDocsWhenThereAreNone(t *testing.T) {
+	ts := newTestServer(t)
+	if _, err := ts.mgr.Start(session.ModeExam, time.Hour); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if err := ts.mgr.End("submitted"); err != nil {
+		t.Fatalf("End: %v", err)
+	}
+
+	rec := ts.do(t, http.MethodGet, "/api/questions/q02/solution")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200, body=%s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); strings.Contains(body, "docs") {
+		t.Errorf("body = %s, want no docs key at all", body)
 	}
 }
 

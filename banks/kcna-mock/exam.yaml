@@ -36,6 +36,9 @@ spec:
         - "The kube-apiserver"
         - "The kube-controller-manager"
       correct: [2]
+      docs:
+        - label: Cluster components
+          url: https://kubernetes.io/docs/concepts/overview/components/
     - id: q02
       domain: Kubernetes Fundamentals
       multi: false
@@ -45,6 +48,9 @@ spec:
         - "The container runtime"
         - "The kube-controller-manager"
       correct: [1]
+      docs:
+        - label: Cluster components
+          url: https://kubernetes.io/docs/concepts/overview/components/
     - id: q03
       domain: Kubernetes Fundamentals
       multi: true
@@ -55,6 +61,9 @@ spec:
         - "kube-proxy"
         - "The container runtime"
       correct: [0, 2]
+      docs:
+        - label: Cluster components
+          url: https://kubernetes.io/docs/concepts/overview/components/
     - id: q04
       domain: Kubernetes Fundamentals
       multi: false
@@ -64,6 +73,9 @@ spec:
         - "A controller that keeps a specified number of container replicas running"
         - "The smallest deployable unit in Kubernetes: one or more containers that share networking and storage"
       correct: [3]
+      docs:
+        - label: Pods
+          url: https://kubernetes.io/docs/concepts/workloads/pods/
     - id: q05
       domain: Kubernetes Fundamentals
       multi: false
@@ -73,6 +85,9 @@ spec:
         - "An ephemeral container"
         - "A static Pod"
       correct: [1]
+      docs:
+        - label: Sidecar containers
+          url: https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/
     - id: q06
       domain: Kubernetes Fundamentals
       multi: false
@@ -82,6 +97,9 @@ spec:
         - "The Pod is running but is failing its readiness probe"
         - "The Pod was deleted and is waiting for garbage collection"
       correct: [0]
+      docs:
+        - label: Pod lifecycle
+          url: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/
     - id: q07
       domain: Kubernetes Fundamentals
       multi: false
@@ -91,6 +109,9 @@ spec:
         - "The ability to run Pods to completion on a schedule"
         - "Declarative rolling updates and rollbacks, managed by creating and scaling ReplicaSets"
       correct: [3]
+      docs:
+        - label: Deployments
+          url: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
     - id: q08
       domain: Kubernetes Fundamentals
       multi: false
@@ -100,6 +121,9 @@ spec:
         - "DaemonSet"
         - "Job"
       correct: [2]
+      docs:
+        - label: DaemonSet
+          url: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
     - id: q09
       domain: Kubernetes Fundamentals
       multi: true
@@ -109,6 +133,11 @@ spec:
         - "CronJob"
         - "DaemonSet"
       correct: [0, 2]
+      docs:
+        - label: Jobs
+          url: https://kubernetes.io/docs/concepts/workloads/controllers/job/
+        - label: CronJob
+          url: https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/
     - id: q10
       domain: Kubernetes Fundamentals
       multi: false
@@ -118,6 +147,9 @@ spec:
         - "DaemonSet"
         - "ReplicaSet"
       correct: [0]
+      docs:
+        - label: StatefulSets
+          url: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
     - id: q11
       domain: Kubernetes Fundamentals
       multi: false
@@ -127,6 +159,9 @@ spec:
         - "Label selectors"
         - "Namespaces"
       correct: [0]
+      docs:
+        - label: Annotations
+          url: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
     - id: q12
       domain: Kubernetes Fundamentals
       multi: false
@@ -136,6 +171,9 @@ spec:
         - "Resource quotas"
         - "Annotations"
       correct: [1]
+      docs:
+        - label: Namespaces
+          url: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
     - id: q13
       domain: Kubernetes Fundamentals
       multi: false
@@ -145,6 +183,9 @@ spec:
         - "The ReplicaSet controller sees that observed state (2 Pods) differs from desired state (3 Pods) and creates a replacement Pod"
         - "The kube-scheduler restarts the deleted Pod on the same node with the same name"
       correct: [2]
+      docs:
+        - label: ReplicaSet
+          url: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/
     - id: q14
       domain: Kubernetes Fundamentals
       multi: false
@@ -154,6 +195,9 @@ spec:
         - "LoadBalancer"
         - "ExternalName"
       correct: [1]
+      docs:
+        - label: Services
+          url: https://kubernetes.io/docs/concepts/services-networking/service/
     - id: q15
       domain: Kubernetes Fundamentals
       multi: false
@@ -163,6 +207,9 @@ spec:
         - "LoadBalancer"
         - "ExternalName"
       correct: [2]
+      docs:
+        - label: Service types
+          url: https://kubernetes.io/docs/concepts/services-networking/service/
     - id: q16
       domain: Kubernetes Fundamentals
       multi: false
@@ -172,6 +219,9 @@ spec:
         - "payments.api.svc.cluster.local"
         - "api.frontend.svc.cluster.local"
       correct: [0]
+      docs:
+        - label: DNS for Services and Pods
+          url: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/
     - id: q17
       domain: Kubernetes Fundamentals
       multi: true
@@ -181,6 +231,9 @@ spec:
         - "The kubelet injects every ConfigMap in the namespace into all containers automatically"
         - "By pulling the ConfigMap as a container image layer at startup"
       correct: [0, 1]
+      docs:
+        - label: ConfigMaps
+          url: https://kubernetes.io/docs/concepts/configuration/configmap/
     - id: q18
       domain: Kubernetes Fundamentals
       multi: false
@@ -190,6 +243,9 @@ spec:
         - "The values are one-way hashed, so the original data cannot be recovered"
         - "The values are only base64-encoded, so anyone allowed to read the Secret can trivially decode them"
       correct: [3]
+      docs:
+        - label: Secrets
+          url: https://kubernetes.io/docs/concepts/configuration/secret/
     - id: q19
       domain: Kubernetes Fundamentals
       multi: false
@@ -199,6 +255,9 @@ spec:
         - "A PV and a PVC are two representations of the same API object"
         - "A PVC creates storage directly on the node's local filesystem by default"
       correct: [1]
+      docs:
+        - label: Persistent volumes
+          url: https://kubernetes.io/docs/concepts/storage/persistent-volumes/
     - id: q20
       domain: Kubernetes Fundamentals
       multi: false
@@ -208,6 +267,9 @@ spec:
         - "It allows PersistentVolumes to be provisioned dynamically when a PersistentVolumeClaim requests the class"
         - "It encrypts all data written to PersistentVolumes by default"
       correct: [2]
+      docs:
+        - label: Storage classes
+          url: https://kubernetes.io/docs/concepts/storage/storage-classes/
     - id: q21
       domain: Kubernetes Fundamentals
       multi: false
@@ -244,6 +306,9 @@ spec:
         - "A new resource type is added to the Kubernetes API, so users can create custom objects with kubectl"
         - "A ServiceAccount is granted permission to manage cluster resources"
       correct: [2]
+      docs:
+        - label: Custom resources
+          url: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
     - id: q25
       domain: Kubernetes Fundamentals
       multi: false
@@ -253,6 +318,9 @@ spec:
         - "Live CPU utilization reported by metrics-server for each node"
         - "The node currently running the fewest Pods is always selected"
       correct: [0]
+      docs:
+        - label: The Kubernetes scheduler
+          url: https://kubernetes.io/docs/concepts/scheduling-eviction/kube-scheduler/
     - id: q26
       domain: Kubernetes Fundamentals
       multi: false
@@ -262,6 +330,9 @@ spec:
         - "A Role is bound with a ClusterRoleBinding, while a ClusterRole is bound with a RoleBinding"
         - "A Role grants permissions within a single namespace, while a ClusterRole can cover cluster-scoped resources or be reused across namespaces"
       correct: [3]
+      docs:
+        - label: RBAC authorization
+          url: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
     - id: q27
       domain: Container Orchestration
       multi: true
@@ -271,6 +342,9 @@ spec:
         - "Scaling the number of running replicas up or down in response to demand"
         - "Guaranteeing that application code is free of bugs before it runs"
       correct: [1, 2]
+      docs:
+        - label: What Kubernetes is
+          url: https://kubernetes.io/docs/concepts/overview/
     - id: q28
       domain: Container Orchestration
       multi: false
@@ -307,6 +381,9 @@ spec:
         - "It deletes the pod so the scheduler can recreate it on a different node"
         - "It kills the container and restarts it, subject to the pod's restart policy"
       correct: [3]
+      docs:
+        - label: Liveness, readiness and startup probes
+          url: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
     - id: q32
       domain: Container Orchestration
       multi: false
@@ -325,6 +402,9 @@ spec:
         - "Pods on different nodes cannot communicate unless an Ingress is created"
         - "Traffic between pods on different nodes must pass through the kube-apiserver"
       correct: [0]
+      docs:
+        - label: The cluster network model
+          url: https://kubernetes.io/docs/concepts/cluster-administration/networking/
     - id: q34
       domain: Container Orchestration
       multi: false
@@ -334,6 +414,9 @@ spec:
         - "Gateway API"
         - "ClusterIP Service"
       correct: [2]
+      docs:
+        - label: Gateway API
+          url: https://kubernetes.io/docs/concepts/services-networking/gateway/
     - id: q35
       domain: Container Orchestration
       multi: false
@@ -352,6 +435,9 @@ spec:
         - "Adding a NetworkPolicy that denies ingress traffic"
         - "Setting `imagePullPolicy: Always` on the container"
       correct: [0]
+      docs:
+        - label: Security contexts
+          url: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
     - id: q37
       domain: Container Orchestration
       multi: false
@@ -361,6 +447,9 @@ spec:
         - "Only traffic within the same node is allowed"
         - "Only traffic to pods with the same labels is allowed"
       correct: [1]
+      docs:
+        - label: Network policies
+          url: https://kubernetes.io/docs/concepts/services-networking/network-policies/
     - id: q38
       domain: Container Orchestration
       multi: true
@@ -379,6 +468,9 @@ spec:
         - "Horizontal Pod Autoscaler (HPA)"
         - "kube-scheduler"
       correct: [2]
+      docs:
+        - label: Horizontal Pod Autoscaling
+          url: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
     - id: q40
       domain: Container Orchestration
       multi: false
@@ -397,6 +489,9 @@ spec:
         - "The application inside the container is crashing after startup"
         - "The pod's liveness probe is failing"
       correct: [0]
+      docs:
+        - label: Resource requests and limits
+          url: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
     - id: q42
       domain: Container Orchestration
       multi: false
@@ -406,6 +501,9 @@ spec:
         - "The image cannot be pulled, so the pod has no containers running"
         - "The scheduler has evicted the pod from its node"
       correct: [1]
+      docs:
+        - label: Liveness, readiness and startup probes
+          url: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
     - id: q43
       domain: Container Orchestration
       multi: false
@@ -415,6 +513,9 @@ spec:
         - "Use a PersistentVolumeClaim backed by a CSI-provisioned PersistentVolume, so the storage follows the pod independently of the node"
         - "Add a second replica so each pod keeps its own copy of the data"
       correct: [2]
+      docs:
+        - label: Persistent volumes
+          url: https://kubernetes.io/docs/concepts/storage/persistent-volumes/
     - id: q44
       domain: Cloud Native Application Delivery
       multi: false
@@ -478,6 +579,9 @@ spec:
         - "Use Kustomize with a shared base and per-environment overlays that patch the base"
         - "Store environment differences in a single ConfigMap that all environments share"
       correct: [2]
+      docs:
+        - label: Kustomize
+          url: https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/
     - id: q51
       domain: Cloud Native Application Delivery
       multi: false
@@ -505,6 +609,9 @@ spec:
         - "kubectl scale deployment web --replicas=0"
         - "kubectl rollout restart deployment/web"
       correct: [1]
+      docs:
+        - label: Deployment rollouts and rollbacks
+          url: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
     - id: q54
       domain: Cloud Native Architecture
       multi: false
@@ -577,6 +684,9 @@ spec:
         - "No traffic at all, because NetworkPolicy resources are ignored unless a CNI plugin's own CRD also exists"
         - "Only traffic from Pods labeled `app: api`, on port 5432"
       correct: [3]
+      docs:
+        - label: Network policies
+          url: https://kubernetes.io/docs/concepts/services-networking/network-policies/
     - id: q62
       domain: Container Orchestration
       multi: false
@@ -586,6 +696,9 @@ spec:
         - "The container image failed to pull because the registry is unreachable"
         - "A NetworkPolicy is blocking the kubelet from registering the Pod"
       correct: [0]
+      docs:
+        - label: Resource requests and limits
+          url: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
     - id: q63
       domain: Container Orchestration
       multi: false
@@ -595,6 +708,9 @@ spec:
         - "Kubernetes falls back to the cluster's default StorageClass automatically"
         - "A 10Gi volume is provisioned from whichever StorageClass has the most free capacity"
       correct: [1]
+      docs:
+        - label: Persistent volumes
+          url: https://kubernetes.io/docs/concepts/storage/persistent-volumes/
     - id: q64
       domain: Container Orchestration
       multi: false
@@ -613,6 +729,9 @@ spec:
         - "The setting is silently ignored because no `USER` instruction exists in the image"
         - "The container fails to start, and the Pod reports an error indicating it would run as root"
       correct: [3]
+      docs:
+        - label: Security contexts
+          url: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
     - id: q66
       domain: Container Orchestration
       multi: false
@@ -631,6 +750,9 @@ spec:
         - "All the `app: web` Pods, but only on port 8080 instead of port 80"
         - "An error, because a Service's selector cannot list more than one label"
       correct: [1]
+      docs:
+        - label: Services
+          url: https://kubernetes.io/docs/concepts/services-networking/service/
     - id: q68
       domain: Container Orchestration
       multi: false
@@ -640,6 +762,9 @@ spec:
         - "No controller processes the Ingress, so the routing rule never takes effect"
         - "Kubernetes automatically creates a default IngressClass and assigns it"
       correct: [2]
+      docs:
+        - label: Ingress
+          url: https://kubernetes.io/docs/concepts/services-networking/ingress/
     - id: q69
       domain: Container Orchestration
       multi: false
@@ -649,6 +774,9 @@ spec:
         - "Change the container's `imagePullPolicy` to `Always`"
         - "Raise the container's `resources.limits.memory`, or reduce the application's memory footprint"
       correct: [3]
+      docs:
+        - label: Resource requests and limits
+          url: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
     - id: q70
       domain: Container Orchestration
       multi: false
@@ -658,6 +786,9 @@ spec:
         - "`serviceName`"
         - "`updateStrategy`"
       correct: [0]
+      docs:
+        - label: StatefulSets
+          url: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
     - id: q71
       domain: Container Orchestration
       multi: false
@@ -775,6 +906,9 @@ spec:
         - "`kubectl logs deployment/<name>`"
         - "`kubectl top deployment`"
       correct: [1]
+      docs:
+        - label: Deployment rollouts and rollbacks
+          url: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
     - id: q84
       domain: Cloud Native Application Delivery
       multi: false
@@ -793,6 +927,9 @@ spec:
         - "`kubectl attach`"
         - "`kubectl debug`"
       correct: [3]
+      docs:
+        - label: Ephemeral containers
+          url: https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/
     - id: q86
       domain: Kubernetes Fundamentals
       multi: false
@@ -802,6 +939,9 @@ spec:
         - "To define which container runtime a Pod's containers use"
         - "To encrypt Secrets so only Pods in the same Namespace can decrypt them"
       correct: [0]
+      docs:
+        - label: Namespaces
+          url: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
     - id: q87
       domain: Kubernetes Fundamentals
       multi: false
@@ -811,6 +951,11 @@ spec:
         - "A Secret is cluster-scoped, while a ConfigMap is Namespace-scoped"
         - "A ConfigMap requires a running Pod to create, while a Secret can be created independently"
       correct: [1]
+      docs:
+        - label: ConfigMaps
+          url: https://kubernetes.io/docs/concepts/configuration/configmap/
+        - label: Secrets
+          url: https://kubernetes.io/docs/concepts/configuration/secret/
     - id: q88
       domain: Kubernetes Fundamentals
       multi: false
@@ -820,6 +965,11 @@ spec:
         - "Labels are key/value pairs used to identify and SELECT objects (by Services, ReplicaSets, and `kubectl` queries, among others), while annotations attach arbitrary, non-identifying metadata that is not used for selection"
         - "Labels are stored in etcd, while annotations are stored only in memory on the API server"
       correct: [2]
+      docs:
+        - label: Labels and selectors
+          url: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+        - label: Annotations
+          url: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
     - id: q89
       domain: Kubernetes Fundamentals
       multi: false
@@ -829,6 +979,11 @@ spec:
         - "A ReplicaSet only exists transiently during a rollout and is deleted once the rollout finishes"
         - "A Deployment manages one or more ReplicaSets on the user's behalf, creating a new ReplicaSet for each rollout so it can orchestrate rolling updates and rollbacks between versions"
       correct: [3]
+      docs:
+        - label: Deployments
+          url: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
+        - label: ReplicaSet
+          url: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/
     - id: q90
       domain: Kubernetes Fundamentals
       multi: false
@@ -838,6 +993,9 @@ spec:
         - "To run Pods on a fixed schedule, similar to a cron job"
         - "To scale a Pod's replica count up and down automatically based on CPU usage"
       correct: [0]
+      docs:
+        - label: DaemonSet
+          url: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
     - id: q91
       domain: Kubernetes Fundamentals
       multi: false
@@ -847,6 +1005,9 @@ spec:
         - "To provide a lightweight base image that all of the Pod's other containers inherit from"
         - "To restart the Pod's main container automatically whenever it crashes"
       correct: [1]
+      docs:
+        - label: Init containers
+          url: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/
     - id: q92
       domain: Kubernetes Fundamentals
       multi: false
@@ -865,6 +1026,9 @@ spec:
         - "A taint and toleration pair replaces the need for resource requests and limits"
         - "A taint on a node repels Pods from being scheduled there unless a Pod carries a matching toleration, letting nodes be reserved for only the workloads that explicitly tolerate them"
       correct: [3]
+      docs:
+        - label: Taints and tolerations
+          url: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
     - id: q94
       domain: Kubernetes Fundamentals
       multi: false
@@ -874,6 +1038,9 @@ spec:
         - "A readiness probe can only check HTTP endpoints, while a liveness probe can only check TCP ports"
         - "A liveness probe applies to the whole Pod, while a readiness probe applies only to individual containers"
       correct: [0]
+      docs:
+        - label: Liveness, readiness and startup probes
+          url: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
     - id: q95
       domain: Kubernetes Fundamentals
       multi: false
@@ -901,3 +1068,6 @@ spec:
         - "The Pod's own restart count"
         - "A custom or external metric supplied through the metrics API (such as requests per second)"
       correct: [0, 1, 3]
+      docs:
+        - label: Horizontal Pod Autoscaling
+          url: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/

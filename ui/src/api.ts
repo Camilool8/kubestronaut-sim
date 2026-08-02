@@ -206,9 +206,23 @@ export interface QuestionDetail {
   multi?: boolean;
 }
 
+/**
+ * One piece of upstream reading a question points at: the concept it
+ * names, and the page that explains it. Authored in the bank
+ * (`spec.questions[].docs`) and served only with the solution — the deep
+ * dive is read after the attempt, in the candidate's own browser, never
+ * on the exam desktop.
+ */
+export interface SolutionDoc {
+  label: string;
+  url: string;
+}
+
 export interface SolutionDetail {
   id: string;
   markdown: string;
+  /** Absent — not empty — on the many questions that declare none. */
+  docs?: SolutionDoc[];
 }
 
 /**
