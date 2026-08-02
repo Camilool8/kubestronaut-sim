@@ -267,10 +267,12 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
           beside it says the same three numbers in words — a bar that
           announces "37 percent" adds a second voice for one fact. */}
       <div className="mcq-rail" aria-hidden="true">
+        {/* scaleX rather than width — only transform and opacity animate
+            without relayout. Same as .job-chip-bar-fill. */}
         <div
           className="mcq-rail-bar"
           style={{
-            width: `${questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0}%`,
+            transform: `scaleX(${questions.length > 0 ? answeredCount / questions.length : 0})`,
           }}
         />
       </div>

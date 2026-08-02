@@ -506,13 +506,17 @@ function ExamProgress({ questions }: { questions: ExamQuestionInfo[] }) {
   const total = questions.length;
   const opened = questions.filter((q) => marksStore.isViewed(q.id)).length;
   const flagged = questions.filter((q) => marksStore.isMarked(q.id)).length;
-  const pct = total > 0 ? Math.round((opened / total) * 100) : 0;
+  // A fraction, not a rounded percent: scaleX takes one directly, and
+  // rounding to whole percent threw away precision the bar can show.
+  const fraction = total > 0 ? opened / total : 0;
 
   return (
     <div className="exam-progress">
       <span className="exam-progress-text">{strings.exam.progress(opened, total, flagged)}</span>
       <div className="exam-progress-track" aria-hidden="true">
-        <div className="exam-progress-bar" style={{ width: `${pct}%` }} />
+        {/* scaleX rather than width — only transform and opacity animate
+            without relayout. Same as .job-chip-bar-fill. */}
+        <div className="exam-progress-bar" style={{ transform: `scaleX(${fraction})` }} />
       </div>
     </div>
   );

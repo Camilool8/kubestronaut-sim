@@ -946,19 +946,27 @@
   overflow: hidden;
 }
 
+/* Full width, scaled by transform — the same shape as .job-chip-bar-fill,
+   which is this product's determinate bar. The radius is gone with the
+   width: .exam-progress-track already clips to a pill, so the fill's own
+   corners were never visible, and scaling a border-radius stretches it. */
 .exam-progress-bar {
   height: 100%;
+  width: 100%;
   background: var(--progress);
-  border-radius: inherit;
+  transform-origin: 0 50%;
 }
 
 @media (prefers-reduced-motion: no-preference) {
   /* A determinate bar that jumps between discrete steps needs the step to
      be legible as a movement — the same reasoning, and the same token, as
-     the global progress bar's. */
+     .job-chip-bar-fill's.
+     transform, not width: width is a layout property, so animating it
+     relayouts on every frame of the transition. BackgroundJobChip states
+     the rule outright, and these two bars were the exception to it. */
   .exam-progress-bar,
   .mcq-rail-bar {
-    transition: width var(--dur-progress) var(--ease-out);
+    transition: transform var(--dur-progress) var(--ease-out);
   }
 }
 
@@ -4299,7 +4307,9 @@
 
 .mcq-rail-bar {
   height: 100%;
+  width: 100%;
   background: var(--progress);
+  transform-origin: 0 50%;
 }
 
 /* overflow: hidden, not auto — the column below owns its own scroll
