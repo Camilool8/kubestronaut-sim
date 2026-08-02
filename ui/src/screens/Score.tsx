@@ -145,7 +145,7 @@ export function Score({ onNewAttempt, endReason, mode }: ScoreProps) {
           <div className="score-end-reason">{strings.score.endReason(endReason)}</div>
         )}
         {/* A training attempt is untimed and had hints and solutions on
-            tap; a speed attempt ran on half the clock. Neither is a
+            tap; a mastery attempt ran on half the clock. Neither is a
             comparable result, and the banner is the one place a
             candidate will screenshot. */}
         {mode && mode !== "exam" && (

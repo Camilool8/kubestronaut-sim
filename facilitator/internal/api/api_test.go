@@ -686,3 +686,100 @@ func TestHealthzIndependentOfBootState(t *testing.T) {
 		t.Errorf("GET /healthz while booting = %d, want 200", rec.Code)
 	}
 }
+
+// examModes is the "modes" slice of GET /api/exam, decoded on its own so
+// this test does not have to widen the examResponse fixture above.
+type examModesResponse struct {
+	Modes []struct {
+		ID              string `json:"id"`
+		DurationSeconds int    `json:"durationSeconds"`
+		Untimed         bool   `json:"untimed"`
+		HelpAllowed     bool   `json:"helpAllowed"`
+		GradesPerTask   bool   `json:"gradesPerTask"`
+		Recorded        bool   `json:"recorded"`
+		Recommended     bool   `json:"recommended"`
+	} `json:"modes"`
+}
+
+func TestExamModes(t *testing.T) {
+	ts := newTestServer(t)
+	rec := ts.do(t, http.MethodGet, "/api/exam")
+	got := decodeJSON[examModesResponse](t, rec).Modes
+
+	// Order is the order the mode screen offers them: gentlest first.
+	want := []string{session.ModeTraining, session.ModeSpeed, session.ModeExam}
+	if len(got) != len(want) {
+		t.Fatalf("len(Modes) = %d, want %d", len(got), len(want))
+	}
+	for i, id := range want {
+		if got[i].ID != id {
+			t.Errorf("Modes[%d].ID = %q, want %q", i, got[i].ID, id)
+		}
+	}
+
+	// The clocks come from the bank: 600s duration, so a speed run is
+	// half of it, and training has no clock at all.
+	if got[0].DurationSeconds != 0 || !got[0].Untimed {
+		t.Errorf("training = %+v, want durationSeconds=0 untimed=true", got[0])
+	}
+	if got[1].DurationSeconds != 300 || got[1].Untimed {
+		t.Errorf("speed = %+v, want durationSeconds=300 untimed=false", got[1])
+	}
+	if got[2].DurationSeconds != 600 || got[2].Untimed {
+		t.Errorf("exam = %+v, want durationSeconds=600 untimed=false", got[2])
+	}
+
+	// Exactly one card is accented, and it is not the untimed one.
+	accented := ""
+	for _, m := range got {
+		if m.Recommended {
+			if accented != "" {
+				t.Errorf("two recommended modes: %q and %q", accented, m.ID)
+			}
+			accented = m.ID
+		}
+	}
+	if accented != session.ModeSpeed {
+		t.Errorf("recommended mode = %q, want %q", accented, session.ModeSpeed)
+	}
+
+	// Training is practice, not a sitting.
+	if got[0].Recorded {
+		t.Error("training.Recorded = true, want false")
+	}
+	if !got[1].Recorded || !got[2].Recorded {
+		t.Error("speed and exam must both be recorded attempts")
+	}
+}
+
+// TestExamModesMatchEnforcement is the point of describing modes on the
+// server: a card must not be able to promise something the handlers then
+// refuse. It starts an attempt in each advertised mode and checks the
+// two gated endpoints against that mode's own flags.
+func TestExamModesMatchEnforcement(t *testing.T) {
+	ts := newTestServer(t)
+	modes := decodeJSON[examModesResponse](t, ts.do(t, http.MethodGet, "/api/exam")).Modes
+
+	for _, m := range modes {
+		t.Run(m.ID, func(t *testing.T) {
+			// A fresh manager per subtest: Start is a one-way transition.
+			ts := newTestServer(t)
+			if _, err := ts.mgr.Start(m.ID, time.Hour); err != nil {
+				t.Fatalf("Start(%q): %v", m.ID, err)
+			}
+
+			// 403 is the gate's answer specifically. A hintless question
+			// (404) or an absent practice grader (501) means the request
+			// got past the gate, which is what these assert.
+			hint := ts.do(t, http.MethodGet, "/api/questions/q01/hints/1")
+			if forbidden := hint.Code == http.StatusForbidden; forbidden == m.HelpAllowed {
+				t.Errorf("hints: status %d with helpAllowed=%v", hint.Code, m.HelpAllowed)
+			}
+
+			grade := ts.do(t, http.MethodPost, "/api/session/grade")
+			if forbidden := grade.Code == http.StatusForbidden; forbidden == m.GradesPerTask {
+				t.Errorf("grade: status %d with gradesPerTask=%v", grade.Code, m.GradesPerTask)
+			}
+		})
+	}
+}

@@ -56,6 +56,41 @@ func ValidMode(s string) bool {
 	return s == ModeExam || s == ModeTraining || s == ModeSpeed
 }
 
+// Modes lists every mode a candidate may choose, in the order the mode
+// screen offers them: gentlest first, the real thing last.
+func Modes() []string {
+	return []string{ModeTraining, ModeSpeed, ModeExam}
+}
+
+// The three predicates below are the single definition of what a mode
+// permits. The HTTP layer both DESCRIBES a mode with them (the cards on
+// the mode screen are generated from these) and ENFORCES with them, so a
+// card cannot advertise something the server then refuses.
+//
+// Two of them return the same answer today. They are kept apart because
+// they are separate promises — a future mode could grade as you go
+// without handing over the reference solution — and collapsing them now
+// would hide that the day it stops being true.
+
+// HelpAllowed reports whether mode may read hints and reference
+// solutions while its attempt is still running.
+func HelpAllowed(mode string) bool { return mode == ModeTraining }
+
+// GradesPerTask reports whether mode may score the work so far without
+// ending the attempt. In an exam, learning your score mid-attempt is
+// precisely what the format withholds.
+func GradesPerTask(mode string) bool { return mode == ModeTraining }
+
+// Recorded reports whether an attempt in mode belongs in the durable
+// attempt history. Training is deliberate practice rather than a
+// sitting: counting it would make every "best score" meaningless.
+func Recorded(mode string) bool { return mode != ModeTraining }
+
+// Recommended names the one mode the mode screen accents. Speed sits
+// between the other two — real conditions, a harder clock — which is the
+// most useful default for someone practising rather than rehearsing.
+func Recommended(mode string) bool { return mode == ModeSpeed }
+
 // reasonExpired is the EndReason the package itself assigns when a
 // running session is ended by the timer or a lazy expiry check, as
 // opposed to reasons supplied by callers of End (e.g. "submitted").

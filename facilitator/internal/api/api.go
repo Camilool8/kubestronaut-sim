@@ -134,11 +134,32 @@ type examResponse struct {
 }
 
 // examMode is one selectable attempt mode.
+//
+// Every boolean here is the behaviour the server will actually enforce,
+// read from the same session-package predicate the enforcing handler
+// reads. The mode screen renders its capability list ("✓ Grade as you
+// go", "– Not recorded as an attempt") straight from these rather than
+// restating the rules client-side, where the two would drift.
+//
+// Labels stay out of this response on purpose. User-facing copy belongs
+// in ui/src/strings.ts (AGENTS.md), and a mode's NAME is copy while its
+// permissions are facts only the server knows.
 type examMode struct {
 	ID              string `json:"id"`
 	DurationSeconds int    `json:"durationSeconds"`
 	Untimed         bool   `json:"untimed"`
-	HelpAllowed     bool   `json:"helpAllowed"`
+	// HelpAllowed: GET /api/questions/{id}/hints/{n} and .../solution
+	// answer mid-attempt.
+	HelpAllowed bool `json:"helpAllowed"`
+	// GradesPerTask: POST /api/session/grade answers mid-attempt.
+	GradesPerTask bool `json:"gradesPerTask"`
+	// Recorded: a finished attempt in this mode belongs in the attempt
+	// history. Nothing reads this until history exists; it is declared
+	// here so the mode screen's promise and the recorder's rule are the
+	// same statement from the start.
+	Recorded bool `json:"recorded"`
+	// Recommended: the one card the mode screen accents.
+	Recommended bool `json:"recommended"`
 }
 
 // examQuestionInfo is one question's entry in the GET /api/exam
@@ -188,10 +209,22 @@ func (s *server) handleExam(w http.ResponseWriter, r *http.Request) {
 		}
 		resp.Questions = append(resp.Questions, info)
 	}
-	resp.Modes = []examMode{
-		{ID: session.ModeExam, DurationSeconds: int(s.ex.Duration.Seconds())},
-		{ID: session.ModeTraining, Untimed: true, HelpAllowed: true},
-		{ID: session.ModeSpeed, DurationSeconds: int(s.ex.SpeedDuration.Seconds())},
+	// Each card's advertised clock comes from durationFor — the same
+	// function POST /api/session/start resolves the real clock with — so
+	// the number on the card is the number the attempt gets, including
+	// under SESSION_DURATION_OVERRIDE.
+	resp.Modes = make([]examMode, 0, 3)
+	for _, mode := range session.Modes() {
+		d := s.durationFor(mode)
+		resp.Modes = append(resp.Modes, examMode{
+			ID:              mode,
+			DurationSeconds: int(d.Seconds()),
+			Untimed:         d == 0,
+			HelpAllowed:     session.HelpAllowed(mode),
+			GradesPerTask:   session.GradesPerTask(mode),
+			Recorded:        session.Recorded(mode),
+			Recommended:     session.Recommended(mode),
+		})
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
@@ -328,7 +361,7 @@ func (s *server) handleSolution(w http.ResponseWriter, r *http.Request) {
 	// Training mode is exactly the mode where reading the solution is
 	// the point. Everything else keeps the exam-fidelity gate.
 	snap := s.mgr.Snapshot()
-	if snap.State != "ended" && snap.Mode != session.ModeTraining {
+	if snap.State != "ended" && !session.HelpAllowed(snap.Mode) {
 		writeJSONError(w, http.StatusForbidden, "solutions are available once the session has ended")
 		return
 	}
@@ -386,7 +419,7 @@ func (s *server) handleHint(w http.ResponseWriter, r *http.Request) {
 	// gate does it: the endpoint must not double as a way to enumerate
 	// which question ids exist.
 	snap := s.mgr.Snapshot()
-	if snap.Mode != session.ModeTraining {
+	if !session.HelpAllowed(snap.Mode) {
 		writeJSONError(w, http.StatusForbidden, "hints are available in Training mode only")
 		return
 	}
@@ -508,7 +541,7 @@ func (s *server) handleAnswersGet(w http.ResponseWriter, r *http.Request) {
 // your score mid-attempt is precisely the thing the format withholds.
 func (s *server) handlePracticeGrade(w http.ResponseWriter, r *http.Request) {
 	snap := s.mgr.Snapshot()
-	if snap.Mode != session.ModeTraining {
+	if !session.GradesPerTask(snap.Mode) {
 		writeJSONError(w, http.StatusForbidden, "scoring mid-attempt is available in Training mode only")
 		return
 	}

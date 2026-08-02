@@ -43,12 +43,26 @@ export interface ExamQuestionInfo {
 /** Which engine grades the active bank. */
 export type ExamType = "hands-on" | "mcq";
 
-/** One selectable attempt mode, described by the server. */
+/**
+ * One selectable attempt mode, described by the server.
+ *
+ * Every flag is the behaviour the facilitator will actually enforce, so
+ * the mode screen's capability list is generated from them rather than
+ * restated here. Labels live in `strings.ts`: a mode's name is copy, its
+ * permissions are facts only the server knows.
+ */
 export interface ExamMode {
   id: Exclude<SessionMode, "">;
   durationSeconds: number;
   untimed: boolean;
+  /** Hints and reference solutions answer while the attempt runs. */
   helpAllowed: boolean;
+  /** Work can be scored mid-attempt without ending it. */
+  gradesPerTask: boolean;
+  /** A finished attempt in this mode belongs in the attempt history. */
+  recorded: boolean;
+  /** The one card the mode screen accents. Exactly one mode carries it. */
+  recommended: boolean;
 }
 
 export interface ExamInfo {

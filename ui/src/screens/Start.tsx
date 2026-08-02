@@ -22,11 +22,36 @@ import { useAsync } from "../lib/useAsync";
 import { strings } from "../strings";
 
 // Fallback for a facilitator that predates the modes field, so the
-// picker still renders rather than collapsing to nothing.
+// picker still renders rather than collapsing to nothing. Ordered as the
+// server orders them: gentlest first, the real thing last.
 const DEFAULT_MODES: ExamMode[] = [
-  { id: "exam", durationSeconds: 7200, untimed: false, helpAllowed: false },
-  { id: "training", durationSeconds: 0, untimed: true, helpAllowed: true },
-  { id: "speed", durationSeconds: 3600, untimed: false, helpAllowed: false },
+  {
+    id: "training",
+    durationSeconds: 0,
+    untimed: true,
+    helpAllowed: true,
+    gradesPerTask: true,
+    recorded: false,
+    recommended: false,
+  },
+  {
+    id: "speed",
+    durationSeconds: 3600,
+    untimed: false,
+    helpAllowed: false,
+    gradesPerTask: false,
+    recorded: true,
+    recommended: true,
+  },
+  {
+    id: "exam",
+    durationSeconds: 7200,
+    untimed: false,
+    helpAllowed: false,
+    gradesPerTask: false,
+    recorded: true,
+    recommended: false,
+  },
 ];
 
 // The stat labels are known before the numbers are, so the placeholder can

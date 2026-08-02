@@ -14,6 +14,19 @@ export const strings = {
     reload: "Reload",
   },
 
+  header: {
+    // Split so the header can grey the suffix: the product is
+    // "kubestronaut", and "-sim" says it is the rehearsal, not the exam.
+    wordmark: "kubestronaut",
+    wordmarkTail: "-sim",
+    navLabel: "Sections",
+    backToExams: "Exams",
+    // The crumb names where you are, in the words the screen itself
+    // uses, so the header reads as one sentence with the page below it.
+    crumbLobby: "Choose an exam",
+    crumbResults: "Results",
+  },
+
   start: {
     fallbackTitle: "kubestronaut-sim",
     durationLabel: "Duration",
@@ -37,7 +50,7 @@ export const strings = {
     // itself (#22's last holdout, caught in the browser pass).
     tipTimer: (mode: string) =>
       mode === "training"
-        ? "Training is untimed. Exam and Speed start their clock the moment you click Start."
+        ? "Training is untimed. Exam and Mastery start their clock the moment you click Start."
         : "The timer starts the moment you click Start and cannot be paused.",
     // The catalog and the exam summary are separate endpoints, so one can
     // fail while the other renders. Say which one, and that the button
@@ -49,7 +62,7 @@ export const strings = {
     // selected Training row promised the wrong thing at the exact moment
     // of commitment (#22).
     start: (mode: string) =>
-      mode === "training" ? "Start Training" : mode === "speed" ? "Start Speed Run" : "Start Exam",
+      mode === "training" ? "Start Training" : mode === "speed" ? "Start Mastery Run" : "Start Exam",
     starting: "Starting…",
     catalogErrorTitle: "Couldn't load the exam catalog",
     catalogErrorBody: (detail: string) =>
@@ -256,22 +269,33 @@ export const strings = {
     cancel: "Cancel",
   },
 
+  // The three attempt modes, gentlest first. `badge` is the mono tag the
+  // mode card wears; `label` is the mode's name everywhere else.
+  //
+  // "Speed" is now "Mastery" per the design brief. Only the label moved
+  // — the wire id stays `speed`, because renaming it would invalidate
+  // every persisted session and every stored attempt.
   modes: {
-    exam: {
-      label: "Exam",
-      blurb: (mins: number) => `${mins} minutes. No hints, no solutions: the real thing.`,
-    },
     training: {
       label: "Training",
+      badge: "LEARN",
       // Named as the accessibility answer as well as the study one:
       // a countdown that cannot be paused fails WCAG 2.2.1, and this is
       // the way out of it.
       blurb: () =>
-        "Untimed. Hints and solutions on demand, and you can score your work without ending the attempt.",
+        "No clock. Hints unlock on request, reference solutions are one click away, and you can grade your work without ending the attempt.",
     },
     speed: {
-      label: "Speed",
-      blurb: (mins: number) => `${mins} minutes, half the usual. No hints. For pacing practice.`,
+      label: "Mastery",
+      badge: "SPEED",
+      blurb: (mins: number) =>
+        `${mins} minutes — half the real clock, everything else identical to exam conditions. Clear the tasks at this pace and the real thing will feel slow.`,
+    },
+    exam: {
+      label: "Exam",
+      badge: "REAL",
+      blurb: (mins: number) =>
+        `${mins} minutes, one attempt at the clock. No hints, and nothing is graded until you submit — the same as the day itself.`,
     },
   },
 

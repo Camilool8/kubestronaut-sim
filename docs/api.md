@@ -22,13 +22,22 @@ text.
 Mode is chosen at `POST /api/session/start` and is immutable for the
 life of the attempt. Every gate below reads server-side session state,
 never a request field
-(`facilitator/internal/session/session.go:38-51`).
+(`facilitator/internal/session/session.go:39-52`).
 
-| Mode | Clock | Hints | Solutions while running | Score mid-attempt | Re-seed a question |
-|---|---|---|---|---|---|
-| `exam` | The bank's `spec.duration` | No | No | No | No |
-| `training` | Untimed | Yes | Yes | Yes | Yes |
-| `speed` | `spec.speedDuration`, or half the bank's duration | No | No | No | No |
+The wire id and the displayed name are not the same word for `speed`.
+The UI calls it **Mastery**; the id stays `speed` because renaming it
+would invalidate every persisted session and every stored attempt.
+
+| Mode | Shown as | Clock | Hints | Solutions while running | Score mid-attempt | Re-seed a question |
+|---|---|---|---|---|---|---|
+| `training` | Training | Untimed | Yes | Yes | Yes | Yes |
+| `speed` | Mastery | `spec.speedDuration`, or half the bank's duration | No | No | No | No |
+| `exam` | Exam | The bank's `spec.duration` | No | No | No | No |
+
+The three columns after the clock are not restated per handler: they are
+`session.HelpAllowed`, `session.GradesPerTask` and `session.Recorded`
+(`facilitator/internal/session/session.go:59-93`), which both the gates
+below and the `modes` array in `GET /api/exam` read.
 
 ## Session-state gates
 
@@ -39,9 +48,9 @@ closes every mode-based gate below while idle.
 
 | Gate | Open when | Closed response | Source |
 |---|---|---|---|
-| Solutions | `state == "ended"`, **or** `mode == "training"` | 403 | `facilitator/internal/api/api.go:265` |
-| Hints | `mode == "training"` and `state != "idle"` | 403 | `facilitator/internal/api/api.go:323-328` |
-| Mid-attempt score | `mode == "training"` and `state == "running"` | 403 on mode, 409 on state | `facilitator/internal/api/api.go:444-450` |
+| Solutions | `state == "ended"`, **or** `HelpAllowed(mode)` | 403 | `facilitator/internal/api/api.go:364` |
+| Hints | `HelpAllowed(mode)` and `state != "idle"` | 403 | `facilitator/internal/api/api.go:422` |
+| Mid-attempt score | `GradesPerTask(mode)` and `state == "running"` | 403 on mode, 409 on state | `facilitator/internal/api/api.go:544` |
 | Answer writes (mcq) | `state == "running"` | 409 | `facilitator/internal/api/api.go:376-379` |
 | Desktop | `state == "running"`, any mode | 403 | `facilitator/cmd/facilitator/main.go:163-165` |
 | Re-seed | `mode == "training"` and `state == "running"` | 403 | `conductor/internal/control/reseed.go:83-89` |
@@ -109,12 +118,31 @@ selectable modes. Always 200.
     {"id": "q01", "instance": "instance-1", "domain": "Application Environment, Configuration and Security", "weight": 9, "totalPoints": 9, "hintCount": 2}
   ],
   "modes": [
-    {"id": "exam", "durationSeconds": 7200, "untimed": false, "helpAllowed": false},
-    {"id": "training", "durationSeconds": 0, "untimed": true, "helpAllowed": true},
-    {"id": "speed", "durationSeconds": 3600, "untimed": false, "helpAllowed": false}
+    {"id": "training", "durationSeconds": 0, "untimed": true, "helpAllowed": true, "gradesPerTask": true, "recorded": false, "recommended": false},
+    {"id": "speed", "durationSeconds": 3600, "untimed": false, "helpAllowed": false, "gradesPerTask": false, "recorded": true, "recommended": true},
+    {"id": "exam", "durationSeconds": 7200, "untimed": false, "helpAllowed": false, "gradesPerTask": false, "recorded": true, "recommended": false}
   ]
 }
 ```
+
+`modes` is ordered gentlest-first, which is the order the mode screen
+offers the cards in. Every flag is read from the same
+`facilitator/internal/session` predicate the enforcing handler reads, so
+a described mode and an enforced one cannot disagree: `helpAllowed` is
+`session.HelpAllowed`, `gradesPerTask` is `session.GradesPerTask`, and
+`recorded` is `session.Recorded`. `durationSeconds` comes from the same
+`durationFor` that `POST /api/session/start` resolves the real clock
+with, including under `SESSION_DURATION_OVERRIDE`.
+
+`recorded` says whether a finished attempt in that mode belongs in the
+durable attempt history. Nothing reads it yet — there is no history —
+and it is declared now so the promise on the card and the rule in the
+recorder are one statement rather than two. `recommended` marks the one
+card the mode screen accents; exactly one mode carries it.
+
+Mode **labels** are deliberately not in this response. A mode's name is
+user-facing copy and lives in `ui/src/strings.ts`; its permissions are
+facts only the server knows.
 
 `examType` is `hands-on` or `mcq` (`facilitator/internal/exam/exam.go`
 normalizes an absent `spec.examType` to `hands-on`). For hands-on,
