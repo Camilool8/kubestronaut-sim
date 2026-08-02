@@ -14,12 +14,12 @@ const THEME_ICONS: Record<string, IconName> = {
 // Tri-state theme control: System -> Light -> Dark. One small button —
 // the label always names the CURRENT preference; activating advances to
 // the next.
-export function ThemeToggle({ floating = false }: { floating?: boolean }) {
+export function ThemeToggle() {
   const [pref, cycle] = useTheme();
 
   return (
     <button
-      className={`theme-toggle${floating ? " theme-toggle-floating" : ""}`}
+      className="theme-toggle"
       onClick={cycle}
       aria-label={strings.theme.ariaLabel(strings.theme.labels[pref])}
     >

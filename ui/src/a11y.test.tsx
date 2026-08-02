@@ -12,6 +12,7 @@ import { HintTray } from "./components/HintTray";
 import { KeyboardSettings } from "./components/KeyboardSettings";
 import { ShortcutHelp } from "./components/ShortcutHelp";
 import { DesktopRequired } from "./components/DesktopRequired";
+import { AppHeader } from "./components/AppHeader";
 import { Dialog } from "./components/Dialog";
 import { ExamIntro } from "./components/ExamIntro";
 import { InfoDrawer } from "./components/InfoDrawer";
@@ -438,6 +439,35 @@ describe("axe: no WCAG violations", () => {
   test("desktop-required gate", async () => {
     // The one screen a phone or a 400%-zoomed desktop ever sees.
     const { container } = render(<DesktopRequired verdict="narrow" />);
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  // The header is on nearly every screen, so anything wrong here is
+  // wrong everywhere. Both variants are scanned: they differ in what
+  // leads the left cluster, which is exactly where the landmark, the
+  // link and the nav all live.
+  test("app header, brand variant", async () => {
+    const { container } = render(
+      <AppHeader
+        crumb="Choose an exam"
+        nav={[
+          { label: "History", to: "/progress" },
+          { label: "Packs", to: "/packs", current: true },
+        ]}
+      />,
+    );
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  test("app header, back variant", async () => {
+    const { container } = render(
+      <AppHeader
+        variant="back"
+        back={{ label: "Exams", to: "/exams" }}
+        crumb="CKAD"
+        detail="Certified Kubernetes Application Developer"
+      />,
+    );
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 

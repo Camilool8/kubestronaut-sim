@@ -10,12 +10,30 @@ import { readBaseCss, readThemeCss, ruleBody } from "../test/readCss";
 // fails loudly if someone deletes the rule while tidying.
 
 describe("full-height chain", () => {
-  test("main carries a height, or every screen root's percentage collapses", async () => {
+  test("the chain reaches #root, or every screen root's percentage collapses", async () => {
     const css = await readBaseCss();
-    const body = ruleBody(css, "html, body, #root, main");
+    const body = ruleBody(css, "html, body, #root");
 
-    expect(body, "the html/body/#root/main height rule was renamed or removed").not.toBeNull();
+    expect(body, "the html/body/#root height rule was renamed or removed").not.toBeNull();
     expect(body).toContain("height: 100%");
+  });
+
+  // `main` used to be in the rule above. It is now the flexible row of a
+  // column, because `.app-header` is its sibling and 100% + a 56px header
+  // overflows the viewport. Both halves are asserted: without the column
+  // on #root, `flex: 1` means nothing and main collapses to its content.
+  test("main takes the space the header leaves, and still has a definite height", async () => {
+    const css = await readBaseCss();
+    const root = ruleBody(css, "#root");
+    const main = ruleBody(css, "main");
+
+    expect(root, "#root's own rule was renamed or removed").not.toBeNull();
+    expect(root).toContain("flex-direction: column");
+    expect(main).toContain("flex: 1 1 auto");
+    expect(
+      main,
+      "a percentage height here would re-add the header's 56px on top of a full viewport",
+    ).not.toContain("height: 100%");
   });
 
   test("the screen roots that depend on it still ask for a percentage height", async () => {

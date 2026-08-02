@@ -20,10 +20,9 @@ import { Exam, ExamGateControls } from "./screens/Exam";
 import { McqExam } from "./screens/McqExam";
 import { Score } from "./screens/Score";
 import { DesktopRequired, gateOverridden, useDesktopGate } from "./components/DesktopRequired";
+import { AppHeader } from "./components/AppHeader";
 import { BackgroundJobChip } from "./components/BackgroundJobChip";
 import { ControlProgress } from "./components/ControlProgress";
-import { ThemeToggle } from "./components/ThemeToggle";
-import { InfoButton } from "./components/InfoButton";
 import { ToastLayer } from "./components/Toast";
 import { TopProgress } from "./components/TopProgress";
 import { ScreenTransition } from "./components/ScreenTransition";
@@ -306,6 +305,12 @@ export default function App() {
     !showOverlay &&
     !backgroundedJob;
 
+  // What the header calls the current location. Derived from the same
+  // session.state the screen switch below is derived from, so the crumb
+  // and the page under it can never name two different things.
+  const headerCrumb =
+    session?.state === "ended" ? strings.header.crumbResults : strings.header.crumbLobby;
+
   let screen = null;
   if (booting) {
     screen = <BootProgress boot={boot} onRetry={handleNewAttempt} />;
@@ -367,14 +372,12 @@ export default function App() {
   return (
     <>
       <TopProgress />
-      <main>
-        <ScreenTransition screenKey={booting ? "booting" : (session?.state ?? "loading")}>
-          {screen}
-        </ScreenTransition>
-      </main>
-      <ToastLayer />
+      {/* The header is chrome for the screens that are a PAGE. The exam is
+          not one — it has its own topbar carrying a clock and a submit
+          button — and neither is the boot screen, which is a takeover with
+          nothing to navigate to yet. */}
       {session && !booting && session.state !== "running" && (
-        <div className="floating-controls">
+        <AppHeader crumb={headerCrumb}>
           {/* A backgrounded rebuild used to run for 2-4 minutes with no
               indicator anywhere: the lobby behind it looked idle while the
               cluster it describes was being torn down. */}
@@ -385,10 +388,14 @@ export default function App() {
               onReopen={() => setBackgroundedJobId(null)}
             />
           )}
-          <InfoButton floating />
-          <ThemeToggle floating />
-        </div>
+        </AppHeader>
       )}
+      <main>
+        <ScreenTransition screenKey={booting ? "booting" : (session?.state ?? "loading")}>
+          {screen}
+        </ScreenTransition>
+      </main>
+      <ToastLayer />
       {showOverlay && overlayJob && (
         <ControlProgress
           job={overlayJob}

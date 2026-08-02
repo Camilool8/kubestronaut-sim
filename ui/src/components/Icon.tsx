@@ -12,12 +12,16 @@ import type { ReactNode } from "react";
 // — renders as a tofu box on many Linux font sets, and ☀/☾ can resolve to
 // Apple Color Emoji on macOS, which DESIGN.md explicitly bans.
 //
-// The geometry is not invented here: ui/public/favicon.svg is already a
-// hand-authored chevron with round caps and joins, no fill, and a stroke
-// proportional to its 32 grid. This is that language at 24, which is the
-// size the UI actually uses. Extending one system beats importing a
-// second one, and it keeps the offline promise absolute — nothing about
-// an icon can fail to arrive.
+// These are hand-authored on a 24 grid with round caps and joins, no
+// fill, and a stroke proportional to the grid. Everything is drawn here
+// rather than imported, which keeps the offline promise absolute —
+// nothing about an icon can fail to arrive.
+//
+// The brand mark is deliberately NOT in this set. It is a filled,
+// multi-colour drawing on its own field (see BrandMark in AppHeader and
+// its mirror in ui/public/favicon.svg); these are monochrome outlines
+// that take `currentColor`, and mixing the two systems in one file would
+// invite a call site to tint the mark.
 //
 // The <svg> hardcodes aria-hidden and takes no label prop, deliberately.
 // Every glyph in this product already sits beside .sr-only text or an

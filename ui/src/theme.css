@@ -117,21 +117,161 @@
   transform: translateY(1px);
 }
 
-/* Both floating controls live in one cluster, so their spacing comes
-   from the layout rather than from a hardcoded offset that had to guess
-   the theme toggle's label width. */
-.floating-controls {
-  position: fixed;
-  top: var(--space-4);
-  right: var(--space-4);
-  z-index: var(--z-panel);
+/* ---- app header ----
+   The chrome above every screen that is not the exam itself. It replaced
+   a fixed cluster of two icon buttons pinned to the top-right corner:
+   with more than one destination to reach, floating controls had nowhere
+   to put a breadcrumb or a nav, and the page below them started at the
+   very top of the viewport with nothing naming it. */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  height: 56px;
+  /* Not optional. #root is a column flex container, so `height` here is
+     only a flex BASE size — with the default shrink factor the score
+     screen's 1500px of results squashed this to its min-content height
+     (29px, the label text) while the lobby, whose content fits, kept the
+     full 56. A header that is a different height depending on how long
+     the page below it is. */
+  flex-shrink: 0;
+  padding: 0 var(--space-5);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.app-header-lead,
+.app-header-tail {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.app-header-lead {
+  gap: var(--space-3);
+}
+
+.app-header-tail {
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+/* Not .app-header-brand: that name is already the variant modifier on
+   the <header> itself, so styling the link with it would have applied
+   this gap to the header too and quietly narrowed the space between the
+   two clusters. */
+.app-header-home {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius-s);
 }
 
-.theme-toggle-floating {
-  background: var(--surface);
+.brand-mark {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.app-header-wordmark {
+  font-size: var(--text-l);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  white-space: nowrap;
+}
+
+/* The product is "kubestronaut"; "-sim" says this is the rehearsal. */
+.app-header-wordmark-tail {
+  color: var(--text-secondary);
+}
+
+/* A hairline, not a bullet: it separates the mark from the crumb without
+   reading as punctuation between two names. */
+.app-header-rule {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.app-header-crumb {
+  font-size: var(--text-s);
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Truncates rather than wraps: the header is a fixed 56px and a long
+   exam name must not push the nav out of it. */
+.app-header-detail {
+  font-size: var(--text-s);
+  color: var(--text-subtle);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.app-header-back,
+.app-header-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: none;
+  border: 0;
+  padding: var(--space-1) 0;
+  font: inherit;
+  font-size: var(--text-s);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.app-header-back {
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.app-header-back:hover {
+  color: var(--accent-strong);
+}
+
+.app-header-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.app-header-link {
+  color: var(--text-secondary);
+}
+
+.app-header-link:hover {
+  color: var(--text);
+}
+
+.app-header-link-on {
+  color: var(--text);
+  cursor: default;
+}
+
+/* Under ~560px the crumb is the first thing to go: the mark still says
+   where you are, and the nav is the only part that cannot be reached any
+   other way. */
+@media (max-width: 560px) {
+  .app-header {
+    padding: 0 var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .app-header-crumb,
+  .app-header-rule,
+  .app-header-detail {
+    display: none;
+  }
 }
 
 /* ---- loading ---- */
@@ -2277,10 +2417,6 @@
 .info-button:active {
   background: var(--surface-hover);
   transform: translateY(1px);
-}
-
-.info-button-floating {
-  background: var(--surface);
 }
 
 .drawer-overlay {
