@@ -159,6 +159,73 @@ sys.exit(1 if fail else 0)
 PY
 }
 
+# The link-preview card, against the page that advertises it.
+#
+# og.png is NOT a mirror and cannot be one here: it is a raster, and
+# regenerating it needs a browser, which is exactly the dependency this
+# directory refuses to take. So this holds the parts that CAN be held --
+# that the source and the artwork both exist, that the artwork is the
+# frame Open Graph expects, and that index.html advertises the frame the
+# file actually has. A card whose declared size is a lie gets cropped or
+# dropped by the scraper, and nobody finds out from the repository.
+#
+# What it deliberately does NOT check: whether the pixels are current.
+# Editing og.html without re-running the command in site/README.md leaves
+# a stale card and this gate green. Said plainly rather than implied,
+# because a check that is trusted for more than it does is worse than no
+# check -- which this file has already learned once (see check_figures).
+#
+# PNG dimensions come from the IHDR header: an 8-byte signature, a 4-byte
+# chunk length, the "IHDR" tag, then width and height as big-endian
+# uint32. That is a fixed offset in every PNG ever written, so it needs
+# no image library on the host.
+check_og() {
+  python3 - "$repo" <<'PY'
+import pathlib, re, struct, sys
+
+repo = pathlib.Path(sys.argv[1])
+fail = []
+
+src = repo / "site" / "og.html"
+png = repo / "site" / "og.png"
+if not src.exists():
+    fail.append("site/og.html is missing -- og.png has no source to be rebuilt from")
+
+want = (1200, 630)
+if not png.exists():
+    fail.append("site/og.png is missing, but index.html points og:image at it")
+else:
+    head = png.read_bytes()[:24]
+    if head[:8] != b"\x89PNG\r\n\x1a\n" or head[12:16] != b"IHDR":
+        fail.append("site/og.png is not a PNG")
+    else:
+        got = struct.unpack(">II", head[16:24])
+        if got != want:
+            fail.append(f"site/og.png is {got[0]}x{got[1]}, want {want[0]}x{want[1]}")
+
+page = (repo / "site" / "index.html").read_text()
+for prop, value in (("og:image:width", want[0]), ("og:image:height", want[1])):
+    m = re.search(rf'property="{prop}"\s+content="(\d+)"', page)
+    if m is None:
+        fail.append(f"index.html declares no {prop}")
+    elif int(m.group(1)) != value:
+        fail.append(f"index.html says {prop} is {m.group(1)}, the file is {value}")
+
+# Relative og:image and og:url are ignored by every scraper, which is a
+# silent failure: the page looks fine and the preview is simply blank.
+for prop in ("og:image", "og:url"):
+    m = re.search(rf'property="{prop}"\s+content="([^"]+)"', page)
+    if m is None:
+        fail.append(f"index.html declares no {prop}")
+    elif not m.group(1).startswith("https://"):
+        fail.append(f"{prop} is not absolute: {m.group(1)}")
+
+for line in fail:
+    print(f"build.sh: {line}", file=sys.stderr)
+sys.exit(1 if fail else 0)
+PY
+}
+
 if [ "${1:-}" = "--check" ]; then
   tmp=$(mktemp -d)
   trap 'rm -rf "$tmp"' EXIT
@@ -166,6 +233,7 @@ if [ "${1:-}" = "--check" ]; then
 
   status=0
   check_figures || status=1
+  check_og || status=1
   for f in tokens.css favicon.svg; do
     if ! diff -q "$tmp/$f" "$here/$f" >/dev/null 2>&1; then
       echo "build.sh: site/$f is out of date - run site/build.sh" >&2

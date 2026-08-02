@@ -19,9 +19,17 @@
     <meta name="theme-color" content="#f6f8fc" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#101728" media="(prefers-color-scheme: dark)" />
 
-    <!-- Link-preview metadata. No og:image: this project has no artwork
-         to put behind one, and a generated placeholder would be the kind
-         of claim the rest of the page refuses to make. -->
+    <!-- Link-preview metadata. og:image is og.png, generated from
+         og.html by the command in site/README.md — the card is this
+         page's own hero in the dark theme, drawn by the same stylesheet,
+         so it cannot advertise a design the site does not have.
+
+         Both URLs are ABSOLUTE and must stay that way: a relative
+         og:image is ignored by every scraper, which fails silently — the
+         page looks fine and the preview is simply blank. They point at
+         the GitHub Pages origin this directory is built for. Scrapers
+         cache aggressively, so later artwork needs the platform's own
+         cache flushed before it shows. -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="kubestronaut-sim" />
     <meta
@@ -29,7 +37,18 @@
       content="A killer.sh-style rehearsal for the Kubernetes certifications, as a Docker Compose stack on your own machine. Deliberately harder than the real exams."
     />
     <meta property="og:url" content="https://camilool8.github.io/kubestronaut-sim/" />
-    <meta name="twitter:card" content="summary" />
+    <meta
+      property="og:image"
+      content="https://camilool8.github.io/kubestronaut-sim/og.png"
+    />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="kubestronaut-sim. An exam simulator you run yourself. Five orbits, one per certification on the Kubestronaut path, with KCNA and CKAD drawn solid because each has a question bank you can sit today."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
 
     <!-- tokens.css is the app's own stylesheet, mirrored here by
          site/build.sh and loaded first so every value below resolves

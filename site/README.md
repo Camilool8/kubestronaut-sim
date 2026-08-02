@@ -52,7 +52,9 @@ in `DESIGN.md`, enforced by `ui/src/styles/mirrors.test.ts`):
 Run that alongside the other offline gates in `AGENTS.md`. A token change
 that has not reached the landing page is then a failure, not a slow drift.
 
-`--check` also re-derives the page's **figures** from `banks/*/exam.yaml`
+`--check` also verifies the link-preview card as far as it can, described
+under "The link-preview card" below, and re-derives the page's **figures**
+from `banks/*/exam.yaml`
 and fails if they disagree: the headline question total, each bank's
 share of it, and the drawn/pool pair of every pooled bank. `index.html`
 is written by hand and nothing regenerates it, so its numbers could only
@@ -71,6 +73,50 @@ fail before you trust it.
 Fonts need `npm ci` to have run in `ui/`. Without them `build.sh` warns
 and the page falls through the token stacks to `system-ui` and
 `ui-monospace` — plainer, and fully functional.
+
+## The link-preview card
+
+`og.png` is the 1200×630 image every scraper shows when someone pastes a
+link to the site. It is generated from `og.html`, which is a real page in
+this directory: it loads `tokens.css` and `styles.css` and draws the hero
+orbit with the *same rules the hero uses*, so the card cannot advertise a
+design the site does not have. It sets `data-theme="dark"` on `<html>`,
+because a raster cannot follow a preference and a dark card stays a
+defined object on a light feed and on a dark one.
+
+Regenerate it after any change to `og.html`, `styles.css` or the tokens:
+
+```bash
+python3 -m http.server 8099 -d site &                 # Chrome needs an origin for the fonts
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --headless=new --disable-gpu --hide-scrollbars --force-color-profile=srgb \
+  --screenshot=site/og.png --window-size=1200,630 \
+  http://localhost:8099/og.html
+```
+
+`--window-size` and the `.og` rule in `og.html` must agree, and both must
+agree with the `og:image:width` / `og:image:height` in `index.html`.
+
+**This is the one thing in this directory that is not held equal to its
+source.** Rasterizing needs a browser, which is a dependency this
+directory will not take, so `build.sh --check` cannot rebuild `og.png`
+and compare. What it *does* check: that `og.html` and `og.png` both
+exist, that the PNG really is 1200×630 (read straight out of the IHDR
+header, no image library), and that `index.html` declares that same size
+and gives absolute URLs for `og:image` and `og:url` — a relative one is
+ignored by every scraper, and it fails silently, leaving a page that
+looks fine and a preview that is blank.
+
+So editing `og.html` and forgetting the command leaves a stale card and a
+green gate. That is stated here rather than implied, because a check
+trusted for more than it does is worse than no check — a lesson this
+directory has already had once, from a CI step that claimed to catch a
+question count drifting from the banks and did not.
+
+Two things worth knowing when the artwork changes: scrapers cache
+aggressively, so the platform's own cache has to be flushed before a new
+card appears; and the URLs point at the GitHub Pages origin, so they
+resolve only once Pages is serving this directory.
 
 ## Things worth knowing before editing
 

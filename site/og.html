@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <!-- The SOURCE of og.png, not a page anyone is meant to land on.
+         Served from this directory only because Chrome needs an origin to
+         load the fonts from; noindex keeps it out of search results. -->
+    <meta name="robots" content="noindex, nofollow" />
+    <title>og.png source — kubestronaut-sim</title>
+
+    <!-- The card is the page's own dark theme, not a second palette.
+         data-theme="dark" is set on <html> above rather than left to the
+         OS, because a raster cannot follow a preference: it has to pick
+         one and carry it. Dark is the pick because a link preview is
+         drawn on somebody else's background — a dark card stays a
+         defined object on a light feed and on a dark one, where a light
+         card dissolves into the first and glares on the second. The
+         field it lands on, #101728, is --bg in dark and --ink in light,
+         and it is the favicon's own field, so the card and the mark
+         agree.
+
+         styles.css is loaded for one reason: the orbit is drawn by the
+         SAME rules as the hero. Ring geometry, the dashed "no bank yet"
+         treatment, the label knockouts and the --exam-tint aliasing all
+         come from there, so the card cannot drift from the page it
+         advertises. Everything below styles only this card. -->
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="fonts.css" />
+    <link rel="stylesheet" href="styles.css" />
+
+    <style>
+      /* No literal colour here either, for the same reason styles.css has
+         none: this file is a second surface for the same design system,
+         not a second source of truth for it. */
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+      }
+
+      /* Exactly the Open Graph frame. Chrome is told to capture this
+         size, so any change here has to be matched in the --window-size
+         of the regeneration command in site/README.md. */
+      .og {
+        box-sizing: border-box;
+        width: 1200px;
+        height: 630px;
+        display: grid;
+        grid-template-columns: 1fr 420px;
+        align-items: center;
+        gap: var(--space-8);
+        padding: 72px;
+        background: var(--bg);
+        font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* Sized in px rather than through the type scale. The scale is
+         built for a reading surface at arm's length; this is read as a
+         thumbnail in somebody's feed, where the whole card may be 500px
+         wide, so every step here is deliberately coarser than any step
+         the product itself uses. */
+      .og-mark {
+        font-size: 26px;
+        font-weight: 600;
+        letter-spacing: var(--tracking-tight);
+        color: var(--text);
+      }
+
+      /* The same split the site header draws: the product is
+         "kubestronaut", and "-sim" says this is the rehearsal. */
+      .og-mark span {
+        color: var(--text-secondary);
+      }
+
+      .og-title {
+        margin: 28px 0 0;
+        font-size: 58px;
+        line-height: 1.08;
+        font-weight: 600;
+        letter-spacing: -0.025em;
+        color: var(--text);
+        text-wrap: balance;
+      }
+
+      /* Measured in px against the column it sits in, not in ch. A ch
+         measure sized for prose left this at four lines with a
+         one-word last line, and a widow is the one typographic fault a
+         link preview cannot hide: the card is read at a glance or not at
+         all. pretty then keeps the last line from going short again if
+         the copy is ever edited. */
+      .og-desc {
+        margin: 26px 0 0;
+        max-width: 540px;
+        font-size: 24px;
+        line-height: 1.45;
+        color: var(--text-muted);
+        text-wrap: pretty;
+      }
+
+      /* The figure fills its column. styles.css caps .orbit-svg at 21rem
+         for the hero, which is the wrong measure at card scale. */
+      .og .orbit-svg {
+        max-width: none;
+        width: 420px;
+      }
+
+      /* A raster has one frame, so the bodies sit at the angles they were
+         authored at rather than wherever the animation happened to be
+         when the shutter opened. Without this the card is not
+         reproducible: two runs would not be byte-identical. */
+      .og .orbit-track {
+        animation: none !important;
+      }
+
+      /* Bumped from --text-xs. At 320 user units drawn into 420px the
+         ring labels would land near 14px, which survives a full-size
+         card and disappears in a feed thumbnail. */
+      .og .orbit-label {
+        font-size: 13px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="og">
+      <div>
+        <p class="og-mark">kubestronaut<span>-sim</span></p>
+        <p class="og-title">An exam simulator you run yourself.</p>
+        <p class="og-desc">
+          A killer.sh-style rehearsal for the Kubernetes certifications, run
+          locally. Two of the five have a bank you can sit today.
+        </p>
+      </div>
+
+      <svg
+        class="orbit-svg"
+        viewBox="0 0 320 320"
+        role="img"
+        aria-label="Five orbits, one per certification on the Kubestronaut path. KCNA and CKAD are drawn solid: each has a question bank you can sit today. KCSA, CKA and CKS are drawn dashed: they appear in the catalog but no bank is written for them."
+      >
+        <g class="orbit-ring" data-ring="kcna" data-engine="mcq" data-state="live">
+          <circle class="orbit-path" cx="160" cy="160" r="48" />
+          <g class="orbit-track">
+            <g transform="rotate(40 160 160)">
+              <circle class="orbit-body" cx="160" cy="112" r="7" />
+            </g>
+          </g>
+          <text class="orbit-label" x="160" y="212">KCNA</text>
+        </g>
+
+        <g class="orbit-ring" data-ring="kcsa" data-engine="soon" data-state="soon">
+          <circle class="orbit-path" cx="160" cy="160" r="71" />
+          <g class="orbit-track">
+            <g transform="rotate(200 160 160)">
+              <circle class="orbit-body" cx="160" cy="89" r="5" />
+            </g>
+          </g>
+          <text class="orbit-label" x="210" y="114">KCSA</text>
+        </g>
+
+        <g class="orbit-ring" data-ring="cka" data-engine="soon" data-state="soon">
+          <circle class="orbit-path" cx="160" cy="160" r="94" />
+          <g class="orbit-track">
+            <g transform="rotate(60 160 160)">
+              <circle class="orbit-body" cx="160" cy="66" r="5" />
+            </g>
+          </g>
+          <text class="orbit-label" x="94" y="231">CKA</text>
+        </g>
+
+        <g class="orbit-ring" data-ring="ckad" data-state="live">
+          <circle class="orbit-path" cx="160" cy="160" r="117" />
+          <g class="orbit-track">
+            <g transform="rotate(250 160 160)">
+              <circle class="orbit-body" cx="160" cy="43" r="7" />
+            </g>
+          </g>
+          <text class="orbit-label" x="277" y="164">CKAD</text>
+        </g>
+
+        <g class="orbit-ring" data-ring="cks" data-engine="soon" data-state="soon">
+          <circle class="orbit-path" cx="160" cy="160" r="140" />
+          <g class="orbit-track">
+            <g transform="rotate(130 160 160)">
+              <circle class="orbit-body" cx="160" cy="20" r="5" />
+            </g>
+          </g>
+          <text class="orbit-label" x="45" y="84">CKS</text>
+        </g>
+
+        <circle class="orbit-core" cx="160" cy="160" r="16" />
+      </svg>
+    </div>
+  </body>
+</html>
