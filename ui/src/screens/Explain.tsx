@@ -402,10 +402,11 @@ function collectEvidence(checks: CheckResult[]): Evidence[] {
  */
 function EvidenceSection({ evidence }: { evidence: Evidence[] }) {
   // Computed HERE, in the client, and deliberately. The grader emits two
-  // documents and never a diff: docs/bank-spec.md:324 bans `diff` inside
-  // a validator because SCORING on line order fails a correct answer that
-  // is merely ordered differently. Rendering has no such property, so the
-  // highlight is a view concern and the ban upstream stays intact.
+  // documents and never a diff: docs/bank-spec.md ("check-lint rules")
+  // bans `diff` inside a validator because SCORING on line order fails a
+  // correct answer that is merely ordered differently. Rendering has no
+  // such property, so the highlight is a view concern and the ban
+  // upstream stays intact.
   const blocks = evidence.map((e) => ({
     ...e,
     diff: e.actual && e.expected ? diffDocuments(e.actual.body, e.expected.body) : null,

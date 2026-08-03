@@ -19,11 +19,15 @@ questions against [docs/bank-spec.md](docs/bank-spec.md).
 
 ## Product Purpose
 
-A killer.sh-style exam simulator for the Kubestronaut certification
-track, run locally. It gives a timed, graded, environment-backed
-rehearsal of the real exam: an exam catalog, a countdown that cannot be
-paused, a real Linux desktop with terminals, a real two-node Kubernetes
-cluster to act on, and a per-check score with full solutions afterwards.
+An exam simulator for the Kubestronaut certification track, run locally.
+It gives a timed, graded, environment-backed rehearsal of the real exam:
+an exam catalog, a countdown that cannot be paused, a real Linux desktop
+with terminals, a real two-node Kubernetes cluster to act on, and a
+per-check score with full solutions afterwards.
+
+It is built to accompany a candidate across the whole Kubestronaut path
+rather than a single sitting: graded attempts are kept, so weak domains
+and progress along the five certifications are answerable at any point.
 
 ## Positioning
 
@@ -49,6 +53,13 @@ candidate narrowing to two domains — the points a draw happens to
 contain no longer carry the curriculum's shape, and only weighting the
 result restores it. The raw earned-over-total figure is still reported
 beside the weighted one, because a candidate is owed both.
+
+**It is one part of preparing, and says so.** It does not replace working
+a problem out for yourself, the lab a candidate builds at home, or the
+Linux Foundation's own training. What it adds is a timed rehearsal on a
+real cluster and a score that can be trusted. Positioning it as a
+substitute for any of those would be both false and worse for the
+candidate.
 
 ## Operating Context
 
@@ -166,10 +177,27 @@ The parts that constrain product decisions:
 - The name **kubestronaut-sim** is binding (owner decision, 2026-07-26).
   It stays in the repository, the UI and the CLI.
 - Every surface that names a certification carries the non-affiliation
-  notice: not affiliated with CNCF, The Linux Foundation, PSI, or
-  killer.sh; Kubernetes and the certification names are trademarks of
-  The Linux Foundation. It lives in the README and in the app's About
-  panel beside a real-exam comparison table.
+  notice: not affiliated with CNCF, The Linux Foundation, or PSI;
+  Kubernetes and the certification names are trademarks of The Linux
+  Foundation. It lives in the README and in the app's About panel beside
+  a real-exam comparison table.
+- **The brand does not position against another product.** Inspiration
+  from open-source tooling, from commercial simulators and from sitting
+  the real exams is real, and it stays out of the identity. The product
+  is described by what it does, never as a version of something else.
+- **Every mark in this product is original. No Kubernetes, CNCF or Linux
+  Foundation artwork is used or implied**, in the app, on the landing
+  page, or in the favicon. This is not caution for its own sake. The
+  Linux Foundation's trademark policy requires written permission before
+  a logo appears on a site promoting a product, and the certification
+  badges are issued to individuals who pass an exam, for personal
+  display — they are not available to a third party. Using them would
+  also claim precisely the affiliation the notice above denies, and a
+  disclaimer under a wall of official badges is not a defence. The
+  certification acronyms as **text** are a different matter: naming an
+  exam you prepare someone for is true factual reference, and it needs
+  no permission. Marks live in `ui/src/components/CertMark.tsx`, drawn
+  from the product's own orbit figure.
 - Licensing is stated rather than implied: Apache-2.0 for code,
   CC BY-SA 4.0 for question banks ([banks/LICENSE](banks/LICENSE)).
 - Voice is plain, specific, and unhedged. It states what is defended and
@@ -192,8 +220,10 @@ The parts that constrain product decisions:
 - Reference solution scripts that must score 100%, the
   fresh-environment-scores-0 gate, and the curriculum weight check. See
   [docs/testing.md](docs/testing.md).
-- A documented bank format and an open backlog
-  ([docs/follow-ups.md](docs/follow-ups.md)).
+- A documented bank format ([docs/bank-spec.md](docs/bank-spec.md)) and a
+  written record of where the simulator diverges from the real exam on
+  purpose ([docs/follow-ups.md](docs/follow-ups.md)). Open work is in
+  GitHub issues.
 
 **Absences future work must not paper over:** there are no users,
 testimonials, adoption numbers, pass-rate claims, or hosted service. The

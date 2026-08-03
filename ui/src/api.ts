@@ -469,7 +469,7 @@ export type SolutionResponse =
   | { ok: false; error: string };
 
 // GET /api/questions/{id}/solution is 403 until the session has ended
-// (killer.sh UX fidelity, not a security boundary) — modeled as a
+// (real-exam UX fidelity, not a security boundary) — modeled as a
 // tagged union rather than a thrown error so callers render a normal
 // "not available yet" state instead of an exception.
 export async function getSolution(id: string, signal?: AbortSignal): Promise<SolutionResponse> {

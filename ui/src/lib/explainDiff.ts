@@ -1,8 +1,9 @@
 // Line matching for the explanation screen's two document panes.
 //
 // The grader emits two documents and never a diff, and never will:
-// docs/bank-spec.md:324 bans `diff` inside a validator because SCORING on
-// line order fails a correct answer that is merely ordered differently —
+// docs/bank-spec.md ("check-lint rules") bans `diff` inside a validator
+// because SCORING on line order fails a correct answer that is merely
+// ordered differently —
 // two Service ports in the other sequence are the same Service. Rendering
 // carries no such hazard: a highlight that lands on the wrong line is a
 // highlight, not a lost point. So the comparison is computed here, in the

@@ -1,6 +1,6 @@
 # Testing
 
-Four gates run offline in seconds. Three toolchain suites need Go or
+Five gates run offline in seconds. Three toolchain suites need Go or
 Node and no Docker. One end-to-end suite needs Docker, ~9GB of RAM and
 about 35 minutes, and is the only place the question banks are ever
 proved honest.
@@ -13,19 +13,21 @@ green check mark.
 
 | Touched | Run |
 |---|---|
-| `banks/` | The four offline gates |
+| `banks/` | The five offline gates |
 | `conductor/`, `facilitator/`, `proxy/` | `go test ./... && go vet ./...` in that module |
 | `ui/` | `npx tsc --noEmit`, `npm run lint`, `npm test`, from `ui/` |
-| `sim`, `images/`, `docker-compose.yml`, or any validator | The smoke suite, on a machine with Docker |
+| `site/` | `bash site/build.sh --check` |
+| `sim`, `images/`, `docker-compose.yaml`, or any validator | The smoke suite, on a machine with Docker |
 
 ## The offline gates
 
-Four scripts, seconds in total, no cluster and no containers. Run all
-four from the repo root:
+Five scripts, seconds in total, no cluster and no containers. Run all
+five from the repo root:
 
 ```bash
 bash tests/bank-weights.sh && bash tests/check-lint.sh \
-  && bash tests/check-lib.sh && bash tests/bank-hints.sh
+  && bash tests/check-lib.sh && bash tests/bank-hints.sh \
+  && bash tests/bank-mcq.sh
 ```
 
 | Script | What it proves |
@@ -34,6 +36,7 @@ bash tests/bank-weights.sh && bash tests/check-lint.sh \
 | `tests/check-lint.sh` | No validator grades spelling instead of behaviour: no `diff`, no `grep` over YAML, no `kubectl get -o yaml`, no `kubectl run`, no `grep -qx`. It also requires an exact `# points: N` header on every check and refuses a call into `banks/_lib/checks.sh` that never sourced it. |
 | `tests/check-lib.sh` | The `banks/_lib/checks.sh` helpers still treat `0.1` and `100m` as the same CPU request, `1Gi` and `1024Mi` as the same memory, and a trailing space as the same answer. It also covers `k8s_clean`, which decides what a captured object looks like on the explanation screen: server-side noise goes, and so does a cluster-assigned `clusterIP` — allocated per cluster, so an authored `expected/` document would disagree with the live object on every attempt, and a disagreeing line is drawn as the one that is *wrong*. `clusterIP: None` stays, because a human types that one. |
 | `tests/bank-hints.sh` | Every question in a bank that has hints has both tiers, and no hint shares 120 consecutive characters with its `solution.md` — a hint you can paste is the solution wearing a hint's name. |
+| `tests/bank-mcq.sh` | Six invariants over every `examType: mcq` bank (header at tests/bank-mcq.sh:7-28). The ones with no hands-on equivalent: every question is well-formed (3-6 options, a `correct` list that is unique, sorted, in range and sized to match `multi`, and a `solution.md` over 200 characters, since "the answer is B" is not an explanation); mcq purity, meaning no `setup.sh`, no `validate.d/` and no `files/` anywhere in the bank, because a stray one means a question was ported without changing shape; and a non-degenerate answer key, since no option index may be the answer to more than half the single-answer questions. |
 
 The bank format these enforce is specified in
 [docs/bank-spec.md](bank-spec.md).
@@ -124,8 +127,8 @@ want. It needs Docker, ~9GB of free RAM, and about 35 minutes.
 bash tests/smoke.sh
 ```
 
-It starts with the four offline gates, so a mis-weighted bank fails in
-two seconds rather than forty minutes in. Two budgets bound the waits,
+It starts with the five offline gates (tests/smoke.sh:28-37), so a
+mis-weighted bank fails in two seconds rather than forty minutes in. Two budgets bound the waits,
 both overridable from the environment:
 
 | Variable | Default | Bounds |
@@ -186,11 +189,14 @@ machine.
 ## What CI runs
 
 `.github/workflows/ci.yml` runs five jobs on push to every branch, on
-every pull request, and on manual dispatch.
+every pull request, and on manual dispatch. It is the only workflow that
+gates anything — `.github/workflows/site.yml` deploys `site/` to GitHub
+Pages on a push to `main` and tests nothing (see
+[site/README.md](../site/README.md)).
 
 | Job | What it runs |
 |---|---|
-| `banks` | The four offline gates, `tests/bank-mcq.sh`, and `site/build.sh --check` |
+| `banks` | The five offline gates, then `site/build.sh --check` |
 | `go` | `go test ./...` then `go vet ./...` for `facilitator`, `conductor` and `proxy`, in a matrix with `fail-fast: false` |
 | `ui` | `npm ci`, `npx tsc --noEmit`, `npm run lint`, `npm test`, all with `working-directory: ui` |
 | `images` | Builds all six Dockerfiles with `PRELOAD=none`, then `docker compose config -q` |
@@ -199,6 +205,19 @@ every pull request, and on manual dispatch.
 `PRELOAD=none` skips baking ~2GB of image archives. The job proves the
 Dockerfiles parse and build; only a real boot proves the archives are
 right, and that is the smoke suite's job.
+
+## Dependency updates
+
+`.github/dependabot.yml` opens monthly pull requests for two ecosystems
+only: npm in `/ui`, with development dependencies grouped into one PR and
+major vitest bumps ignored, and GitHub Actions in `/`.
+
+There is deliberately no `gomod` entry — all three Go modules are
+stdlib-only, so no `go.sum` exists and there is nothing to bump. There is
+no `docker` entry either: base image tags are hand-pinned, and a bump
+needs a cold-cache smoke run to prove the preloaded images still resolve
+offline. CI cannot run that, so an automated PR would arrive
+unverifiable.
 
 ## What CI does not check
 
@@ -209,8 +228,9 @@ right, and that is the smoke suite's job.
 | `go test -race` | Races in the facilitator's session state surface at runtime, not on a pull request |
 | Coverage | No report and no threshold |
 | `shellcheck` | Only `bash -n`, which proves a script parses and nothing more, across 76 validator scripts |
-| `govulncheck`, `npm audit` | No dependency advisories on either toolchain |
-| Dependabot, code scanning | `.github/` holds one workflow and nothing else |
+| `govulncheck`, `npm audit` | No advisory scan runs in CI on either toolchain |
+| Code scanning | No CodeQL and no SAST of any kind |
+| Anything in `site/` beyond `--check` | The Pages deploy publishes whatever is on `main`; nothing tests the served page |
 
 A green CI run means the code compiles, the types check, the unit tests
 pass and the banks are internally consistent. It does not mean a single

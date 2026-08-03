@@ -24,6 +24,25 @@ python3 -m http.server 8000 -d site   # then open http://localhost:8000
 directory mirrors from elsewhere in the repo (below); the page is
 otherwise served exactly as it is written.
 
+## How it is published
+
+`.github/workflows/site.yml` uploads this directory to GitHub Pages on
+every push to `main`, and on manual dispatch. It runs no build step and
+no checks: it publishes the files as they are committed, so whatever is
+on `main` is what the world sees.
+
+The gate is therefore entirely upstream of the deploy. `site/build.sh
+--check` runs in CI's `banks` job on every branch and every pull request
+(see [../docs/testing.md](../docs/testing.md)), which is the only thing
+standing between a stale mirror and production. Nothing re-checks the
+page after it is served.
+
+Because the deploy carries the directory verbatim, `build.sh`,
+`README.md` and `og.html` are published alongside the page. Nothing
+links to them and nothing needs them at runtime — `og.html` is rendered
+locally to produce `og.png`, and it is only the PNG that scrapers
+fetch.
+
 ## How it consumes the design system
 
 `index.html` loads `tokens.css` before its own stylesheet:
@@ -69,6 +88,29 @@ fail before you trust it.
 | `tokens.css` | `ui/src/styles/tokens.css` |
 | `favicon.svg` | `ui/public/favicon.svg` |
 | `fonts/*.woff2` | `ui/node_modules/@fontsource/ibm-plex-{sans,mono}` |
+
+### The certification marks — checked, not generated
+
+The five marks on the exam cards are owned by
+`ui/src/components/CertMark.tsx`. This page cannot import a React
+component, so the same geometry is inlined into `index.html` — a fourth
+mirror, and the one that is compared rather than regenerated.
+
+Each `<svg class="cert-mark">` carries `data-cert`, and `--check` asserts
+its shapes match that certification's entry in the component exactly:
+same elements, same attributes, same values. Attribute order and
+whitespace are normalised away, since JSX self-closes with a space and
+the page does not. The set has to match both ways — a mark in the
+component but not on the page is a landing page advertising four exams
+out of five.
+
+To change a mark, edit `CertMark.tsx`, copy the shapes into the matching
+`data-cert` block here, and run `--check`. It fails loudly if you do one
+and not the other.
+
+**No Kubernetes, CNCF or Linux Foundation artwork is used anywhere on
+this page**, and none may be added. The reason is in
+[../PRODUCT.md](../PRODUCT.md) under Brand Commitments.
 
 Fonts need `npm ci` to have run in `ui/`. Without them `build.sh` warns
 and the page falls through the token stacks to `system-ui` and

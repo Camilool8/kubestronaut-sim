@@ -18,6 +18,9 @@ pages are for changing the thing.
   enforces, and what CI structurally cannot.
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — symptoms and fixes, from
   the preflight through boot, an attempt, and grading.
+- [../site/README.md](../site/README.md) — the GitHub Pages landing
+  page: which of its files are generated mirrors, and what
+  `site/build.sh --check` does and does not catch.
 
 ## Looking something up
 

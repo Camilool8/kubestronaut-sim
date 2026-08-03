@@ -8,6 +8,7 @@ import {
   type BanksResponse,
 } from "../api";
 import { Async } from "../components/Async";
+import { CertMark, hasCertMark } from "../components/CertMark";
 import { Dialog } from "../components/Dialog";
 import { pathStatus } from "../lib/attemptHistory";
 import { formatDuration } from "../lib/format";
@@ -88,15 +89,21 @@ function examStats(bank: BankEntry): [string, ReactNode][] {
  * which is a sentence ("CKA Mock Exam 01") and would spill out of a 44px
  * square. A bank that claims no certification simply has no tile.
  *
- * The whole acronym, not the design's two-letter crop: CKA, CKAD and CKS
- * all crop to "CK". Four mono characters fit, and the tile is decoration
- * anyway — the same string is the heading beside it.
+ * It holds an original mark per certification (see CertMark), not the
+ * acronym: the acronym is already the heading beside it, so setting it
+ * twice spent the one memorable slot on the card saying nothing new.
+ *
+ * The acronym survives as the fallback for a certification nobody has
+ * drawn a mark for yet — `banks/catalog.yaml` can advertise one at any
+ * time, and a tile that renders empty is worse than a plain one. That is
+ * why the mono type rules stay on `.exam-avatar`.
  */
 function ExamAvatar({ bank }: { bank: BankEntry }) {
   if (!bank.certification) return null;
   return (
     <span className="exam-avatar" aria-hidden="true">
-      {bank.certification}
+      <CertMark certification={bank.certification} />
+      {!hasCertMark(bank.certification) && bank.certification}
     </span>
   );
 }

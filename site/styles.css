@@ -656,9 +656,20 @@ img {
   border-radius: var(--radius-l);
   background: var(--exam-tint-soft);
   color: var(--exam-tint);
+  /* Fallback path only: a certification with no drawn mark still sets
+     its acronym here, the same way ExamAvatar does in the app. */
   font-family: var(--font-mono);
   font-size: var(--text-s);
   font-weight: 600;
+}
+
+/* The certification marks. Geometry is mirrored from
+   ui/src/components/CertMark.tsx and held equal to it by
+   site/build.sh --check — 24 of the tile's 44, which is the proportion
+   they were drawn and checked at. */
+.cert-mark {
+  width: 24px;
+  height: 24px;
 }
 
 .exam-card-name {
@@ -807,6 +818,11 @@ img {
   height: 38px;
   border-radius: var(--radius-m);
   font-size: var(--text-xs);
+}
+
+.exam-card-soon .cert-mark {
+  width: 20px;
+  height: 20px;
 }
 
 .exam-card-soon .exam-card-name h4 {

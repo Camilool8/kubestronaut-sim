@@ -11,7 +11,7 @@ after `./sim up` can also be done from the browser at
 |---|---|
 | Docker Engine, or Docker Desktop | Every service is a container. |
 | Docker Compose v2 (`docker compose`) | The stack is a single compose project. |
-| `python3` | `./sim up` and `./sim reset` read JSON fields with it (`sim:11`, `sim:150`). |
+| `python3` | `./sim up` and `./sim reset` read JSON fields with it (`sim:11`, `sim:166-169`). |
 | `curl` | `./sim up`, `./sim reset` and `./sim doctor` poll the facilitator with it. |
 | `bash` | `./sim` uses `$SECONDS` and `set -o pipefail`. |
 | ~9GB RAM available to Docker | An XFCE desktop plus a two-node cluster. |
@@ -21,7 +21,7 @@ after `./sim up` can also be done from the browser at
 with it (`sim:11`), so without `python3` every poll yields an empty
 state, no phase line is printed, and the command spins until
 `SIM_BOOT_BUDGET` expires rather than finishing. `./sim doctor` reports
-it as `MISSING (./sim up needs it)` (`sim:114`).
+it as `MISSING (./sim up needs it)` (`sim:119`).
 
 ## Commands
 
@@ -36,7 +36,7 @@ it as `MISSING (./sim up needs it)` (`sim:114`).
 | `./sim ssh [instance]` | `docker compose exec <instance> su - candidate`, defaulting to `instance-1`. | Nothing. |
 | `./sim status` | `docker compose ps`. | Nothing. |
 | `./sim grade` | Runs the facilitator's session-free scoreboard against the environment as it stands (`docker compose exec facilitator /entrypoint.sh grade`). Hands-on banks only: an mcq bank's answers live in the session, not the cluster, so `grade` refuses with a pointer to the UI/API rather than printing a misleading 0%. | Nothing. It records no result and touches no session state. |
-| `./sim help` | Prints the usage string. It is also the default with no argument (`sim:4`), and what an unknown subcommand prints before exiting 1 (`sim:160`). | Nothing. |
+| `./sim help` | Prints the usage string. It is also the default with no argument (`sim:4`), and what an unknown subcommand prints before exiting 1 (`sim:176`). | Nothing. |
 
 ### up
 
@@ -74,7 +74,7 @@ way to lose it, and export from the app first if it matters.
 
 ### doctor
 
-The disk check runs `alpine:3.21` (`sim:121`), so the first `doctor` on
+The disk check runs `alpine:3.21` (`sim:126`), so the first `doctor` on
 a clean machine pulls that image.
 
 ## Configuration variables

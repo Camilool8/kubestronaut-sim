@@ -1,7 +1,7 @@
 # kubestronaut-sim
 
-A killer.sh-style exam simulator for the Kubestronaut certifications,
-run locally as a Docker Compose stack.
+An exam simulator for the Kubestronaut certifications, run locally as a
+Docker Compose stack.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing anything. Its
 "Things that will bite you" and "Rules that are not negotiable"
@@ -47,8 +47,9 @@ for any change that could affect grading or the environment.
 
 ## Conventions
 
-- Commit subjects: `type: what changed`, lower case, no trailing period.
-  Types in use: `feat`, `fix`, `docs`, `chore`, `bank`.
+- Commit subjects: `type: what changed` or `type(scope): what changed`,
+  lower case, no trailing period. Types in use: `feat`, `fix`, `docs`,
+  `copy`, `test`, `chore`, `bank`.
 - All user-facing copy belongs in `ui/src/strings.ts`.
 - `docs/history/` is frozen. It is not maintained, and where it
   disagrees with the code the code is right. Do not update it.

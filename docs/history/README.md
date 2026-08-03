@@ -29,7 +29,8 @@ For anything current, use:
 | The HTTP API | [../api.md](../api.md) |
 | How the pieces fit | [../architecture.md](../architecture.md) |
 | How to build and test | [../../CONTRIBUTING.md](../../CONTRIBUTING.md) |
-| What is still open | [../follow-ups.md](../follow-ups.md) |
+| Where the simulator diverges from the real exam on purpose | [../follow-ups.md](../follow-ups.md) |
+| What is still open | [GitHub issues](https://github.com/Camilool8/kubestronaut-sim/issues) |
 
 The rules from these documents that still bind are in
 [CONTRIBUTING.md](../../CONTRIBUTING.md) under "Things that will bite

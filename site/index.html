@@ -6,7 +6,7 @@
     <title>kubestronaut-sim — a local exam simulator for the Kubestronaut certifications</title>
     <meta
       name="description"
-      content="Open-source, killer.sh-style exam simulator for the Kubestronaut certifications, run locally as a Docker Compose stack. Two banks ship today: CKAD hands-on and KCNA multiple-choice."
+      content="An open-source exam simulator for the Kubestronaut certifications, run locally as a Docker Compose stack. Two banks ship today: CKAD hands-on and KCNA multiple-choice."
     />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 
@@ -34,7 +34,7 @@
     <meta property="og:title" content="kubestronaut-sim" />
     <meta
       property="og:description"
-      content="A killer.sh-style rehearsal for the Kubernetes certifications, as a Docker Compose stack on your own machine. Deliberately harder than the real exams."
+      content="A timed rehearsal for the Kubernetes certifications, on a real cluster on your own machine. Deliberately harder than the real exams."
     />
     <meta property="og:url" content="https://camilool8.github.io/kubestronaut-sim/" />
     <meta
@@ -89,9 +89,9 @@
         <div class="hero-copy">
           <h1 id="hero-title">An exam simulator you run yourself.</h1>
           <p class="lede">
-            A killer.sh-style rehearsal for the Kubernetes certifications, as a
-            Docker Compose stack on your own machine. Deliberately harder than
-            the real exams.
+            A timed rehearsal for the Kubernetes certifications, on a real
+            cluster on your own machine. Deliberately harder than the real
+            exams.
           </p>
 
           <p class="hero-actions">
@@ -303,7 +303,7 @@
                --exam-tint at --accent, which is the practical case. -->
           <li class="exam-card">
             <div class="exam-card-head">
-              <span class="exam-avatar" aria-hidden="true">CKAD</span>
+              <span class="exam-avatar" aria-hidden="true"><svg class="cert-mark" data-cert="CKAD" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3.4l8.2 4.4L12 12.2 3.8 7.8z"/><path d="M3.8 12l8.2 4.4L20.2 12"/><path d="M3.8 16.2l8.2 4.4 8.2-4.4"/></svg></span>
               <div class="exam-card-name">
                 <h4>CKAD Mock Exam 01</h4>
                 <p>Certified Kubernetes Application Developer</p>
@@ -352,7 +352,7 @@
 
           <li class="exam-card" data-engine="mcq">
             <div class="exam-card-head">
-              <span class="exam-avatar" aria-hidden="true">KCNA</span>
+              <span class="exam-avatar" aria-hidden="true"><svg class="cert-mark" data-cert="KCNA" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="6.3"/><circle cx="12" cy="5.7" r="2.15" fill="currentColor" stroke="none"/></svg></span>
               <div class="exam-card-name">
                 <h4>KCNA Mock Exam</h4>
                 <p>Kubernetes and Cloud Native Associate</p>
@@ -405,7 +405,7 @@
         <ul class="exam-grid exam-grid-soon">
           <li class="exam-card exam-card-soon" data-engine="soon">
             <div class="exam-card-head">
-              <span class="exam-avatar" aria-hidden="true">CKA</span>
+              <span class="exam-avatar" aria-hidden="true"><svg class="cert-mark" data-cert="CKA" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="11.6" r="3.1" fill="currentColor" stroke="none"/><circle cx="12" cy="3.7" r="2.2"/><circle cx="19.1" cy="17.6" r="2.2"/><circle cx="4.9" cy="17.6" r="2.2"/><path d="M12 8.5V5.9M14.6 13.4l2.6 2.5M9.4 13.4l-2.6 2.5"/></svg></span>
               <div class="exam-card-name">
                 <h4>CKA Mock Exam</h4>
               </div>
@@ -416,7 +416,7 @@
 
           <li class="exam-card exam-card-soon" data-engine="soon">
             <div class="exam-card-head">
-              <span class="exam-avatar" aria-hidden="true">KCSA</span>
+              <span class="exam-avatar" aria-hidden="true"><svg class="cert-mark" data-cert="KCSA" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4.4" y="10.6" width="15.2" height="10.2" rx="2.4"/><path d="M7.9 10.6V7.9a4.1 4.1 0 0 1 8.2 0v2.7"/><circle cx="12" cy="15.7" r="1.7" fill="currentColor" stroke="none"/></svg></span>
               <div class="exam-card-name">
                 <h4>KCSA Mock Exam</h4>
               </div>
@@ -427,7 +427,7 @@
 
           <li class="exam-card exam-card-soon" data-engine="soon">
             <div class="exam-card-head">
-              <span class="exam-avatar" aria-hidden="true">CKS</span>
+              <span class="exam-avatar" aria-hidden="true"><svg class="cert-mark" data-cert="CKS" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 2.9l7.4 2.8v6c0 4.7-3.2 7.1-7.4 8.4-4.2-1.3-7.4-3.7-7.4-8.4v-6z"/><path d="M9.1 11.9l2 2 3.8-3.9"/></svg></span>
               <div class="exam-card-name">
                 <h4>CKS Mock Exam</h4>
               </div>
@@ -544,6 +544,16 @@
           </div>
 
           <dl class="limit-list">
+            <div class="limit">
+              <dt>Not a replacement for the rest of your preparation.</dt>
+              <dd>
+                This is one part of getting ready, not the whole of it. It does
+                not replace working a problem out for yourself, the lab you
+                build at home, or the Linux Foundation's own training. What it
+                adds is a timed rehearsal on a real cluster and a score you can
+                trust.
+              </dd>
+            </div>
             <div class="limit">
               <dt>No accounts, and no authentication anywhere.</dt>
               <dd>
@@ -844,9 +854,9 @@
           <p>
             Kubestronaut Sim is an independent open-source study tool. It is not
             affiliated with, endorsed by, or associated with the Cloud Native
-            Computing Foundation, The Linux Foundation, PSI, or killer.sh.
-            Kubernetes and the certification names (CKA, CKAD, CKS, KCNA, KCSA)
-            are trademarks of The Linux Foundation.
+            Computing Foundation, The Linux Foundation, or PSI. Kubernetes and
+            the certification names (CKA, CKAD, CKS, KCNA, KCSA) are trademarks
+            of The Linux Foundation.
           </p>
         </div>
       </div>

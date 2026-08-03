@@ -1,8 +1,13 @@
 # kubestronaut-sim
 
-Open-source, killer.sh-style exam simulator for the Kubestronaut
-certifications, run locally on your own machine. Deliberately harder
-than the real exams.
+An open-source exam simulator for the Kubestronaut certifications, run
+locally on your own machine. Sit a full exam under a real countdown, on
+a real cluster, as many times as you need. Deliberately harder than the
+real exams.
+
+It is built to stay with you across the whole path rather than one
+sitting: every graded attempt is kept, so you can see which domains are
+still weak and how far along the five certifications you are.
 
 Two banks ship today. **CKAD Mock Exam 01** is hands-on: 22 questions
 across all five curriculum domains, 120 minutes, 66% to pass, against a
@@ -15,6 +20,13 @@ review. CKA, KCSA and CKS appear in the catalog as coming soon.
 Hands-on questions are graded on behaviour wherever behaviour is the
 point — a policy that actually denies, an Ingress the controller really
 routes — not on the shape of your YAML.
+
+## What it does not replace
+
+This is one part of preparing, not the whole of it. It does not replace
+working a problem out for yourself, the lab you build at home, or the
+Linux Foundation's own training. What it adds is a timed rehearsal on a
+real cluster and a score you can trust.
 
 ## Quickstart
 
@@ -119,7 +131,6 @@ networks and boot sequence.
 Code: Apache-2.0. Question banks: CC BY-SA 4.0 (see
 [banks/LICENSE](banks/LICENSE)).
 
-Not affiliated with CNCF, The Linux Foundation, PSI, or killer.sh.
-Kubernetes and the certification names are trademarks of The Linux
-Foundation. The same notice, plus a real-exam comparison table, lives in
+Not affiliated with CNCF, The Linux Foundation, or PSI. Kubernetes and
+the certification names are trademarks of The Linux Foundation. The same notice, plus a real-exam comparison table, lives in
 the app's About panel.
