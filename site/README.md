@@ -89,6 +89,29 @@ fail before you trust it.
 | `favicon.svg` | `ui/public/favicon.svg` |
 | `fonts/*.woff2` | `ui/node_modules/@fontsource/ibm-plex-{sans,mono}` |
 
+### The certification marks — checked, not generated
+
+The five marks on the exam cards are owned by
+`ui/src/components/CertMark.tsx`. This page cannot import a React
+component, so the same geometry is inlined into `index.html` — a fourth
+mirror, and the one that is compared rather than regenerated.
+
+Each `<svg class="cert-mark">` carries `data-cert`, and `--check` asserts
+its shapes match that certification's entry in the component exactly:
+same elements, same attributes, same values. Attribute order and
+whitespace are normalised away, since JSX self-closes with a space and
+the page does not. The set has to match both ways — a mark in the
+component but not on the page is a landing page advertising four exams
+out of five.
+
+To change a mark, edit `CertMark.tsx`, copy the shapes into the matching
+`data-cert` block here, and run `--check`. It fails loudly if you do one
+and not the other.
+
+**No Kubernetes, CNCF or Linux Foundation artwork is used anywhere on
+this page**, and none may be added. The reason is in
+[../PRODUCT.md](../PRODUCT.md) under Brand Commitments.
+
 Fonts need `npm ci` to have run in `ui/`. Without them `build.sh` warns
 and the page falls through the token stacks to `system-ui` and
 `ui-monospace` — plainer, and fully functional.

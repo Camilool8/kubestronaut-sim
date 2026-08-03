@@ -226,6 +226,82 @@ sys.exit(1 if fail else 0)
 PY
 }
 
+# The certification marks, against the component that owns them.
+#
+# ui/src/components/CertMark.tsx draws one mark per certification and the
+# app renders it from there. This page cannot import a React component,
+# so the same geometry is inlined into index.html -- a fourth mirror, and
+# mirrors held equal only by convention drift the moment nobody re-greps
+# (the lesson ui/src/styles/mirrors.test.ts was written for).
+#
+# Rather than regenerate, this compares: every <svg class="cert-mark">
+# carries data-cert, and its shapes must match that certification's entry
+# in the component exactly -- same elements, same attributes, same
+# values. Attribute ORDER and whitespace are normalised away, because JSX
+# self-closes with a space and the page does not, and neither difference
+# changes a single pixel.
+#
+# The set must match both ways. A mark added to the component and not the
+# page is a landing page advertising four exams out of five; a mark on
+# the page with no component behind it is art the app cannot render.
+check_cert_marks() {
+  python3 - "$repo" <<'PY'
+import pathlib, re, sys
+
+repo = pathlib.Path(sys.argv[1])
+tsx = (repo / "ui" / "src" / "components" / "CertMark.tsx").read_text()
+page = (repo / "site" / "index.html").read_text()
+fail = []
+
+def shapes(fragment):
+    """Every drawn element, as (tag, sorted attribute pairs)."""
+    out = []
+    for tag, attrs in re.findall(r"<(circle|path|rect)\b([^>]*?)/?>", fragment):
+        pairs = tuple(sorted(re.findall(r'([\w-]+)\s*=\s*"([^"]*)"', attrs)))
+        out.append((tag, pairs))
+    return out
+
+# The component's MARKS record: KEY: ( ...jsx... ),
+body = re.search(r"const MARKS[^{]*\{(.*?)\n\};", tsx, re.S)
+if body is None:
+    fail.append("could not find the MARKS record in CertMark.tsx")
+    component = {}
+else:
+    component = {
+        cert: shapes(frag)
+        for cert, frag in re.findall(r"\n  (\w+):\s*\(\s*(.*?)\s*\),", body.group(1), re.S)
+    }
+
+published = {
+    cert: shapes(frag)
+    for cert, frag in re.findall(
+        r'<svg class="cert-mark" data-cert="(\w+)"(.*?)</svg>', page, re.S
+    )
+}
+
+if not component:
+    fail.append("CertMark.tsx defines no marks -- the parse is wrong")
+if not published:
+    fail.append("index.html carries no cert-mark svg -- the parse is wrong")
+
+for cert in sorted(set(component) - set(published)):
+    fail.append(f"{cert} has a mark in CertMark.tsx but none on the landing page")
+for cert in sorted(set(published) - set(component)):
+    fail.append(f"{cert} is drawn on the landing page but not in CertMark.tsx")
+
+for cert in sorted(set(component) & set(published)):
+    if component[cert] != published[cert]:
+        fail.append(
+            f"{cert}'s mark differs between CertMark.tsx and index.html "
+            f"-- re-copy the geometry"
+        )
+
+for line in fail:
+    print(f"build.sh: {line}", file=sys.stderr)
+sys.exit(1 if fail else 0)
+PY
+}
+
 if [ "${1:-}" = "--check" ]; then
   tmp=$(mktemp -d)
   trap 'rm -rf "$tmp"' EXIT
@@ -234,6 +310,7 @@ if [ "${1:-}" = "--check" ]; then
   status=0
   check_figures || status=1
   check_og || status=1
+  check_cert_marks || status=1
   for f in tokens.css favicon.svg; do
     if ! diff -q "$tmp/$f" "$here/$f" >/dev/null 2>&1; then
       echo "build.sh: site/$f is out of date - run site/build.sh" >&2
