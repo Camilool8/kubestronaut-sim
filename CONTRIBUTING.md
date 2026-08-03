@@ -24,26 +24,29 @@ cd kubestronaut-sim
 | `ui/` | React + Vite front end. |
 | `images/` | Dockerfiles for the desktop, the instances, and the cluster host. |
 | `banks/` | Question banks, the shared validator library, and Helm charts. |
-| `tests/` | The four offline gates, the smoke suite, and reference solutions. |
+| `tests/` | The five offline gates, the smoke suite, and reference solutions. |
 | `docs/` | Reference and explanation. Start at [docs/README.md](docs/README.md). |
 
 ## Before you push
 
-Run the four offline gates and the unit tests. They need no Docker and
+Run the five offline gates and the unit tests. They need no Docker and
 take seconds:
 
 ```bash
-tests/bank-weights.sh && tests/check-lint.sh && tests/check-lib.sh && tests/bank-hints.sh
+tests/bank-weights.sh && tests/check-lint.sh && tests/check-lib.sh \
+  && tests/bank-hints.sh && tests/bank-mcq.sh
 for m in conductor facilitator proxy; do (cd $m && go test ./... && go vet ./...); done
 (cd ui && npm ci && npx tsc --noEmit && npm run lint && npm test)
 ```
 
-CI runs exactly these on every push. It does **not** run
-`tests/smoke.sh`, which means the two gates that keep the banks honest —
-a fresh environment must score 0, and the reference solutions must score
-100% — are never enforced by machine. Run the smoke suite by hand before
-a release. [docs/testing.md](docs/testing.md) covers all of this,
-including what CI silently does not check.
+CI runs all of these on every push, and three things you cannot run in
+seconds: `site/build.sh --check`, the six image builds, and a shell
+syntax pass. It does **not** run `tests/smoke.sh`, which means the two
+gates that keep the banks honest — a fresh environment must score 0, and
+the reference solutions must score 100% — are never enforced by machine.
+Run the smoke suite by hand before a release.
+[docs/testing.md](docs/testing.md) covers all of this, including what CI
+silently does not check.
 
 ## Things that will bite you
 
@@ -66,8 +69,9 @@ proxies `/api` and the `/desktop` websocket to port 8080, so run
 **vitest is pinned to v2** for compatibility with vite 5. Do not bump it
 alone.
 
-**`npm run lint` has one pre-existing warning**, a deliberate mount-only
-polling effect at `ui/src/screens/Score.tsx:78`. Do not add a second.
+**`npm run lint` is clean at zero warnings.** `npx eslint src
+--max-warnings 0` passes today, so there is no baseline for a new
+warning to hide in. Keep it that way.
 
 **The facilitator builds from the repo root**, because its Dockerfile's
 Vite stage needs `ui/` in the build context. The conductor and the proxy
@@ -77,7 +81,7 @@ build from their own directories.
 The facilitator serves the UI from `//go:embed all:dist`, and the embed
 fails to compile if that directory is empty. The real Vite output
 overwrites it at image build time and must never be committed.
-`.gitignore:12-20` has the details.
+`.gitignore:13-21` has the details.
 
 **Building Go in a container needs `GOFLAGS=-buildvcs=false`**, because
 a bind-mounted `.git` has the wrong ownership:
@@ -113,10 +117,13 @@ behaviour.
 
 ## Commits and pull requests
 
-Commit subjects follow `type: what changed`, in lower case, with no
-trailing period. Types in use: `feat`, `fix`, `docs`, `chore`, `bank`.
-Write the subject as a phrase a reader would understand without the
-diff.
+Commit subjects follow `type: what changed` or `type(scope): what
+changed`, in lower case, with no trailing period. Types in use: `feat`,
+`fix`, `docs`, `copy`, `test`, `chore`, `bank` — `copy` is for
+user-facing wording that changes no behaviour. The scope is the
+subsystem, and about half of the history carries one: `ui`, `api`,
+`site`, `exam`, `smoke`, `bank-spec`. Write the subject as a phrase a
+reader would understand without the diff.
 
 ```
 fix: behavioural checks that cost 5 points to a stopwatch

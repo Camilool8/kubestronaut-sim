@@ -58,20 +58,5 @@ Recorded because each has been proposed at least once and is settled.
   Struck through rather than deleted, because this entry was cited as
   settled and a reader who remembers it needs to find out it was reversed
   rather than simply not find it.
-- ~~**`spec.domainWeights` is read by no Go code.**~~ **No longer true.**
-  It is now a runtime value in three places: `exam.Load` derives
-  `Exam.Domains` from it, `exam.Draw` stratifies a pooled or filtered draw by it,
-  and both graders weight the final score by it. Kept here struck through
-  rather than deleted because this entry was cited as settled, and a
-  reader who remembers it needs to know it was overturned rather than
-  simply not find it.
 - **`spec.environment.kubernetesVersion` and `nodes` are
   informational.** They are surfaced to the UI and drive nothing.
-
-## Where the milestone history went
-
-The per-milestone review notes that used to fill this file are in the
-git log and in [history/](history/). They were a changelog wearing a
-backlog's clothes: closed items left in place as strikethrough, sections
-ordered neither by date nor by priority, and five items duplicated
-across milestones.

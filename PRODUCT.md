@@ -192,8 +192,10 @@ The parts that constrain product decisions:
 - Reference solution scripts that must score 100%, the
   fresh-environment-scores-0 gate, and the curriculum weight check. See
   [docs/testing.md](docs/testing.md).
-- A documented bank format and an open backlog
-  ([docs/follow-ups.md](docs/follow-ups.md)).
+- A documented bank format ([docs/bank-spec.md](docs/bank-spec.md)) and a
+  written record of where the simulator diverges from the real exam on
+  purpose ([docs/follow-ups.md](docs/follow-ups.md)). Open work is in
+  GitHub issues.
 
 **Absences future work must not paper over:** there are no users,
 testimonials, adoption numbers, pass-rate claims, or hosted service. The

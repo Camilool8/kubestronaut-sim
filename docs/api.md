@@ -1060,7 +1060,29 @@ job carries `error` and keeps the failed phase in `lastJob`. `job` and
 `lastJob` are omitted while unset.
 
 `./sim reset` polls `busy` and then reads `lastJob.error`
-(`sim:147-153`).
+(`sim:163-170`).
+
+### GET /api/control/log
+
+The retained command output of the job `status` is reporting: the
+in-flight one while a job runs, otherwise the last settled one. Always
+200.
+
+```json
+{
+  "jobId": "job-1",
+  "lines": ["seeding q03 (3 of 22)", "configmap/limits created"]
+}
+```
+
+`lines` is a ring buffer of the last 200 lines, each truncated to 500
+bytes (`conductor/internal/job/job.go:22-27`); it is `[]` rather than
+`null` when nothing has been logged. A new job clears the buffer on its
+first line, so the previous job's output never leaks into this one's
+pane.
+
+This is what carries the `setup.sh` output while a pooled bank prepares
+an attempt — see [Preparing an attempt](#preparing-an-attempt).
 
 ### POST /api/control/reset
 

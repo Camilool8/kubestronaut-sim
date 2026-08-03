@@ -24,6 +24,25 @@ python3 -m http.server 8000 -d site   # then open http://localhost:8000
 directory mirrors from elsewhere in the repo (below); the page is
 otherwise served exactly as it is written.
 
+## How it is published
+
+`.github/workflows/site.yml` uploads this directory to GitHub Pages on
+every push to `main`, and on manual dispatch. It runs no build step and
+no checks: it publishes the files as they are committed, so whatever is
+on `main` is what the world sees.
+
+The gate is therefore entirely upstream of the deploy. `site/build.sh
+--check` runs in CI's `banks` job on every branch and every pull request
+(see [../docs/testing.md](../docs/testing.md)), which is the only thing
+standing between a stale mirror and production. Nothing re-checks the
+page after it is served.
+
+Because the deploy carries the directory verbatim, `build.sh`,
+`README.md` and `og.html` are published alongside the page. Nothing
+links to them and nothing needs them at runtime — `og.html` is rendered
+locally to produce `og.png`, and it is only the PNG that scrapers
+fetch.
+
 ## How it consumes the design system
 
 `index.html` loads `tokens.css` before its own stylesheet:

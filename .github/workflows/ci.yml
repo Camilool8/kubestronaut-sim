@@ -1,10 +1,10 @@
 # Every gate in this repo that does not need a Kubernetes cluster.
 #
-# Until now there were none running automatically: `go test`, `npm test`,
-# `tsc`, and the four bank validators all ran only when someone
+# Before this existed there were none running automatically: `go test`,
+# `npm test`, `tsc`, and the bank validators all ran only when someone
 # remembered, and `tests/smoke.sh` — the only thing that runs them
 # together — is destructive and takes ~35 minutes, so nobody runs it on a
-# whim. docs/follow-ups.md has asked for this since Milestone A.
+# whim.
 #
 # Deliberately NOT here: tests/smoke.sh. It purges every volume and
 # builds a two-node cluster; it belongs on a human's machine before a
