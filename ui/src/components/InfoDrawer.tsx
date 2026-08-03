@@ -38,6 +38,11 @@ export function InfoDrawer({ onClose, onShowIntro }: InfoDrawerProps) {
         </div>
 
         <section>
+          <h3>{s.scopeTitle}</h3>
+          <p>{s.scopeBody}</p>
+        </section>
+
+        <section>
           <h3>{s.compareTitle}</h3>
           <div className="compare-table-scroll">
             <table className="compare-table">

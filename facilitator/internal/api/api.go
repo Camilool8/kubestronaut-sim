@@ -506,7 +506,7 @@ func (s *server) handleSolution(w http.ResponseWriter, r *http.Request) {
 	// The gate is checked before any question lookup at all (even
 	// before validating the id), so a client can't use this endpoint
 	// to probe which question ids exist before the session ends —
-	// documented UX fidelity with killer.sh, not a security boundary
+	// documented UX fidelity with the real exam, not a security boundary
 	// (the bank files sit on the candidate's own disk regardless).
 	// Training mode is exactly the mode where reading the solution is
 	// the point. Everything else keeps the exam-fidelity gate.

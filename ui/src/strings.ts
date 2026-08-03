@@ -462,6 +462,13 @@ export const strings = {
     title: "About this simulator",
     open: "About this simulator",
     close: "Close panel",
+    // Leads the panel, before the comparison table. Someone opening
+    // "About this simulator" is asking what this is; the honest answer
+    // starts with what it is not, and the table reads better once that
+    // frame is set.
+    scopeTitle: "One part of preparing",
+    scopeBody:
+      "This is one part of getting ready, not the whole of it. It does not replace working a problem out for yourself, the lab you build at home, or the Linux Foundation's own training. What it adds is a timed rehearsal on a real cluster and a score you can trust.",
     compareTitle: "How this compares to the real exam",
     compareAspect: "Aspect",
     compareHere: "This simulator",
@@ -484,7 +491,7 @@ export const strings = {
       "Scores here measure practice progress. They do not predict a real exam result.",
     disclaimerTitle: "Independent project",
     disclaimerBody:
-      "Kubestronaut Sim is an independent open-source study tool. It is not affiliated with, endorsed by, or associated with the Cloud Native Computing Foundation, The Linux Foundation, PSI, or killer.sh. Kubernetes and the certification names (CKA, CKAD, CKS, KCNA, KCSA) are trademarks of The Linux Foundation.",
+      "Kubestronaut Sim is an independent open-source study tool. It is not affiliated with, endorsed by, or associated with the Cloud Native Computing Foundation, The Linux Foundation, or PSI. Kubernetes and the certification names (CKA, CKAD, CKS, KCNA, KCSA) are trademarks of The Linux Foundation.",
     licensesTitle: "Licenses and credits",
     licenses: [
       "Simulator code: Apache License 2.0",
@@ -493,7 +500,7 @@ export const strings = {
       "Desktop client: built on noVNC (MPL 2.0)",
     ],
     howItWorks: "How this exam works",
-    footerLine: "Independent study tool. Not affiliated with CNCF, The Linux Foundation, PSI, or killer.sh.",
+    footerLine: "Independent study tool. Not affiliated with CNCF, The Linux Foundation, or PSI.",
   },
 
   theme: {

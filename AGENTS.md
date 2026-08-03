@@ -1,7 +1,7 @@
 # kubestronaut-sim
 
-A killer.sh-style exam simulator for the Kubestronaut certifications,
-run locally as a Docker Compose stack.
+An exam simulator for the Kubestronaut certifications, run locally as a
+Docker Compose stack.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing anything. Its
 "Things that will bite you" and "Rules that are not negotiable"
