@@ -79,8 +79,12 @@ jobs:
           # front of every session Pod. It is published here because it
           # ships from this repo and versions with the images it starts —
           # the pod template it renders is this repo's manifest.
+          #
+          # Context is the root, like the facilitator's and for the same
+          # reason: it embeds ui/, because the sign-in and lobby screens
+          # have to be served before any session Pod exists to serve them.
           - image: hub
-            context: hub
+            context: .
             file: hub/Dockerfile
     steps:
       - uses: actions/checkout@v7

@@ -55,27 +55,50 @@ func (s *Server) newProxy() *httputil.ReverseProxy {
 type targetKey struct{}
 
 // handleProxy is the catch-all: anything the hub's own mux did not
-// claim belongs to the candidate's session.
+// claim belongs to the candidate's session — once there is one. Until
+// then it belongs to the shell, because the screens that start a session
+// are part of the app being asked for. Each of the three ways there can
+// be nothing to proxy to serves the shell to a browser and keeps its
+// JSON to everything else; see wantsShell.
 func (s *Server) handleProxy(w http.ResponseWriter, r *http.Request) {
-	sess, ok := s.requireUser(w, r)
-	if !ok {
+	sess, err := s.Auth.Current(r)
+	if err != nil {
+		// The most important of the three: this is a first visit. The
+		// sign-in screen is in the bundle below, and a JSON 401 here is
+		// the whole product being unreachable.
+		if s.wantsShell(r) {
+			s.serveShell(w, r)
+			return
+		}
+		writeError(w, http.StatusUnauthorized, "not signed in")
 		return
 	}
 	live, err := s.Sessions.Get(sess.UserID)
 	if errors.Is(err, session.ErrNoSession) {
 		// 404, not 502: there is nothing wrong, the candidate simply has
-		// no session yet. The SPA's own shell is served by the hub, so
-		// this is only reached for API calls made before starting.
+		// no session yet. They are signed in, so this is the lobby.
+		if s.wantsShell(r) {
+			s.serveShell(w, r)
+			return
+		}
 		writeError(w, http.StatusNotFound, "you have no session running — start one first")
 		return
 	}
 	if err != nil {
+		// Not diverted to the shell on purpose: something is actually
+		// broken, and an app that renders over it would poll a hub that
+		// cannot answer instead of showing what happened.
 		writeError(w, http.StatusInternalServerError, "could not find your session")
 		return
 	}
 	if live.Addr() == "" {
 		// 503 with Retry-After, because the answer really is "ask again":
-		// the Pod is booting and the SPA polls.
+		// the Pod is booting and the SPA polls. A candidate who reloads
+		// mid-boot still needs the app back, hence the shell.
+		if s.wantsShell(r) {
+			s.serveShell(w, r)
+			return
+		}
 		w.Header().Set("Retry-After", "5")
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
 			"error": "your exam environment is still starting",
