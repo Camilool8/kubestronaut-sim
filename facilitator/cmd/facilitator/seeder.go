@@ -33,9 +33,9 @@ type conductorSeeder struct {
 	statusURL string
 }
 
-func newConductorSeeder(base *url.URL) api.Seeder {
+func newConductorSeeder(base *url.URL, rt http.RoundTripper) api.Seeder {
 	return &conductorSeeder{
-		client:    &http.Client{Timeout: seedTimeout},
+		client:    &http.Client{Timeout: seedTimeout, Transport: rt},
 		seedURL:   base.JoinPath("/api/control/seed").String(),
 		statusURL: base.JoinPath("/api/control/status").String(),
 	}

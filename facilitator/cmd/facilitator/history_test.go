@@ -66,7 +66,7 @@ func TestRecordAttemptCopiesTheBankIn(t *testing.T) {
 	ex := recorderExam()
 	snap := session.Snapshot{State: "ended", Mode: session.ModeExam, StartedAt: time.Date(2026, 3, 1, 9, 0, 0, 0, time.UTC)}
 
-	if err := recordAttempt(store, ex, "tok-1", snap, gradedResults()); err != nil {
+	if err := recordAttempt(store, nil, ex, "tok-1", snap, gradedResults()); err != nil {
 		t.Fatalf("recordAttempt: %v", err)
 	}
 
@@ -107,7 +107,7 @@ func TestRecordAttemptSkipsTraining(t *testing.T) {
 	res := gradedResults()
 	res.Mode = session.ModeTraining
 
-	if err := recordAttempt(store, recorderExam(), "tok-1", snap, res); err != nil {
+	if err := recordAttempt(store, nil, recorderExam(), "tok-1", snap, res); err != nil {
 		t.Fatalf("recordAttempt: %v", err)
 	}
 	if got := len(store.All()); got != 0 {
@@ -124,7 +124,7 @@ func TestRecordAttemptMarksAFilteredDrawUncounted(t *testing.T) {
 	res.Percent = 100
 	res.Passed = true
 
-	if err := recordAttempt(store, recorderExam(), "tok-1", snap, res); err != nil {
+	if err := recordAttempt(store, nil, recorderExam(), "tok-1", snap, res); err != nil {
 		t.Fatalf("recordAttempt: %v", err)
 	}
 	got := store.All()
@@ -145,7 +145,7 @@ func TestRecordAttemptIsIdempotent(t *testing.T) {
 	store := newTestStore(t)
 	snap := session.Snapshot{State: "ended", Mode: session.ModeExam}
 	for i := 0; i < 3; i++ {
-		if err := recordAttempt(store, recorderExam(), "tok-1", snap, gradedResults()); err != nil {
+		if err := recordAttempt(store, nil, recorderExam(), "tok-1", snap, gradedResults()); err != nil {
 			t.Fatalf("recordAttempt %d: %v", i, err)
 		}
 	}
@@ -157,7 +157,7 @@ func TestRecordAttemptIsIdempotent(t *testing.T) {
 func TestRecordAttemptWithoutATokenRefuses(t *testing.T) {
 	store := newTestStore(t)
 	snap := session.Snapshot{State: "ended", Mode: session.ModeExam}
-	if err := recordAttempt(store, recorderExam(), "", snap, gradedResults()); err == nil {
+	if err := recordAttempt(store, nil, recorderExam(), "", snap, gradedResults()); err == nil {
 		t.Fatal("recordAttempt with no token returned nil; an id-less record cannot be de-duplicated")
 	}
 	if got := len(store.All()); got != 0 {
@@ -169,7 +169,7 @@ func TestRecordAttemptWithoutATokenRefuses(t *testing.T) {
 // still runs, it just keeps no record.
 func TestRecordAttemptWithNoStore(t *testing.T) {
 	snap := session.Snapshot{State: "ended", Mode: session.ModeExam}
-	if err := recordAttempt(nil, recorderExam(), "tok-1", snap, gradedResults()); err != nil {
+	if err := recordAttempt(nil, nil, recorderExam(), "tok-1", snap, gradedResults()); err != nil {
 		t.Fatalf("recordAttempt with a nil store: %v", err)
 	}
 }
@@ -183,7 +183,7 @@ func TestGradeRecordsTheAttempt(t *testing.T) {
 
 	g := newGrader(ex, mgr, &countingRunner{}, time.Second)
 	g.record = func(token string, snap session.Snapshot, res *evaluate.Results) error {
-		return recordAttempt(store, ex, token, snap, res)
+		return recordAttempt(store, nil, ex, token, snap, res)
 	}
 	g.Grade()
 
@@ -243,7 +243,7 @@ func TestNewBanksFetcher(t *testing.T) {
 	defer srv.Close()
 
 	base := mustParseURL(t, srv.URL)
-	raw, err := newBanksFetcher(base)(t.Context())
+	raw, err := newBanksFetcher(base, nil)(t.Context())
 	if err != nil {
 		t.Fatalf("fetch: %v", err)
 	}
@@ -258,7 +258,7 @@ func TestNewBanksFetcher(t *testing.T) {
 		http.Error(w, "nope", http.StatusInternalServerError)
 	}))
 	defer bad.Close()
-	if _, err := newBanksFetcher(mustParseURL(t, bad.URL))(t.Context()); err == nil {
+	if _, err := newBanksFetcher(mustParseURL(t, bad.URL), nil)(t.Context()); err == nil {
 		t.Error("a 500 from the conductor was not reported as an error")
 	}
 }

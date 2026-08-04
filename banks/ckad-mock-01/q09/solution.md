@@ -65,9 +65,24 @@ Podman has two entirely separate worlds. Rootless podman keeps images in
 `~/.local/share/containers`; rootful keeps them in `/var/lib/containers`.
 They cannot see each other's images, so a build in one and a `run` in the
 other produces a baffling "image not found" for an image you just watched
-build. On these instances rootless builds fail outright, so `sudo` is the
-only path — but the same split exists on real machines where both work,
-and it is a common way to lose ten minutes.
+build.
+
+On these instances the split bites in a particular way, and it is worth
+recognising: a rootless `podman build` *succeeds*, and then the rootless
+`podman run` fails with
+
+```
+Error: crun: mount `proc` to `proc`: Operation not permitted
+```
+
+Nothing is wrong with the image you just built. Rootless podman starts
+its container in a new user namespace, and the kernel will not let a
+process in one mount a fresh `/proc` while the surrounding `/proc` has
+parts masked off — which is how every container runtime hides things like
+`/proc/kcore`. Root podman creates no such namespace, so the restriction
+never applies. That is why `sudo` is the path that works end to end here.
+The same rootless/rootful split exists on real machines where both halves
+work, and it is a common way to lose ten minutes.
 
 ## ENV at build time vs run time
 

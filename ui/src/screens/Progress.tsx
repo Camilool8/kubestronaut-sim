@@ -27,11 +27,29 @@ interface ProgressProps {
    * panel's drill button can do anything at all.
    */
   catalogVersion: number;
+  /**
+   * Served by the hub rather than by a facilitator, which changes three
+   * things on this screen: history outlives every environment (so the
+   * lead saying it lives in a state volume would be wrong), each row can
+   * be opened because the hub keeps the whole graded document, and there
+   * is nothing to import into — hosted history is the durable copy, not
+   * a fragile one that needs a backup.
+   */
+  hosted?: boolean;
 }
 
 /** Everything one render of this screen needs, fetched together. */
 interface Dashboard {
-  catalog: CatalogResponse;
+  /**
+   * The bank list, or null when there is no environment to ask.
+   *
+   * Never null locally. In hosted mode the catalog is the session Pod's —
+   * it names the banks THAT environment can load — so before a session
+   * exists there is no honest answer, and the path cards it feeds are
+   * simply not drawn. The attempt record below them is the hub's and is
+   * always there, which is the half that matters without a seat.
+   */
+  catalog: CatalogResponse | null;
   history: HistoryResponse;
   /**
    * The LOADED bank's curriculum, or null when /api/exam did not answer.
@@ -136,7 +154,7 @@ function timeCell(record: AttemptRecord): string {
   return record.durationSeconds ? strings.progress.noScore : strings.progress.untimed;
 }
 
-export function Progress({ catalogVersion }: ProgressProps) {
+export function Progress({ catalogVersion, hosted = false }: ProgressProps) {
   const [erasing, setErasing] = useState(false);
   // Which destructive/slow action is in flight, so every other one is
   // held rather than racing it. One value, not one flag each: two of
@@ -151,7 +169,7 @@ export function Progress({ catalogVersion }: ProgressProps) {
   const state = useAsync<Dashboard>(
     async (signal) => {
       const [catalog, history, exam] = await Promise.all([
-        getCatalog(signal),
+        getCatalog(signal).catch(() => null),
         getHistory(signal),
         getExam(signal).catch(() => null),
       ]);
@@ -214,7 +232,9 @@ export function Progress({ catalogVersion }: ProgressProps) {
       <header className="page-head">
         <div>
           <h1>{strings.progress.title}</h1>
-          <p className="page-lead">{strings.progress.lead}</p>
+          <p className="page-lead">
+            {hosted ? strings.progress.leadHosted : strings.progress.lead}
+          </p>
         </div>
         <div className="progress-actions">
           {/* A link, not a fetch: the browser saves the document under the
@@ -226,7 +246,16 @@ export function Progress({ catalogVersion }: ProgressProps) {
           {/* The button is the control; the input is the mechanism. A file
               picker is the only way a browser can hand a document back,
               and an export with no way in would be a one-way door — but
-              the visible vocabulary of this screen stays buttons. */}
+              the visible vocabulary of this screen stays buttons.
+
+              Not offered in hosted mode, where the hub refuses it with a
+              501: this record is the durable copy rather than the
+              fragile one, and accepting an arbitrary attempt document
+              would let a history that survives on purpose hold entries
+              that were never graded. Export stays, because an export
+              from here still imports into a local `./sim`. */}
+          {!hosted && (
+            <>
           <button
             type="button"
             className="btn"
@@ -244,6 +273,8 @@ export function Progress({ catalogVersion }: ProgressProps) {
             aria-label={strings.progress.importPick}
             onChange={(e) => void handleFile(e.target.files?.[0])}
           />
+            </>
+          )}
           <button
             type="button"
             className="btn btn-danger"
@@ -292,21 +323,31 @@ export function Progress({ catalogVersion }: ProgressProps) {
           // certification cannot be drilled from here whatever the rollup
           // says — and a button that started a run over domains the loaded
           // bank has never heard of would draw nothing at all.
+          // A drill is started against the LOADED bank, so it needs both
+          // a curriculum to check the domains against and a catalog to
+          // name. Hosted mode before a session has neither.
           const curriculum = new Set((exam?.domains ?? []).map((d) => d.name));
-          const drillable = weak.map((w) => w.domain).filter((d) => curriculum.has(d));
+          const drillable =
+            catalog === null ? [] : weak.map((w) => w.domain).filter((d) => curriculum.has(d));
           // Whether "these" covers the whole visible list. When it does
           // not, the button has to say so: the rows it will skip are on
           // screen, directly above it.
           const partial = drillable.length > 0 && drillable.length < weak.length;
-          const activeExam = catalog.exams.find((e) => e.id === catalog.active);
+          const activeExam = catalog?.exams.find((e) => e.id === catalog.active);
 
           return (
             <>
-              <ul className="path-cards" aria-label={strings.progress.pathLabel}>
-                {catalog.exams.map((e) => (
-                  <PathCard key={e.id} exam={e} />
-                ))}
-              </ul>
+              {/* The path cards describe what THIS environment can load.
+                  With no environment there is nothing truthful to draw,
+                  and a row of empty cards would read as "you have never
+                  attempted anything" — which the table below disproves. */}
+              {catalog && (
+                <ul className="path-cards" aria-label={strings.progress.pathLabel}>
+                  {catalog.exams.map((e) => (
+                    <PathCard key={e.id} exam={e} />
+                  ))}
+                </ul>
+              )}
 
               <div className="progress-body">
                 <section className="history-panel">
@@ -335,7 +376,24 @@ export function Progress({ catalogVersion }: ProgressProps) {
                             {attempts.map((a) => (
                               <tr key={a.id}>
                                 <th scope="row" className="history-exam">
-                                  {a.certification || a.examTitle || a.bank}
+                                  {/* Hosted only: the hub keeps the whole
+                                      graded document, a local facilitator
+                                      keeps only this row. A link that
+                                      404s would be worse than none. */}
+                                  {hosted ? (
+                                    <a
+                                      className="history-open"
+                                      href={`#/history/${a.id}`}
+                                      aria-label={strings.progress.reviewRow(
+                                        a.certification || a.examTitle || a.bank,
+                                        formatAttemptDate(a.gradedAt),
+                                      )}
+                                    >
+                                      {a.certification || a.examTitle || a.bank}
+                                    </a>
+                                  ) : (
+                                    (a.certification || a.examTitle || a.bank)
+                                  )}
                                 </th>
                                 <td className="history-mode">{modeCell(a)}</td>
                                 <td className="history-date">{formatAttemptDate(a.gradedAt)}</td>
@@ -423,7 +481,7 @@ export function Progress({ catalogVersion }: ProgressProps) {
                     <button
                       type="button"
                       className="btn weak-drill"
-                      onClick={() => navigate(drillHref(catalog.active, drillable))}
+                      onClick={() => catalog && navigate(drillHref(catalog.active, drillable))}
                     >
                       {partial ? strings.progress.drillSome(drillable.length) : strings.progress.drill}
                     </button>

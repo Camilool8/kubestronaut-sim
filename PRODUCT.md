@@ -127,9 +127,13 @@ The parts that constrain product decisions:
 
 **Durable constraints**
 
-- **No authentication anywhere, permanently.** This is a local
-  single-user tool; a password field would be theatre. The only real
-  control is which interface it binds to.
+- **No authentication anywhere in the simulator, permanently.** `./sim
+  up` is a local single-user tool; a password field would be theatre,
+  and the only real control is which interface it binds to. This
+  survived the hosted tier rather than being weakened by it: the hub is
+  a separate process in front of the facilitator, which still has no
+  authentication of any kind and is simply never reachable except
+  through it. See [docs/hosting.md](docs/hosting.md).
 - The session-state gates on desktop access and the solutions endpoint
   exist for UX fidelity, not security. Training mode deliberately
   relaxes the solutions gate, because reading the solution is the point
@@ -147,9 +151,13 @@ The parts that constrain product decisions:
     domain-filtered or short draw is kept and shown, but cannot set a
     best score or claim a pass: 100% on a ten-task drill of one domain
     is a good session and is not a CKAD pass.
-  - It stays on the candidate's machine. Nothing is uploaded, and the
-    only ways it leaves are the export the candidate asks for and the
-    delete they confirm.
+  - Run locally it stays on the candidate's machine. Nothing is
+    uploaded, and the only ways it leaves are the export the candidate
+    asks for and the delete they confirm. In a hosted session it is
+    additionally posted to the deployment that is hosting it, because
+    the environment is destroyed on purpose and that copy is the one the
+    candidate still has tomorrow — the local behaviour is unchanged and
+    is the stricter of the two.
 - The timer is server-side. In Exam mode it cannot be paused.
 - The exam requires a desktop-sized screen. Small screens get an
   explanation instead of a broken layout.
@@ -164,13 +172,27 @@ The parts that constrain product decisions:
   attempt, for someone who wants the pressure of a countdown at a pace
   they set. Training mode already covers the untimed case.
 
-**Explicitly out of scope**
+**Hosted, with limits**
 
-- Hosting, accounts, and multi-user separation. Local single-user is the
-  permanent model, so notes elsewhere of the form "needs auth once
-  hosted" describe a scenario that is not planned.
-- Running this somewhere shared or persistent. Nothing in it assumes an
-  adversary.
+Overturned deliberately. "Hosting, accounts and multi-user separation
+are out of scope" was a durable constraint until the hardware most
+people have made it the wrong one: a 9GB, forty-minute first boot is a
+real barrier to trying this at all. There is now a hosted tier, and the
+shape of it is what kept the constraint above true.
+
+- **The hosted tier is capped and the local one is the reference.**
+  A hosted session is a try-it-out: a handful of concurrent hands-on
+  seats, an idle timeout, and a hard cap on how long one lasts. Local is
+  uncapped, has no accounts, and needs no configuration. Anyone who
+  wants the uncapped one clones this.
+- **The simulator did not change to make it possible.** Identity, seats
+  and history live in `hub/`, a separate module that sits in front. The
+  facilitator gained one optional webhook, off unless configured.
+- **A third party can host it too**, with their own limits and their own
+  identity — the chart takes an auth mode that trusts a proxy they
+  already run. That is why the caps are values rather than constants.
+- Still out of scope: anything that would make the local product assume
+  an adversary. Nothing in `./sim up` does.
 
 ## Brand Commitments
 

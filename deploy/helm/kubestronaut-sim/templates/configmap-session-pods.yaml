@@ -1,0 +1,24 @@
+{{- if or (gt (int .Values.sessions.practical.seats) 0) (gt (int .Values.sessions.mcq.seats) 0) }}
+# The two Pod manifests, as JSON, for the hub to stamp out.
+#
+# JSON because the hub is stdlib-only and the standard library has no
+# YAML parser — a rule this repo keeps everywhere, and the conversion is
+# a one-liner here. The YAML in files/ stays the single source of truth,
+# comments and all, and no second copy of the spec exists to drift.
+#
+# Rendered from files/ at install time, so `helm template` shows exactly
+# what a session will be. See the sessionPod helper for the four fields
+# this chart rewrites and why.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kubestronaut-sim.fullname" . }}-session-pods
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubestronaut-sim.labels" . | nindent 4 }}
+data:
+  session-pod.json: |
+    {{- include "kubestronaut-sim.sessionPod" (dict "ctx" . "file" "files/session-pod.yaml" "flavour" .Values.sessions.practical) | nindent 4 }}
+  session-pod-mcq.json: |
+    {{- include "kubestronaut-sim.sessionPod" (dict "ctx" . "file" "files/session-pod-mcq.yaml" "flavour" .Values.sessions.mcq) | nindent 4 }}
+{{- end }}

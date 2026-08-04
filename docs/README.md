@@ -18,6 +18,9 @@ pages are for changing the thing.
   enforces, and what CI structurally cannot.
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — symptoms and fixes, from
   the preflight through boot, an attempt, and grading.
+- [hosting.md](hosting.md) — running it for other people: the Helm
+  chart, every cap it takes as a value, and the handful of things a
+  hosted session does differently from `./sim up`.
 - [../site/README.md](../site/README.md) — the GitHub Pages landing
   page: which of its files are generated mirrors, and what
   `site/build.sh --check` does and does not catch.
@@ -26,7 +29,7 @@ pages are for changing the thing.
 
 - [cli.md](cli.md) — every `./sim` subcommand, environment variable,
   and published port.
-- [api.md](api.md) — the facilitator and conductor HTTP APIs.
+- [api.md](api.md) — the facilitator, conductor and hub HTTP APIs.
 - [bank-spec.md](bank-spec.md) — the question bank format and the
   validator contract.
 

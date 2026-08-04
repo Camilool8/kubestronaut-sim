@@ -58,6 +58,21 @@ for the full command and configuration reference.
 >
 > See [SECURITY.md](SECURITY.md) for what is and is not defended.
 
+## Running it for other people
+
+`./sim up` is the reference and it is uncapped. If you want to put it in
+front of a group — or in front of the internet — there is a Helm chart
+in [`deploy/helm/`](deploy/helm/kubestronaut-sim) that deploys a front
+door: sign-in, a capped pool of concurrent sessions with a queue, and
+attempt history kept per user that outlives the environment it was made
+in. Each candidate gets the whole eight-container stack as one Pod.
+
+The simulator itself does not change to make that work — the front door
+is a separate process in front of it — so nothing above is affected.
+Read [docs/hosting.md](docs/hosting.md) before you deploy one: a
+hands-on session runs a privileged container, and the nodes it runs on
+should be ones you are willing to rebuild.
+
 ## What the exam feels like
 
 1. **Exams** — every certification on the Kubestronaut path, with each
@@ -123,6 +138,7 @@ networks and boot sequence.
 | [docs/api.md](docs/api.md) | HTTP API for the facilitator and conductor |
 | [docs/bank-spec.md](docs/bank-spec.md) | Question bank format and the validator contract |
 | [docs/testing.md](docs/testing.md) | What CI enforces, and what only the smoke suite does |
+| [docs/hosting.md](docs/hosting.md) | The chart, its values, and what hosted mode does differently |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Building, testing, and submitting changes |
 | [SECURITY.md](SECURITY.md) | Threat model and the boundaries that exist |
 

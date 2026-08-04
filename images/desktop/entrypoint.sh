@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 echo "waiting for shared ssh key..."
-until [ -f /shared/ssh/id_ed25519 ]; do sleep 2; done
+# -s, not -f: same reason as images/instance/entrypoint.sh. An empty
+# private key installs fine and then fails every `ssh instance-1` the
+# candidate types, which is the entire exam from this container.
+until [ -s /shared/ssh/id_ed25519 ]; do sleep 2; done
 install -d -m 700 -o candidate -g candidate /home/candidate/.ssh
 install -m 600 -o candidate -g candidate /shared/ssh/id_ed25519 /home/candidate/.ssh/id_ed25519
 install -m 644 -o candidate -g candidate /etc/sim/ssh_config /home/candidate/.ssh/config
@@ -39,6 +42,23 @@ until su - candidate -c 'DISPLAY=:1 xset q' >/dev/null 2>&1; do
   sleep 1
 done
 su - candidate -c 'DISPLAY=:1 dbus-launch startxfce4' &
-websockify --web /usr/share/novnc 6080 localhost:5901 &
+# --heartbeat sends a WebSocket Ping every 30s. A VNC session with a
+# still screen and nobody typing sends nothing at all, and a hosted
+# session's stream crosses a CDN that closes an idle WebSocket after
+# about 100 seconds. The candidate then sees the desktop drop while
+# they are reading a question.
+#
+# It belongs here and not in the facilitator's desktop proxy, which is
+# where it was first proposed: that proxy hijacks the connection after
+# the 101 and splices raw bytes: it does not parse frames, so a ping
+# injected there would land in the middle of whatever frame was in
+# flight. websockify owns the WebSocket protocol state at this end, so
+# its ping is well-formed and every proxy between here and the browser
+# — the facilitator, the hub, the CDN — just sees bytes moving, which
+# is what an idle timer measures. The browser answers Pong itself; no
+# UI change and nothing for noVNC to know about.
+#
+# Harmless under compose, where nothing was going to time out anyway.
+websockify --heartbeat=30 --web /usr/share/novnc 6080 localhost:5901 &
 echo "desktop ready: noVNC on :6080"
 wait -n   # exit (and let compose restart us) if any component dies

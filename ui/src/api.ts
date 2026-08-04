@@ -1138,3 +1138,204 @@ export async function importHistory(
   const body = (await res.json()) as { imported: number; skipped: number };
   return { ok: true, imported: body.imported, skipped: body.skipped };
 }
+
+// ---------------------------------------------------------------------
+// Hosted mode
+//
+// Everything below exists only when the SPA is served by the hub rather
+// than by a facilitator. `./sim up` never sees any of it: getMe() is the
+// one call that probes for a hub, and it answers null against a local
+// facilitator, which JSON-404s any /api/* it does not know. That is the
+// whole detection mechanism — no build flag, no second bundle, and one
+// request on load.
+
+/** Which flavour of session a hosted deployment can hand out. */
+export type SessionKind = "practical" | "mcq";
+
+/**
+ * Where a hosted session is in its life.
+ *
+ * `pending` and `starting` are distinct on purpose, and the difference
+ * matters to the person waiting: pending means a seat is held and
+ * someone else's environment is booting first, starting means their own
+ * Pod exists and is building. `failed` keeps the seat so they can read
+ * why before it is reaped.
+ */
+export type HostedSessionState = "pending" | "starting" | "ready" | "failed";
+
+/** One candidate's exam environment, as the hub describes it. */
+export interface HostedSession {
+  kind: SessionKind;
+  bank?: string;
+  pod: string;
+  state: HostedSessionState;
+  startedAt: string;
+  /** The hard cap. A session is taken back at this time whatever it is doing. */
+  expiresAt: string;
+  lastSeen: string;
+  error?: string;
+}
+
+/** How many of one flavour's seats are taken. */
+export interface Seats {
+  used: number;
+  total: number;
+}
+
+/**
+ * GET /api/me — identity, seat and queue position in one answer.
+ *
+ * 200 whether or not anyone is signed in, deliberately: the question the
+ * SPA is asking is "am I talking to a hub?", and a 401 would conflate
+ * "hosted, logged out" with "not hosted at all".
+ */
+export interface Me {
+  authenticated: boolean;
+  authMode: "github" | "header" | "none";
+  user?: { id: string; login: string };
+  /** Where to send someone who is not signed in. */
+  loginURL?: string;
+  /** The candidate's own session, absent when they have none. */
+  session?: HostedSession;
+  /** Their place in the queue, absent unless they are in one. */
+  queue?: { position: number };
+  /** Per-flavour capacity, keyed by SessionKind. */
+  seats?: Partial<Record<SessionKind, Seats>>;
+}
+
+/**
+ * Probe for a hub. Resolves to null when this is a local facilitator.
+ *
+ * Two ways to be local, and both are checked. A facilitator answers 404
+ * for an /api/* route it does not have; a proxy or a captive portal in
+ * front of one might answer 200 with something else entirely, and a body
+ * with no `authMode` in it is not a hub however healthy the status line
+ * looks. Guessing "hosted" wrongly puts a login screen in front of a
+ * local product that has no accounts.
+ *
+ * Network failures are thrown rather than swallowed: during a cold start
+ * the facilitator is not listening yet, and "not answering" is not the
+ * same answer as "not hosted".
+ */
+export async function getMe(signal?: AbortSignal): Promise<Me | null> {
+  const res = await request("/api/me", { signal });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(await readError(res));
+  }
+  const body = (await res.json()) as Partial<Me>;
+  if (typeof body.authMode !== "string") return null;
+  return body as Me;
+}
+
+export type HostedStartResponse =
+  /** 202: a seat is held and the environment is being built. Poll /api/me. */
+  | { ok: true; starting: true; state: HostedSessionState }
+  /** 409: every seat of that flavour is taken. */
+  | { ok: true; queued: true; position: number; seats: Seats; error: string }
+  | { ok: false; error: string };
+
+/**
+ * POST /api/session/start with a flavour — hosted admission, not the
+ * start of an attempt.
+ *
+ * The same path does both, in that order: the hub grants a seat and
+ * boots a Pod, and only once that Pod answers does it forward the
+ * request to the facilitator inside it, which is what actually begins an
+ * exam. So this is only ever called when the candidate has no session —
+ * once they have one, the ordinary startSession() reaches the
+ * facilitator through the same door and configures the attempt properly.
+ *
+ * The 200 case is therefore not modelled here: reaching it would mean a
+ * ready Pod was handed a body naming a kind and no mode, and starting an
+ * unconfigured attempt is precisely what the caller must not do by
+ * accident.
+ */
+export async function startHostedSession(
+  kind: SessionKind,
+  signal?: AbortSignal,
+): Promise<HostedStartResponse> {
+  const res = await request("/api/session/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind }),
+    signal,
+  });
+  if (res.status === 409) {
+    const body = (await res.json()) as {
+      error: string;
+      queued?: boolean;
+      position?: number;
+      seats?: Seats;
+    };
+    if (body.queued) {
+      return {
+        ok: true,
+        queued: true,
+        position: body.position ?? 0,
+        seats: body.seats ?? { used: 0, total: 0 },
+        error: body.error,
+      };
+    }
+    return { ok: false, error: body.error };
+  }
+  if (!res.ok) {
+    return { ok: false, error: await readError(res) };
+  }
+  if (res.status === 202) {
+    const body = (await res.json()) as { state: HostedSessionState };
+    return { ok: true, starting: true, state: body.state };
+  }
+  // 200 from a Pod that was already ready. Treated as "you already have
+  // one" rather than parsed: the caller's next /api/me poll carries the
+  // session, and nothing here should try to interpret a facilitator
+  // response to a request the facilitator was never meant to see.
+  return { ok: true, starting: true, state: "ready" };
+}
+
+/**
+ * POST /hub/session/end — give up the seat and the Pod.
+ *
+ * Deliberately not /api/session/end, which is the facilitator's and ends
+ * the ATTEMPT: it grades the exam and writes the record while the
+ * environment stays up so the candidate can read their score. Ending the
+ * seat is a different act, and a candidate who confused the two would
+ * lose their results to a misclick.
+ */
+export async function endHostedSession(
+  signal?: AbortSignal,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await request("/hub/session/end", { method: "POST", signal });
+  if (!res.ok) {
+    return { ok: false, error: await readError(res) };
+  }
+  return { ok: true };
+}
+
+/** POST /hub/auth/logout — clear the session cookie. */
+export async function logout(signal?: AbortSignal): Promise<void> {
+  await request("/hub/auth/logout", { method: "POST", signal });
+}
+
+/**
+ * GET /api/history/{attempt} — the full graded-results document of a
+ * past attempt.
+ *
+ * Hosted only, and it is worth saying why rather than leaving it as an
+ * absence. A local facilitator records the attempt SUMMARY in
+ * /state/history.json and nothing else; the results document lives in
+ * /session, which the next attempt overwrites. The hub keeps both,
+ * because its whole reason to exist is that a session Pod is disposable
+ * — so "read last Tuesday's exam back" is a thing only hosted mode can
+ * offer, not a feature the local product is missing.
+ */
+export async function getAttemptResults(
+  attempt: string,
+  signal?: AbortSignal,
+): Promise<Results> {
+  const res = await request(`/api/history/${encodeURIComponent(attempt)}`, { signal });
+  if (!res.ok) {
+    throw new Error(await readError(res));
+  }
+  return (await res.json()) as Results;
+}

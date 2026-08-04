@@ -29,6 +29,13 @@ import { ToastLayer } from "./components/Toast";
 import { TopProgress } from "./components/TopProgress";
 import { ScreenTransition } from "./components/ScreenTransition";
 import { toastStore } from "./components/toastStore";
+import { HostedBooting } from "./screens/HostedBooting";
+import { HostedSignIn } from "./screens/HostedSignIn";
+import { HostedStart } from "./screens/HostedStart";
+import { Review } from "./screens/Review";
+import { SessionChip } from "./components/SessionChip";
+import { useHosted } from "./lib/useHosted";
+import type { Me } from "./api";
 import { useRoute } from "./lib/useHashRoute";
 import { strings } from "./strings";
 
@@ -62,7 +69,121 @@ const PREPARE_POLL_MS = 1_000;
 // so every screen transition and every timer resync flows from one
 // source of truth. It also owns the control-job overlay, which must
 // survive the screen transitions a reset/switch causes.
+/** Who the candidate is, and how to re-ask. Absent in the local product. */
+export interface Hosted {
+  me: Me;
+  refresh: () => void;
+}
+
+/**
+ * The gate above everything.
+ *
+ * One request on load decides which product this is. It has to be a
+ * gate rather than a branch inside the app because the app below assumes
+ * an environment exists: its session poller, its boot poller and its
+ * control poller all address a facilitator, and in hosted mode there is
+ * no facilitator to address until a Pod has been built. Mounting them
+ * against a hub with no session would be three pollers 404ing in a loop
+ * behind a screen that cannot be right anyway.
+ *
+ * `local` renders SimApp with no props at all, which is the property
+ * that matters most here: `./sim up` is byte-identical, and the only
+ * trace of any of this in it is one 404 for /api/me at page load.
+ */
 export default function App() {
+  const { state, refresh } = useHosted();
+  const route = useRoute();
+
+  if (state.status === "unknown") {
+    return (
+      <>
+        <TopProgress />
+        <div className="loading-screen" role="status">
+          {state.error ? strings.app.cannotReach(state.error) : strings.app.loading}
+        </div>
+      </>
+    );
+  }
+  if (state.status === "local") {
+    return <SimApp />;
+  }
+
+  const { me } = state;
+  if (!me.authenticated) {
+    return <HostedSignIn me={me} />;
+  }
+
+  // A ready environment is the ordinary product with a header chip on
+  // top. Everything below this line is the same code a local candidate
+  // runs, reaching the same facilitator through the hub's proxy.
+  if (me.session?.state === "ready") {
+    return <SimApp hosted={{ me, refresh }} />;
+  }
+
+  return <HostedHome hosted={{ me, refresh }} route={route} />;
+}
+
+/**
+ * Signed in, with no usable environment: the lobby, the boot screen, and
+ * the two pages that do not need a Pod at all.
+ *
+ * Progress and a past attempt are answered by the hub out of its own
+ * store, so they work with no session running — which is the whole
+ * argument for hosted history. A candidate can read last week's exam
+ * back without spending a seat to do it.
+ */
+function HostedHome({ hosted, route }: { hosted: Hosted; route: ReturnType<typeof useRoute> }) {
+  const { me, refresh } = hosted;
+  const reviewId = route.segments[0] === "history" ? (route.segments[1] ?? null) : null;
+  const questionId = reviewId ? (route.segments[2] ?? null) : null;
+  const onProgress = route.segments[0] === "progress";
+
+  let screen;
+  if (reviewId) {
+    screen = <Review attemptId={reviewId} questionId={questionId} />;
+  } else if (onProgress) {
+    screen = <Progress catalogVersion={0} hosted />;
+  } else if (me.session) {
+    screen = <HostedBooting session={me.session} onChanged={refresh} />;
+  } else {
+    screen = <HostedStart me={me} onChanged={refresh} />;
+  }
+
+  const headerProps: Partial<AppHeaderProps> = reviewId
+    ? {
+        variant: "back",
+        back: { label: strings.review.back, to: "/progress" },
+        crumb: strings.review.crumb,
+      }
+    : {
+        crumb: onProgress ? strings.header.crumbProgress : strings.hosted.chipLabel,
+        nav: [
+          { label: strings.hosted.chipLabel, to: "/", current: !onProgress && !reviewId },
+          { label: strings.header.navProgress, to: "/progress", current: onProgress },
+        ],
+      };
+
+  return (
+    <>
+      <TopProgress />
+      <AppHeader {...headerProps}>
+        <SessionChip
+          login={me.user?.login ?? ""}
+          session={me.session}
+          onChanged={refresh}
+        />
+      </AppHeader>
+      <main>
+        <ScreenTransition screenKey={reviewId ? `review:${reviewId}` : onProgress ? "progress" : "lobby"}>
+          {screen}
+        </ScreenTransition>
+      </main>
+      <ToastLayer />
+    </>
+  );
+}
+
+function SimApp({ hosted }: { hosted?: Hosted } = {}) {
   const [session, setSession] = useState<SessionSnapshot | null>(null);
   const [fetchedAt, setFetchedAt] = useState<number>(() => Date.now());
   const [pollError, setPollError] = useState<string | null>(null);
@@ -425,8 +546,21 @@ export default function App() {
           nav,
         };
 
+  // A page about the candidate's RECORD rather than their environment.
+  // Above the session switch for the same reason the boot screen is: it
+  // is not a fourth session state, it is a different subject. Hosted
+  // only, and never over a running attempt — session.state is server
+  // truth and no bookmark may talk a candidate out of an exam that is
+  // counting down.
+  const reviewId =
+    hosted && route.segments[0] === "history" && session?.state !== "running"
+      ? (route.segments[1] ?? null)
+      : null;
+
   let screen = null;
-  if (booting) {
+  if (reviewId) {
+    screen = <Review attemptId={reviewId} questionId={route.segments[2] ?? null} />;
+  } else if (booting) {
     screen = <BootProgress boot={boot} onRetry={handleNewAttempt} />;
   } else if (!session) {
     screen = (
@@ -438,7 +572,7 @@ export default function App() {
     switch (session.state) {
       case "idle":
         screen = onProgress ? (
-          <Progress catalogVersion={catalogVersion} />
+          <Progress catalogVersion={catalogVersion} hosted={hosted !== undefined} />
         ) : modeBankId ? (
           <Mode
             bankId={modeBankId}
@@ -499,6 +633,23 @@ export default function App() {
           nothing to navigate to yet. */}
       {session && !booting && session.state !== "running" && (
         <AppHeader {...headerProps}>
+          {/* Hosted only. It carries the lease countdown, which is the one
+              thing about a hosted session a candidate cannot be left to
+              guess: the seat is taken back at the cap whatever they are
+              doing. Deliberately NOT rendered over a running exam — that
+              screen has its own topbar with its own clock, and a second
+              countdown beside it would be read as the exam's. One good
+              consequence and one recorded cost: there is no way to
+              destroy an environment mid-attempt by misclick, and a lease
+              that expires mid-attempt gives no warning. See
+              docs/follow-ups.md. */}
+          {hosted && (
+            <SessionChip
+              login={hosted.me.user?.login ?? ""}
+              session={hosted.me.session}
+              onChanged={hosted.refresh}
+            />
+          )}
           {/* A backgrounded rebuild used to run for 2-4 minutes with no
               indicator anywhere: the lobby behind it looked idle while the
               cluster it describes was being torn down. */}

@@ -1,14 +1,22 @@
 # HTTP API
 
-There is no authentication on any endpoint: anyone who can reach the
-port has every capability the exam UI has. See
-[SECURITY.md](../SECURITY.md).
+There is no authentication on any endpoint of the simulator: anyone who
+can reach the port has every capability the exam UI has. See
+[SECURITY.md](../SECURITY.md). That property survives a hosted
+deployment rather than being weakened by it — the hub documented at the
+end of this page is a separate process in front, and the facilitator is
+never reachable except through it.
 
-Two services. The facilitator serves the whole browser-facing surface
+Two services in the simulator, and a third only in a hosted deployment
+([hosting.md](hosting.md)). The facilitator serves the whole browser-facing surface
 on port 8080 — the API, the embedded UI, the desktop proxy, and a
-reverse proxy to the conductor. The conductor listens on `:9000` on an
-`internal: true` network with no host port, and is reachable only
-through that proxy (`facilitator/cmd/facilitator/main.go:203-207`).
+reverse proxy to the conductor. The conductor is reachable only through
+that proxy: under compose it listens on `:9000` on an `internal: true`
+network with no host port, and in a hosted Pod — one network namespace,
+so an internal network is not available — it listens on a unix socket
+in a volume mounted into the facilitator and nothing else. One value
+per side describes either shape (`LISTEN` and `CONDUCTOR_ADDR`, a
+`host:port` or a `unix:/path`; `facilitator/cmd/facilitator/conductor.go`).
 Host ports are in [cli.md](cli.md).
 
 Errors are `{"error":"..."}` as `application/json`
@@ -1197,3 +1205,148 @@ instances (`conductor/internal/control/control.go:275-330`).
 | 400 | The body has no non-empty `bank` (`conductor/internal/api/api.go:85-87`), or the bank is unknown, malformed or not runnable (`conductor/internal/api/api.go:107-108`). |
 | 409 | An attempt is running — end it first (`conductor/internal/api/api.go:105-106`) — or another control operation is in flight (`conductor/internal/api/api.go:103-104`). |
 | 500 | Switching is not configured on this conductor (`conductor/internal/control/control.go:247-249`). |
+
+## Hub
+
+Only in a hosted deployment. `./sim up` never runs this process, and the
+SPA finds out which product it is talking to by asking for one route:
+a facilitator JSON-404s `GET /api/me`, and that 404 is the whole
+detection mechanism (`hub/internal/api/api.go`).
+
+The route table is deliberately small. The hub **answers** identity,
+history, admission and the control operations that replace a Pod —
+everything whose truth outlives one session — and **proxies** everything
+else to the candidate's own session Pod, where the facilitator described
+above is unchanged and unaware any of this exists.
+
+Every route below except `/healthz`, `GET /api/me` and the OAuth pair
+requires a signed session cookie and answers `401 {"error":"not signed
+in"}` without one.
+
+### The catch-all proxy
+
+| Code | When |
+|---|---|
+| — | Proxied to the candidate's Pod, unchanged. `X-Forwarded-*` is deliberately NOT set: the facilitator trusts its inputs, and a header the hub uses for auth must not be one a candidate can set. |
+| 404 | The candidate has no session. Not 502 — nothing is wrong, they have not started one. |
+| 503 | Their Pod exists and is not ready. Carries `Retry-After: 5` and `{"state": "..."}`. |
+| 502 | The Pod is unreachable. |
+
+The upgrade to the desktop's WebSocket is carried by the same proxy
+(`httputil.ReverseProxy` hijacks on a 101), with `FlushInterval: -1` so
+a stream is never buffered.
+
+### GET /api/me
+
+The hosted-mode probe, and the SPA's whole view of its own state.
+Answers 200 whether or not anyone is signed in — a 401 would conflate
+"hosted, logged out" with "not hosted at all".
+
+```json
+{
+  "authenticated": true,
+  "authMode": "github",
+  "user": {"id": "583231", "login": "octocat"},
+  "session": {
+    "kind": "practical", "pod": "sim-session-practical-583231",
+    "state": "starting", "startedAt": "...", "expiresAt": "...",
+    "lastSeen": "..."
+  },
+  "seats": {"practical": {"used": 1, "total": 3}, "mcq": {"used": 0, "total": 30}}
+}
+```
+
+`session` is absent when the candidate has none, `queue` (`{"position":
+2}`) is present only while they are in one, and `loginURL` replaces
+`user` when they are not signed in. `seats` is reported to signed-out
+callers too: someone deciding whether to sign in is entitled to know
+whether there is anywhere to sit.
+
+`state` is `pending` (a seat is held, someone else is booting first),
+`starting` (their own Pod is building), `ready`, or `failed` — which
+keeps the seat so they can read why before it is reaped.
+
+### POST /api/session/start
+
+Admission first, then the facilitator's own start. The two are separate
+events minutes apart, and the same path does both in that order.
+
+| Code | When |
+|---|---|
+| 202 | A seat was granted and a Pod is being built. `{"starting": true, "state": "..."}` with `Retry-After: 5`. |
+| 409 | Every seat of that flavour is taken. `{"queued": true, "position": 2, "seats": {...}, "kind": "practical"}`. |
+| 400 | The body names a `kind` that is not `practical` or `mcq`. |
+| 502 | The Pod failed to boot; the body carries the reason. |
+| — | Once the Pod is ready, the request is forwarded to it unchanged and the facilitator's own answer is returned. |
+
+The body is `{"kind": "practical"}` for admission and the facilitator's
+own `StartOptions` for an attempt. The SPA never sends the first form to
+a ready session: on the ready path this is the facilitator's endpoint,
+and a body naming a kind and no mode would start an unconfigured
+attempt.
+
+### POST /hub/session/end
+
+Gives up the seat and destroys the Pod. 204, or 204 if there was nothing
+to end. A queued candidate with no session is dequeued by the same call.
+
+Deliberately not `POST /api/session/end`, which is the facilitator's and
+ends the **attempt** — grading it and writing its record while the
+environment stays up so the candidate can read their score. Ending the
+seat is a different act, and a candidate who confused the two would lose
+their results to a misclick.
+
+### POST /api/control/reset, POST /api/control/switch
+
+A hosted reset or switch replaces the Pod rather than rebuilding in
+place: the conductor cannot restart a container it reaches over ssh, and
+a Pod has no per-container restart under `restartPolicy: Never`. Both
+answer in the conductor's own 202-plus-job shape, and
+`GET /api/control/status` and `/api/control/log` answer from the hub's
+job store rather than the conductor's — the Pod they describe may not
+exist while they run.
+
+### Attempt history
+
+`GET /api/history` returns the same shape the facilitator's does —
+attempts most recent first, with the cross-attempt rollup beside them —
+so the dashboard needs no hosted branch. It is the hub's store, never
+the Pod's: a route answered there would answer from the copy that is
+about to be destroyed.
+
+| Route | Behaviour |
+|---|---|
+| `GET /api/history` | `{"attempts": [...], "summary": {...}}`, newest first |
+| `GET /api/history/{attempt}` | The full graded-results document. Scoped to the caller's own user directory, so someone else's attempt id is simply not found. Hosted only — a local facilitator keeps the summary row and lets the next attempt overwrite the results. |
+| `GET /api/history/export` | The interchange document (`{"version":1,"attempts":[...]}`, oldest first). Importable by a local `./sim`. |
+| `DELETE /api/history` | Erases the user's directory: every attempt and every results blob. |
+| `POST /api/history/import` | 501, with the reason. |
+| `GET /api/history/summary` | 501 — the CLI's route, and answering it wrongly would be worse than not answering. |
+
+### POST /hub/ingest/history
+
+How a graded attempt reaches the store. The session Pod's facilitator
+posts `{"record": {...}, "results": {...}}` with a bearer ticket; the
+hub reads the user out of the ticket and never out of the body, because
+a Pod that could name its own user could write into anyone's history.
+
+The ticket is signed with a key derived from `COOKIE_KEY` — `HMAC-SHA256(key,
+"history-ingest")` — so it can never be spent as that candidate's login,
+and the login cookie can never be spent as a ticket.
+
+Under `/hub/`, not `/api/`, and deliberately: `/api/` is the candidate's
+surface, and this is the Pod talking to the hub about them.
+
+| Code | When |
+|---|---|
+| 200 | `{"recorded": true}`, or `false` if that attempt id was already stored — a retried delivery records nothing twice. |
+| 400 | No record in the body. |
+| 401 | The ticket is missing, forged, or expired. Expiry is logged separately and answered identically. |
+
+### /hub/auth/*
+
+`GET /hub/auth/login` redirects to GitHub with a CSRF state cookie
+scoped to `/hub/auth`; `GET /hub/auth/callback` checks that state before
+anything else and redirects to `/` on success; `POST /hub/auth/logout`
+clears the cookie and answers 204. All three answer 404 in
+`AUTH_MODE=header` and `none`, where there is nothing to log in to.

@@ -63,7 +63,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [facilitator, conductor, proxy]
+        module: [facilitator, conductor, proxy, hub]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -110,6 +110,126 @@ jobs:
       - name: Test
         run: npm test
 
+  # The chart is the only place the Pod manifests and the hub meet, and
+  # they meet as bytes: helm renders YAML into JSON, the hub parses that
+  # JSON and stamps out a Pod. Checking each half alone proves nothing
+  # about the join — a manifest that stops declaring an env var the hub
+  # must fill renders perfectly and fails at the first candidate.
+  chart:
+    name: Helm chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.3
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.24"
+          cache-dependency-path: hub/go.mod
+
+      - name: Lint
+        run: |
+          helm lint deploy/helm/kubestronaut-sim \
+            --set hub.baseURL=https://sim.invalid --set hub.existingSecret=hub
+
+      # Every one of these is a deployment that cannot work, and the
+      # chart's job is to say so before anything is applied rather than
+      # leave a CrashLoopBackOff where a working hub used to be.
+      - name: Refuses a deployment it cannot make work
+        run: |
+          fails() {
+            desc="$1"; shift
+            if out=$(helm template sim deploy/helm/kubestronaut-sim -n ks "$@" 2>&1); then
+              echo "should have been refused: $desc" >&2
+              exit 1
+            fi
+            echo "refused ($desc): $(echo "$out" | head -1)"
+          }
+          fails "github mode with no credentials" --set hub.baseURL=https://sim.invalid
+          fails "github mode with no base URL"    --set hub.existingSecret=hub
+          fails "an auth mode that does not exist" \
+            --set hub.existingSecret=hub --set hub.auth.mode=oidc
+          fails "an HTTPRoute attached to no Gateway" \
+            --set hub.existingSecret=hub --set hub.baseURL=https://sim.invalid \
+            --set httpRoute.enabled=true
+
+      - name: Render
+        run: |
+          helm template sim deploy/helm/kubestronaut-sim -n kubestronaut-sim \
+            --set hub.baseURL=https://sim.invalid --set hub.existingSecret=hub \
+            --show-only templates/configmap-session-pods.yaml > /tmp/cm.yaml
+
+      # What the chart is responsible for, as opposed to what the
+      # manifests are: that every first-party image was rewritten to the
+      # configured registry and tag, that no container was lost on the
+      # way through, and that privilege did not spread.
+      - name: The rendered Pods are the manifests, with the images moved
+        run: |
+          mkdir -p /tmp/rendered
+          python3 - <<'PY'
+          import json, re, sys
+          # No PyYAML on the runner, and none is needed: toJson emits one
+          # line per key, so the ConfigMap is read by indentation.
+          docs, key = {}, None
+          for line in open('/tmp/cm.yaml'):
+              line = line.rstrip('\n')
+              m = re.match(r'^  ([A-Za-z0-9._-]+\.json): \|\s*$', line)
+              if m:
+                  key = m.group(1); docs[key] = []; continue
+              if key is None:
+                  continue
+              if line.startswith('    '):
+                  docs[key].append(line[4:])
+              elif line.strip():
+                  key = None
+          # From Chart.yaml, so a version bump is one edit and not two.
+          tag = re.search(r'^appVersion:\s*"?([^"\s]+)"?',
+                          open('deploy/helm/kubestronaut-sim/Chart.yaml').read(),
+                          re.M).group(1)
+          want = {'session-pod.json': (1, 8, 1), 'session-pod-mcq.json': (1, 2, 0)}
+          if set(docs) != set(want):
+              sys.exit(f'rendered {sorted(docs)}, want {sorted(want)}')
+          for name, (inits, containers, privileged) in want.items():
+              pod = json.loads('\n'.join(docs[name]))
+              open('/tmp/rendered/' + name, 'w').write(json.dumps(pod))
+              if pod['kind'] != 'Pod':
+                  sys.exit(f'{name}: rendered a {pod["kind"]}')
+              # The API server rejects a create whose body names a
+              # different namespace from the URL, and defaults an empty
+              # one silently — which is worse.
+              if not pod['metadata'].get('namespace'):
+                  sys.exit(f'{name}: no namespace')
+              got = (len(pod['spec'].get('initContainers', [])), len(pod['spec']['containers']))
+              if got != (inits, containers):
+                  sys.exit(f'{name}: {got[0]} init + {got[1]} containers, want {inits} + {containers}')
+              priv = [c['name'] for c in pod['spec']['containers']
+                      if c.get('securityContext', {}).get('privileged')]
+              if len(priv) != privileged:
+                  sys.exit(f'{name}: privileged containers {priv}, want {privileged}')
+              if privileged and priv != ['k8s-env']:
+                  sys.exit(f'{name}: {priv} is privileged, only k8s-env may be')
+              for c in pod['spec'].get('initContainers', []) + pod['spec']['containers']:
+                  first_party = c['image'].startswith('docker.io/cjoga/kubestronaut-sim-')
+                  if first_party and not c['image'].endswith(':' + tag):
+                      sys.exit(f'{name}: {c["name"]} is on {c["image"]}, not the chart appVersion')
+                  # An upstream pinned tag is not the chart's to move.
+                  if c['image'] == 'registry:2':
+                      continue
+                  if not first_party:
+                      sys.exit(f'{name}: {c["name"]} image {c["image"]} was not rewritten')
+              print(f'{name}: {inits} init + {containers} containers, images rewritten')
+          PY
+
+      # The join. render() is the hub's, the JSON is the chart's, and
+      # this is the only thing that runs one against the other.
+      - name: The hub can stamp out what the chart renders
+        working-directory: hub
+        env:
+          GOFLAGS: -buildvcs=false
+          SESSION_POD_JSON: /tmp/rendered/session-pod.json:/tmp/rendered/session-pod-mcq.json
+        run: go test ./internal/session/ -run TestTheChart -v
+
   images:
     name: Images build
     runs-on: ubuntu-latest
@@ -121,6 +241,17 @@ jobs:
       # booting, which is smoke.sh's job.
       - name: k8s-env
         run: docker build --build-arg PRELOAD=none -t sim-k8s-env images/k8s-env
+      # bootstrap.sh does not only run from PID 1: a hosted reset re-runs
+      # it over ssh (ENGINE=ssh), and an sshd session inherits none of the
+      # image's ENV. That aborted the rebuild at `set -u` with
+      # "NODE_IMAGE: unbound variable" — after it had already deleted the
+      # cluster, so the session was left with none. `env -i` reproduces
+      # exactly that empty environment.
+      - name: NODE_IMAGE resolves with no environment at all
+        run: |
+          docker run --rm --entrypoint env sim-k8s-env -i sh -c \
+            'NODE_IMAGE="${NODE_IMAGE:-$(cat /opt/sim/node-image)}"; \
+             test -n "$NODE_IMAGE" && echo "resolved to $NODE_IMAGE"'
       - name: instance
         run: docker build -t sim-instance images/instance
       - name: desktop
@@ -131,8 +262,111 @@ jobs:
         run: docker build -t sim-conductor conductor
       - name: docs-proxy
         run: docker build -t sim-proxy proxy
+      # Context is banks/, not the repo root: the root .dockerignore
+      # excludes banks/ so it stays out of the facilitator's context.
+      - name: banks
+        run: docker build -f images/banks/Dockerfile -t sim-banks banks
+      - name: hub
+        run: docker build -t sim-hub hub
+      # FROM scratch: there is no shell to check the image with, and a
+      # broken binary in one would otherwise only surface at deploy time.
+      - name: hub refuses to start misconfigured
+        run: |
+          out=$(docker run --rm -e AUTH_MODE=github sim-hub 2>&1) && {
+            echo "hub started with no GitHub credentials; it must not" >&2; exit 1
+          }
+          echo "$out" | grep -q GITHUB_CLIENT_ID
       - name: Compose config is valid
         run: docker compose config -q
+      # The hosted session Pod is not built from these, but a typo in it
+      # would only surface at deploy time. This parses it and checks the
+      # image names line up with the Dockerfiles above.
+      - name: Session pod manifest is valid YAML
+        run: |
+          python3 - <<'PY'
+          import sys, re
+          src = open('deploy/helm/kubestronaut-sim/files/session-pod.yaml').read()
+          # Stdlib only: no PyYAML on the runner by default, and the
+          # checks worth having here are structural, not schema-deep.
+          for probe in ('hostAliases:', 'initContainers:', 'containers:', 'volumes:'):
+              if probe not in src:
+                  sys.exit(f'session-pod.yaml: missing {probe}')
+          names = set(re.findall(r'image: cjoga/kubestronaut-sim-([a-z0-9-]+):', src))
+          expected = {'banks', 'k8s-env', 'instance', 'desktop', 'facilitator', 'conductor', 'docs-proxy'}
+          if names != expected:
+              sys.exit(f'session-pod.yaml images {sorted(names)} != {sorted(expected)}')
+          # A mutable tag with the default pull policy silently serves a
+          # stale image; every first-party image must opt out.
+          if src.count('imagePullPolicy: Always') - src.count('# imagePullPolicy: Always') != len(re.findall(r'image: cjoga/', src)):
+              sys.exit('session-pod.yaml: every cjoga/ image needs imagePullPolicy: Always')
+          # Pod containers share a UTS namespace, so an instance that does
+          # not name itself shows the candidate the same prompt they typed
+          # `ssh instance-1` at, with no way to tell it worked.
+          for want in ('instance-1', 'instance-2'):
+              if 'SIM_HOSTNAME, value: "%s"' % want not in src:
+                  sys.exit('session-pod.yaml: %s has no SIM_HOSTNAME' % want)
+          # A practical session is a privileged container holding a root
+          # shell for a stranger. Its egress boundary is not optional, and
+          # it is not part of the Pod spec, so assert it exists and still
+          # denies every private range rather than trusting it shipped.
+          np = open('deploy/helm/kubestronaut-sim/templates/networkpolicy.yaml').read()
+          for cidr in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16',
+                       '100.64.0.0/10', '169.254.0.0/16'):
+              if cidr not in np:
+                  sys.exit('networkpolicy.yaml: %s is not denied' % cidr)
+
+          # The MCQ flavour. Its whole reason to exist is being small and
+          # unprivileged, so those are what is asserted: no cluster, no
+          # shells, no privilege.
+          #
+          # Comments are stripped first. Every one of these manifests
+          # explains itself at length, and a check that reads the prose
+          # fails on a file that says "no desktop container exists here"
+          # — which is the file being correct, described correctly.
+          raw = open('deploy/helm/kubestronaut-sim/files/session-pod-mcq.yaml').read()
+          mcq = '\n'.join(re.sub(r'(^|\s)#.*$', '', line) for line in raw.splitlines())
+          if 'privileged: true' in mcq:
+              sys.exit('session-pod-mcq.yaml: an MCQ session must not be privileged')
+          for forbidden in ('name: k8s-env', 'name: instance-1', 'name: desktop', 'image: registry:2'):
+              if forbidden in mcq:
+                  sys.exit('session-pod-mcq.yaml: %s does not belong in an MCQ session' % forbidden)
+          # /shared/ready is the authority on readiness for every service
+          # in the stack. Nothing boots here, so if the init container
+          # stops writing it the facilitator serves a permanent boot
+          # screen over a session that was ready before it started.
+          if '/shared/ready' not in mcq:
+              sys.exit('session-pod-mcq.yaml: nothing writes /shared/ready')
+
+          # The conductor's control API resets clusters and switches
+          # banks. Compose keeps it off the exam network entirely; a Pod
+          # is one network namespace, so a TCP port would sit on the
+          # candidate's own loopback and a shell on an instance could
+          # drive it. The socket is the replacement boundary, and the
+          # boundary is the MOUNT — exactly two containers may hold it.
+          plain = '\n'.join(re.sub(r'(^|\s)#.*$', '', line) for line in src.splitlines())
+          sock = 'unix:/run/control/conductor.sock'
+          for name, text in (('session-pod.yaml', plain), ('session-pod-mcq.yaml', mcq)):
+              for var in ('LISTEN', 'CONDUCTOR_ADDR'):
+                  if '%s, value: "%s"' % (var, sock) not in text:
+                      sys.exit('%s: %s must be %s' % (name, var, sock))
+              if ':9000' in text:
+                  sys.exit('%s: the conductor must not listen on TCP in a Pod' % name)
+              if text.count('mountPath: /run/control') != 2:
+                  sys.exit('%s: exactly two containers may mount the control socket' % name)
+              # The hub fills these per session, and can only fill an env
+              # var the manifest already declares. Without them a hosted
+              # attempt is graded, shown, and then lost with the Pod —
+              # which the candidate discovers the next day.
+              for var in ('HISTORY_WEBHOOK_URL', 'HISTORY_WEBHOOK_TOKEN'):
+                  if '%s, value: ""' % var not in text:
+                      sys.exit('%s: the facilitator must declare an empty %s' % (name, var))
+
+          # A still VNC screen sends nothing, and an idle WebSocket
+          # through a CDN is closed out from under the candidate.
+          if '--heartbeat' not in open('images/desktop/entrypoint.sh').read():
+              sys.exit('images/desktop/entrypoint.sh: websockify needs --heartbeat or a hosted desktop drops when idle')
+          print('session-pod.yaml + session-pod-mcq.yaml + networkpolicy.yaml ok')
+          PY
 
   shell:
     name: Shell syntax
@@ -151,3 +385,28 @@ jobs:
             bash -n "$f" || { echo "syntax error: $f"; fail=1; }
           done
           exit $fail
+      # /shared is a handoff between containers, and `>` truncates the
+      # destination before it writes it — so a reader polling for the file
+      # can open one that exists, is empty, and is about to be filled.
+      #
+      # Compose makes that window unreachable (every consumer declares
+      # depends_on k8s-env: service_healthy, so nothing reads while this
+      # writes) which is why it survived this long. A Pod has no
+      # depends_on and starts all eight containers at once: a session
+      # booted with instance-1 holding a 5574-byte kubeconfig and
+      # instance-2 holding a 0-byte one, whose kubectl then fell back to
+      # its localhost:8080 default — the facilitator — and failed every
+      # command. Eleven of the bank's twenty-two questions are graded on
+      # instance-2, so half the exam was unscoreable and nothing said so.
+      #
+      # Writers use write_shared() in bootstrap.sh, or the temp+mv that
+      # phase.sh has always used for boot.json. Both rename into place,
+      # and rename is atomic.
+      - name: Writes into /shared are atomic
+        run: |
+          if grep -rnE '>>?[[:space:]]*/shared/' images/ proxy/; then
+            echo "^^ writes into /shared must rename into place, not truncate."
+            echo "   use write_shared (images/k8s-env/bootstrap.sh) or temp+mv."
+            exit 1
+          fi
+          echo "no truncating writes into /shared"

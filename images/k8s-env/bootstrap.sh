@@ -18,11 +18,52 @@ fi
 BANK=${BANK:?BANK env var or /shared/bank required}
 BANK_DIR="/banks/${BANK}"
 [ -f "${BANK_DIR}/exam.yaml" ] || { echo "no exam.yaml in ${BANK_DIR}"; exit 1; }
-[ -f /shared/bank ] || printf '%s' "${BANK}" > /shared/bank
+# Same shape as the bank above — a value that may or may not be in the
+# environment — for a different reason. NODE_IMAGE is a build-time
+# constant delivered as an image ENV, and an ENV only reaches processes
+# descended from PID 1. A hosted reset re-runs this script over ssh
+# (ENGINE=ssh in the conductor), where the environment is empty, and
+# `set -u` aborted the rebuild below *after* the old cluster was already
+# deleted. The Dockerfile writes the file; it is always right, and it does
+# not care how this script was started.
+NODE_IMAGE="${NODE_IMAGE:-$(cat /opt/sim/node-image)}"
+# Every file this script hands to another container is written to a
+# temporary name and renamed into place. `>` truncates first and fills
+# after, so a reader that polls for existence can — and does — open a
+# file that is real, zero bytes long, and about to be filled in.
+#
+# Under compose that window is unreachable: instance-1, instance-2 and
+# desktop all declare `depends_on: k8s-env: {condition: service_healthy}`,
+# so they do not start until this script has finished. A Pod has no
+# depends_on and starts all eight containers at once, which puts the
+# instances straight into the window. Measured, not theorised: a session
+# pod booted with instance-1 holding a 5574-byte kubeconfig and
+# instance-2 holding a 0-byte one, and kubectl on instance-2 then fell
+# back to its localhost:8080 default — the facilitator — and failed every
+# command with "invalid character '<'" for the rest of the exam.
+#
+# rename(2) within one filesystem is atomic, so a reader sees the old
+# file or the new one and never a half-written one. Cheap, and it removes
+# the startup-ordering assumption rather than documenting it.
+write_shared() {   # write_shared DEST  <content on stdin>
+  cat > "$1.tmp" && mv "$1.tmp" "$1"
+}
+
+[ -f /shared/bank ] || printf '%s' "${BANK}" | write_shared /shared/bank
 
 rm -f /shared/ready
 mkdir -p /shared/ssh
-[ -f /shared/ssh/id_ed25519 ] || ssh-keygen -t ed25519 -N '' -f /shared/ssh/id_ed25519 -q
+# Both halves of the keypair land by rename, public half first: the
+# private key is this block's own idempotence guard, and it is what the
+# desktop waits for, so it must be the last thing to appear. Once it is
+# there, both files are complete.
+if [ ! -f /shared/ssh/id_ed25519 ]; then
+  keytmp=$(mktemp -d /shared/ssh/.keygen.XXXXXX)
+  ssh-keygen -t ed25519 -N '' -f "${keytmp}/id_ed25519" -q
+  mv "${keytmp}/id_ed25519.pub" /shared/ssh/id_ed25519.pub
+  mv "${keytmp}/id_ed25519" /shared/ssh/id_ed25519
+  rmdir "${keytmp}"
+fi
 
 # Side-loads a manifest's images into the kind nodes from the DinD image
 # cache, which lives on a named volume and therefore survives resets. The
@@ -119,7 +160,7 @@ if ! kind get clusters 2>/dev/null | grep -qx sim; then
   kind create cluster --config /opt/sim/kind-config.yaml --image "${node_ref}"
   created=1
 fi
-kind get kubeconfig --name sim | sed 's#https://0\.0\.0\.0:6443#https://k8s-env:6443#' > /shared/kubeconfig
+kind get kubeconfig --name sim | sed 's#https://0\.0\.0\.0:6443#https://k8s-env:6443#' | write_shared /shared/kubeconfig
 kind export kubeconfig --name sim   # local admin access via ~/.kube/config
 
 # on warm restart the node containers auto-restart but the API server needs
@@ -237,7 +278,7 @@ if [ "$exam_type" = "mcq" ]; then
     echo " This is a multiple-choice exam: answer in the question panel."
     echo " The desktop is not needed for this bank."
     echo "=============================================================="
-  } > /shared/exam/motd
+  } | write_shared /shared/exam/motd
 else
   {
     echo "=============================================================="
@@ -256,7 +297,7 @@ else
     echo " Click any value in the question panel to copy it, then paste"
     echo " here with Ctrl+V."
     echo "=============================================================="
-  } > /shared/exam/motd
+  } | write_shared /shared/exam/motd
 fi
 
 phase finalize "Finishing up" 8

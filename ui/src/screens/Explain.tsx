@@ -68,9 +68,19 @@ interface ExplainProps {
   results: Results;
   /** The `<id>` from `#/results/<id>`, which may name nothing at all. */
   questionId: string;
+  /**
+   * The route this screen's own links hang off, with no trailing slash.
+   *
+   * "/results" is the attempt that just ended, which is where this screen
+   * has always lived. Hosted mode reads a PAST attempt back at
+   * "/history/<attemptId>" and renders the identical component under it,
+   * so the base cannot be a constant — every step and back link here
+   * would jump out of the record and into the live session.
+   */
+  basePath?: string;
 }
 
-export function Explain({ results, questionId }: ExplainProps) {
+export function Explain({ results, questionId, basePath = "/results" }: ExplainProps) {
   const index = results.questions.findIndex((q) => q.id === questionId);
   const question = index === -1 ? null : results.questions[index];
 
@@ -112,7 +122,7 @@ export function Explain({ results, questionId }: ExplainProps) {
     // so the page still announces what it is.
     return (
       <div className="explain">
-        <BackLink />
+        <BackLink basePath={basePath} />
         <div className="explain-card explain-unknown">
           <h1 className="explain-title">{strings.explain.unknownTask}</h1>
         </div>
@@ -144,7 +154,7 @@ export function Explain({ results, questionId }: ExplainProps) {
 
   return (
     <div className="explain">
-      <BackLink />
+      <BackLink basePath={basePath} />
 
       <article className="explain-card">
         <header className="explain-head">
@@ -170,14 +180,14 @@ export function Explain({ results, questionId }: ExplainProps) {
           {(prev !== null || next !== null) && (
             <nav className="explain-nav" aria-label={strings.explain.navLabel}>
               {prev !== null && (
-                <a className="btn explain-step" href={`#/results/${prev.id}`}>
+                <a className="btn explain-step" href={`#${basePath}/${prev.id}`}>
                   <Icon name="chevron-left" />
                   <span className="sr-only">{strings.explain.prevLabel}: </span>
                   {strings.explain.prevTask(index)}
                 </a>
               )}
               {next !== null && (
-                <a className="btn explain-step" href={`#/results/${next.id}`}>
+                <a className="btn explain-step" href={`#${basePath}/${next.id}`}>
                   <span className="sr-only">{strings.explain.nextLabel}: </span>
                   {strings.explain.nextTask(index + 2)}
                   <Icon name="chevron-right" />
@@ -244,9 +254,9 @@ export function Explain({ results, questionId }: ExplainProps) {
   );
 }
 
-function BackLink() {
+function BackLink({ basePath }: { basePath: string }) {
   return (
-    <a className="explain-back" href="#/results">
+    <a className="explain-back" href={`#${basePath}`}>
       <Icon name="chevron-left" />
       {strings.explain.backToResults}
     </a>

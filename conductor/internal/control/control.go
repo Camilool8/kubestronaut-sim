@@ -29,12 +29,41 @@ var ErrInvalidBank = errors.New("control: invalid bank")
 // explicit "abandon this attempt" operation.)
 var ErrSessionRunning = errors.New("control: a session is running — end the exam first")
 
+// ErrRestartUnavailable rejects reset and switch on an engine that cannot
+// restart a container at all — the ssh engine a hosted session runs,
+// where a Pod offers no per-container restart and restartPolicy: Never
+// makes killing PID 1 terminal.
+//
+// It is checked BEFORE either job begins, and that ordering is the whole
+// point of it. Both jobs wipe the instances, and switch also rewrites the
+// active bank, several phases before they reach the restart that cannot
+// work: a hosted switch got as far as "the bank file says mcq, while
+// docs-proxy and the facilitator are still serving the practical exam"
+// and then stopped, leaving a session that was neither exam. An operation
+// that cannot finish must not be allowed to start. Mapped to 501.
+var ErrRestartUnavailable = errors.New("control: this deployment cannot restart containers — start a new session instead")
+
 // Engine is the slice of the Docker Engine API the controller needs.
 // containerIDs returned by FindContainer are opaque to this package.
 type Engine interface {
 	FindContainer(ctx context.Context, project, service string) (string, error)
 	Exec(ctx context.Context, containerID string, cmd []string, onLine func(string)) (exitCode int, output string, err error)
 	Restart(ctx context.Context, containerID string, timeoutSec int) error
+}
+
+// restartCapable lets an Engine declare up front that Restart will always
+// fail, so a job needing one can be refused before its earlier phases
+// destroy anything. Deliberately optional rather than a fourth Engine
+// method: an engine that says nothing is assumed capable, which is true
+// of the Docker engine and of every test fake.
+type restartCapable interface {
+	CanRestart() bool
+}
+
+// canRestart reports whether the engine can restart containers at all.
+func (c *Controller) canRestart() bool {
+	rc, ok := c.Engine.(restartCapable)
+	return !ok || rc.CanRestart()
 }
 
 // Controller wires the engine, job store, and facilitator endpoint into
@@ -152,10 +181,17 @@ func resetPhases(mcq bool) []job.PhaseSpec {
 	}
 }
 
-// StartReset begins an asynchronous reset job, returning the job record
-// or job.ErrBusy if another operation is in flight.
+// StartReset begins an asynchronous reset job, returning the job record,
+// job.ErrBusy if another operation is in flight, or ErrRestartUnavailable
+// if the engine could not complete the job's restart phase.
 func (c *Controller) StartReset() (job.Job, error) {
 	mcq := c.bankIsMCQ(c.activeBank())
+	// A hands-on reset restarts the instances after rebuilding the cluster
+	// (resetPhases); an MCQ reset has neither phase, so it stays available
+	// on an engine that cannot restart anything.
+	if !mcq && !c.canRestart() {
+		return job.Job{}, ErrRestartUnavailable
+	}
 	j, err := c.Store.Begin("reset", "", resetPhases(mcq))
 	if err != nil {
 		return job.Job{}, err
@@ -250,6 +286,20 @@ func (c *Controller) StartSwitch(bank string) (job.Job, error) {
 	if err := c.Catalog.Switchable(bank); err != nil {
 		return job.Job{}, fmt.Errorf("%w: %v", ErrInvalidBank, err)
 	}
+	mcq := c.bankIsMCQ(bank)
+	// Every switch restarts the bank-reading services (RestartExtra), and
+	// a hands-on target restarts the instances too. Unlike reset there is
+	// no variant that needs none, so on an engine that cannot restart, a
+	// switch is refused outright rather than half-performed.
+	//
+	// Checked before the session-state probe below because this is a
+	// static property of the deployment: an operation this engine can
+	// never carry out should not first cost a round-trip to the
+	// facilitator, nor report a transport failure in its place.
+	if (!mcq || len(c.RestartExtra) > 0) && !c.canRestart() {
+		return job.Job{}, ErrRestartUnavailable
+	}
+
 	state, err := c.sessionState(context.Background())
 	if err != nil {
 		return job.Job{}, fmt.Errorf("control: check session state: %w", err)
@@ -258,7 +308,6 @@ func (c *Controller) StartSwitch(bank string) (job.Job, error) {
 		return job.Job{}, ErrSessionRunning
 	}
 
-	mcq := c.bankIsMCQ(bank)
 	j, err := c.Store.Begin("switch", bank, switchPhases(mcq))
 	if err != nil {
 		return job.Job{}, err

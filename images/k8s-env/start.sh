@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 HELM_REPO_PORT=${HELM_REPO_PORT:-8879}
+# This script is PID 1, so it does have the image's ENV — unlike
+# bootstrap.sh when a hosted reset re-runs it over ssh. Resolved the same
+# way anyway, so there is one rule rather than two. See bootstrap.sh.
+NODE_IMAGE="${NODE_IMAGE:-$(cat /opt/sim/node-image)}"
 # shellcheck source=phase.sh
 . /opt/sim/phase.sh
 rm -f /shared/ready   # clear stale marker before healthcheck can see it
@@ -78,10 +82,45 @@ helm repo update >/dev/null 2>&1 || true
 # recreate-cluster phase can still exec a retry in here, which is what
 # the "New attempt" button drives. Exiting would take that away and
 # leave the candidate with nothing but a restart loop.
+# Only in the hosted deployment, where the stack is one Kubernetes Pod:
+# the conductor has no Docker socket there and execs in here over ssh
+# (ENGINE=ssh). Unset under compose, where the socket is the route and
+# nothing should be listening.
+#
+# The address is explicit because the Pod shares one network namespace
+# with the instances, which take 127.0.0.2 and 127.0.0.3. Binding
+# 0.0.0.0 here would take :22 on every address and lock them out.
+#
+# Called after bootstrap.sh because that is what generates the key pair
+# this authorises, and on the failure path too so a broken environment is
+# still reachable for diagnosis.
+start_control_sshd() {
+  [ -n "${SSHD_LISTEN:-}" ] || return 0
+  # -s, not -f, to match the instance and desktop entrypoints: an empty
+  # authorized_keys authorises nobody, and this would then start an sshd
+  # the conductor can never log into — a working-looking listener that
+  # refuses every connection. Unreachable now that bootstrap.sh renames
+  # the key into place, and kept because that is exactly the assumption
+  # this file should not be making again.
+  if [ ! -s /shared/ssh/id_ed25519.pub ]; then
+    echo "control sshd: no shared key yet, not starting" >&2
+    return 0
+  fi
+  mkdir -p /root/.ssh
+  cp /shared/ssh/id_ed25519.pub /root/.ssh/authorized_keys
+  chmod 700 /root/.ssh
+  chmod 600 /root/.ssh/authorized_keys
+  ssh-keygen -A >/dev/null 2>&1
+  /usr/sbin/sshd -e -o "ListenAddress=$SSHD_LISTEN" -o PermitRootLogin=prohibit-password \
+    && echo "control sshd on ${SSHD_LISTEN}:22"
+}
+
 if ! /opt/sim/bootstrap.sh; then
+  start_control_sshd
   echo "bootstrap failed; holding the container open so the failure is visible and retryable" >&2
   tail -f /dev/null
 fi
 
+start_control_sshd
 echo "k8s-env ready"
 tail -f /dev/null

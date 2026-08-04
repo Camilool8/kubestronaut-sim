@@ -1,0 +1,198 @@
+# A hosted kubestronaut-sim.
+#
+# Two things are deployed from here: the hub, which is the only process
+# reachable from the internet, and the Pod manifests it stamps out once
+# per candidate. The manifests are not templated — they are the files in
+# files/, applied as written, with only the handful of fields below
+# rewritten. That is deliberate: they were debugged against a real
+# cluster as concrete YAML and they stay readable as concrete YAML.
+#
+# Everything a deployment is allowed to differ in is on this page.
+
+# -------------------------------------------------------------------
+# Images
+#
+# Every image this chart runs is `<prefix><name>:<tag>` — the seven
+# session images plus the hub, all published by one release workflow, so
+# one prefix and one tag name all eight. Change `prefix` to pull from a
+# mirror or a private registry; the names after it are fixed.
+images:
+  prefix: docker.io/cjoga/kubestronaut-sim-
+  # Empty means Chart.appVersion, which is the release these manifests
+  # were written against. Pin it here to deploy a different one.
+  tag: ""
+  # IfNotPresent because a released tag is immutable and k8s-env is
+  # 2.6 GB — re-checking that on every session boot costs minutes for
+  # nothing. Set Always if you point `tag` at a mutable tag like `dev`.
+  pullPolicy: IfNotPresent
+  # Names of imagePullSecrets, for a private registry.
+  pullSecrets: []
+
+# -------------------------------------------------------------------
+# The hub
+hub:
+  replicas: 1
+
+  # Where a browser reaches the hub, scheme and host, no trailing slash.
+  # REQUIRED: it is the OAuth redirect target and the address session
+  # Pods post their graded attempts back to.
+  baseURL: ""
+
+  auth:
+    # github — the hosted tier: any GitHub account may sign in.
+    # header  — trust a header set by a proxy in front of this. For a
+    #           self-hoster who already has SSO. The hub says at boot
+    #           that it MUST NOT be reachable except through that proxy.
+    # none    — no identity at all. Everyone is the same user.
+    mode: github
+    # Only read when mode is header.
+    header: X-Forwarded-User
+    # How long a login lasts.
+    ttl: 12h
+    # Set false only if you terminate TLS somewhere the cookie cannot
+    # reach — which for an internet-facing deployment means: do not.
+    cookieSecure: true
+
+  # Credentials. Either name a Secret that already exists (an
+  # ExternalSecret, a sealed secret, whatever you use) or set the values
+  # inline and let the chart create one. The keys are the same either
+  # way: COOKIE_KEY, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET.
+  #
+  # COOKIE_KEY signs two things with two different keys derived from it:
+  # login cookies, and the per-Pod tickets a session presents to record a
+  # graded attempt. Rotating it logs everyone out and invalidates
+  # in-flight tickets; losing it does the same. It is not generated here
+  # on purpose — a chart that minted one would rotate it on every
+  # upgrade that missed the old value.
+  existingSecret: ""
+  secret:
+    cookieKey: ""
+    githubClientID: ""
+    githubClientSecret: ""
+
+  # Durable per-user history: one JSON document per user plus the full
+  # results of each attempt. Small — an attempt is tens of KB — but it is
+  # the only thing in this deployment that is not disposable.
+  state:
+    size: 5Gi
+    # Empty uses the cluster default StorageClass.
+    storageClass: ""
+    # Name an existing PVC to keep history across a `helm uninstall`.
+    existingClaim: ""
+
+  service:
+    type: ClusterIP
+    port: 80
+
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {cpu: 500m, memory: 256Mi}
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  # Extra environment for the hub, as a plain env list. An escape hatch
+  # for a knob this chart has not grown a value for yet.
+  extraEnv: []
+
+# -------------------------------------------------------------------
+# Sessions
+#
+# The caps. Every number here is a value because the whole scaling story
+# is "more seats on more nodes" — none of it is a code change.
+sessions:
+  # Empty means the release namespace. The hub can only create Pods in a
+  # namespace its Role covers, and the chart writes that Role here.
+  namespace: ""
+
+  # Which flavour POST /api/session/start admits into when the caller
+  # does not say.
+  defaultKind: practical
+
+  # How long a seat may be held before it is taken back, whatever the
+  # candidate is doing. The ticket a Pod records attempts with outlives
+  # this by an hour so a grade in the final minutes still lands.
+  maxAge: 10h
+  # No request from the browser for this long and the seat is reclaimed.
+  idleTimeout: 30m
+  # The head of the queue is offered a hold, not a seat. This is how long
+  # they have to claim it before it passes to the next person — a browser
+  # closed an hour ago must not keep a seat warm.
+  queueHold: 2m
+  # A boot that has not reached ready by now is declared failed. A cold
+  # practical session builds a two-node cluster.
+  bootTimeout: 20m
+  # Pod creations in flight at once, across all flavours. Boot is
+  # CPU-bound: one measured session took a 4-core node to 3090m while
+  # memory stayed at 25%, so two boots on one node do not take turns,
+  # they both crawl. Raise this only with nodes to spread them over.
+  bootConcurrency: 1
+  # Pod names are <prefix>-<flavour>-<short hash of the user>.
+  podPrefix: sim-session
+
+  practical:
+    # 0 seats disables the flavour: no template is loaded and
+    # /api/session/start refuses it.
+    seats: 3
+    bank: ckad-mock-01
+    # A practical session is a privileged Pod that hands a stranger a
+    # root shell with a container runtime in it. Confine it to nodes you
+    # have decided may run that, and label them to match.
+    #
+    # To schedule anywhere instead, set this to `null` and not to `{}` —
+    # Helm merges maps from your values over the defaults rather than
+    # replacing them, so an empty map here leaves the label requirement
+    # below in place and nothing tells you.
+    nodeSelector:
+      kubestronaut-sim/session: "true"
+    tolerations: []
+    # Per-container overrides, merged over what files/session-pod.yaml
+    # declares. The manifest's numbers are measured; change them here
+    # rather than editing it, e.g.
+    #   resources:
+    #     k8s-env:
+    #       limits: {memory: 8Gi}
+    resources: {}
+
+  mcq:
+    # An MCQ session is a facilitator and 128Mi. It needs no cluster, no
+    # shells and no privilege, so it schedules anywhere and the cap is
+    # about a hundred times higher.
+    seats: 30
+    bank: kcna-mock
+    nodeSelector: {}
+    tolerations: []
+    resources: {}
+
+  # What a session Pod may talk to. Not optional in any deployment that
+  # sells seats to strangers: without it a session reaches the cluster's
+  # own API server and every other namespace's Pods.
+  networkPolicy:
+    enabled: true
+    # Also refuse ingress to a session Pod from anything but the hub.
+    #
+    # Off by default because it is the one rule here that can break a
+    # working deployment rather than fail closed: the port a session
+    # serves is reached by the hub in-cluster, but also by the kubelet's
+    # readiness probe, and whether probe traffic is subject to policy
+    # depends on the CNI. `kubectl port-forward` is unaffected either way
+    # — it enters the Pod's network namespace rather than the dataplane.
+    # Turn it on, then confirm sessions still reach ready.
+    restrictIngress: false
+
+# -------------------------------------------------------------------
+# Routing
+#
+# The chart publishes a ClusterIP Service and stops there: point your
+# own Ingress, Gateway or tunnel at it. A Gateway API HTTPRoute is
+# offered because that is what this project's own deployment uses.
+httpRoute:
+  enabled: false
+  # e.g. [{name: my-gateway, namespace: gateway-system, sectionName: https}]
+  parentRefs: []
+  hostnames: []
+  annotations: {}
+
+nameOverride: ""
+fullnameOverride: ""

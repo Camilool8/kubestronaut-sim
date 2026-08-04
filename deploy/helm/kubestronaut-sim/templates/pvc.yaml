@@ -1,0 +1,33 @@
+{{- if not .Values.hub.state.existingClaim }}
+# Attempt history: one JSON document per user plus the full results of
+# every graded attempt.
+#
+# It is the only thing in this deployment that is not disposable. A
+# session Pod's own /state dies with the Pod by design — that is what
+# makes a seat reclaimable — so this volume is where "the score you got
+# last Tuesday" actually lives.
+#
+# ReadWriteOnce, and the Deployment is `Recreate` for that reason: two
+# replicas would either fail to schedule or, with a RWX class, race each
+# other writing the same user's document.
+#
+# helm.sh/resource-policy: keep — an uninstall must not take a
+# candidate's history with it. Delete the PVC by hand if you mean it.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "kubestronaut-sim.fullname" . }}-state
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubestronaut-sim.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- with .Values.hub.state.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.hub.state.size | quote }}
+{{- end }}

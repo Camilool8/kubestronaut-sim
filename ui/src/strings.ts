@@ -1194,6 +1194,11 @@ export const strings = {
     // No backticks: this is a plain string rendered as text, not markdown,
     // so a pair of them arrives on screen as a pair of them.
     lead: "Every attempt this environment has graded. Kept in its own volume rather than in this browser, so a reset, a bank switch and a purge all leave it where it is.",
+    // The hosted record. It is the durable copy by construction — the
+    // environment it was taken in is destroyed on purpose — so it says
+    // that rather than naming a volume the candidate cannot see.
+    leadHosted:
+      "Every attempt you have finished here. Kept against your account rather than in the environment, so it outlives every session you start. Open one to read it back in full.",
     export: "Export",
     // Both hints describe a button, so both belong ON the button rather
     // than in the page flow. Rendered on this screen as the accessible
@@ -1308,5 +1313,111 @@ export const strings = {
     loadFailed: (detail: string) =>
       `Couldn't load your history (${detail}). It is served by the facilitator from its state volume; check it with \`docker compose ps facilitator\`.`,
     retry: "Retry",
+    // Hosted only. A row links to the attempt it describes, because the
+    // hub keeps the whole graded document and not just the summary line.
+    reviewRow: (exam: string, date: string) => `Review the ${exam} attempt from ${date}`,
+  },
+
+  // Everything a hosted deployment adds, and nothing a local one shows.
+  //
+  // `./sim up` never renders a single string in this group: the SPA asks
+  // GET /api/me once on load, a facilitator 404s it, and the whole
+  // surface below stays out of the tree. Copy here therefore talks about
+  // seats, queues and sign-in — none of which exist in the local product
+  // and none of which should leak into it.
+  hosted: {
+    // The sign-in screen.
+    signInTitle: "Sign in to sit an exam",
+    // Says what an account is FOR. Nobody signs into a practice exam for
+    // fun; they do it because the record is the point.
+    signInLead:
+      "A hosted session gives you a real cluster for a few hours. Signing in is how your attempts stay yours — every graded exam is kept against your account, and it outlives the environment it was taken in.",
+    signInGitHub: "Continue with GitHub",
+    signInSeats: (used: number, total: number) =>
+      used >= total
+        ? `All ${total} hands-on seats are in use right now — you can still join the queue.`
+        : `${total - used} of ${total} hands-on seats free.`,
+    // No login to offer. AUTH_MODE=header sits behind someone else's
+    // proxy, and if it did not identify you, this app cannot.
+    signInUnavailable:
+      "This deployment identifies you through the proxy in front of it, and that proxy did not say who you are. There is nothing to sign in to here.",
+    // The local product, stated plainly on the way in. It is uncapped and
+    // it is the reference; hosting is the try-it-out tier.
+    signInLocal:
+      "Prefer no caps and no queue? The whole thing runs on your own machine — clone the repository and run ./sim up.",
+
+    // The lobby: signed in, no session yet.
+    startTitle: (login: string) => `Ready when you are, ${login}`,
+    startLead:
+      "Pick what to sit. A hands-on session builds a real two-node cluster and takes a few minutes to come up; multiple choice is ready immediately.",
+    practicalTitle: "Hands-on exam",
+    practicalBody:
+      "A two-node cluster, two shells and a desktop with a browser, in your own environment. This is the full simulator.",
+    mcqTitle: "Multiple choice",
+    mcqBody:
+      "Answered in this browser. No cluster, no waiting, and it works on a phone.",
+    seatsFree: (used: number, total: number) => `${total - used} of ${total} free`,
+    seatsFull: (total: number) => `all ${total} in use`,
+    start: "Start",
+    starting: "Starting…",
+    startFailed: (detail: string) => `Could not start a session: ${detail}`,
+
+    // The queue dialog, raised by the 409.
+    queueTitle: "Every seat is taken",
+    queueBody: (position: number) =>
+      position === 1
+        ? "You are next. The moment a seat is given up, yours starts building."
+        : `You are number ${position} in the queue.`,
+    // The hold is the mechanism and it is worth stating: a browser that
+    // closed an hour ago must not keep a seat warm, so the offer has to
+    // be claimed.
+    queueHold:
+      "Keep this page open. When a seat reaches you it is held briefly — if nothing claims it, it passes to the next person.",
+    queueLeave: "Leave the queue",
+    queueWait: "Wait here",
+
+    // Booting. The two states differ for the person waiting, so they say
+    // different things.
+    bootPendingTitle: "Waiting for a slot",
+    bootPendingBody:
+      "Your seat is held. Environments are built one at a time — building two at once makes both slow rather than making either fast.",
+    bootStartingTitle: "Building your environment",
+    bootStartingBody:
+      "A two-node Kubernetes cluster, the exam images and 22 tasks' worth of setup. It usually takes three to six minutes; nothing is lost if you close this tab.",
+    bootElapsed: (elapsed: string) => `${elapsed} so far`,
+    bootFailedTitle: "Your environment did not start",
+    bootRetry: "Try again",
+    bootGiveUp: "Give up this seat",
+
+    // The header chip.
+    chipLabel: "Session",
+    chipTimeLeft: (left: string) => `${left} left`,
+    // Said out loud once the end is close enough to plan around.
+    chipEndingSoon: (left: string) => `Ends in ${left}`,
+    chipExpired: "Session over",
+    endSession: "End session",
+    endConfirmTitle: "End this session?",
+    // The distinction that matters most on this screen. Ending the seat
+    // destroys the environment; it does not throw away a graded attempt.
+    endConfirmBody:
+      "Your environment is destroyed and the seat goes back to the pool. Attempts you have already finished stay in your history — this only ends the environment.",
+    endConfirm: "End session",
+    endCancel: "Keep working",
+    endFailed: (detail: string) => `Could not end your session: ${detail}`,
+    signOut: "Sign out",
+  },
+
+  // Reading a past attempt back, whole. Hosted only: the hub is the one
+  // thing that keeps a graded results document after the environment
+  // that produced it is gone.
+  review: {
+    back: "Progress",
+    crumb: "Past attempt",
+    loading: "Loading that attempt…",
+    loadFailed: (detail: string) => `Couldn't load that attempt: ${detail}`,
+    retry: "Retry",
+    // Said on the page, because everything below it looks exactly like
+    // the screen shown at the end of a live exam and is not one.
+    banner: (date: string) => `Sat on ${date}. This is a record, not a live session.`,
   },
 } as const;

@@ -122,6 +122,11 @@ function stubFetch() {
         statusPolls++;
         return json(controlStatus);
       }
+      // A local facilitator JSON-404s any /api/* it does not have, and
+      // that 404 is how the SPA tells this product from the hosted one.
+      // Stubbed explicitly so every test in this file is unambiguously
+      // about the local app.
+      if (url.endsWith("/api/me")) return json({ error: "not found" }, 404);
       if (url.endsWith("/api/boot")) return json(readyBoot);
       if (url.endsWith("/api/session")) return json(idleSession);
       if (url.endsWith("/api/exam")) return json(exam);

@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 	"os"
 	"sync/atomic"
 	"time"
@@ -175,10 +174,18 @@ func runServer() error {
 		hist = nil
 	}
 
+	// Default-off, and the only thing in this process that knows a world
+	// outside the Pod exists. Unset under compose, which is every local
+	// run: no mirror, no request, no behaviour change.
+	mir := newMirror(os.Getenv("HISTORY_WEBHOOK_URL"), os.Getenv("HISTORY_WEBHOOK_TOKEN"), log.Printf)
+	if mir != nil {
+		log.Printf("attempts will also be posted to %s", os.Getenv("HISTORY_WEBHOOK_URL"))
+	}
+
 	runner := evaluate.NewSSHRunner(cfg.sshKey)
 	g := newGrader(ex, mgr, runner, checkTimeout)
 	g.record = func(token string, snap session.Snapshot, res *evaluate.Results) error {
-		return recordAttempt(hist, ex, token, snap, res)
+		return recordAttempt(hist, mir, ex, token, snap, res)
 	}
 	gradeFn := g.Grade
 	onExpire.Store(&gradeFn)
@@ -199,12 +206,14 @@ func runServer() error {
 
 	// Reverse proxy for the conductor's control API: the browser only
 	// ever talks to :8080, and the conductor is only reachable from this
-	// container (they share the internal control network).
-	conductorURL, err := url.Parse("http://" + envOr("CONDUCTOR_ADDR", "conductor:9000"))
+	// container — over the internal control network under compose, over
+	// a unix socket in a hosted Pod. See conductorEndpoint.
+	conductorURL, conductorTransport, err := conductorEndpoint(envOr("CONDUCTOR_ADDR", "conductor:9000"))
 	if err != nil {
-		return fmt.Errorf("parse CONDUCTOR_ADDR: %w", err)
+		return err
 	}
 	controlProxy := httputil.NewSingleHostReverseProxy(conductorURL)
+	controlProxy.Transport = conductorTransport
 
 	boot := bootstate.New(
 		envOr("BOOT_FILE", "/shared/boot.json"),
@@ -223,8 +232,8 @@ func runServer() error {
 	// exam.Pooled, and no bank in the tree opts in yet.
 	handler := api.New(ex, cfg.bankDir, mgr, g.Grade, desktopHandler, controlProxy, web.FS(), boot, g.PracticeGrade,
 		api.WithHistory(hist),
-		api.WithBanks(newBanksFetcher(conductorURL)),
-		api.WithSeeder(newConductorSeeder(conductorURL)),
+		api.WithBanks(newBanksFetcher(conductorURL, conductorTransport)),
+		api.WithSeeder(newConductorSeeder(conductorURL, conductorTransport)),
 	)
 
 	srv := &http.Server{

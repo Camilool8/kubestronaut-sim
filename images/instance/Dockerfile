@@ -31,6 +31,54 @@ COPY registries.conf /etc/containers/registries.conf
 COPY storage.conf /etc/containers/storage.conf
 COPY containers.conf /etc/containers/containers.conf
 
+# chroot, not the default oci isolation, for the RUN steps of a build.
+#
+# `cgroups = "disabled"` in containers.conf covers `podman run`, but a
+# build is buildah, and buildah still asks crun for a real container per
+# RUN step. Under compose that works because `cgroup: host` hands the
+# instance the host's cgroup namespace. Kubernetes has no pod-spec field
+# for cgroup namespace mode and gives an unprivileged container a private
+# one, where crun dies twice over — first
+#
+#   opening file `/sys/fs/cgroup/cgroup.subtree_control` for writing:
+#   Read-only file system
+#
+# and then, once that mount is made writable, on the eBPF program it
+# attaches for cgroup v2 device control:
+#
+#   bpf query: Operation not permitted
+#
+# Neither CAP_BPF and CAP_PERFMON nor a read-write bind of the host's
+# /sys/fs/cgroup moves it; all four combinations were measured in a pod.
+# The only two things that work are granting the container `privileged`
+# — which would make a candidate's shell the most privileged container
+# in the pod — or skipping the runtime for RUN steps, which is this.
+#
+# What it costs: a RUN step executes in a chroot rather than a container,
+# so it gets no namespaces of its own. Nothing here needs them — the
+# images the questions build are deliberately tiny, and the candidate is
+# already root in this container. What it buys is one image that behaves
+# the same under compose and under Kubernetes, with the capability set
+# unchanged. Revisit if a question ever needs a RUN step that isolates.
+#
+# Set three ways because no single one reaches every caller, and the one
+# that matters most is the one a candidate actually types:
+#
+#   ENV               only reaches processes the runtime execs directly
+#                     (`compose exec`, `kubectl exec`). sshd sanitises the
+#                     environment for login sessions, so it never reaches
+#                     a candidate's shell.
+#   /etc/environment  pam_env reads it for every login session, which is
+#                     how `ssh instance-1` from the exam desktop gets it.
+#   sudoers env_keep  sudo resets the environment, and q09 requires sudo
+#                     ("rootless builds fail outright on these
+#                     instances"), so without this the candidate's own
+#                     `sudo podman build` is the one path still broken.
+ENV BUILDAH_ISOLATION=chroot
+RUN echo 'BUILDAH_ISOLATION=chroot' >> /etc/environment \
+    && echo 'Defaults env_keep += "BUILDAH_ISOLATION"' > /etc/sudoers.d/buildah \
+    && chmod 0440 /etc/sudoers.d/buildah
+
 # Editor defaults. /etc/vim/vimrc.local is Debian's supported hook and is
 # sourced after defaults.vim, so it survives a candidate creating their own
 # ~/.vimrc — which would otherwise silently disable syntax highlighting,

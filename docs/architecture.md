@@ -1,7 +1,15 @@
 # Architecture
 
-kubestronaut-sim is eight containers, three Go modules that share no
+kubestronaut-sim is eight containers, four Go modules that share no
 code, and one kind cluster. Read this before changing any of them.
+
+Seven containers and three of the modules are the simulator, which is
+what `./sim up` runs and what almost all of this page describes. The
+fourth module, `hub/`, exists only in a hosted deployment: it runs in
+front of the simulator rather than inside it, and it is the reason the
+simulator itself did not have to change to be hosted. Where that
+distinction matters below it is called out; [hosting.md](hosting.md)
+covers the rest.
 
 Commands live in [cli.md](cli.md), HTTP endpoints in [api.md](api.md),
 bank file layout in [bank-spec.md](bank-spec.md), and the threat model in
@@ -123,6 +131,24 @@ candidate can legitimately drive the control API, and a candidate
 resetting their own exam is a feature. [SECURITY.md](../SECURITY.md) owns
 the rest of the threat model.
 
+In a hosted session that boundary has to be redrawn, because a Pod is
+one network namespace and `controlnet` has no equivalent: a TCP port
+would sit on the candidate's own loopback. The conductor listens on a
+unix socket in a volume mounted into itself and the facilitator, and
+into no other container — the mount is the boundary the network used to
+be (`deploy/helm/kubestronaut-sim/files/session-pod.yaml`, gated in CI).
+
+This is defence in depth rather than a hole being closed. Every
+state-changing endpoint is already refused there on its own merits: a
+Pod cannot restart a container under `restartPolicy: Never`, so reset
+and switch return 501 before touching anything
+(`conductor/internal/control/control.go:192,299`); re-seeding is Training
+mode only and the conductor asks the facilitator, not the caller
+(`reseed.go`); and `seed` fires only for a pooled bank, of which the tree
+has none. The socket is what keeps that list from having to stay
+complete — an endpoint added later without its own gate is not
+reachable in the first place.
+
 The conductor speaks the Docker Engine API directly over the socket
 through a hand-written stdlib client with three calls: find a compose
 service's container, exec inside it, restart it
@@ -130,21 +156,28 @@ service's container, exec inside it, restart it
 docker CLI out of the image: the narrower the client, the less a
 socket-holding container can be talked into doing.
 
-## The three Go modules
+## The four Go modules
 
-| Directory | Module path | Binary | Built from |
-|---|---|---|---|
-| `conductor/` | `kubestronaut-sim/conductor` | `/conductor` | `conductor/` |
-| `facilitator/` | `kubestronaut-sim/facilitator` | `/facilitator` | repo root |
-| `proxy/` | `kubestronaut-sim/proxy` | `/docs-proxy` | `proxy/` |
+| Directory | Module path | Binary | Built from | Runs |
+|---|---|---|---|---|
+| `conductor/` | `kubestronaut-sim/conductor` | `/conductor` | `conductor/` | always |
+| `facilitator/` | `kubestronaut-sim/facilitator` | `/facilitator` | repo root | always |
+| `proxy/` | `kubestronaut-sim/proxy` | `/docs-proxy` | `proxy/` | always |
+| `hub/` | `kubestronaut-sim/hub` | `/hub` | `hub/` | hosted only |
 
-All three declare Go 1.24 and have **zero external dependencies**. No
+All four declare Go 1.24 and have **zero external dependencies**. No
 `go.sum` exists anywhere in the repo, and none should: a stdlib-only
 build is what lets every image compile from a bare `golang:1.24-alpine`
-stage with no module download and nothing to pin.
+stage with no module download and nothing to pin. The hub keeps the rule
+in the place it is most tempting to break: it talks to the Kubernetes API
+with a hand-written REST client for four calls rather than vendoring
+client-go, exactly as the conductor hand-rolls the Docker Engine API for
+three.
 
-The three communicate over HTTP and never by import. No module's code
-appears in another module's build.
+The four communicate over HTTP and never by import. No module's code
+appears in another module's build — which is also why the hub
+re-implements the facilitator's attempt rollup instead of sharing it
+(docs/follow-ups.md records the reasoning and the risk).
 
 None of them parses YAML either. Each image's entrypoint shells out to
 `yq` to pre-convert the bank files to JSON and hands the Go binary a path
