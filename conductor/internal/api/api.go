@@ -134,6 +134,10 @@ func writeOpError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "a session is running — end the exam first")
 	case errors.Is(err, control.ErrInvalidBank):
 		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, control.ErrRestartUnavailable):
+		// 501, not 403: the operation is understood and legitimate, this
+		// deployment just has no way to carry it out.
+		writeError(w, http.StatusNotImplemented, err.Error())
 	case errors.Is(err, control.ErrUnknownQuestion):
 		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, control.ErrReseedBusy):
