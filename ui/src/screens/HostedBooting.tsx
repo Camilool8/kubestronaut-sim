@@ -72,11 +72,19 @@ export function HostedBooting({ session, onChanged }: HostedBootingProps) {
 
   const pending = session.state === "pending";
   const title = pending ? strings.hosted.bootPendingTitle : strings.hosted.bootStartingTitle;
+  // The queue reads the same whatever is being queued for; the build does
+  // not. A multiple-choice seat has no cluster to build and is up in
+  // seconds, so the hands-on copy would be describing someone else's wait.
+  const body = pending
+    ? strings.hosted.bootPendingBody
+    : session.kind === "mcq"
+      ? strings.hosted.bootStartingBodyMcq
+      : strings.hosted.bootStartingBody;
 
   return (
     <div className="page hosted-screen hosted-booting">
       <h1>{title}</h1>
-      <p>{pending ? strings.hosted.bootPendingBody : strings.hosted.bootStartingBody}</p>
+      <p>{body}</p>
       <div className="score-loading-progress">
         <PendingBar label={title} />
         {/* aria-hidden and tabular, matching the control overlay: a clock

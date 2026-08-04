@@ -629,3 +629,36 @@ describe("Explain for a multiple-choice question", () => {
     expect(panes()).toHaveLength(0);
   });
 });
+
+// Reading back a stored attempt. The reference solution is part of the
+// bank and the bank is in a session Pod, so a saved attempt simply does
+// not contain one — and asking anyway is worse than not having it: with a
+// session running it would answer from whichever exam is loaded NOW,
+// which need not be the exam being reviewed.
+describe("a historical attempt", () => {
+  test("does not ask a session for the reference solution", async () => {
+    const asked: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        asked.push(String(input));
+        return new Response(JSON.stringify({}), { status: 200 });
+      }),
+    );
+
+    render(<Explain results={attempt([withEvidence])} questionId="q19" live={false} />);
+
+    await screen.findByRole("heading", { level: 1 });
+    expect(asked.filter((url) => url.includes("/solution"))).toHaveLength(0);
+  });
+
+  test("says where reference solutions live, and does not report an error", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({}), { status: 200 })));
+
+    render(<Explain results={attempt([withEvidence])} questionId="q19" live={false} />);
+
+    expect(await screen.findByText(/Reference solutions live in the exam environment/i)).toBeTruthy();
+    expect(document.querySelector(".explain-solution .error-text")).toBeNull();
+  });
+});
+

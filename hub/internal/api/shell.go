@@ -36,6 +36,15 @@ func (s *Server) wantsShell(r *http.Request) bool {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		return false
 	}
+	// A WebSocket handshake is a GET, and the desktop stream is not
+	// under /api/. Answering one with 200 and an HTML body fails it as
+	// code 1006 — "connection closed abnormally" — which tells the
+	// candidate's console nothing about the Pod still booting. The 503
+	// with Retry-After that the proxy would otherwise send is the honest
+	// answer, and the one the SPA's reconnect loop is written against.
+	if strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
+		return false
+	}
 	return !strings.HasPrefix(r.URL.Path, "/api/") && !strings.HasPrefix(r.URL.Path, "/hub/")
 }
 

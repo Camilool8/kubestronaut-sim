@@ -79,11 +79,16 @@ function mockApi() {
 }
 
 const noop = () => {};
-const renderExams = (catalogVersion = 0, onControlStart = noop as never) =>
+const renderExams = (
+  catalogVersion = 0,
+  onControlStart = noop as never,
+  seatKind?: "practical" | "mcq",
+) =>
   render(
     <Exams
       catalogVersion={catalogVersion}
       onControlStart={onControlStart}
+      seatKind={seatKind}
       onBanksLoaded={noop}
     />,
   );
@@ -338,5 +343,47 @@ describe("choosing an exam", () => {
     );
     await waitFor(() => expect(screen.getByRole("heading", { name: "CKAD" })).toBeInTheDocument());
     expect(window.location.hash).toBe("");
+  });
+});
+
+// A hosted seat IS a Pod template. The multiple-choice one is a
+// facilitator and 128Mi with no cluster in it, so a hands-on exam started
+// from that seat booted the bank into an environment with no instances
+// and no desktop: every task graded zero against "could not resolve
+// hostname instance-1", and it was recorded as a real attempt. The
+// catalog cannot tell — every bank is staged into every session — so this
+// screen is where the seat has to be honoured.
+describe("a hosted seat", () => {
+  test("offers only the exams that seat can actually run", async () => {
+    renderExams(0, noop as never, "mcq");
+    await screen.findByRole("heading", { name: "KCNA" });
+
+    expect(within(cardFor("KCNA")).getByRole("button", { name: "Choose a mode" })).toBeTruthy();
+    expect(within(cardFor("CKAD")).queryByRole("button")).toBeNull();
+  });
+
+  test("says which seat a hands-on exam needs, rather than calling it unavailable", async () => {
+    renderExams(0, noop as never, "mcq");
+    await screen.findByRole("heading", { name: "CKAD" });
+
+    const card = cardFor("CKAD");
+    expect(within(card).getByText("Not in this seat")).toBeTruthy();
+    expect(within(card).getByText(/end this session and start a practical one/i)).toBeTruthy();
+  });
+
+  test("the mirror: a hands-on seat is not offered the question bank", async () => {
+    renderExams(0, noop as never, "practical");
+    await screen.findByRole("heading", { name: "CKAD" });
+
+    expect(within(cardFor("CKAD")).getByRole("button", { name: "Choose a mode" })).toBeTruthy();
+    expect(within(cardFor("KCNA")).queryByRole("button")).toBeNull();
+  });
+
+  test("changes nothing locally, where there is no seat and every exam is yours", async () => {
+    renderExams();
+    await screen.findByRole("heading", { name: "CKAD" });
+
+    expect(within(cardFor("CKAD")).getByRole("button", { name: "Choose a mode" })).toBeTruthy();
+    expect(within(cardFor("KCNA")).getByRole("button", { name: "Choose a mode" })).toBeTruthy();
   });
 });

@@ -583,6 +583,7 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
           <Exams
             onControlStart={runControlAction}
             catalogVersion={catalogVersion}
+            seatKind={hosted?.me.session?.kind}
             onBanksLoaded={handleBanksLoaded}
           />
         );

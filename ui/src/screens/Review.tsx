@@ -57,6 +57,7 @@ export function Review({ attemptId, questionId }: ReviewProps) {
               results={results}
               questionId={questionId}
               basePath={`/history/${attemptId}`}
+              live={false}
             />
           </div>
         ) : (

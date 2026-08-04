@@ -78,9 +78,19 @@ interface ExplainProps {
    * would jump out of the record and into the live session.
    */
   basePath?: string;
+  /**
+   * Whether a live exam environment is behind this screen.
+   *
+   * False when reading back a stored attempt. The reference solution is
+   * part of the bank, and the bank is in a session Pod — so there is
+   * nothing to ask when no session is running, and asking anyway when one
+   * IS running is worse than useless: it would answer from whichever exam
+   * is loaded now, which need not be the exam being reviewed.
+   */
+  live?: boolean;
 }
 
-export function Explain({ results, questionId, basePath = "/results" }: ExplainProps) {
+export function Explain({ results, questionId, basePath = "/results", live = true }: ExplainProps) {
   const index = results.questions.findIndex((q) => q.id === questionId);
   const question = index === -1 ? null : results.questions[index];
 
@@ -100,7 +110,7 @@ export function Explain({ results, questionId, basePath = "/results" }: ExplainP
   const [solutionError, setSolutionError] = useState<string | null>(null);
   const known = question !== null;
   useEffect(() => {
-    if (!known) return;
+    if (!known || !live) return;
     const call = new AbortController();
     getSolution(questionId, call.signal)
       .then((r) => {
@@ -114,7 +124,7 @@ export function Explain({ results, questionId, basePath = "/results" }: ExplainP
         if (!call.signal.aborted) setSolutionError(String(err));
       });
     return () => call.abort();
-  }, [questionId, known]);
+  }, [questionId, known, live]);
 
   if (question === null) {
     // A bookmark from an earlier draw, or a hand-typed fragment. It must
@@ -241,6 +251,11 @@ export function Explain({ results, questionId, basePath = "/results" }: ExplainP
           <div className="explain-solution-body">
             {solution !== null ? (
               <Markdown>{solution.markdown}</Markdown>
+            ) : !live ? (
+              // Not an error: nothing failed, and a red line saying a
+              // fetch went wrong would read as a broken page rather than
+              // as the boundary of what a saved attempt contains.
+              <p className="explain-note">{strings.explain.solutionHistorical}</p>
             ) : solutionError !== null ? (
               <p className="error-text">{strings.explain.solutionFailed(solutionError)}</p>
             ) : (

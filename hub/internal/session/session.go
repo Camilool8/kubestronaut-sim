@@ -215,6 +215,27 @@ var ErrNoSession = errors.New("session: no session")
 // ErrBusy is a second control operation while one is in flight.
 var ErrBusy = errors.New("session: another control operation is in flight")
 
+// KindOf maps a bank's declared examType onto the flavour of seat that
+// can run it.
+//
+// A seat is a Pod template: an MCQ seat has two containers and no
+// cluster. Switching a session's bank does NOT switch its template, so a
+// hands-on exam chosen from an MCQ seat booted the hands-on bank into a
+// Pod with no instances and no desktop — every grader check returned
+// "could not resolve hostname instance-1", scored 0, and was recorded as
+// a real attempt. The catalog inside a session lists every bank the
+// banks image staged, which is all of them, so the seat is the thing
+// that has to say no.
+//
+// An empty examType is hands-on, which is the facilitator's own default
+// (exam.TypeHandsOn) and must stay in step with it.
+func KindOf(examType string) Kind {
+	if examType == "mcq" {
+		return MCQ
+	}
+	return Practical
+}
+
 // Manager is the whole hosted tier's admission control.
 type Manager struct {
 	cfg  Config
@@ -527,7 +548,6 @@ func (m *Manager) Recycle(user, bank string) (Job, error) {
 	if !haveFlavour {
 		return Job{}, fmt.Errorf("%w: %s", ErrNoSuchKind, e.Kind)
 	}
-
 	op, phases := "reset", []Phase{
 		{ID: "stop", Label: "Stop the current session"},
 		{ID: "start", Label: "Start a clean session"},

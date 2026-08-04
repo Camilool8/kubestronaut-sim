@@ -15,6 +15,10 @@ import { strings } from "../strings";
  */
 export function HostedSignIn({ me }: { me: Me }) {
   const seats = me.seats?.practical;
+  // The other flavour is not a footnote: it is thirty seats that need no
+  // cluster, and a visitor who reads "all 3 seats in use" and leaves was
+  // told something true about a third of what is on offer.
+  const mcq = me.seats?.mcq;
 
   return (
     <div className="page hosted-screen">
@@ -36,7 +40,8 @@ export function HostedSignIn({ me }: { me: Me }) {
             </a>
             {seats && (
               <p className="hosted-seats" role="status">
-                {strings.hosted.signInSeats(seats.used, seats.total)}
+                {strings.hosted.signInSeats(seats.used, seats.total)}{" "}
+                {mcq && strings.hosted.signInSeatsMcq(mcq.total - mcq.used)}
               </p>
             )}
           </>

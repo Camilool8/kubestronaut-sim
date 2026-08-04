@@ -6,6 +6,7 @@ import {
   type CatalogExam,
   type ControlActionResponse,
   type BanksResponse,
+  type SessionKind,
 } from "../api";
 import { Async } from "../components/Async";
 import { CertMark, hasCertMark } from "../components/CertMark";
@@ -192,7 +193,7 @@ function ExamCard({ bank, onChoose }: { bank: CatalogExam; onChoose: () => void 
   );
 }
 
-function SoonCard({ bank }: { bank: BankEntry }) {
+function SoonCard({ bank, badge }: { bank: BankEntry; badge?: string }) {
   return (
     <li>
       <article className="exam-card exam-card-soon" data-engine="soon">
@@ -203,7 +204,7 @@ function SoonCard({ bank }: { bank: BankEntry }) {
             <p>{examSubtitle(bank)}</p>
           </div>
           <span className="exam-badge">
-            {bank.comingSoon ? strings.exams.soon : strings.exams.unavailable}
+            {badge ?? (bank.comingSoon ? strings.exams.soon : strings.exams.unavailable)}
           </span>
         </div>
         {/* The reason is the entire point of rendering an exam nobody can
@@ -214,10 +215,52 @@ function SoonCard({ bank }: { bank: BankEntry }) {
   );
 }
 
+/**
+ * The seat a hosted candidate is sitting in, or undefined when this is
+ * the local product and every exam is theirs to choose.
+ *
+ * A seat is a Pod template. The multiple-choice one is a facilitator and
+ * 128Mi with no cluster in it, so a hands-on exam started there boots the
+ * bank into an environment with no instances and no desktop: every task
+ * grades zero against "could not resolve hostname instance-1", and the
+ * attempt is recorded as if it counted.
+ *
+ * The catalog cannot make this distinction itself — the banks image
+ * stages every bank into every session, so all of them are `available`
+ * from inside any Pod. The hub refuses the switch too, and that refusal
+ * is the one that matters; this is so nobody is offered it first.
+ */
+function seatFor(
+  exams: CatalogExam[],
+  seat: SessionKind | undefined,
+): { offered: CatalogExam[]; wrongSeat: Set<string> } {
+  const wrongSeat = new Set<string>();
+  if (!seat) return { offered: exams, wrongSeat };
+  const offered = exams.map((bank) => {
+    if (!bank.available) return bank;
+    const needs = bank.examType === "mcq" ? "mcq" : "practical";
+    if (needs === seat) return bank;
+    wrongSeat.add(bank.id);
+    return {
+      ...bank,
+      available: false,
+      // Not "coming soon": it exists, it is finished, and someone in the
+      // other seat is sitting it right now.
+      comingSoon: false,
+      note: strings.exams.wrongSeatNote(
+        needs === "mcq" ? strings.exams.engineMcq : strings.exams.enginePractical,
+      ),
+    };
+  });
+  return { offered, wrongSeat };
+}
+
 interface ExamsProps {
   // Bumped by App whenever a control job finishes: a completed switch
   // changes which bank is active while this screen stays mounted.
   catalogVersion: number;
+  // The hosted seat, if this is a hosted session. Undefined locally.
+  seatKind?: SessionKind;
   // Takes the *starter*, not its result, so the switch runs inside App's
   // runControlAction — the wrapper that turns both a refused job
   // ({ok:false}) and a rejected fetch into a toast.
@@ -244,7 +287,7 @@ interface ExamsProps {
  * same "Choose a mode" verb but a card that is not the active bank goes
  * through a confirmation first.
  */
-export function Exams({ catalogVersion, onControlStart, onBanksLoaded }: ExamsProps) {
+export function Exams({ catalogVersion, seatKind, onControlStart, onBanksLoaded }: ExamsProps) {
   const [confirm, setConfirm] = useState<CatalogExam | null>(null);
   const [switching, setSwitching] = useState(false);
   // The bank a switch was started FOR, so the mode screen it was meant
@@ -322,8 +365,12 @@ export function Exams({ catalogVersion, onControlStart, onBanksLoaded }: ExamsPr
         )}
       >
         {(loaded) => {
-          const live = loaded.exams.filter((b) => b.available);
-          const soon = loaded.exams.filter((b) => !b.available);
+          // Only the two lists below are seat-aware. The coverage figure
+          // above counts certifications passed on the path, which is a
+          // fact about the candidate and not about the Pod they are in.
+          const { offered, wrongSeat } = seatFor(loaded.exams, seatKind);
+          const live = offered.filter((b) => b.available);
+          const soon = offered.filter((b) => !b.available);
           return (
             <>
               <header className="page-head">
@@ -370,7 +417,11 @@ export function Exams({ catalogVersion, onControlStart, onBanksLoaded }: ExamsPr
               {soon.length > 0 && (
                 <ul className="exam-grid exam-grid-soon" aria-label={strings.exams.soonListLabel}>
                   {soon.map((b) => (
-                    <SoonCard key={b.id} bank={b} />
+                    <SoonCard
+                      key={b.id}
+                      bank={b}
+                      badge={wrongSeat.has(b.id) ? strings.exams.wrongSeat : undefined}
+                    />
                   ))}
                 </ul>
               )}

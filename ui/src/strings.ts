@@ -50,6 +50,15 @@ export const strings = {
     unavailable: "Unavailable",
     liveListLabel: "Exams you can sit",
     soonListLabel: "Exams not built yet",
+    // Hosted only. A seat IS a Pod: the multiple-choice one has no
+    // cluster in it, so a hands-on exam chosen there would boot the exam
+    // into an environment with no instances and grade every task zero.
+    // The card says which seat the exam needs and what to do about it,
+    // because "unavailable" on an exam that is plainly built and live for
+    // everyone else reads as a fault.
+    wrongSeat: "Not in this seat",
+    wrongSeatNote: (needs: string) =>
+      `This is a ${needs} exam and you are in the other kind of seat. End this session and start a ${needs.toLowerCase()} one to sit it.`,
     // The stat strip under each card's title.
     durationLabel: "Duration",
     passingLabel: "To pass",
@@ -1161,6 +1170,14 @@ export const strings = {
     solutionTitle: "Reference solution",
     solutionLoading: "Loading the reference solution…",
     solutionFailed: (detail: string) => `Couldn't load the reference solution (${detail}).`,
+    // Reviewing a past attempt. The reference solution lives in the bank,
+    // which lives in a session Pod, and the attempt being read back may
+    // well be from a different exam than whatever is loaded now — so this
+    // is not a thing to fetch and fail at, it is a thing this screen
+    // genuinely does not have. The grader's own checks, the captured
+    // state and the score are all here, because those were recorded.
+    solutionHistorical:
+      "Reference solutions live in the exam environment, so they are not part of a saved attempt. Start a session on this exam to read them alongside the tasks.",
 
     // The upstream reading a bank author attached to this task
     // (`SolutionDetail.docs`). Most questions carry none, and the footer
@@ -1333,10 +1350,16 @@ export const strings = {
     signInLead:
       "A hosted session gives you a real cluster for a few hours. Signing in is how your attempts stay yours — every graded exam is kept against your account, and it outlives the environment it was taken in.",
     signInGitHub: "Continue with GitHub",
+    // Both kinds, because both are offered the moment you sign in and a
+    // page that counts only the scarce one tells a visitor there may be
+    // nowhere to sit when thirty multiple-choice seats are free. The
+    // hands-on figure still leads: it is the one that runs out.
     signInSeats: (used: number, total: number) =>
       used >= total
         ? `All ${total} hands-on seats are in use right now — you can still join the queue.`
         : `${total - used} of ${total} hands-on seats free.`,
+    signInSeatsMcq: (free: number) =>
+      free > 0 ? `Multiple choice needs no cluster: ${free} seats free.` : "",
     // No login to offer. AUTH_MODE=header sits behind someone else's
     // proxy, and if it did not identify you, this app cannot.
     signInUnavailable:
@@ -1382,8 +1405,17 @@ export const strings = {
     bootPendingBody:
       "Your seat is held. Environments are built one at a time — building two at once makes both slow rather than making either fast.",
     bootStartingTitle: "Building your environment",
+    // Per seat, because the two are not the same wait and saying so
+    // wrongly is worse than saying nothing. A hands-on seat really does
+    // build a cluster and really does take minutes. A multiple-choice
+    // seat is a facilitator and 128Mi with no cluster in it at all, and
+    // it is ready in about twenty seconds — telling that candidate to
+    // expect six minutes of cluster building describes someone else's
+    // session.
     bootStartingBody:
       "A two-node Kubernetes cluster, the exam images and 22 tasks' worth of setup. It usually takes three to six minutes; nothing is lost if you close this tab.",
+    bootStartingBodyMcq:
+      "No cluster to build for a multiple-choice exam — just the question bank and the marker. This takes a few seconds.",
     bootElapsed: (elapsed: string) => `${elapsed} so far`,
     bootFailedTitle: "Your environment did not start",
     bootRetry: "Try again",
