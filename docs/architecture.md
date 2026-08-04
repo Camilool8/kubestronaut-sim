@@ -1,7 +1,15 @@
 # Architecture
 
-kubestronaut-sim is eight containers, three Go modules that share no
+kubestronaut-sim is eight containers, four Go modules that share no
 code, and one kind cluster. Read this before changing any of them.
+
+Seven containers and three of the modules are the simulator, which is
+what `./sim up` runs and what almost all of this page describes. The
+fourth module, `hub/`, exists only in a hosted deployment: it runs in
+front of the simulator rather than inside it, and it is the reason the
+simulator itself did not have to change to be hosted. Where that
+distinction matters below it is called out; [hosting.md](hosting.md)
+covers the rest.
 
 Commands live in [cli.md](cli.md), HTTP endpoints in [api.md](api.md),
 bank file layout in [bank-spec.md](bank-spec.md), and the threat model in
@@ -148,21 +156,28 @@ service's container, exec inside it, restart it
 docker CLI out of the image: the narrower the client, the less a
 socket-holding container can be talked into doing.
 
-## The three Go modules
+## The four Go modules
 
-| Directory | Module path | Binary | Built from |
-|---|---|---|---|
-| `conductor/` | `kubestronaut-sim/conductor` | `/conductor` | `conductor/` |
-| `facilitator/` | `kubestronaut-sim/facilitator` | `/facilitator` | repo root |
-| `proxy/` | `kubestronaut-sim/proxy` | `/docs-proxy` | `proxy/` |
+| Directory | Module path | Binary | Built from | Runs |
+|---|---|---|---|---|
+| `conductor/` | `kubestronaut-sim/conductor` | `/conductor` | `conductor/` | always |
+| `facilitator/` | `kubestronaut-sim/facilitator` | `/facilitator` | repo root | always |
+| `proxy/` | `kubestronaut-sim/proxy` | `/docs-proxy` | `proxy/` | always |
+| `hub/` | `kubestronaut-sim/hub` | `/hub` | `hub/` | hosted only |
 
-All three declare Go 1.24 and have **zero external dependencies**. No
+All four declare Go 1.24 and have **zero external dependencies**. No
 `go.sum` exists anywhere in the repo, and none should: a stdlib-only
 build is what lets every image compile from a bare `golang:1.24-alpine`
-stage with no module download and nothing to pin.
+stage with no module download and nothing to pin. The hub keeps the rule
+in the place it is most tempting to break: it talks to the Kubernetes API
+with a hand-written REST client for four calls rather than vendoring
+client-go, exactly as the conductor hand-rolls the Docker Engine API for
+three.
 
-The three communicate over HTTP and never by import. No module's code
-appears in another module's build.
+The four communicate over HTTP and never by import. No module's code
+appears in another module's build — which is also why the hub
+re-implements the facilitator's attempt rollup instead of sharing it
+(docs/follow-ups.md records the reasoning and the risk).
 
 None of them parses YAML either. Each image's entrypoint shells out to
 `yq` to pre-convert the bank files to JSON and hands the Go binary a path

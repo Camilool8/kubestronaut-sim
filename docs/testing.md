@@ -69,6 +69,7 @@ cd facilitator && go test ./... && go vet ./...
 | `facilitator/` | The HTTP API, the session state machine, grading, and the embedded UI |
 | `conductor/` | The Docker-socket sidecar that rebuilds the cluster and switches banks |
 | `proxy/` | The documentation allowlist proxy the exam desktop browses through |
+| `hub/` | Identity, seats, the queue, durable history and the session proxy. Hosted deployments only ([hosting.md](hosting.md)) |
 
 Without a host Go toolchain, run the same commands in a container:
 
@@ -188,7 +189,7 @@ machine.
 
 ## What CI runs
 
-`.github/workflows/ci.yml` runs five jobs on push to every branch, on
+`.github/workflows/ci.yml` runs six jobs on push to every branch, on
 every pull request, and on manual dispatch. It is the only workflow that
 gates anything — `.github/workflows/site.yml` deploys `site/` to GitHub
 Pages on a push to `main` and tests nothing (see
@@ -197,10 +198,20 @@ Pages on a push to `main` and tests nothing (see
 | Job | What it runs |
 |---|---|
 | `banks` | The five offline gates, then `site/build.sh --check` |
-| `go` | `go test ./...` then `go vet ./...` for `facilitator`, `conductor` and `proxy`, in a matrix with `fail-fast: false` |
+| `go` | `go test ./...` then `go vet ./...` for `facilitator`, `conductor`, `proxy` and `hub`, in a matrix with `fail-fast: false` |
 | `ui` | `npm ci`, `npx tsc --noEmit`, `npm run lint`, `npm test`, all with `working-directory: ui` |
 | `images` | Builds all six Dockerfiles with `PRELOAD=none`, then `docker compose config -q` |
 | `shell` | `bash -n` over `sim`, `tests/*.sh`, image entrypoints, `banks/_lib/*.sh`, every `setup.sh` and `validate.d/*.sh`, and every solution script |
+| `chart` | `helm lint`, four negative controls that must each be refused at render time, then `helm template` and the hub's own `render()` run over the result |
+
+The `chart` job is the only place the Pod manifests and the hub meet.
+They meet as bytes — helm turns YAML into JSON, the hub parses that JSON
+and stamps out a Pod — and checking each half alone proves nothing about
+the join: a manifest that stops declaring an env var the hub must fill
+renders perfectly and then fails at the first candidate to press start.
+It is gated by `TestTheChartRendersSomethingThisPackageCanStampOut`,
+which skips when `SESSION_POD_JSON` is unset so `go test ./...` needs no
+helm.
 
 `PRELOAD=none` skips baking ~2GB of image archives. The job proves the
 Dockerfiles parse and build; only a real boot proves the archives are
@@ -212,7 +223,7 @@ right, and that is the smoke suite's job.
 only: npm in `/ui`, with development dependencies grouped into one PR and
 major vitest bumps ignored, and GitHub Actions in `/`.
 
-There is deliberately no `gomod` entry — all three Go modules are
+There is deliberately no `gomod` entry — all four Go modules are
 stdlib-only, so no `go.sum` exists and there is nothing to bump. There is
 no `docker` entry either: base image tags are hand-pinned, and a bump
 needs a cold-cache smoke run to prove the preloaded images still resolve

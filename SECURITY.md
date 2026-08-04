@@ -10,6 +10,14 @@ There is no account system, no multi-user separation, and no attempt to
 stop the person at the keyboard from doing anything — they own the
 machine already.
 
+**This document is about `./sim up`,** which is what almost every copy
+of this is. A hosted deployment puts a different process in front of the
+same simulator and has a genuinely different threat model — a stranger
+at one end and a privileged container at the other. That is
+[docs/hosting.md](docs/hosting.md), and the short version is at the
+bottom of this page. Everything between here and there describes the
+local tool and is unchanged by it.
+
 **Not defended, by design:**
 
 - the candidate against themselves — you can read every answer off disk
@@ -126,9 +134,50 @@ deny-override, so permitting `kubernetes.io` necessarily permits
 The instances, unlike the desktop, do have direct internet access.
 `podman build` needs it to resolve short image names against Docker Hub.
 
+## Hosted deployments
+
+Everything above describes `./sim up`. A hosted deployment — this
+repository's `hub/` in front of session Pods, deployed with the chart in
+`deploy/helm/` — inverts the assumption the rest of this page rests on:
+the person at the keyboard is a stranger, and the thing they are handed
+is still a privileged container with a root shell in it.
+
+What that changes, in full:
+
+- **A practical session is privileged and that is not fixable.** It runs
+  a container runtime and builds a real cluster inside itself. User
+  namespaces are explicitly incompatible with `privileged`, and the
+  sandboxed runtimes either cannot host a nested runtime or need nested
+  virtualization. So the containment is placement, not isolation: run
+  these on nodes you are willing to rebuild, and on nothing else.
+- **A NetworkPolicy is part of the deployment, not an option.** It
+  denies a session every private range — the cluster's own API and
+  Services, other namespaces, the nodes, and the link-local range cloud
+  metadata answers on. The chart installs it by default. Without it a
+  session reaches the API server of the cluster hosting it.
+- **The documentation allowlist stops being a network boundary.** A Pod
+  is one network namespace and a NetworkPolicy selects Pods, not
+  containers, so the desktop and the candidate's shells share one egress
+  — and the shells need theirs, because a question builds an image from
+  Docker Hub. The allowlist still governs the browser. Local behaviour
+  is unchanged and is the stricter of the two.
+- **One candidate cannot reach another.** Each session is its own Pod,
+  addressed by the hub from the cookie it verified, and history is
+  stored per user with the attempt id scoped to the owner's directory.
+- **The one credential is `COOKIE_KEY`.** It signs login cookies and,
+  under a derived key, the per-Pod ticket a session presents to record
+  an attempt. Derived so that a ticket read out of a Pod spec can never
+  be spent as that candidate's login.
+
+The MCQ flavour has none of this: no cluster, no shell, no privilege.
+
 ## Reporting
 
-There is no security contact and no coordinated disclosure process,
-because there is no deployed service to compromise: every instance of
-this runs on somebody's laptop, from source they can read. If you find
-something wrong here, open an issue.
+There is no security contact and no coordinated disclosure process for
+the tool itself: almost every instance of this runs on somebody's
+laptop, from source they can read. If you find something wrong here,
+open an issue.
+
+If you find something wrong in a hosted deployment of it, that is
+between you and whoever runs that deployment. Nothing in this repository
+identifies one.

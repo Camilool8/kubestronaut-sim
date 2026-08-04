@@ -20,7 +20,7 @@ Makefile; the commands below are what CI runs
 | Stop it | `./sim down` | repo root |
 | Bank gates | `tests/bank-weights.sh && tests/check-lint.sh && tests/check-lib.sh && tests/bank-hints.sh && tests/bank-mcq.sh` | repo root |
 | Landing page | `site/build.sh --check` | repo root |
-| Go tests | `for m in conductor facilitator proxy; do (cd $m && go test ./... && go vet ./...); done` | repo root |
+| Go tests | `for m in conductor facilitator proxy hub; do (cd $m && go test ./... && go vet ./...); done` | repo root |
 | UI tests | `npm ci && npx tsc --noEmit && npm run lint && npm test` | **`ui/`** |
 | Smoke suite | `tests/smoke.sh` | repo root |
 

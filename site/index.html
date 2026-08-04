@@ -557,20 +557,22 @@
             <div class="limit">
               <dt>No accounts, and no authentication anywhere.</dt>
               <dd>
-                Permanently. This is a local single-user tool and a password
-                field would be theatre; the only real control is which interface
-                it binds to. Ports bind to all interfaces by default, so on a
-                network you do not control, start it with
-                <code>SIM_BIND=127.0.0.1 ./sim up</code> instead.
+                In the simulator, permanently. What you clone is a local
+                single-user tool and a password field would be theatre; the only
+                real control is which interface it binds to. Ports bind to all
+                interfaces by default, so on a network you do not control, start
+                it with <code>SIM_BIND=127.0.0.1 ./sim up</code> instead.
               </dd>
             </div>
             <div class="limit">
-              <dt>No hosted version.</dt>
+              <dt>Hosting it is your job, not ours.</dt>
               <dd>
-                There is nothing to sign up for and nothing is uploaded. Local
-                single-user is the permanent model, not a stage before a
-                service, so hosting, accounts and multi-user separation are out
-                of scope rather than unbuilt.
+                There is no service here to sign up for, and running this needs
+                nothing but Docker on your own machine. If you want to put it in
+                front of a group there is a Helm chart in the repository that
+                deploys sign-in, a capped pool of sessions and per-user history
+                — but a hands-on session is a privileged container, so that is a
+                decision about hardware you are willing to rebuild.
               </dd>
             </div>
             <div class="limit">
@@ -585,11 +587,10 @@
               <dd>
                 Graded attempts are kept — best score per exam, weakest
                 domains, progress along the five-certification path — but that
-                record is one candidate's, on one machine. It can describe your
-                progress and never a population's, so nothing here compares you
-                to other candidates. Training runs are not recorded at all:
-                practice with the solutions open would make every best score
-                meaningless.
+                record is one candidate's. It can describe your progress and
+                never a population's, so nothing here compares you to other
+                candidates. Training runs are not recorded at all: practice with
+                the solutions open would make every best score meaningless.
               </dd>
             </div>
             <div class="limit">
