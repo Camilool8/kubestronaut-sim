@@ -58,7 +58,14 @@ interface Row {
  * column strip is therefore aria-hidden decoration and every cell that
  * would be ambiguous alone carries its own name instead.
  */
-export function TaskVerdicts({ questions }: { questions: QuestionResult[] }) {
+export function TaskVerdicts({
+  questions,
+  basePath = "/results",
+}: {
+  questions: QuestionResult[];
+  /** Where a row's "open" link points. See Explain's basePath. */
+  basePath?: string;
+}) {
   const [filter, setFilter] = useState<Filter>("all");
   // The flags are the candidate's own, from the attempt that just ended.
   // Subscribing to the version counter rather than the sets themselves:
@@ -159,7 +166,13 @@ export function TaskVerdicts({ questions }: { questions: QuestionResult[] }) {
           <span>{strings.score.colVerdict}</span>
         </div>
         {visible.map((row) => (
-          <TaskRow key={row.question.id} row={row} weighted={weighted} timed={timed} />
+          <TaskRow
+            key={row.question.id}
+            row={row}
+            weighted={weighted}
+            timed={timed}
+            basePath={basePath}
+          />
         ))}
         {visible.length === 0 && <p className="tv-empty">{strings.score.filterEmpty}</p>}
       </div>
@@ -190,7 +203,17 @@ export const VERDICT_WORD: Record<Verdict, string> = {
   failed: strings.score.verdictFailed,
 };
 
-function TaskRow({ row, weighted, timed }: { row: Row; weighted: boolean; timed: boolean }) {
+function TaskRow({
+  row,
+  weighted,
+  timed,
+  basePath,
+}: {
+  row: Row;
+  weighted: boolean;
+  timed: boolean;
+  basePath: string;
+}) {
   const { question, n, verdict, flagged } = row;
 
   // mcq results carry the option texts; hands-on results never do. That
@@ -261,7 +284,7 @@ function TaskRow({ row, weighted, timed }: { row: Row; weighted: boolean; timed:
             back button all work without this component importing a
             router. */}
         <p className="tv-more">
-          <a className="tv-open" href={`#/results/${question.id}`}>
+          <a className="tv-open" href={`#${basePath}/${question.id}`}>
             {strings.score.openExplain(n)}
             <Icon name="chevron-right" />
           </a>

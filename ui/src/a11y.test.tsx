@@ -24,6 +24,10 @@ import { QuestionPanel } from "./components/QuestionPanel";
 import { ToastLayer } from "./components/Toast";
 import { McqExam } from "./screens/McqExam";
 import { McqAnswerReview } from "./components/McqAnswerReview";
+import { HostedBooting } from "./screens/HostedBooting";
+import { HostedSignIn } from "./screens/HostedSignIn";
+import { HostedStart } from "./screens/HostedStart";
+import { SessionChip } from "./components/SessionChip";
 import { SPLIT_QUERY } from "./lib/useMediaQuery";
 import { matchMediaMock } from "./test/setup";
 import { marksStore } from "./components/marksStore";
@@ -770,6 +774,81 @@ describe("axe: no WCAG violations", () => {
           options: ["CNI", "CSI", "CRI", "OCI"],
           multi: true,
         }}
+      />,
+    );
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  // ---- hosted mode ----
+  //
+  // Four surfaces a local candidate never sees, and the reason they are
+  // scanned here rather than trusted: every one of them was written
+  // after this suite existed, so none of them is covered by the App
+  // scans above, and the sign-in screen is the first thing a stranger
+  // ever meets.
+
+  test("hosted sign-in", async () => {
+    const { container } = render(
+      <HostedSignIn
+        me={{
+          authenticated: false,
+          authMode: "github",
+          loginURL: "/hub/auth/login",
+          seats: { practical: { used: 1, total: 3 } },
+        }}
+      />,
+    );
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  test("hosted lobby, with a place in the queue", async () => {
+    const { container } = render(
+      <HostedStart
+        me={{
+          authenticated: true,
+          authMode: "github",
+          user: { id: "1", login: "octocat" },
+          seats: { practical: { used: 3, total: 3 }, mcq: { used: 0, total: 30 } },
+          queue: { position: 2 },
+        }}
+        onChanged={() => {}}
+      />,
+    );
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  test("hosted boot screen", async () => {
+    const { container } = render(
+      <HostedBooting
+        session={{
+          kind: "practical",
+          pod: "sim-session-practical-1",
+          state: "starting",
+          startedAt: "2026-08-04T11:55:00Z",
+          expiresAt: "2026-08-04T21:55:00Z",
+          lastSeen: "2026-08-04T12:00:00Z",
+        }}
+        onChanged={() => {}}
+      />,
+    );
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  // The one hosted surface that lives inside the header, beside the
+  // theme toggle and a backgrounded-job chip.
+  test("session chip with a lease running out", async () => {
+    const { container } = render(
+      <SessionChip
+        login="octocat"
+        session={{
+          kind: "practical",
+          pod: "sim-session-practical-1",
+          state: "ready",
+          startedAt: "2026-08-04T11:00:00Z",
+          expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+          lastSeen: "2026-08-04T12:00:00Z",
+        }}
+        onChanged={() => {}}
       />,
     );
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();

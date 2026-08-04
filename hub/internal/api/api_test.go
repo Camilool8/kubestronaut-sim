@@ -114,7 +114,7 @@ func TestHistoryReturnsTheStoredRecordUnchanged(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d", w.Code)
 	}
-	var doc store.Document
+	var doc store.History
 	if err := json.Unmarshal(w.Body.Bytes(), &doc); err != nil {
 		t.Fatal(err)
 	}
@@ -123,6 +123,81 @@ func TestHistoryReturnsTheStoredRecordUnchanged(t *testing.T) {
 	}
 	if !strings.Contains(string(doc.Attempts[0]), `"aNewField":true`) {
 		t.Errorf("record lost a field in transit: %s", doc.Attempts[0])
+	}
+}
+
+// The dashboard shape, not the interchange one.
+//
+// Progress.tsx reads `summary.weakDomains` without checking and lists
+// attempts newest first. Serving store.Document here — versioned,
+// oldest first, no summary — renders a blank dashboard rather than a
+// visibly wrong one, which is the failure mode worth a test.
+func TestHistoryIsTheDashboardShapeNotTheExportShape(t *testing.T) {
+	s, st := newServer(t, auth.ModeGitHub)
+	for _, rec := range []string{
+		`{"id":"older","certification":"CKAD","mode":"exam","counted":true,"passed":true,
+		  "gradedAt":"2026-08-01T10:00:00Z","percent":75,
+		  "domains":[{"domain":"Observability","earned":2,"total":10}]}`,
+		`{"id":"newer","certification":"KCNA","mode":"exam","counted":true,"passed":true,
+		  "gradedAt":"2026-08-04T10:00:00Z","percent":90,
+		  "domains":[{"domain":"Fundamentals","earned":9,"total":10}]}`,
+	} {
+		if _, err := st.Add("583231", json.RawMessage(rec), nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	r := httptest.NewRequest(http.MethodGet, "/api/history", nil)
+	r.AddCookie(login(t, s, "583231", "octocat"))
+	w := do(s, r)
+
+	var body struct {
+		Version  *int              `json:"version"`
+		Attempts []json.RawMessage `json:"attempts"`
+		Summary  struct {
+			Attempts    int `json:"attempts"`
+			PassedCount int `json:"passedCount"`
+			TrackCount  int `json:"trackCount"`
+			WeakDomains []struct {
+				Domain string `json:"domain"`
+			} `json:"weakDomains"`
+		} `json:"summary"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Version != nil {
+		t.Error("the dashboard response carries an interchange version field")
+	}
+	if len(body.Attempts) != 2 || !strings.Contains(string(body.Attempts[0]), `"newer"`) {
+		t.Errorf("attempts are not newest first: %s", w.Body.String())
+	}
+	if body.Summary.Attempts != 2 || body.Summary.PassedCount != 2 || body.Summary.TrackCount != 5 {
+		t.Errorf("summary = %+v", body.Summary)
+	}
+	if len(body.Summary.WeakDomains) != 2 || body.Summary.WeakDomains[0].Domain != "Observability" {
+		t.Errorf("weak domains = %+v, want Observability first", body.Summary.WeakDomains)
+	}
+}
+
+// Export stays the interchange document: versioned, oldest first, and
+// importable by a local `./sim`. That is the whole reason hosted export
+// exists while hosted import is refused.
+func TestExportIsStillTheInterchangeDocument(t *testing.T) {
+	s, st := newServer(t, auth.ModeGitHub)
+	if _, err := st.Add("583231", json.RawMessage(`{"id":"a1","gradedAt":"2026-08-03T10:00:00Z"}`), nil); err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequest(http.MethodGet, "/api/history/export", nil)
+	r.AddCookie(login(t, s, "583231", "octocat"))
+	w := do(s, r)
+
+	var doc store.Document
+	if err := json.Unmarshal(w.Body.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if doc.Version == 0 {
+		t.Error("export lost its version, so a local import cannot check it")
 	}
 }
 

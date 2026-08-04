@@ -5958,3 +5958,213 @@
     margin-left: 0;
   }
 }
+
+/* ---------------------------------------------------------------------
+   Hosted mode
+
+   Nothing below renders in the local product. The whole surface — sign
+   in, the lobby, the queue, the boot screen, the header chip — exists
+   only when the SPA is served by the hub, and `./sim up` never reaches
+   any of these selectors.
+
+   It borrows the page vocabulary rather than inventing one: the same
+   card, the same border, the same spacing scale as the exam selector.
+   A hosted deployment is the same product with a door in front of it,
+   and a lobby that looked like a different application would say
+   otherwise. */
+
+.hosted-screen {
+  max-width: 56rem;
+}
+
+.hosted-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+}
+
+/* An anchor styled as the primary button. Anchors do not inherit the
+   button's line box, so the two would otherwise sit at different
+   heights on the same row. */
+.hosted-signin {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.hosted-seats,
+.hosted-flavour-seats {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-s);
+}
+
+.hosted-unavailable {
+  margin: 0;
+  color: var(--text-body);
+}
+
+.hosted-local {
+  margin-top: var(--space-5);
+  color: var(--text-muted);
+  font-size: var(--text-s);
+}
+
+/* Two cards, side by side where there is room and stacked where there
+   is not. auto-fit rather than a breakpoint: the second card appears
+   only when a deployment sells that flavour, so the count is not known
+   here. */
+.hosted-flavours {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: var(--space-4);
+  margin: var(--space-5) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hosted-flavour {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+}
+
+/* A full pool is not an error and not a disabled card: the button still
+   works, and what it gets you is a place in the queue. Dashed, the same
+   language a not-yet-available exam speaks. */
+.hosted-flavour[data-full] {
+  background: var(--bg);
+  border-style: dashed;
+}
+
+.hosted-flavour h2 {
+  margin: 0;
+  font-size: var(--text-l);
+}
+
+.hosted-flavour p {
+  margin: 0;
+  color: var(--text-body);
+}
+
+/* Standing state rather than an interruption, so it reads as part of
+   the page: the warn palette, which is the product's "you are waiting
+   on something outside your control" colour. */
+.hosted-queue {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-border);
+  border-radius: var(--radius-m);
+}
+
+.hosted-queue-place {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.hosted-queue-hold {
+  margin: 0;
+  color: var(--text-body);
+  font-size: var(--text-s);
+}
+
+.hosted-booting {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+/* The header chip: identity, the lease, and the two ways out. */
+.session-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.session-chip-user {
+  color: var(--text-secondary);
+  font-size: var(--text-s);
+}
+
+/* Tabular, so a countdown does not reflow the row it sits in every
+   second. */
+.session-chip-clock {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--neutral-soft);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-s);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The word already changed from "left" to "Ends in" — this is the
+   second channel, never the only one. */
+.session-chip-clock[data-soon] {
+  background: var(--warn-soft);
+  color: var(--warn-strong);
+}
+
+/* A button that carries no weight of its own: it lives in the header
+   beside a theme toggle, and two filled buttons up there would compete
+   with the page's own primary action. */
+.btn-quiet {
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-secondary);
+  font-size: var(--text-s);
+}
+
+.btn-quiet:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border);
+}
+
+/* A history row that opens. Underlined rather than coloured alone: the
+   table's other cells are text, and a link that differs only by hue is
+   not a link to everyone. */
+.history-open {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.history-open:hover {
+  color: var(--accent-strong);
+}
+
+/* Said before the banner, because everything under it is pixel-identical
+   to the screen shown at the end of a live exam and is not one. */
+.review-note {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-raised);
+  border-radius: var(--radius-m);
+  color: var(--text-secondary);
+  font-size: var(--text-s);
+}
+
+@media (max-width: 40rem) {
+  .session-chip-user {
+    display: none;
+  }
+}

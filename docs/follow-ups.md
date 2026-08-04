@@ -110,6 +110,31 @@ Known, chosen, and not currently worth the cost of changing.
   because the failure worth retrying is a hub mid-redeploy; a rejected
   ticket is not retried, because retrying sends identical bytes to an
   identical answer.
+- **The hosted lease countdown is not shown during a running exam.** The
+  header chip carries it, and the header is not rendered over the exam
+  screen — that screen has its own topbar with its own clock, and a
+  second countdown beside it would be read as the exam's. Two
+  consequences, one good and one not. The good one: there is no way to
+  destroy an environment mid-attempt by misclick, because the End
+  session control is on the same chip. The cost: a session whose hard
+  cap falls inside an attempt ends it with no warning on screen. Narrow
+  in practice — the cap defaults to ten hours against a two-hour exam —
+  and the honest fix is a lease indicator in the exam's own topbar
+  rather than a second header, which is a change to two exam screens
+  rather than to the chip.
+- **The hub mirrors the facilitator's cross-attempt rollup rather than
+  sharing it.** `hub/internal/store/rollup.go` recomputes what
+  `facilitator/internal/history` already computes: which attempts count,
+  which certifications the Kubestronaut path holds, and the weakest
+  domains across every graded attempt. Sharing it is not available —
+  the hub is a separate module, every module here is stdlib-only with no
+  `go.sum`, and `history` is an internal package, which Go scopes to its
+  own module's tree whatever the `go.mod` says. Lifting it out of
+  `internal` would couple the hub's build to the facilitator's for one
+  function, and the hub's image copies `hub/` alone. So it is a copy,
+  narrowly: only the fields the rollup reads are decoded out of each
+  record and the rest stays raw bytes. If the two drift, the symptom is
+  a hosted dashboard whose numbers differ from a local one.
 - **The session Pod's history ticket is an env var in the Pod spec, not
   a Secret.** It names one user and authorises appending to that user's
   history and nothing else, it is minted per Pod and expires an hour

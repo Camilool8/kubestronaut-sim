@@ -163,6 +163,40 @@ func (s *Store) Document(user string) (Document, error) {
 	return s.documentLocked(user)
 }
 
+// History is what GET /api/history answers with, and it is a different
+// shape from Document on purpose.
+//
+// Document is the INTERCHANGE format: versioned, oldest first, and the
+// thing an export writes and a local `./sim` can import. History is the
+// DASHBOARD format the facilitator serves — most recent first, with the
+// cross-attempt rollup beside it — and the UI's Progress screen reads
+// exactly this. Serving the interchange document here would leave that
+// screen with attempts in grading order and no `summary` at all, which
+// is a blank dashboard rather than a visibly wrong one.
+type History struct {
+	// Never nil: the wire contract types this as an array.
+	Attempts []json.RawMessage `json:"attempts"`
+	Summary  Summary           `json:"summary"`
+}
+
+// History returns one user's attempts, most recent first, with the
+// rollup.
+func (s *Store) History(user string) (History, error) {
+	doc, err := s.Document(user)
+	if err != nil {
+		return History{}, err
+	}
+	// Reversed rather than re-sorted: the document is already in graded
+	// order, which is the order the dashboard wants read backwards, and a
+	// sort here would need to decode every record to find a timestamp
+	// that Add has already used to place it.
+	attempts := make([]json.RawMessage, 0, len(doc.Attempts))
+	for i := len(doc.Attempts) - 1; i >= 0; i-- {
+		attempts = append(attempts, doc.Attempts[i])
+	}
+	return History{Attempts: attempts, Summary: summarize(doc.Attempts)}, nil
+}
+
 // Clear erases one user's history: every attempt and every results
 // blob. There is no undo, which is also true of the facilitator's own
 // DELETE /api/history — the difference is that here it is the only copy

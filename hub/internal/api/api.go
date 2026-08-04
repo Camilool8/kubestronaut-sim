@@ -193,20 +193,26 @@ func (s *Server) seats() map[string]seat {
 }
 
 // handleHistory serves the user's attempts in the exact shape the
-// facilitator's own /api/history returns, so Progress.tsx needs no
+// facilitator's own /api/history returns — most recent first, with the
+// cross-attempt rollup beside them — so Progress.tsx needs no
 // hosted-mode branch.
+//
+// Not store.Document: that is the interchange format an export writes,
+// and it is oldest-first with no summary. The dashboard reads
+// `summary.weakDomains` unconditionally, so serving the document here
+// gives a blank screen rather than a wrong one.
 func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
 	sess, ok := s.requireUser(w, r)
 	if !ok {
 		return
 	}
-	doc, err := s.Store.Document(sess.UserID)
+	hist, err := s.Store.History(sess.UserID)
 	if err != nil {
 		s.logf("hub: history for %s: %v", sess.UserID, err)
 		writeError(w, http.StatusInternalServerError, "could not read your history")
 		return
 	}
-	writeJSON(w, http.StatusOK, doc)
+	writeJSON(w, http.StatusOK, hist)
 }
 
 func (s *Server) handleAttempt(w http.ResponseWriter, r *http.Request) {
