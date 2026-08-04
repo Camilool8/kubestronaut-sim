@@ -174,10 +174,18 @@ func runServer() error {
 		hist = nil
 	}
 
+	// Default-off, and the only thing in this process that knows a world
+	// outside the Pod exists. Unset under compose, which is every local
+	// run: no mirror, no request, no behaviour change.
+	mir := newMirror(os.Getenv("HISTORY_WEBHOOK_URL"), os.Getenv("HISTORY_WEBHOOK_TOKEN"), log.Printf)
+	if mir != nil {
+		log.Printf("attempts will also be posted to %s", os.Getenv("HISTORY_WEBHOOK_URL"))
+	}
+
 	runner := evaluate.NewSSHRunner(cfg.sshKey)
 	g := newGrader(ex, mgr, runner, checkTimeout)
 	g.record = func(token string, snap session.Snapshot, res *evaluate.Results) error {
-		return recordAttempt(hist, ex, token, snap, res)
+		return recordAttempt(hist, mir, ex, token, snap, res)
 	}
 	gradeFn := g.Grade
 	onExpire.Store(&gradeFn)

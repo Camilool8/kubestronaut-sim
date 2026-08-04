@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -38,8 +39,15 @@ const maxBanksBytes = 1 << 20
 // with the hints and the solution open; counting it would make every
 // "best score" meaningless, and session.Recorded is the one place that
 // rule is defined — the mode screen advertises the same predicate.
-func recordAttempt(store *history.Store, ex *exam.Exam, token string, snap session.Snapshot, res *evaluate.Results) error {
-	if store == nil || res == nil {
+//
+// Two destinations, one record. mir is nil under compose and in every
+// test, which is the whole of the local behaviour. Where it is not nil,
+// it is the copy that survives the Pod, so its failure is reported
+// alongside the local one rather than instead of it — and neither
+// suppresses the other, because a hub that is down must not also cost
+// the candidate the record on their own disk.
+func recordAttempt(store *history.Store, mir *mirror, ex *exam.Exam, token string, snap session.Snapshot, res *evaluate.Results) error {
+	if res == nil || (store == nil && mir == nil) {
 		return nil
 	}
 	if !session.Recorded(snap.Mode) {
@@ -80,10 +88,18 @@ func recordAttempt(store *history.Store, ex *exam.Exam, token string, snap sessi
 		Domains:         toHistoryDomains(res.Domains),
 	}
 
-	if _, err := store.Add(rec); err != nil {
-		return err
+	var errs []error
+	if store != nil {
+		if _, err := store.Add(rec); err != nil {
+			errs = append(errs, err)
+		}
 	}
-	return nil
+	if mir != nil {
+		if err := mir.post(context.Background(), rec, res); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // declaredLength is the bank's declared exam length: ExamLength for a

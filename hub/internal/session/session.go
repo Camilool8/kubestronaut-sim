@@ -149,6 +149,17 @@ type Config struct {
 	PodPrefix string
 	Labels    map[string]string
 
+	// Webhook mints the endpoint and the ticket a session Pod posts its
+	// graded attempts back with, for one user. Nil means nothing is
+	// collecting them and the Pod keeps only its own ephemeral history —
+	// which is what a self-hoster running this without the store gets,
+	// and what every test that does not care gets.
+	//
+	// Minted per Pod rather than once at boot because the ticket names
+	// the user: it is the Pod's only way to say whose attempt this is,
+	// and it must not be able to say anyone else's.
+	Webhook func(user string) (url, token string, err error)
+
 	Now  func() time.Time
 	Logf func(string, ...any)
 }
@@ -358,11 +369,22 @@ func (m *Manager) bootPod(e *entry, fl Flavour) {
 
 // createAndWait is the boot itself, shared by first start and recycle.
 func (m *Manager) createAndWait(ctx context.Context, e *entry, fl Flavour) error {
-	spec, err := fl.Template.render(patch{
+	p := patch{
 		Name:   e.Pod,
 		Labels: m.labelsFor(e),
 		Bank:   e.Bank,
-	})
+	}
+	// Minted here rather than when the session was admitted, so a
+	// recycle gets a fresh ticket: the replacement Pod may outlive the
+	// window the original one's was good for.
+	if m.cfg.Webhook != nil {
+		url, token, err := m.cfg.Webhook(e.User)
+		if err != nil {
+			return fmt.Errorf("mint a history ticket for %s: %w", e.User, err)
+		}
+		p.WebhookURL, p.WebhookToken = url, token
+	}
+	spec, err := fl.Template.render(p)
 	if err != nil {
 		return err
 	}

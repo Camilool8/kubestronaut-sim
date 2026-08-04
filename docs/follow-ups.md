@@ -99,6 +99,26 @@ Known, chosen, and not currently worth the cost of changing.
   the durable copy, and accepting an arbitrary attempt document would
   only let a record that survives on purpose hold entries that were never
   graded.
+- **A hosted attempt is recorded twice, and only one copy is meant to
+  last.** The facilitator writes `/state/history.json` exactly as it
+  always has — that is what `./sim up` relies on and it does not change
+  — and additionally posts the record and the full results document to
+  the hub, which keeps it per user on a volume that outlives the Pod.
+  The two can disagree for one attempt: a hub that is down when an
+  exam is graded costs the durable copy, and the facilitator says so in
+  its log rather than failing the grade. Three deliveries are attempted
+  because the failure worth retrying is a hub mid-redeploy; a rejected
+  ticket is not retried, because retrying sends identical bytes to an
+  identical answer.
+- **The session Pod's history ticket is an env var in the Pod spec, not
+  a Secret.** It names one user and authorises appending to that user's
+  history and nothing else, it is minted per Pod and expires an hour
+  after the hard session cap, and it is signed with a key derived from
+  `COOKIE_KEY` so it can never be spent as that candidate's login.
+  Reading it needs Pod-read in the session namespace, which is already
+  well inside the accepted threat model for a namespace whose Pods run
+  a privileged container. A Secret would be a second object to create,
+  delete and grant RBAC over for no change in who can read it.
 - **ingress-nginx image digests are stripped** at build time so the
   preloaded tags resolve offline.
 - **The ingress `ValidatingWebhookConfiguration` is left in place.** It

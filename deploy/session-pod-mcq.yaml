@@ -93,6 +93,10 @@ spec:
         # No desktop container exists, so the proxy has nowhere to send
         # /desktop/*. An MCQ bank never asks for one.
         - {name: DESKTOP_ADDR, value: ""}
+        # Filled per session by the hub. See the practical Pod for what
+        # the ticket is and why it lives in the spec.
+        - {name: HISTORY_WEBHOOK_URL, value: ""}
+        - {name: HISTORY_WEBHOOK_TOKEN, value: ""}
       volumeMounts:
         - {name: banks, mountPath: /banks, readOnly: true}
         - {name: shared, mountPath: /shared, readOnly: true}

@@ -40,7 +40,12 @@ type Server struct {
 	// BaseURL is where a browser reaches the hub, used to build the
 	// OAuth redirect back to it.
 	BaseURL string
-	Logf    func(string, ...any)
+	// Ingest verifies the tickets session Pods post graded attempts
+	// with. A DIFFERENT signer from Auth's, over a derived key, so a
+	// ticket lifted from a Pod spec is not a login — see auth.Derive.
+	// Nil leaves the route unregistered.
+	Ingest *auth.Signer
+	Logf   func(string, ...any)
 
 	proxy *httputil.ReverseProxy
 }
@@ -88,6 +93,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /hub/auth/login", s.handleLogin)
 	mux.HandleFunc("GET /hub/auth/callback", s.handleCallback)
 	mux.HandleFunc("POST /hub/auth/logout", s.handleLogout)
+
+	// Under /hub/, not /api/, and deliberately: /api/ is the candidate's
+	// surface and everything under it is proxied or answered on their
+	// behalf. This is the session Pod talking to the hub about them, and
+	// it authenticates as the Pod, not as them.
+	if s.Ingest != nil {
+		mux.HandleFunc("POST /hub/ingest/history", s.handleIngestHistory)
+	}
 
 	if s.Sessions != nil {
 		s.proxy = s.newProxy()

@@ -233,6 +233,18 @@ jobs:
                   sys.exit('%s: the conductor must not listen on TCP in a Pod' % name)
               if text.count('mountPath: /run/control') != 2:
                   sys.exit('%s: exactly two containers may mount the control socket' % name)
+              # The hub fills these per session, and can only fill an env
+              # var the manifest already declares. Without them a hosted
+              # attempt is graded, shown, and then lost with the Pod —
+              # which the candidate discovers the next day.
+              for var in ('HISTORY_WEBHOOK_URL', 'HISTORY_WEBHOOK_TOKEN'):
+                  if '%s, value: ""' % var not in text:
+                      sys.exit('%s: the facilitator must declare an empty %s' % (name, var))
+
+          # A still VNC screen sends nothing, and an idle WebSocket
+          # through a CDN is closed out from under the candidate.
+          if '--heartbeat' not in open('images/desktop/entrypoint.sh').read():
+              sys.exit('images/desktop/entrypoint.sh: websockify needs --heartbeat or a hosted desktop drops when idle')
           print('session-pod.yaml + session-pod-mcq.yaml + session-networkpolicy.yaml ok')
           PY
 

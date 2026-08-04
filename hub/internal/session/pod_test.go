@@ -129,6 +129,74 @@ func TestRenderRejectsWhatItCannotUse(t *testing.T) {
 	}
 }
 
+const withWebhook = `{
+  "kind": "Pod",
+  "metadata": {},
+  "spec": {"containers": [
+    {"name": "facilitator", "env": [
+      {"name": "BANK", "value": "old"},
+      {"name": "HISTORY_WEBHOOK_URL", "value": ""},
+      {"name": "HISTORY_WEBHOOK_TOKEN", "value": ""}
+    ]},
+    {"name": "conductor", "env": [{"name": "BANK", "value": "old"}]}
+  ]}
+}`
+
+func TestRenderSetsTheWebhookOnTheContainerThatDeclaresIt(t *testing.T) {
+	pod := render(t, withWebhook, patch{
+		Name:         "p",
+		Bank:         "ckad-mock-01",
+		WebhookURL:   "https://hub.example/hub/ingest/history",
+		WebhookToken: "tkt",
+	})
+	containers := pod["spec"].(map[string]any)["containers"].([]any)
+
+	env := map[string]any{}
+	for _, e := range containers[0].(map[string]any)["env"].([]any) {
+		entry := e.(map[string]any)
+		env[entry["name"].(string)] = entry["value"]
+	}
+	if env["HISTORY_WEBHOOK_URL"] != "https://hub.example/hub/ingest/history" {
+		t.Errorf("URL = %v", env["HISTORY_WEBHOOK_URL"])
+	}
+	if env["HISTORY_WEBHOOK_TOKEN"] != "tkt" {
+		t.Errorf("token = %v", env["HISTORY_WEBHOOK_TOKEN"])
+	}
+	// The conductor declares neither and must not acquire them: a ticket
+	// is a credential, and it belongs in the one container that has a
+	// use for it.
+	for _, e := range containers[1].(map[string]any)["env"].([]any) {
+		if name := e.(map[string]any)["name"]; name != "BANK" {
+			t.Errorf("conductor gained %v", name)
+		}
+	}
+}
+
+// A hub told to collect history against a template with nowhere to put
+// the endpoint would run perfectly and record nothing, and the
+// candidate would find out after their exam.
+func TestRenderRefusesAWebhookTheTemplateCannotTake(t *testing.T) {
+	_, err := Template(twoContainers).render(patch{
+		Name:       "p",
+		WebhookURL: "https://hub.example/hub/ingest/history",
+	})
+	if err == nil || !strings.Contains(err.Error(), "HISTORY_WEBHOOK_URL") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+// No webhook configured is a real deployment, not a broken one: a
+// self-hoster keeping seats and a proxy without a durable history.
+func TestRenderWithNoWebhookLeavesTheTemplateAlone(t *testing.T) {
+	pod := render(t, withWebhook, patch{Name: "p", Bank: "b"})
+	for _, e := range pod["spec"].(map[string]any)["containers"].([]any)[0].(map[string]any)["env"].([]any) {
+		entry := e.(map[string]any)
+		if strings.HasPrefix(entry["name"].(string), "HISTORY_WEBHOOK") && entry["value"] != "" {
+			t.Errorf("%v = %v with no webhook configured", entry["name"], entry["value"])
+		}
+	}
+}
+
 // generateName wins over name at the API server, so a template carrying
 // both would produce Pods the hub cannot address by the name it thinks
 // it gave them.

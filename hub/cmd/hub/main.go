@@ -74,6 +74,7 @@ func run() error {
 	// one to report is the configuration: a hub run with no environment
 	// at all should say what it needs, not what it could not mkdir.
 	baseURL := strings.TrimSuffix(os.Getenv("HUB_BASE_URL"), "/")
+	var ingest *auth.Signer
 	if mode == auth.ModeGitHub {
 		// Every one of these is required, and a hub that starts without
 		// them would look healthy and fail at the first login. Checked
@@ -101,6 +102,23 @@ func run() error {
 		a.GitHub = auth.NewGitHub(id, secret, baseURL+"/hub/auth/callback")
 	}
 
+	// Follows COOKIE_KEY rather than the auth mode, deliberately.
+	//
+	// AUTH_MODE=header issues no cookie and so needs no key of its own —
+	// but it is the self-hosting path, and a deployment there with seats
+	// and a proxy and silently no durable history would be the one thing
+	// a hosted tier is for, missing. Setting COOKIE_KEY is what turns
+	// attempt collection on; github mode requires it anyway.
+	//
+	// Derived, not the same key: see auth.Derive. A ticket read out of a
+	// Pod spec must not be spendable as that candidate's login.
+	if key := os.Getenv("COOKIE_KEY"); key != "" {
+		ingest, err = auth.NewSigner(auth.Derive([]byte(key), auth.PurposeIngest))
+		if err != nil {
+			return err
+		}
+	}
+
 	if mode == auth.ModeHeader {
 		// Said out loud at boot because the failure is silent: a hub
 		// reachable directly in this mode lets anyone claim any identity
@@ -112,12 +130,12 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	srv := &api.Server{Auth: a, Store: st, BaseURL: baseURL}
+	srv := &api.Server{Auth: a, Store: st, BaseURL: baseURL, Ingest: ingest}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	mgr, err := buildManager()
+	mgr, err := buildManager(newTicketer(ingest, baseURL, envDuration("SESSION_MAX_AGE", 10*time.Hour)))
 	if err != nil {
 		return err
 	}
@@ -159,11 +177,42 @@ func run() error {
 	return nil
 }
 
+// ticketGrace is how long a Pod's history ticket stays good past the
+// hard session cap.
+//
+// It is not a second lease. The Pod is already gone by then; this only
+// covers an attempt graded in the last minutes of a session whose POST
+// is retrying while the hub restarts. A ticket that expired exactly at
+// the cap would lose precisely the attempt that ran the full length.
+const ticketGrace = time.Hour
+
+// newTicketer returns the session.Config.Webhook for this deployment,
+// or nil when nothing here can collect attempts — no signer (so no
+// AUTH_MODE=github) or no base URL for the Pod to post back to. Nil is
+// not a failure: it is a hub keeping seats and a proxy without a
+// durable history, which is exactly what AUTH_MODE=none is.
+func newTicketer(signer *auth.Signer, baseURL string, maxAge time.Duration) func(string) (string, string, error) {
+	if signer == nil || baseURL == "" {
+		return nil
+	}
+	endpoint := baseURL + "/hub/ingest/history"
+	return func(user string) (string, string, error) {
+		tok, err := signer.Encode(auth.Session{
+			UserID:  user,
+			Expires: time.Now().Add(maxAge + ticketGrace).Unix(),
+		})
+		if err != nil {
+			return "", "", err
+		}
+		return endpoint, tok, nil
+	}
+}
+
 // buildManager returns nil when this deployment serves identity and
 // history only — which is a real configuration, not a degraded one: it
 // is what the auth and store halves can be run and proved with before a
 // cluster exists.
-func buildManager() (*session.Manager, error) {
+func buildManager(webhook func(string) (string, string, error)) (*session.Manager, error) {
 	upstream := os.Getenv("SESSION_UPSTREAM")
 	practical := os.Getenv("SESSION_POD_TEMPLATE")
 	mcq := os.Getenv("SESSION_POD_TEMPLATE_MCQ")
@@ -187,7 +236,8 @@ func buildManager() (*session.Manager, error) {
 			"app.kubernetes.io/name":      "kubestronaut-sim",
 			"app.kubernetes.io/component": "session",
 		},
-		Logf: log.Printf,
+		Webhook: webhook,
+		Logf:    log.Printf,
 	}
 
 	var pods session.Pods
@@ -239,8 +289,15 @@ func buildManager() (*session.Manager, error) {
 			// SESSION_UPSTREAM has no Pod to create, but the manager
 			// still renders a manifest to name and label the thing it is
 			// tracking. A minimal one keeps that path identical to the
-			// real one rather than special-cased.
-			tmpl = session.Template(`{"kind":"Pod","metadata":{},"spec":{"containers":[{"name":"facilitator","env":[{"name":"BANK","value":""}]}]}}`)
+			// real one rather than special-cased — including declaring
+			// the webhook vars, so a render that would fail against the
+			// real template fails here too rather than only in the
+			// cluster. Nothing reads them: the upstream is a `./sim up`
+			// this process did not start and cannot configure.
+			tmpl = session.Template(`{"kind":"Pod","metadata":{},"spec":{"containers":[{"name":"facilitator","env":[` +
+				`{"name":"BANK","value":""},` +
+				`{"name":"HISTORY_WEBHOOK_URL","value":""},` +
+				`{"name":"HISTORY_WEBHOOK_TOKEN","value":""}]}]}}`)
 		}
 		cfg.Flavours[kind] = session.Flavour{
 			Seats: seats, Template: tmpl, Bank: os.Getenv(spec.bank),

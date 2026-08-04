@@ -243,6 +243,20 @@ spec:
         - {name: BANK, value: "ckad-mock-01"}
         - {name: CONDUCTOR_ADDR, value: "unix:/run/control/conductor.sock"}
         - {name: DESKTOP_ADDR, value: "127.0.0.1:6080"}
+        # Declared empty and filled per session by the hub, the same way
+        # BANK is. This Pod's /state dies with it, so the copy posted
+        # here is the one the candidate still has tomorrow.
+        #
+        # The token is a ticket naming one user, minted at Pod creation
+        # and good for appending to that user's history and nothing
+        # else. It is in the Pod spec rather than a Secret because that
+        # is one fewer object to create, delete and grant the hub RBAC
+        # over, and reading it needs Pod-read in this namespace — which
+        # is already inside the accepted threat model for a Pod that
+        # runs a privileged container. Unset under compose, where
+        # nothing is collecting attempts.
+        - {name: HISTORY_WEBHOOK_URL, value: ""}
+        - {name: HISTORY_WEBHOOK_TOKEN, value: ""}
       volumeMounts:
         - {name: banks, mountPath: /banks, readOnly: true}
         - {name: shared, mountPath: /shared, readOnly: true}
