@@ -1,4 +1,6 @@
-# Publishes the seven images a hosted session is built from.
+# Publishes the seven images a hosted session is built from, and the hub
+# that hands sessions out. Eight in all; the hub is not part of a session,
+# which is why the coverage job below has to check for it separately.
 #
 # Until this existed the only copies on Docker Hub were `:dev` tags pushed
 # by hand from a laptop — cross-compiled to linux/amd64 through emulation,
@@ -39,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       # One image per runner, so k8s-env's 2.6 GB has a disk to itself and
-      # a single failure still tells you about the other six.
+      # a single failure still tells you about the other seven.
       fail-fast: false
       matrix:
         include:
