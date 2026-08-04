@@ -64,4 +64,34 @@ describe("DesktopRequired", () => {
     );
     expect(screen.getByRole("button", { name: "End Exam" })).toBeInTheDocument();
   });
+
+  // Reachable is not enough on the device this screen exists for. Below
+  // three paragraphs and a requirements list, on a phone, the only way to
+  // submit a still-running exam is off the bottom of the screen — which
+  // is what a candidate arriving here is actually looking for.
+  test("the running session's controls come before the explanation, not after it", () => {
+    render(
+      <DesktopRequired verdict="narrow">
+        <button>End Exam</button>
+      </DesktopRequired>,
+    );
+
+    const submit = screen.getByRole("button", { name: "End Exam" });
+    const why = screen.getByText(/side by side with the questions/i);
+    expect(submit.compareDocumentPosition(why) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  // The override is the one control that belongs after the reasons: it
+  // is "I have read why this will not work", not a way out of an exam.
+  test("continue anyway stays last", () => {
+    render(
+      <DesktopRequired verdict="narrow">
+        <button>End Exam</button>
+      </DesktopRequired>,
+    );
+
+    const anyway = screen.getByRole("button", { name: /continue anyway/i });
+    const why = screen.getByText(/side by side with the questions/i);
+    expect(why.compareDocumentPosition(anyway) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });

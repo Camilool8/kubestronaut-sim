@@ -1170,14 +1170,15 @@ export const strings = {
     solutionTitle: "Reference solution",
     solutionLoading: "Loading the reference solution…",
     solutionFailed: (detail: string) => `Couldn't load the reference solution (${detail}).`,
-    // Reviewing a past attempt. The reference solution lives in the bank,
-    // which lives in a session Pod, and the attempt being read back may
-    // well be from a different exam than whatever is loaded now — so this
-    // is not a thing to fetch and fail at, it is a thing this screen
-    // genuinely does not have. The grader's own checks, the captured
-    // state and the score are all here, because those were recorded.
+    // Reviewing an OLD past attempt. Attempts are stored with their
+    // reference solutions now, so this is the narrow case: a record
+    // written before that, whose solution stayed behind in a Pod that no
+    // longer exists. Never a fetch and never an error — the attempt being
+    // read back may be from a different exam than whatever is loaded now,
+    // so asking a running session would answer with the wrong document
+    // rather than fail honestly.
     solutionHistorical:
-      "Reference solutions live in the exam environment, so they are not part of a saved attempt. Start a session on this exam to read them alongside the tasks.",
+      "This attempt was saved before reference solutions were kept alongside them, and the environment it was taken in is long gone. Newer attempts carry theirs; the checks, the captured state and the score above are all recorded here.",
 
     // The upstream reading a bank author attached to this task
     // (`SolutionDetail.docs`). Most questions carry none, and the footer
@@ -1350,6 +1351,13 @@ export const strings = {
     signInLead:
       "A hosted session gives you a real cluster for a few hours. Signing in is how your attempts stay yours — every graded exam is kept against your account, and it outlives the environment it was taken in.",
     signInGitHub: "Continue with GitHub",
+    // Said before the button is pressed, because it is true and because
+    // "Continue with GitHub" is a phrase people have learned to read as
+    // "grant an app access to my repositories". The hub requests no OAuth
+    // scopes at all (hub/internal/auth/github.go) — keep this sentence and
+    // that decision in step.
+    signInScope:
+      "No permissions are requested. GitHub tells this app your username and nothing else; it cannot see your repositories.",
     // Both kinds, because both are offered the moment you sign in and a
     // page that counts only the scarce one tells a visitor there may be
     // nowhere to sit when thirty multiple-choice seats are free. The
@@ -1382,6 +1390,10 @@ export const strings = {
     seatsFree: (used: number, total: number) => `${total - used} of ${total} free`,
     seatsFull: (total: number) => `all ${total} in use`,
     start: "Start",
+    // The same button, when every seat of that flavour is taken. It is
+    // enabled either way — the queue is the answer to a full pool — but
+    // "Start" would promise a session the click does not produce.
+    startQueue: "Join the queue",
     starting: "Starting…",
     startFailed: (detail: string) => `Could not start a session: ${detail}`,
 

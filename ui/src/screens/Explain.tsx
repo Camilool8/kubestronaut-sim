@@ -81,11 +81,12 @@ interface ExplainProps {
   /**
    * Whether a live exam environment is behind this screen.
    *
-   * False when reading back a stored attempt. The reference solution is
-   * part of the bank, and the bank is in a session Pod — so there is
-   * nothing to ask when no session is running, and asking anyway when one
-   * IS running is worse than useless: it would answer from whichever exam
-   * is loaded now, which need not be the exam being reviewed.
+   * False when reading back a stored attempt, and then the solution is
+   * READ OUT OF THE ATTEMPT rather than fetched: the facilitator stored
+   * it with the document precisely so this screen still works with no
+   * Pod in existence. Asking a session for it instead would be worse
+   * than useless — it would answer from whichever exam is loaded now,
+   * which need not be the exam being reviewed.
    */
   live?: boolean;
 }
@@ -93,6 +94,13 @@ interface ExplainProps {
 export function Explain({ results, questionId, basePath = "/results", live = true }: ExplainProps) {
   const index = results.questions.findIndex((q) => q.id === questionId);
   const question = index === -1 ? null : results.questions[index];
+  // What a stored attempt carries, in the shape the live fetch returns,
+  // so everything below this line renders one document and not two.
+  // Absent on attempts recorded before solutions were stored with them.
+  const stored: SolutionDetail | null =
+    !live && question?.solution
+      ? { id: question.id, markdown: question.solution, docs: question.docs }
+      : null;
 
   // Eagerly, and not behind the disclosure the verdict row uses. The
   // attempt is over, so there is no answer left to protect (that is
@@ -139,6 +147,10 @@ export function Explain({ results, questionId, basePath = "/results", live = tru
       </div>
     );
   }
+
+  // One of the two, never both: the fetch does not run when `stored` can
+  // exist, and `stored` is null whenever a session is behind the screen.
+  const shown = solution ?? stored;
 
   const verdict = verdictOf(question.verdict, question.earned, question.total);
   // mcq results carry the option texts and hands-on results never do, so
@@ -249,12 +261,13 @@ export function Explain({ results, questionId, basePath = "/results", live = tru
               re-acquire; reserving the shortest solution's worth of room
               means the arrival fills a space that was already there. */}
           <div className="explain-solution-body">
-            {solution !== null ? (
-              <Markdown>{solution.markdown}</Markdown>
+            {shown !== null ? (
+              <Markdown>{shown.markdown}</Markdown>
             ) : !live ? (
+              // An attempt stored before solutions travelled with them.
               // Not an error: nothing failed, and a red line saying a
               // fetch went wrong would read as a broken page rather than
-              // as the boundary of what a saved attempt contains.
+              // as the boundary of what this saved attempt contains.
               <p className="explain-note">{strings.explain.solutionHistorical}</p>
             ) : solutionError !== null ? (
               <p className="error-text">{strings.explain.solutionFailed(solutionError)}</p>
@@ -262,7 +275,7 @@ export function Explain({ results, questionId, basePath = "/results", live = tru
               <p className="explain-note">{strings.explain.solutionLoading}</p>
             )}
           </div>
-          {solution !== null && <SolutionDocs docs={solution.docs} />}
+          {shown !== null && <SolutionDocs docs={shown.docs} />}
         </section>
       </article>
     </div>

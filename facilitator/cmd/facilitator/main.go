@@ -177,7 +177,13 @@ func runServer() error {
 	// Default-off, and the only thing in this process that knows a world
 	// outside the Pod exists. Unset under compose, which is every local
 	// run: no mirror, no request, no behaviour change.
-	mir := newMirror(os.Getenv("HISTORY_WEBHOOK_URL"), os.Getenv("HISTORY_WEBHOOK_TOKEN"), log.Printf)
+	mir := newMirror(
+		os.Getenv("HISTORY_WEBHOOK_URL"),
+		os.Getenv("HISTORY_WEBHOOK_TOKEN"),
+		cfg.bankDir,
+		ex,
+		log.Printf,
+	)
 	if mir != nil {
 		log.Printf("attempts will also be posted to %s", os.Getenv("HISTORY_WEBHOOK_URL"))
 	}

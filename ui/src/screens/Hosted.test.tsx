@@ -208,6 +208,31 @@ test("a signed-out visitor gets the sign-in screen and the seat count", async ()
   // Capacity before sign-in, on purpose: someone deciding whether to
   // create an account is entitled to know there is somewhere to sit.
   expect(screen.getByText(/2 of 3 hands-on seats free/i)).toBeTruthy();
+  // What pressing it actually costs, said first. The hub requests no
+  // OAuth scopes at all, and "Continue with GitHub" is a phrase people
+  // have learned to read as "grant this app my repositories".
+  expect(screen.getByText(/No permissions are requested/i)).toBeTruthy();
+});
+
+// It is the only screen in the product with no header, so it is the only
+// one that has to carry the header's furniture itself — otherwise a
+// visitor's first impression is a heading alone in the top-left corner of
+// an empty page, with no mark, no wordmark and no way to set the theme.
+test("the sign-in screen carries the product's own chrome", async () => {
+  identity = {
+    authenticated: false,
+    authMode: "github",
+    loginURL: "/hub/auth/login",
+    seats: { practical: { used: 1, total: 3 } },
+  };
+  render(<App />);
+
+  await screen.findByRole("link", { name: /continue with github/i });
+  expect(document.querySelector(".signin-mark")).toBeTruthy();
+  expect(screen.getByText("kubestronaut")).toBeTruthy();
+  expect(screen.getByRole("button", { name: /theme/i })).toBeTruthy();
+  // The GitHub mark rides the button it belongs to.
+  expect(document.querySelector(".signin-github .signin-github-mark")).toBeTruthy();
 });
 
 // AUTH_MODE=header behind a proxy that did not identify anyone. There is
@@ -250,6 +275,21 @@ test("a flavour with no seats configured is not offered at all", async () => {
 
   expect(await screen.findByRole("heading", { name: /hands-on exam/i })).toBeTruthy();
   expect(screen.queryByRole("heading", { name: /multiple choice/i })).toBeNull();
+});
+
+// The button stays enabled when every seat is taken — the queue is the
+// answer to a full pool, and a greyed-out button offers no way to ask
+// for one — so it has to say what the click will actually produce.
+test("a full flavour offers the queue rather than promising a session", async () => {
+  identity = me({
+    seats: { practical: { used: 3, total: 3 }, mcq: { used: 0, total: 30 } },
+  });
+  render(<App />);
+
+  const queue = await screen.findByRole("button", { name: /join the queue/i });
+  expect(queue).toBeEnabled();
+  // The flavour that is not full still says Start.
+  expect(screen.getByRole("button", { name: "Start" })).toBeTruthy();
 });
 
 test("a full pool answers 409 with a place in the queue", async () => {

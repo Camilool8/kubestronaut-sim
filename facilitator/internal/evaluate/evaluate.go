@@ -234,6 +234,33 @@ type QuestionResult struct {
 	Correct  []int    `json:"correct,omitempty"`
 	Options  []string `json:"options,omitempty"`
 	Multi    bool     `json:"multi,omitempty"`
+
+	// Solution and Docs are the bank's reference solution for this
+	// question, and they are set on ONE copy of the document only: the
+	// one posted to a history mirror (cmd/facilitator/solutions.go).
+	//
+	// Grading never fills them, /session/results.json never carries them,
+	// and GET /api/results never serves them. That is not tidiness — the
+	// live document is also what a training-mode practice grade produces,
+	// mid-session, and the solution endpoint is gated precisely there.
+	// Attaching a solution to the live results would hand it out through
+	// the one door that is meant to be shut.
+	//
+	// Why they are attached to the mirrored copy at all: a stored attempt
+	// is read back long after its Pod is gone, and the reference solution
+	// lives in the bank, inside that Pod. Without this the review screen
+	// could show what a candidate got wrong and nothing about what right
+	// looked like — which is the half that teaches.
+	Solution string `json:"solution,omitempty"`
+	Docs     []Doc  `json:"docs,omitempty"`
+}
+
+// Doc is one piece of upstream reading a bank attached to a question.
+// Mirrors the shape GET /api/questions/{id}/solution serves live, so the
+// review screen renders a stored attempt through the same component.
+type Doc struct {
+	Label string `json:"label"`
+	URL   string `json:"url"`
 }
 
 // CheckResult is one validate.d check's graded outcome.

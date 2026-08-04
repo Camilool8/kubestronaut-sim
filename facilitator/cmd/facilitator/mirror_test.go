@@ -17,7 +17,7 @@ import (
 // so a test of three attempts costs no seconds.
 func quietMirror(t *testing.T, url, token string) *mirror {
 	t.Helper()
-	m := newMirror(url, token, func(string, ...any) {})
+	m := newMirror(url, token, "", nil, func(string, ...any) {})
 	m.sleep = func(time.Duration) {}
 	return m
 }
@@ -71,6 +71,41 @@ func TestMirrorPostsTheRecordAndTheFullResults(t *testing.T) {
 	for _, forbidden := range []string{"user", "uid", "login"} {
 		if strings.Contains(strings.ToLower(string(raw)), `"`+forbidden+`"`) {
 			t.Errorf("the posted body names a %q; identity must come from the ticket alone", forbidden)
+		}
+	}
+}
+
+// The wiring, end to end: what leaves this process is the SELF-CONTAINED
+// document. The bank goes away with the Pod, so a stored attempt that
+// pointed at it for the reference solution would be a review that can
+// only ever say what went wrong.
+func TestMirrorPostsTheReferenceSolutionsWithTheAttempt(t *testing.T) {
+	var body struct {
+		Results struct {
+			Questions []struct {
+				ID       string `json:"id"`
+				Solution string `json:"solution"`
+			} `json:"questions"`
+		} `json:"results"`
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	m := newMirror(srv.URL, "tok", bankWithSolutions(t, "q01", "q02"), recorderExam(), func(string, ...any) {})
+	m.sleep = func(time.Duration) {}
+	if err := m.post(t.Context(), historyRecord(), gradedResults()); err != nil {
+		t.Fatalf("post: %v", err)
+	}
+
+	if len(body.Results.Questions) != 2 {
+		t.Fatalf("questions = %d, want 2", len(body.Results.Questions))
+	}
+	for _, q := range body.Results.Questions {
+		if q.Solution == "" {
+			t.Errorf("%s was stored with no reference solution", q.ID)
 		}
 	}
 }
@@ -154,7 +189,7 @@ func TestMirrorDoesNotRetryARejectedTicket(t *testing.T) {
 // Unset is what `./sim up` runs, and it must produce no mirror at all —
 // not a mirror that posts nowhere.
 func TestNoWebhookURLMeansNoMirror(t *testing.T) {
-	if m := newMirror("", "tok", nil); m != nil {
+	if m := newMirror("", "tok", "", nil, nil); m != nil {
 		t.Errorf("newMirror with no URL returned %+v", m)
 	}
 }

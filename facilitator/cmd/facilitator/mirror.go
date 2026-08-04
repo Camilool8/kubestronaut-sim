@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"kubestronaut-sim/facilitator/internal/evaluate"
+	"kubestronaut-sim/facilitator/internal/exam"
 	"kubestronaut-sim/facilitator/internal/history"
 )
 
@@ -54,22 +55,30 @@ type mirror struct {
 	token  string
 	client *http.Client
 	logf   func(string, ...any)
+	// bankDir and ex are what makes the stored copy self-contained: the
+	// reference solutions live in the bank, the bank lives in this Pod,
+	// and the Pod is the thing the stored copy has to outlive. See
+	// withSolutions.
+	bankDir string
+	ex      *exam.Exam
 	// sleep is overridable so the retry can be tested without waiting.
 	sleep func(time.Duration)
 }
 
 // newMirror returns nil when HISTORY_WEBHOOK_URL is unset, which is the
 // only configuration `./sim up` has ever had.
-func newMirror(rawURL, token string, logf func(string, ...any)) *mirror {
+func newMirror(rawURL, token, bankDir string, ex *exam.Exam, logf func(string, ...any)) *mirror {
 	if rawURL == "" {
 		return nil
 	}
 	return &mirror{
-		url:    rawURL,
-		token:  token,
-		client: &http.Client{Timeout: mirrorTimeout},
-		logf:   logf,
-		sleep:  time.Sleep,
+		url:     rawURL,
+		token:   token,
+		client:  &http.Client{Timeout: mirrorTimeout},
+		logf:    logf,
+		bankDir: bankDir,
+		ex:      ex,
+		sleep:   time.Sleep,
 	}
 }
 
@@ -78,12 +87,16 @@ func newMirror(rawURL, token string, logf func(string, ...any)) *mirror {
 // The results document is sent whole rather than summarised because it
 // is what the review screen renders: the per-check artifacts carry the
 // actual, the expected and the why, and a summary would leave a hosted
-// candidate with a score and no explanation of it.
+// candidate with a score and no explanation of it. The reference
+// solutions are attached HERE, on the way out and on a copy, for the
+// same reason and one more — they are the half that says what right
+// looked like, and they do not otherwise survive the Pod.
 func (m *mirror) post(ctx context.Context, rec history.Record, res *evaluate.Results) error {
+	stored := withSolutions(res, m.ex, m.bankDir, m.logf)
 	body, err := json.Marshal(struct {
 		Record  history.Record    `json:"record"`
 		Results *evaluate.Results `json:"results"`
-	}{rec, res})
+	}{rec, stored})
 	if err != nil {
 		return fmt.Errorf("history mirror: encode: %w", err)
 	}

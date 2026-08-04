@@ -7,6 +7,7 @@ import {
   type Seats,
 } from "../api";
 import { Dialog } from "../components/Dialog";
+import { Icon, type IconName } from "../components/Icon";
 import { strings } from "../strings";
 
 interface HostedStartProps {
@@ -21,6 +22,13 @@ interface Flavour {
   title: string;
   body: string;
   seats: Seats | undefined;
+  /**
+   * The tile glyph, in the exam selector's vocabulary — this lobby is
+   * the same product one step earlier, so its cards are that card.
+   * A hands-on seat is the one that needs a keyboard (it is what the
+   * mobile gate says too); multiple choice is a grid of options.
+   */
+  icon: IconName;
 }
 
 /**
@@ -91,12 +99,14 @@ export function HostedStart({ me, onChanged }: HostedStartProps) {
       title: strings.hosted.practicalTitle,
       body: strings.hosted.practicalBody,
       seats: me.seats?.practical,
+      icon: "keyboard",
     },
     {
       kind: "mcq",
       title: strings.hosted.mcqTitle,
       body: strings.hosted.mcqBody,
       seats: me.seats?.mcq,
+      icon: "grid",
     },
   ];
   // A flavour a deployment gave no seats to is not offered at all. The
@@ -137,26 +147,41 @@ export function HostedStart({ me, onChanged }: HostedStartProps) {
           return (
             <li key={f.kind}>
               <article className="hosted-flavour" data-full={full || undefined}>
-                <h2>{f.title}</h2>
-                <p>{f.body}</p>
-                <p className="hosted-flavour-seats">
-                  {f.seats === undefined
-                    ? null
-                    : full
-                      ? strings.hosted.seatsFull(f.seats.total)
-                      : strings.hosted.seatsFree(f.seats.used, f.seats.total)}
-                </p>
-                {/* Enabled even when full, deliberately. The answer to a
-                    full pool is a place in the queue, and a greyed-out
-                    button offers no way to ask for one. */}
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => void start(f.kind)}
-                  disabled={starting !== null}
-                >
-                  {starting === f.kind ? strings.hosted.starting : strings.hosted.start}
-                </button>
+                <div className="hosted-flavour-head">
+                  <span className="exam-avatar hosted-flavour-tile" aria-hidden="true">
+                    <Icon name={f.icon} />
+                  </span>
+                  <div className="hosted-flavour-name">
+                    <h2>{f.title}</h2>
+                    <p className="hosted-flavour-seats">
+                      {f.seats === undefined
+                        ? null
+                        : full
+                          ? strings.hosted.seatsFull(f.seats.total)
+                          : strings.hosted.seatsFree(f.seats.used, f.seats.total)}
+                    </p>
+                  </div>
+                </div>
+                <p className="hosted-flavour-body">{f.body}</p>
+                {/* Enabled even when full, deliberately, and it says what
+                    it will actually do. The answer to a full pool is a
+                    place in the queue: a greyed-out button offers no way
+                    to ask for one, and one labelled "Start" promises a
+                    session that is not what the click produces. */}
+                <div className="hosted-flavour-actions">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => void start(f.kind)}
+                    disabled={starting !== null}
+                  >
+                    {starting === f.kind
+                      ? strings.hosted.starting
+                      : full
+                        ? strings.hosted.startQueue
+                        : strings.hosted.start}
+                  </button>
+                </div>
               </article>
             </li>
           );

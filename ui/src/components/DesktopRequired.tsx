@@ -34,7 +34,17 @@ export function gateOverridden(): boolean {
 
 interface DesktopRequiredProps {
   verdict: GateVerdict;
-  /** Rendered underneath the explanation while a session is running. */
+  /**
+   * The running attempt's clock and its submit control.
+   *
+   * Rendered FIRST, immediately under the heading. It used to sit below
+   * the explanation and the requirements list, which on a phone put the
+   * only way to submit an exam that is still being timed below the fold
+   * — three paragraphs of why this device cannot run the exam, read by
+   * someone whose actual question is "how do I get out of this". The
+   * explanation is why they are here; the clock is what they can do
+   * about it, and it goes first.
+   */
   children?: React.ReactNode;
 }
 
@@ -55,6 +65,7 @@ export function DesktopRequired({ verdict, children }: DesktopRequiredProps) {
     <div className="desktop-required">
       <div className="desktop-required-card">
         <h1>{strings.mobile.title}</h1>
+        {children}
         <p>{strings.mobile.why}</p>
         <ul className="desktop-required-needs">
           {strings.mobile.requirements.map((r) => (
@@ -62,9 +73,11 @@ export function DesktopRequired({ verdict, children }: DesktopRequiredProps) {
           ))}
         </ul>
         <p className="desktop-required-still">{strings.mobile.stillAvailable}</p>
-        {children}
+        {/* Last, and that is the right place for it: it is the "I have
+            read why this will not work" action, not an escape from a
+            running exam. */}
         {verdict === "narrow" && (
-          <button className="btn" onClick={continueAnyway}>
+          <button className="btn desktop-required-anyway" onClick={continueAnyway}>
             {strings.mobile.continueAnyway}
           </button>
         )}
