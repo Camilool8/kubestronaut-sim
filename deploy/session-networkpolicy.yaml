@@ -1,0 +1,100 @@
+# What a hosted session is allowed to talk to.
+#
+# Deploy this WITH the session Pod, not after it. A practical session
+# runs a privileged container and hands a stranger a root shell with a
+# container runtime in it; this is the boundary around that, and the Pod
+# spec on its own does not have one.
+#
+# ---------------------------------------------------------------------
+# What this policy does NOT do, so nobody reads it as more than it is
+#
+# It does not restore the documentation allowlist as a network boundary.
+# That is not a gap to be closed later — it cannot be closed in a
+# single-Pod session, and the reason is worth writing down.
+#
+# Under compose the exam has three networks. `desktop` sits only on
+# `examnet`, which runs with masquerade off, so it cannot reach the
+# internet at all and Firefox's only route out is `docs-proxy`. The two
+# instances sit on `examnet` AND `default`, so they have ordinary
+# internet access — measured, not assumed: `curl https://example.com`
+# from instance-1 answers 200 while the same call from the desktop times
+# out. The instances need it, because a question builds an image
+# `FROM alpine:3.21` and podman pulls that from Docker Hub.
+#
+# A Pod is one network namespace shared by every container, and a
+# NetworkPolicy selects Pods, not containers. So the desktop and the
+# instances necessarily get the same egress, and the instances' egress
+# is load-bearing. Splitting `docs-proxy` into its own Pod would not
+# help — the hole is the instances, not the proxy.
+#
+# The practical effect is narrower than it first sounds: the allowlist
+# still governs the browser (Firefox is configured to use the proxy, and
+# a non-allowlisted host returns "blocked by exam docs allowlist"), and
+# a candidate determined to search the web from an instance shell could
+# already do that in the local product. Recorded in docs/follow-ups.md.
+#
+# ---------------------------------------------------------------------
+# What it does do
+#
+# It stops a session reaching the infrastructure hosting it. Measured on
+# an unpoliced session Pod: an instance reached the cluster's API server
+# and got a 401 — rejected for want of a credential, which is not the
+# same as unreachable, and `automountServiceAccountToken: false` is the
+# only reason there was no credential to present. Everything private is
+# denied here instead: the cluster's own API and Services, every other
+# namespace's Pods, the nodes, and the link-local range that cloud
+# metadata services answer on.
+#
+# Addressed by reserved range rather than by this cluster's addressing,
+# so it carries no deployment detail and a self-hoster can apply it
+# unedited.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: session
+  namespace: kubestronaut-sim
+  labels:
+    app.kubernetes.io/name: kubestronaut-sim
+    app.kubernetes.io/component: session
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kubestronaut-sim
+      app.kubernetes.io/component: session
+  # Egress only, deliberately. Ingress belongs with the hub, which is
+  # the only thing that should ever reach a session and does not exist
+  # yet; a rule written before there is something to name would either
+  # be guesswork or would have to encode node addressing to keep
+  # `kubectl port-forward` working, and both are worse than saying so.
+  policyTypes: [Egress]
+  egress:
+    # DNS. Named by the Pods that serve it rather than by the Service
+    # address, because that address is in a range denied below.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    # The public internet, and nothing private. The instances need this
+    # for `podman pull`, and k8s-env needs it on a first boot whose
+    # add-on images are not already baked into the image.
+    #
+    # Note what is NOT excepted: 127.0.0.0/8. Every service in this Pod
+    # talks to every other over loopback inside the shared namespace,
+    # which never reaches the dataplane a NetworkPolicy acts on, and the
+    # inner kind cluster's own bridge is inside that namespace too.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8        # cluster Pods and Services
+              - 172.16.0.0/12     # RFC1918
+              - 192.168.0.0/16    # RFC1918
+              - 100.64.0.0/10     # RFC6598 carrier-grade NAT
+              - 169.254.0.0/16    # link-local, incl. cloud metadata
+              - 224.0.0.0/4       # multicast

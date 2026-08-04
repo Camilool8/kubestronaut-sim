@@ -6,10 +6,22 @@ ARG CALICO_VERSION=v3.32.1
 ARG INGRESS_NGINX_VERSION=controller-v1.15.1
 ARG NODE_IMAGE=kindest/node:v1.35.5@sha256:ce977ae6d65918d0b58a5f8b5e940429c2ce42fa3a5619ec2bbc60b949c0ac95
 ENV NODE_IMAGE=${NODE_IMAGE}
+# The same constant again, as a file, because an ENV only reaches
+# processes descended from PID 1. On a hosted reset the conductor re-runs
+# bootstrap.sh over ssh (ENGINE=ssh) and an sshd session inherits none of
+# the image's environment: the rebuild aborted at `set -u` with
+# "NODE_IMAGE: unbound variable" — after it had already deleted the old
+# cluster, so the session was left with no cluster at all. A build-time
+# constant must not depend on how the script reading it was invoked.
+RUN mkdir -p /opt/sim && printf '%s' "${NODE_IMAGE}" > /opt/sim/node-image
 # busybox-extras is here for exactly one applet: httpd, which serves the
 # packaged Helm charts (see start.sh). Alpine's base busybox is built
 # without it.
-RUN apk add --no-cache bash curl jq yq openssh-client openssl busybox-extras
+# openssh-server, not just the client: the hosted deployment runs the
+# whole stack as one Pod, where the conductor has no Docker socket and
+# reaches this container over ssh instead (ENGINE=ssh). Idle and unused
+# under compose, which never sets SSHD_LISTEN — see start.sh.
+RUN apk add --no-cache bash curl jq yq openssh-client openssh-server openssl busybox-extras
 RUN ARCH=$(uname -m); case "$ARCH" in x86_64) ARCH=amd64 ;; aarch64) ARCH=arm64 ;; esac \
     && curl -fsSL -o /usr/local/bin/kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-${ARCH}" \
     && curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" \

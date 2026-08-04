@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 echo "waiting for shared ssh key..."
-until [ -f /shared/ssh/id_ed25519 ]; do sleep 2; done
+# -s, not -f: same reason as images/instance/entrypoint.sh. An empty
+# private key installs fine and then fails every `ssh instance-1` the
+# candidate types, which is the entire exam from this container.
+until [ -s /shared/ssh/id_ed25519 ]; do sleep 2; done
 install -d -m 700 -o candidate -g candidate /home/candidate/.ssh
 install -m 600 -o candidate -g candidate /shared/ssh/id_ed25519 /home/candidate/.ssh/id_ed25519
 install -m 644 -o candidate -g candidate /etc/sim/ssh_config /home/candidate/.ssh/config
