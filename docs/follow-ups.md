@@ -26,6 +26,79 @@ Known, chosen, and not currently worth the cost of changing.
 - **Podman on the instances runs with the `vfs` storage driver.** Slower
   and more disk-hungry than overlay, but it works without granting the
   instances more than the five capabilities they already hold.
+- **A build's `RUN` steps use chroot isolation, not a container.**
+  `BUILDAH_ISOLATION=chroot`, set in `images/instance/Dockerfile` three
+  ways — as an `ENV`, in `/etc/environment`, and via a sudoers
+  `env_keep`. Under compose the instances get the host's cgroup namespace
+  and crun works; under Kubernetes an unprivileged container gets a
+  private one, where crun cannot enable cgroup controllers or attach its
+  device-control eBPF program. Granting `privileged` would fix it and
+  would make the candidate's own shell the most privileged container in
+  the pod, so the isolation of the build step was traded away instead. A
+  `RUN` step gets no namespaces of its own; the images the questions build
+  are tiny and the candidate is already root there, so nothing current
+  notices. One image behaves identically in both places, which is the
+  point. The three mechanisms are not redundancy: `ENV` alone never
+  reaches a candidate, because sshd sanitises login sessions and sudo
+  resets the environment again — and q09 requires sudo.
+- **In a hosted session the exam desktop can reach the open web, and no
+  NetworkPolicy can change that.** Under compose the desktop sits only on
+  `examnet`, which runs with masquerade off, so its only route out is
+  `docs-proxy` — `tests/smoke.sh` asserts a plain
+  `curl https://example.com` from the desktop fails. A Pod is one network
+  namespace and the same call succeeds.
+  This is architectural, not a deferred fix. The two instances are on
+  `default` as well as `examnet`, so they have ordinary internet access
+  even locally (measured: 200 from instance-1, timeout from the desktop),
+  and they need it — a question builds an image `FROM alpine:3.21`, which
+  podman pulls from Docker Hub. A NetworkPolicy selects Pods, not
+  containers, so the desktop and the instances necessarily share one
+  egress and the instances' egress is load-bearing. Splitting
+  `docs-proxy` out would not help; the instances are the hole.
+  What survives is narrower than it sounds: the allowlist still governs
+  the browser, which is where candidates actually read documentation, and
+  a candidate willing to search the web from an instance shell can
+  already do that in the local product. Local behaviour is unchanged and
+  remains the stricter of the two.
+  `deploy/session-networkpolicy.yaml` addresses the part that *is*
+  fixable — a session reaching the infrastructure hosting it — and says
+  the same thing at more length.
+- **In a hosted session, containers other than the two instances report
+  the Pod's hostname.** Pod containers share a UTS namespace. The
+  instances take one of their own (`unshare --uts`, using CAP_SYS_ADMIN
+  they already hold for image builds), because the prompt is the
+  candidate's only confirmation that `ssh instance-1` landed and it
+  otherwise looks identical before and after. The desktop and the four
+  service containers keep the Pod's name: the desktop cannot unshare
+  without being granted a capability it has no other use for, and its
+  prompt is now unambiguous anyway — it is the one that is *not*
+  `instance-1` or `instance-2`. Nothing reads a hostname anywhere.
+- **In a hosted session, reset and switch replace the Pod rather than
+  rebuilding in place.** The conductor cannot restart a container it
+  reaches over ssh — a Pod has no per-container restart under
+  `restartPolicy: Never` — so `hub/internal/session` deletes the Pod and
+  creates a new one, reporting progress in the conductor's own job shape
+  so the UI needs no hosted branch. Two consequences, both accepted: the
+  phases differ from a local reset's (there is no cluster to rebuild in
+  place), and a hosted reset costs a full boot rather than a partial one.
+- **In a hosted session, seeding a pooled bank would report no
+  progress.** The hub answers `/api/control/status` and `/api/control/log`
+  from its own job store, because reset and switch are its operations and
+  the Pod they describe may not exist while they run. The conductor's one
+  remaining job type, `seed`, is triggered by the facilitator
+  server-to-server and would therefore be invisible to the browser. No
+  hands-on bank in the tree is pooled — `exam.Pooled()` is false for
+  every one — so nothing is currently affected. Recorded rather than
+  guessed at, because the first pooled hands-on bank will need this.
+- **Hosted history cannot be imported into, and reports no summary.**
+  Both are refused with 501 and an explanation rather than proxied. The
+  Pod's own `/state` is ephemeral by design, so a history route answered
+  there would answer from the copy that is about to be destroyed — "clear
+  my history" would succeed against nothing that lasts. Import exists
+  locally because local history is genuinely fragile; hosted history is
+  the durable copy, and accepting an arbitrary attempt document would
+  only let a record that survives on purpose hold entries that were never
+  graded.
 - **ingress-nginx image digests are stripped** at build time so the
   preloaded tags resolve offline.
 - **The ingress `ValidatingWebhookConfiguration` is left in place.** It
@@ -43,9 +116,17 @@ Known, chosen, and not currently worth the cost of changing.
 
 Recorded because each has been proposed at least once and is settled.
 
-- **No authentication, permanently.** See [../SECURITY.md](../SECURITY.md).
-  Notes elsewhere of the form "needs auth once hosted" describe a
-  scenario that is not planned.
+- ~~**No authentication, permanently.**~~ **Still true of the
+  simulator, no longer true of the product.** The facilitator has no
+  authentication of any kind and gains none: `./sim up` is unchanged,
+  with no accounts and no new required configuration. What changed is
+  that a hosted deployment puts `hub/` in front of it — GitHub login,
+  capped seats, durable per-user history — and the facilitator is simply
+  never reachable except through it. That is the whole reason the
+  property survives: the hub was built *around* the simulator rather
+  than into it. Struck through rather than deleted, because this entry
+  was cited as settled and a reader who remembers it needs to find out
+  what it became.
 - ~~**No attempt history and no cross-attempt analytics.**~~ **Overturned,
   deliberately.** This was a durable constraint until the design brief
   made cross-attempt progress a product goal, and it is now built: every
