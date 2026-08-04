@@ -63,7 +63,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [facilitator, conductor, proxy]
+        module: [facilitator, conductor, proxy, hub]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -121,6 +121,17 @@ jobs:
       # booting, which is smoke.sh's job.
       - name: k8s-env
         run: docker build --build-arg PRELOAD=none -t sim-k8s-env images/k8s-env
+      # bootstrap.sh does not only run from PID 1: a hosted reset re-runs
+      # it over ssh (ENGINE=ssh), and an sshd session inherits none of the
+      # image's ENV. That aborted the rebuild at `set -u` with
+      # "NODE_IMAGE: unbound variable" — after it had already deleted the
+      # cluster, so the session was left with none. `env -i` reproduces
+      # exactly that empty environment.
+      - name: NODE_IMAGE resolves with no environment at all
+        run: |
+          docker run --rm --entrypoint env sim-k8s-env -i sh -c \
+            'NODE_IMAGE="${NODE_IMAGE:-$(cat /opt/sim/node-image)}"; \
+             test -n "$NODE_IMAGE" && echo "resolved to $NODE_IMAGE"'
       - name: instance
         run: docker build -t sim-instance images/instance
       - name: desktop
@@ -131,8 +142,82 @@ jobs:
         run: docker build -t sim-conductor conductor
       - name: docs-proxy
         run: docker build -t sim-proxy proxy
+      # Context is banks/, not the repo root: the root .dockerignore
+      # excludes banks/ so it stays out of the facilitator's context.
+      - name: banks
+        run: docker build -f images/banks/Dockerfile -t sim-banks banks
+      - name: hub
+        run: docker build -t sim-hub hub
+      # FROM scratch: there is no shell to check the image with, and a
+      # broken binary in one would otherwise only surface at deploy time.
+      - name: hub refuses to start misconfigured
+        run: |
+          out=$(docker run --rm -e AUTH_MODE=github sim-hub 2>&1) && {
+            echo "hub started with no GitHub credentials; it must not" >&2; exit 1
+          }
+          echo "$out" | grep -q GITHUB_CLIENT_ID
       - name: Compose config is valid
         run: docker compose config -q
+      # The hosted session Pod is not built from these, but a typo in it
+      # would only surface at deploy time. This parses it and checks the
+      # image names line up with the Dockerfiles above.
+      - name: Session pod manifest is valid YAML
+        run: |
+          python3 - <<'PY'
+          import sys, re
+          src = open('deploy/session-pod.yaml').read()
+          # Stdlib only: no PyYAML on the runner by default, and the
+          # checks worth having here are structural, not schema-deep.
+          for probe in ('hostAliases:', 'initContainers:', 'containers:', 'volumes:'):
+              if probe not in src:
+                  sys.exit(f'session-pod.yaml: missing {probe}')
+          names = set(re.findall(r'image: cjoga/kubestronaut-sim-([a-z0-9-]+):', src))
+          expected = {'banks', 'k8s-env', 'instance', 'desktop', 'facilitator', 'conductor', 'docs-proxy'}
+          if names != expected:
+              sys.exit(f'session-pod.yaml images {sorted(names)} != {sorted(expected)}')
+          # A mutable tag with the default pull policy silently serves a
+          # stale image; every first-party image must opt out.
+          if src.count('imagePullPolicy: Always') - src.count('# imagePullPolicy: Always') != len(re.findall(r'image: cjoga/', src)):
+              sys.exit('session-pod.yaml: every cjoga/ image needs imagePullPolicy: Always')
+          # Pod containers share a UTS namespace, so an instance that does
+          # not name itself shows the candidate the same prompt they typed
+          # `ssh instance-1` at, with no way to tell it worked.
+          for want in ('instance-1', 'instance-2'):
+              if 'SIM_HOSTNAME, value: "%s"' % want not in src:
+                  sys.exit('session-pod.yaml: %s has no SIM_HOSTNAME' % want)
+          # A practical session is a privileged container holding a root
+          # shell for a stranger. Its egress boundary is not optional, and
+          # it is not part of the Pod spec, so assert it exists and still
+          # denies every private range rather than trusting it shipped.
+          np = open('deploy/session-networkpolicy.yaml').read()
+          for cidr in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16',
+                       '100.64.0.0/10', '169.254.0.0/16'):
+              if cidr not in np:
+                  sys.exit('session-networkpolicy.yaml: %s is not denied' % cidr)
+
+          # The MCQ flavour. Its whole reason to exist is being small and
+          # unprivileged, so those are what is asserted: no cluster, no
+          # shells, no privilege.
+          #
+          # Comments are stripped first. Every one of these manifests
+          # explains itself at length, and a check that reads the prose
+          # fails on a file that says "no desktop container exists here"
+          # — which is the file being correct, described correctly.
+          raw = open('deploy/session-pod-mcq.yaml').read()
+          mcq = '\n'.join(re.sub(r'(^|\s)#.*$', '', line) for line in raw.splitlines())
+          if 'privileged: true' in mcq:
+              sys.exit('session-pod-mcq.yaml: an MCQ session must not be privileged')
+          for forbidden in ('name: k8s-env', 'name: instance-1', 'name: desktop', 'image: registry:2'):
+              if forbidden in mcq:
+                  sys.exit('session-pod-mcq.yaml: %s does not belong in an MCQ session' % forbidden)
+          # /shared/ready is the authority on readiness for every service
+          # in the stack. Nothing boots here, so if the init container
+          # stops writing it the facilitator serves a permanent boot
+          # screen over a session that was ready before it started.
+          if '/shared/ready' not in mcq:
+              sys.exit('session-pod-mcq.yaml: nothing writes /shared/ready')
+          print('session-pod.yaml + session-pod-mcq.yaml + session-networkpolicy.yaml ok')
+          PY
 
   shell:
     name: Shell syntax
@@ -151,3 +236,28 @@ jobs:
             bash -n "$f" || { echo "syntax error: $f"; fail=1; }
           done
           exit $fail
+      # /shared is a handoff between containers, and `>` truncates the
+      # destination before it writes it — so a reader polling for the file
+      # can open one that exists, is empty, and is about to be filled.
+      #
+      # Compose makes that window unreachable (every consumer declares
+      # depends_on k8s-env: service_healthy, so nothing reads while this
+      # writes) which is why it survived this long. A Pod has no
+      # depends_on and starts all eight containers at once: a session
+      # booted with instance-1 holding a 5574-byte kubeconfig and
+      # instance-2 holding a 0-byte one, whose kubectl then fell back to
+      # its localhost:8080 default — the facilitator — and failed every
+      # command. Eleven of the bank's twenty-two questions are graded on
+      # instance-2, so half the exam was unscoreable and nothing said so.
+      #
+      # Writers use write_shared() in bootstrap.sh, or the temp+mv that
+      # phase.sh has always used for boot.json. Both rename into place,
+      # and rename is atomic.
+      - name: Writes into /shared are atomic
+        run: |
+          if grep -rnE '>>?[[:space:]]*/shared/' images/ proxy/; then
+            echo "^^ writes into /shared must rename into place, not truncate."
+            echo "   use write_shared (images/k8s-env/bootstrap.sh) or temp+mv."
+            exit 1
+          fi
+          echo "no truncating writes into /shared"
