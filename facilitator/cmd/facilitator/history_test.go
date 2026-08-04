@@ -243,7 +243,7 @@ func TestNewBanksFetcher(t *testing.T) {
 	defer srv.Close()
 
 	base := mustParseURL(t, srv.URL)
-	raw, err := newBanksFetcher(base)(t.Context())
+	raw, err := newBanksFetcher(base, nil)(t.Context())
 	if err != nil {
 		t.Fatalf("fetch: %v", err)
 	}
@@ -258,7 +258,7 @@ func TestNewBanksFetcher(t *testing.T) {
 		http.Error(w, "nope", http.StatusInternalServerError)
 	}))
 	defer bad.Close()
-	if _, err := newBanksFetcher(mustParseURL(t, bad.URL))(t.Context()); err == nil {
+	if _, err := newBanksFetcher(mustParseURL(t, bad.URL), nil)(t.Context()); err == nil {
 		t.Error("a 500 from the conductor was not reported as an error")
 	}
 }

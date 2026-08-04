@@ -124,8 +124,8 @@ func toHistoryDomains(in []evaluate.DomainResult) []history.DomainResult {
 // risk of starting work — the conductor's other endpoints rebuild
 // clusters — so this reaches for exactly one route and cannot be talked
 // into another.
-func newBanksFetcher(base *url.URL) api.BanksFetcher {
-	client := &http.Client{Timeout: banksTimeout}
+func newBanksFetcher(base *url.URL, rt http.RoundTripper) api.BanksFetcher {
+	client := &http.Client{Timeout: banksTimeout, Transport: rt}
 	endpoint := base.JoinPath("/api/control/banks").String()
 
 	return func(ctx context.Context) ([]byte, error) {

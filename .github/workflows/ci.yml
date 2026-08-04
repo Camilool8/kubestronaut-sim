@@ -216,6 +216,23 @@ jobs:
           # screen over a session that was ready before it started.
           if '/shared/ready' not in mcq:
               sys.exit('session-pod-mcq.yaml: nothing writes /shared/ready')
+
+          # The conductor's control API resets clusters and switches
+          # banks. Compose keeps it off the exam network entirely; a Pod
+          # is one network namespace, so a TCP port would sit on the
+          # candidate's own loopback and a shell on an instance could
+          # drive it. The socket is the replacement boundary, and the
+          # boundary is the MOUNT — exactly two containers may hold it.
+          plain = '\n'.join(re.sub(r'(^|\s)#.*$', '', line) for line in src.splitlines())
+          sock = 'unix:/run/control/conductor.sock'
+          for name, text in (('session-pod.yaml', plain), ('session-pod-mcq.yaml', mcq)):
+              for var in ('LISTEN', 'CONDUCTOR_ADDR'):
+                  if '%s, value: "%s"' % (var, sock) not in text:
+                      sys.exit('%s: %s must be %s' % (name, var, sock))
+              if ':9000' in text:
+                  sys.exit('%s: the conductor must not listen on TCP in a Pod' % name)
+              if text.count('mountPath: /run/control') != 2:
+                  sys.exit('%s: exactly two containers may mount the control socket' % name)
           print('session-pod.yaml + session-pod-mcq.yaml + session-networkpolicy.yaml ok')
           PY
 

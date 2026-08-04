@@ -23,7 +23,7 @@ func TestConductorSeederStart(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	s := newConductorSeeder(mustParseURL(t, srv.URL))
+	s := newConductorSeeder(mustParseURL(t, srv.URL), nil)
 	id, err := s.Start(t.Context(), []string{"q03", "q01"})
 	if err != nil {
 		t.Fatalf("Start: %v", err)
@@ -48,7 +48,7 @@ func TestConductorSeederStartSurfacesTheConductorsReason(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	s := newConductorSeeder(mustParseURL(t, srv.URL))
+	s := newConductorSeeder(mustParseURL(t, srv.URL), nil)
 	_, err := s.Start(t.Context(), []string{"q01"})
 	if err == nil {
 		t.Fatal("Start accepted a 409")
@@ -85,7 +85,7 @@ func TestConductorSeederStatus(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			s := newConductorSeeder(mustParseURL(t, srv.URL))
+			s := newConductorSeeder(mustParseURL(t, srv.URL), nil)
 			got, err := s.Status(t.Context(), "job-4")
 			if err != nil {
 				t.Fatalf("Status: %v", err)

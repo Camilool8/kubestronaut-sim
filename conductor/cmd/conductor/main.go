@@ -6,9 +6,12 @@
 package main
 
 import (
+	"errors"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -22,8 +25,12 @@ import (
 
 const readHeaderTimeout = 10 * time.Second
 
+// unixPrefix marks a LISTEN value as a filesystem socket rather than a
+// TCP address.
+const unixPrefix = "unix:"
+
 func main() {
-	listen := envOr("LISTEN", ":9000")
+	listenAddr := envOr("LISTEN", ":9000")
 	engine, engineName := newEngine()
 	project := envOr("COMPOSE_PROJECT", "kubestronaut-sim")
 	facilitatorURL := envOr("FACILITATOR_URL", "http://facilitator:8080")
@@ -53,13 +60,55 @@ func main() {
 		RestartExtra:   strings.Split(envOr("RESTART_EXTRA", "docs-proxy,facilitator"), ","),
 	}
 
+	ln, err := listen(listenAddr)
+	if err != nil {
+		log.Fatalf("conductor: listen on %s: %v", listenAddr, err)
+	}
 	srv := &http.Server{
-		Addr:              listen,
 		Handler:           api.New(ctrl, store),
 		ReadHeaderTimeout: readHeaderTimeout,
 	}
-	log.Printf("conductor listening on %s (project %s, engine %s)", listen, project, engineName)
-	log.Fatal(srv.ListenAndServe())
+	log.Printf("conductor listening on %s (project %s, engine %s)", listenAddr, project, engineName)
+	log.Fatal(srv.Serve(ln))
+}
+
+// listen opens the control API's listener.
+//
+// A TCP address is what compose runs, where `controlnet: internal:
+// true` puts the conductor on a network the candidate's containers are
+// not on. A hosted session has no such thing: the whole stack is one
+// Pod, one network namespace, and `127.0.0.1:9000` from the candidate's
+// own shell would reach the API that resets their cluster. A unix
+// socket is the boundary that survives sharing a namespace — it is
+// reachable only from a container that mounts the volume holding it,
+// which is the facilitator and nothing else.
+func listen(addr string) (net.Listener, error) {
+	path, ok := strings.CutPrefix(addr, unixPrefix)
+	if !ok {
+		return net.Listen("tcp", addr)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return nil, err
+	}
+	// A socket file outlives the process that made it, and net.Listen
+	// refuses to bind over one. Removing it is safe because exactly one
+	// conductor exists per stack; leaving it would make every restart
+	// fail with "address already in use" against a file nothing is
+	// listening on.
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	ln, err := net.Listen("unix", path)
+	if err != nil {
+		return nil, err
+	}
+	// The mount is the boundary; the mode is a second lock on it. Both
+	// containers run as root today, so 0600 costs nothing.
+	if err := os.Chmod(path, 0o600); err != nil {
+		ln.Close()
+		return nil, err
+	}
+	return ln, nil
 }
 
 // newEngine picks how the conductor reaches the other containers.

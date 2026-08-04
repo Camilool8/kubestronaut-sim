@@ -123,6 +123,24 @@ candidate can legitimately drive the control API, and a candidate
 resetting their own exam is a feature. [SECURITY.md](../SECURITY.md) owns
 the rest of the threat model.
 
+In a hosted session that boundary has to be redrawn, because a Pod is
+one network namespace and `controlnet` has no equivalent: a TCP port
+would sit on the candidate's own loopback. The conductor listens on a
+unix socket in a volume mounted into itself and the facilitator, and
+into no other container — the mount is the boundary the network used to
+be (`deploy/session-pod.yaml`, gated in CI).
+
+This is defence in depth rather than a hole being closed. Every
+state-changing endpoint is already refused there on its own merits: a
+Pod cannot restart a container under `restartPolicy: Never`, so reset
+and switch return 501 before touching anything
+(`conductor/internal/control/control.go:192,299`); re-seeding is Training
+mode only and the conductor asks the facilitator, not the caller
+(`reseed.go`); and `seed` fires only for a pooled bank, of which the tree
+has none. The socket is what keeps that list from having to stay
+complete — an endpoint added later without its own gate is not
+reachable in the first place.
+
 The conductor speaks the Docker Engine API directly over the socket
 through a hand-written stdlib client with three calls: find a compose
 service's container, exec inside it, restart it

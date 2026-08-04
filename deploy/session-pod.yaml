@@ -210,6 +210,14 @@ spec:
       image: cjoga/kubestronaut-sim-conductor:dev
       imagePullPolicy: Always
       env:
+        # A unix socket, not :9000. Compose keeps the conductor off the
+        # exam network entirely (`controlnet: internal: true`); one Pod
+        # is one network namespace, so the same TCP port would sit on
+        # the candidate's own loopback and let a shell on an instance
+        # reset their cluster. The control volume below is mounted into
+        # this container and the facilitator, and nowhere else — that
+        # mount is the boundary compose drew with a network.
+        - {name: LISTEN, value: "unix:/run/control/conductor.sock"}
         # No Docker socket in a Pod. Reset and switch are the hub's job
         # (it recycles this Pod); ssh covers training-mode reseed, which
         # is the only live exec left.
@@ -219,6 +227,7 @@ spec:
       volumeMounts:
         - {name: banks, mountPath: /banks, readOnly: true}
         - {name: shared, mountPath: /shared}
+        - {name: control, mountPath: /run/control}
       resources:
         requests: {memory: "32Mi", cpu: "10m"}
         limits: {memory: "128Mi", cpu: "200m"}
@@ -232,11 +241,13 @@ spec:
         - {name: http, containerPort: 8080}
       env:
         - {name: BANK, value: "ckad-mock-01"}
-        - {name: CONDUCTOR_ADDR, value: "127.0.0.1:9000"}
+        - {name: CONDUCTOR_ADDR, value: "unix:/run/control/conductor.sock"}
         - {name: DESKTOP_ADDR, value: "127.0.0.1:6080"}
       volumeMounts:
         - {name: banks, mountPath: /banks, readOnly: true}
         - {name: shared, mountPath: /shared, readOnly: true}
+        # The only other container that may reach the control API.
+        - {name: control, mountPath: /run/control}
         - {name: session, mountPath: /session}
         # Separate from /session deliberately: /session is one attempt's
         # scratch, /state is every graded attempt. Under compose their
@@ -255,6 +266,11 @@ spec:
   volumes:
     - {name: banks, emptyDir: {sizeLimit: 512Mi}}
     - {name: shared, emptyDir: {sizeLimit: 256Mi}}
+    # Holds one socket and must stay that way. It is mounted into the
+    # conductor and the facilitator only; anything else mounted here
+    # gets the control API, which is the thing this volume exists to
+    # keep away from the candidate's shell.
+    - {name: control, emptyDir: {sizeLimit: 1Mi}}
     # The inner dockerd: kind node images plus whatever the candidate
     # builds. The single largest consumer of node disk.
     - {name: dind, emptyDir: {sizeLimit: 20Gi}}

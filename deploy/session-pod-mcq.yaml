@@ -60,6 +60,13 @@ spec:
       imagePullPolicy: Always
       env:
         - {name: BANK, value: "kcna-mock"}
+        # Same socket as the practical Pod, for uniformity rather than
+        # for a hole this flavour has: an MCQ session ships no shell and
+        # no desktop, so there is nothing here to reach :9000 from. One
+        # rule — the conductor never listens on TCP inside a Pod — is
+        # easier to keep true than one with an exemption, and this Pod
+        # is the one most likely to grow a container later.
+        - {name: LISTEN, value: "unix:/run/control/conductor.sock"}
         # No cluster and no instances to exec into. The ssh engine
         # refuses a restart up front rather than part-way through, which
         # is what keeps a switch from wiping state it cannot rebuild —
@@ -70,6 +77,7 @@ spec:
       volumeMounts:
         - {name: banks, mountPath: /banks, readOnly: true}
         - {name: shared, mountPath: /shared}
+        - {name: control, mountPath: /run/control}
       resources:
         requests: {memory: "32Mi", cpu: "10m"}
         limits: {memory: "128Mi", cpu: "200m"}
@@ -81,13 +89,14 @@ spec:
         - {name: http, containerPort: 8080}
       env:
         - {name: BANK, value: "kcna-mock"}
-        - {name: CONDUCTOR_ADDR, value: "127.0.0.1:9000"}
+        - {name: CONDUCTOR_ADDR, value: "unix:/run/control/conductor.sock"}
         # No desktop container exists, so the proxy has nowhere to send
         # /desktop/*. An MCQ bank never asks for one.
         - {name: DESKTOP_ADDR, value: ""}
       volumeMounts:
         - {name: banks, mountPath: /banks, readOnly: true}
         - {name: shared, mountPath: /shared, readOnly: true}
+        - {name: control, mountPath: /run/control}
         - {name: session, mountPath: /session}
         # Ephemeral here as it is in the practical Pod: the hub owns
         # durable history, and this is the local cache the webhook drains.
@@ -103,5 +112,8 @@ spec:
   volumes:
     - {name: banks, emptyDir: {sizeLimit: 512Mi}}
     - {name: shared, emptyDir: {sizeLimit: 16Mi}}
+    # One socket, and mounted into the conductor and the facilitator
+    # only. See the LISTEN comment above.
+    - {name: control, emptyDir: {sizeLimit: 1Mi}}
     - {name: session, emptyDir: {sizeLimit: 64Mi}}
     - {name: state, emptyDir: {sizeLimit: 64Mi}}

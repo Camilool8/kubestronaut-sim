@@ -6,9 +6,13 @@ port has every capability the exam UI has. See
 
 Two services. The facilitator serves the whole browser-facing surface
 on port 8080 — the API, the embedded UI, the desktop proxy, and a
-reverse proxy to the conductor. The conductor listens on `:9000` on an
-`internal: true` network with no host port, and is reachable only
-through that proxy (`facilitator/cmd/facilitator/main.go:203-207`).
+reverse proxy to the conductor. The conductor is reachable only through
+that proxy: under compose it listens on `:9000` on an `internal: true`
+network with no host port, and in a hosted Pod — one network namespace,
+so an internal network is not available — it listens on a unix socket
+in a volume mounted into the facilitator and nothing else. One value
+per side describes either shape (`LISTEN` and `CONDUCTOR_ADDR`, a
+`host:port` or a `unix:/path`; `facilitator/cmd/facilitator/conductor.go`).
 Host ports are in [cli.md](cli.md).
 
 Errors are `{"error":"..."}` as `application/json`
