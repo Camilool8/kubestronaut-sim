@@ -266,8 +266,10 @@ jobs:
       # excludes banks/ so it stays out of the facilitator's context.
       - name: banks
         run: docker build -f images/banks/Dockerfile -t sim-banks banks
+      # Root context, like the facilitator: the hub embeds ui/ so it can
+      # serve sign-in and the lobby before a session Pod exists.
       - name: hub
-        run: docker build -t sim-hub hub
+        run: docker build -f hub/Dockerfile -t sim-hub .
       # FROM scratch: there is no shell to check the image with, and a
       # broken binary in one would otherwise only surface at deploy time.
       - name: hub refuses to start misconfigured

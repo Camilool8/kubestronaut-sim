@@ -20,6 +20,12 @@ ui/dist/
 facilitator/internal/web/dist/*
 !facilitator/internal/web/dist/index.html
 
+# The hub embeds the same bundle for the same reason, and needs its own
+# copy: it serves the sign-in and lobby screens in the window before a
+# session Pod exists to serve them. Everything above applies here too.
+hub/internal/web/dist/*
+!hub/internal/web/dist/index.html
+
 # Runtime state: volumes, and the active-bank pointer the conductor owns
 # after first boot.
 shared/

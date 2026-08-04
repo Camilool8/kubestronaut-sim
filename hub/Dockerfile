@@ -1,8 +1,22 @@
+# Built from the REPOSITORY ROOT, not from hub/ — the UI it embeds lives
+# at ui/. This is the same arrangement the facilitator has, for the same
+# reason, which is why the COPY paths below are all prefixed.
+FROM node:22-alpine AS ui-build
+WORKDIR /src/ui
+COPY ui/package.json ui/package-lock.json ./
+RUN npm ci
+COPY ui/ ./
+RUN npm run build
+
 FROM golang:1.24-alpine AS build
 WORKDIR /src
-COPY go.mod ./
-COPY cmd ./cmd
-COPY internal ./internal
+COPY hub/go.mod ./
+COPY hub/cmd ./cmd
+COPY hub/internal ./internal
+# Over the committed placeholder. The hub serves this bundle itself for
+# every request that arrives before a session Pod exists to serve it —
+# sign-in, the lobby, the queue — and proxies to the Pod once one does.
+COPY --from=ui-build /src/ui/dist/. ./internal/web/dist/
 RUN CGO_ENABLED=0 go build -o /hub ./cmd/hub
 # STATE_DIR's default, created here because a scratch image has no shell
 # to create it with and the hub runs as 65532. Without it the process

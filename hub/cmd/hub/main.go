@@ -39,6 +39,7 @@ import (
 	"kubestronaut-sim/hub/internal/kube"
 	"kubestronaut-sim/hub/internal/session"
 	"kubestronaut-sim/hub/internal/store"
+	"kubestronaut-sim/hub/internal/web"
 )
 
 func main() {
@@ -130,7 +131,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	srv := &api.Server{Auth: a, Store: st, BaseURL: baseURL, Ingest: ingest}
+	srv := &api.Server{Auth: a, Store: st, BaseURL: baseURL, Ingest: ingest, UI: web.FS()}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

@@ -11,6 +11,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -45,7 +46,12 @@ type Server struct {
 	// ticket lifted from a Pod spec is not a login — see auth.Derive.
 	// Nil leaves the route unregistered.
 	Ingest *auth.Signer
-	Logf   func(string, ...any)
+	// UI is the SPA the hub serves for itself, in the window before a
+	// candidate has a session Pod to be proxied to. Nil answers those
+	// requests with the JSON errors alone, which is what every route
+	// here did before there was a shell to serve. See shell.go.
+	UI   fs.FS
+	Logf func(string, ...any)
 
 	proxy *httputil.ReverseProxy
 }

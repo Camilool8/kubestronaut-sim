@@ -17,7 +17,12 @@ Two things, and the second is created and destroyed on demand:
 - **The hub** — one Deployment, one Service, one PersistentVolumeClaim.
   It is the only process reachable from the internet. It does identity,
   seats, the queue, durable history, and a reverse proxy to each
-  candidate's own environment.
+  candidate's own environment. It also serves the exam UI itself, but
+  only until a session exists: sign-in, the lobby and the queue are
+  screens of the same app the facilitator serves, and there is no
+  facilitator to serve them from until a seat has been claimed. Once one
+  is running, the proxy takes over and a candidate is served by their
+  own Pod.
 - **A session Pod, per candidate** — the whole `./sim up` stack as a
   single Pod. Two flavours: `practical` (eight containers, a real
   two-node cluster) and `mcq` (a facilitator and 128Mi, no cluster).
