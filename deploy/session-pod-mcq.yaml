@@ -1,0 +1,107 @@
+# One multiple-choice exam session, as a single Pod.
+#
+# The second of the two flavours the hub stamps out. An MCQ attempt needs
+# no Kubernetes cluster, no candidate shells, no desktop and no registry:
+# the questions are answered in the browser. So this is the practical
+# Pod's eight containers minus six — around 128Mi against 4Gi, and it
+# schedules anywhere, unprivileged.
+#
+# It is a separate manifest rather than a toggle inside session-pod.yaml
+# because there is no YAML templating in this repo and no dependency that
+# would add it. Two files that each say plainly what they are beats one
+# that has to be read twice.
+#
+# The conductor is here and the desktop is not, which looks arbitrary
+# until you look at what answers GET /api/catalog: the facilitator, from
+# a server-side call to the conductor's bank list. Drop the conductor and
+# the exam picker has nothing to show. It is 32Mi.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sim-session-mcq
+  namespace: kubestronaut-sim
+  labels:
+    app.kubernetes.io/name: kubestronaut-sim
+    app.kubernetes.io/component: session
+    kubestronaut-sim/kind: mcq
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  enableServiceLinks: false
+  terminationGracePeriodSeconds: 10
+
+  # Same reason as the practical Pod: compose service names are used as
+  # hostnames in the code, and a Pod is one network namespace.
+  hostAliases:
+    - ip: "127.0.0.1"
+      hostnames: [facilitator, conductor]
+
+  initContainers:
+    - name: banks
+      image: cjoga/kubestronaut-sim-banks:dev
+      imagePullPolicy: Always
+      # /shared/ready is the authority on whether the environment is
+      # usable — every service gates on it, and bootstate treats its
+      # absence as "still booting" no matter what else it reads. Nothing
+      # boots here, so it is written once, now. Without it the
+      # facilitator would serve a permanent boot screen over a session
+      # that was ready before it started.
+      command: ["sh", "-c", "cp -a /src/. /banks/ && touch /shared/ready"]
+      volumeMounts:
+        - {name: banks, mountPath: /banks}
+        - {name: shared, mountPath: /shared}
+      resources:
+        requests: {memory: "32Mi", cpu: "10m"}
+        limits: {memory: "128Mi", cpu: "200m"}
+
+  containers:
+    - name: conductor
+      image: cjoga/kubestronaut-sim-conductor:dev
+      imagePullPolicy: Always
+      env:
+        - {name: BANK, value: "kcna-mock"}
+        # No cluster and no instances to exec into. The ssh engine
+        # refuses a restart up front rather than part-way through, which
+        # is what keeps a switch from wiping state it cannot rebuild —
+        # and here the hub replaces the whole Pod anyway.
+        - {name: ENGINE, value: "ssh"}
+        - {name: INSTANCES, value: ""}
+        - {name: FACILITATOR_URL, value: "http://127.0.0.1:8080"}
+      volumeMounts:
+        - {name: banks, mountPath: /banks, readOnly: true}
+        - {name: shared, mountPath: /shared}
+      resources:
+        requests: {memory: "32Mi", cpu: "10m"}
+        limits: {memory: "128Mi", cpu: "200m"}
+
+    - name: facilitator
+      image: cjoga/kubestronaut-sim-facilitator:dev
+      imagePullPolicy: Always
+      ports:
+        - {name: http, containerPort: 8080}
+      env:
+        - {name: BANK, value: "kcna-mock"}
+        - {name: CONDUCTOR_ADDR, value: "127.0.0.1:9000"}
+        # No desktop container exists, so the proxy has nowhere to send
+        # /desktop/*. An MCQ bank never asks for one.
+        - {name: DESKTOP_ADDR, value: ""}
+      volumeMounts:
+        - {name: banks, mountPath: /banks, readOnly: true}
+        - {name: shared, mountPath: /shared, readOnly: true}
+        - {name: session, mountPath: /session}
+        # Ephemeral here as it is in the practical Pod: the hub owns
+        # durable history, and this is the local cache the webhook drains.
+        - {name: state, mountPath: /state}
+      readinessProbe:
+        httpGet: {path: /healthz, port: http}
+        periodSeconds: 5
+        failureThreshold: 24
+      resources:
+        requests: {memory: "64Mi", cpu: "10m"}
+        limits: {memory: "256Mi", cpu: "300m"}
+
+  volumes:
+    - {name: banks, emptyDir: {sizeLimit: 512Mi}}
+    - {name: shared, emptyDir: {sizeLimit: 16Mi}}
+    - {name: session, emptyDir: {sizeLimit: 64Mi}}
+    - {name: state, emptyDir: {sizeLimit: 64Mi}}
