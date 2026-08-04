@@ -146,11 +146,11 @@ func TestRenderDropsGenerateName(t *testing.T) {
 
 func TestPodNameSafe(t *testing.T) {
 	for in, want := range map[string]string{
-		"583231":            "583231",
-		"Octo_Cat":          "octo-cat",
-		"user@example.com":  "user-example-com",
-		"---":               "anon",
-		"":                  "anon",
+		"583231":                "583231",
+		"Octo_Cat":              "octo-cat",
+		"user@example.com":      "user-example-com",
+		"---":                   "anon",
+		"":                      "anon",
 		strings.Repeat("a", 60): strings.Repeat("a", 40),
 	} {
 		if got := podNameSafe(in); got != want {

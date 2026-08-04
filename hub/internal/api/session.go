@@ -79,8 +79,8 @@ func (s *Server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 
 	if live.State == session.Failed {
 		writeJSON(w, http.StatusBadGateway, map[string]any{
-			"error": "your exam environment failed to start",
-			"state": live.State,
+			"error":  "your exam environment failed to start",
+			"state":  live.State,
 			"detail": live.Error,
 		})
 		return

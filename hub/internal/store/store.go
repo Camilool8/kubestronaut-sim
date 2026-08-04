@@ -204,8 +204,8 @@ func (s *Store) Results(user, attempt string) (json.RawMessage, error) {
 	return b, nil
 }
 
-func (s *Store) userDir(user string) string  { return filepath.Join(s.dir, user) }
-func (s *Store) docPath(user string) string  { return filepath.Join(s.userDir(user), "history.json") }
+func (s *Store) userDir(user string) string { return filepath.Join(s.dir, user) }
+func (s *Store) docPath(user string) string { return filepath.Join(s.userDir(user), "history.json") }
 func (s *Store) resultsPath(user, attempt string) string {
 	return filepath.Join(s.userDir(user), "results", attempt+".json")
 }

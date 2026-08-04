@@ -18,7 +18,7 @@ type fakePods struct {
 	created []string
 	// notReady names Pods that never become ready, to exercise the
 	// waiting paths.
-	notReady map[string]bool
+	notReady   map[string]bool
 	failCreate error
 }
 
