@@ -190,7 +190,8 @@ jobs:
           wf = open('.github/workflows/release.yml').read()
           have = set(re.findall(r'- image: ([a-z0-9-]+)\n', wf))
           need = set()
-          for manifest in ('deploy/session-pod.yaml', 'deploy/session-pod-mcq.yaml'):
+          for manifest in ('deploy/helm/kubestronaut-sim/files/session-pod.yaml',
+                           'deploy/helm/kubestronaut-sim/files/session-pod-mcq.yaml'):
               need |= set(re.findall(r'image: cjoga/kubestronaut-sim-([a-z0-9-]+):', open(manifest).read()))
           missing = need - have
           if missing:

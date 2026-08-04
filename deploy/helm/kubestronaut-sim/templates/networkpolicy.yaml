@@ -1,6 +1,7 @@
+{{- if and .Values.sessions.networkPolicy.enabled (or (gt (int .Values.sessions.practical.seats) 0) (gt (int .Values.sessions.mcq.seats) 0)) }}
 # What a hosted session is allowed to talk to.
 #
-# Deploy this WITH the session Pod, not after it. A practical session
+# Installed with the hub, before any session exists. A practical session
 # runs a privileged container and hands a stranger a root shell with a
 # container runtime in it; this is the boundary around that, and the Pod
 # spec on its own does not have one.
@@ -51,22 +52,44 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: session
-  namespace: kubestronaut-sim
+  name: {{ include "kubestronaut-sim.fullname" . }}-session
+  namespace: {{ include "kubestronaut-sim.sessionNamespace" . }}
   labels:
-    app.kubernetes.io/name: kubestronaut-sim
-    app.kubernetes.io/component: session
+    {{- include "kubestronaut-sim.labels" . | nindent 4 }}
 spec:
+  # The labels the hub stamps on every session Pod it creates, in both
+  # flavours. Not the chart's own selector labels: these Pods are not
+  # part of the release, they are created and destroyed by the hub long
+  # after `helm install` returned.
   podSelector:
     matchLabels:
       app.kubernetes.io/name: kubestronaut-sim
       app.kubernetes.io/component: session
-  # Egress only, deliberately. Ingress belongs with the hub, which is
-  # the only thing that should ever reach a session and does not exist
-  # yet; a rule written before there is something to name would either
-  # be guesswork or would have to encode node addressing to keep
-  # `kubectl port-forward` working, and both are worse than saying so.
+  {{- if .Values.sessions.networkPolicy.restrictIngress }}
+  # Ingress as well: the hub is the only thing that should ever reach a
+  # session, and it reaches exactly one port. Off by default because
+  # whether the kubelet's readiness probe is subject to policy depends
+  # on the CNI, and a probe that is refused makes every session boot
+  # time out. `kubectl port-forward` is unaffected either way — it
+  # enters the Pod's network namespace rather than the dataplane.
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "kubestronaut-sim.selectorLabels" . | nindent 14 }}
+          {{- if ne (include "kubestronaut-sim.sessionNamespace" .) .Release.Namespace }}
+          namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Release.Namespace }}
+          {{- end }}
+      ports:
+        - {protocol: TCP, port: 8080}
+  {{- else }}
+  # Egress only. The ingress half is sessions.networkPolicy.restrictIngress,
+  # which is off by default for a reason worth reading before turning on.
   policyTypes: [Egress]
+  {{- end }}
   egress:
     # DNS. Named by the Pods that serve it rather than by the Service
     # address, because that address is in a range denied below.
@@ -98,3 +121,4 @@ spec:
               - 100.64.0.0/10     # RFC6598 carrier-grade NAT
               - 169.254.0.0/16    # link-local, incl. cloud metadata
               - 224.0.0.0/4       # multicast
+{{- end }}

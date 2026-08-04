@@ -1,8 +1,18 @@
 # One practical exam session, as a single Pod.
 #
-# This is the compose stack translated container-for-container. It is kept
-# as a concrete manifest rather than a chart template so it can be applied
-# and debugged directly; the Helm chart wraps this once it boots clean.
+# This is the compose stack translated container-for-container. It lives
+# inside the chart but it is NOT a chart template: it has no templating
+# in it and can be applied and debugged as it stands —
+#
+#   kubectl apply -f deploy/helm/kubestronaut-sim/files/session-pod.yaml
+#
+# The chart reads it, rewrites exactly four things and hands the result
+# to the hub as JSON: the first-party image references and their pull
+# policy, metadata.namespace, nodeSelector/tolerations, and per-container
+# resources. Every other line here reaches the API server as written. So
+# the fields below that the chart overrides — the image tags, the
+# namespace, the nodeSelector — are what a bare `kubectl apply` gets, and
+# values.yaml is what a deployment gets.
 #
 # Three things differ from docker-compose.yaml, and only three:
 #
@@ -25,7 +35,9 @@
 # imagePullPolicy: Always on every first-party image, because :dev is a
 # mutable tag — without it the node serves its cached copy and a rebuild
 # never reaches the Pod. Upstream pinned tags (registry:2) keep the
-# default IfNotPresent on purpose.
+# default IfNotPresent on purpose. A chart install replaces both the tag
+# and this policy (images.tag, images.pullPolicy), because a released tag
+# is immutable and re-checking a 2.6 GB image every boot buys nothing.
 #
 # The privilege story: k8s-env is privileged because it runs dockerd and
 # `kind create cluster`. The instances are NOT — they carry exactly the
@@ -47,6 +59,8 @@ spec:
   # candidate works against is the kind cluster inside k8s-env.
   automountServiceAccountToken: false
   enableServiceLinks: false
+  # Placement is the cluster operator's, not this file's: a chart install
+  # replaces this wholesale from sessions.practical.nodeSelector.
   nodeSelector:
     kubestronaut-sim/session: "true"
   terminationGracePeriodSeconds: 30

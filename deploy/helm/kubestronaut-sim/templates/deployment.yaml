@@ -1,0 +1,173 @@
+{{- $sessions := or (gt (int .Values.sessions.practical.seats) 0) (gt (int .Values.sessions.mcq.seats) 0) -}}
+{{- $secret := include "kubestronaut-sim.secretName" . -}}
+
+{{/* Checked here rather than left to the hub's own boot-time check.
+     Both refuse, but only one of them refuses before anything is
+     applied — and a hub that CrashLoopBackOffs on a missing client ID
+     has already replaced the working one. */}}
+{{- if eq .Values.hub.auth.mode "github" -}}
+{{- if not .Values.hub.baseURL -}}
+{{- fail "kubestronaut-sim: hub.baseURL is required — it is the OAuth redirect target and the address session Pods post attempts back to" -}}
+{{- end -}}
+{{- if and (not .Values.hub.existingSecret) (not (include "kubestronaut-sim.createSecret" .)) -}}
+{{- fail "kubestronaut-sim: hub.auth.mode=github needs COOKIE_KEY, GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET — set hub.existingSecret or hub.secret.*" -}}
+{{- end -}}
+{{- end -}}
+{{- if not (has .Values.hub.auth.mode (list "github" "header" "none")) -}}
+{{- fail (printf "kubestronaut-sim: hub.auth.mode=%q — want github, header or none" .Values.hub.auth.mode) -}}
+{{- end -}}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kubestronaut-sim.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubestronaut-sim.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.hub.replicas }}
+  # Recreate, not RollingUpdate: /state is ReadWriteOnce, so a second
+  # replica cannot mount it and a rolling upgrade would wait forever for
+  # a Pod that can never schedule. The cost is a few seconds of downtime
+  # on an upgrade, during which running sessions are untouched — they are
+  # Pods in their own right, and the hub re-adopts them when it comes
+  # back rather than counting their seats as free.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "kubestronaut-sim.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "kubestronaut-sim.labels" . | nindent 8 }}
+      annotations:
+        {{- if $sessions }}
+        # The Pod manifests are read once, at startup. Without this a
+        # `helm upgrade` that changes a session's spec would update the
+        # ConfigMap and leave the running hub stamping out the old one.
+        checksum/session-pods: {{ include (print $.Template.BasePath "/configmap-session-pods.yaml") . | sha256sum }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "kubestronaut-sim.serviceAccountName" . }}
+      # The hub is the one process here that talks to the Kubernetes API,
+      # so it is the one that needs its token.
+      automountServiceAccountToken: {{ $sessions }}
+      enableServiceLinks: false
+      {{- with .Values.images.pullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . }}
+        {{- end }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: hub
+          image: {{ include "kubestronaut-sim.image" (dict "ctx" . "name" "hub") | quote }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          # A FROM scratch image with one static binary and one writable
+          # volume. There is nothing else here to protect.
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - {name: ADDR, value: ":8080"}
+            - {name: STATE_DIR, value: "/state"}
+            - {name: AUTH_MODE, value: {{ .Values.hub.auth.mode | quote }}}
+            - {name: AUTH_HEADER, value: {{ .Values.hub.auth.header | quote }}}
+            - {name: SESSION_TTL, value: {{ .Values.hub.auth.ttl | quote }}}
+            - {name: COOKIE_SECURE, value: {{ .Values.hub.auth.cookieSecure | quote }}}
+            - {name: HUB_BASE_URL, value: {{ .Values.hub.baseURL | quote }}}
+
+            # optional: true throughout, and not because they are
+            # optional. In header and none modes there may legitimately
+            # be no GitHub app at all — and COOKIE_KEY is what turns
+            # durable history on rather than what turns login on, so a
+            # self-hoster behind their own SSO sets one and no client
+            # credentials. A hub that needs one of these and cannot find
+            # it says so by name at boot, which is a better error than a
+            # Pod that will not start.
+            - name: COOKIE_KEY
+              valueFrom:
+                secretKeyRef: {name: {{ $secret | quote }}, key: COOKIE_KEY, optional: true}
+            - name: GITHUB_CLIENT_ID
+              valueFrom:
+                secretKeyRef: {name: {{ $secret | quote }}, key: GITHUB_CLIENT_ID, optional: true}
+            - name: GITHUB_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef: {name: {{ $secret | quote }}, key: GITHUB_CLIENT_SECRET, optional: true}
+
+            {{- if $sessions }}
+            - {name: SESSION_NAMESPACE, value: {{ include "kubestronaut-sim.sessionNamespace" . | quote }}}
+            - {name: DEFAULT_KIND, value: {{ .Values.sessions.defaultKind | quote }}}
+            - {name: POD_PREFIX, value: {{ .Values.sessions.podPrefix | quote }}}
+            - {name: SESSION_MAX_AGE, value: {{ .Values.sessions.maxAge | quote }}}
+            - {name: IDLE_TIMEOUT, value: {{ .Values.sessions.idleTimeout | quote }}}
+            - {name: QUEUE_HOLD, value: {{ .Values.sessions.queueHold | quote }}}
+            - {name: BOOT_TIMEOUT, value: {{ .Values.sessions.bootTimeout | quote }}}
+            - {name: BOOT_CONCURRENCY, value: {{ .Values.sessions.bootConcurrency | quote }}}
+            {{- if gt (int .Values.sessions.practical.seats) 0 }}
+            - {name: PRACTICAL_SEATS, value: {{ .Values.sessions.practical.seats | quote }}}
+            - {name: PRACTICAL_BANK, value: {{ .Values.sessions.practical.bank | quote }}}
+            - {name: SESSION_POD_TEMPLATE, value: "/etc/hub/session-pod.json"}
+            {{- end }}
+            {{- if gt (int .Values.sessions.mcq.seats) 0 }}
+            - {name: MCQ_SEATS, value: {{ .Values.sessions.mcq.seats | quote }}}
+            - {name: MCQ_BANK, value: {{ .Values.sessions.mcq.bank | quote }}}
+            - {name: SESSION_POD_TEMPLATE_MCQ, value: "/etc/hub/session-pod-mcq.json"}
+            {{- end }}
+            {{- end }}
+            {{- with .Values.hub.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            - {name: state, mountPath: /state}
+            {{- if $sessions }}
+            - {name: session-pods, mountPath: /etc/hub, readOnly: true}
+            {{- end }}
+          # /healthz answers before any of the interesting wiring, which
+          # is what makes it a liveness probe and not a readiness one: a
+          # hub whose Kubernetes credentials are wrong is still the right
+          # process to send traffic to, because it is the thing that will
+          # explain the failure.
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.hub.resources | nindent 12 }}
+      volumes:
+        - name: state
+          persistentVolumeClaim:
+            claimName: {{ .Values.hub.state.existingClaim | default (printf "%s-state" (include "kubestronaut-sim.fullname" .)) }}
+        {{- if $sessions }}
+        - name: session-pods
+          configMap:
+            name: {{ include "kubestronaut-sim.fullname" . }}-session-pods
+        {{- end }}
+      {{- with .Values.hub.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.hub.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.hub.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

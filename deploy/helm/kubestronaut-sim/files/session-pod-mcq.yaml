@@ -11,6 +11,10 @@
 # would add it. Two files that each say plainly what they are beats one
 # that has to be read twice.
 #
+# Like its sibling, this is a plain manifest and not a chart template:
+# the chart parses it and rewrites only the images, the namespace,
+# placement and resources. See session-pod.yaml.
+#
 # The conductor is here and the desktop is not, which looks arbitrary
 # until you look at what answers GET /api/catalog: the facilitator, from
 # a server-side call to the conductor's bank list. Drop the conductor and

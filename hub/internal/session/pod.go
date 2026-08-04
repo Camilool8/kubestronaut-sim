@@ -13,11 +13,11 @@ import (
 // dependency, and the standard library has no YAML parser. Converting is
 // a one-liner with a tool every operator of this already has:
 //
-//	kubectl apply --dry-run=client -o json -f deploy/session-pod.yaml
+//	kubectl apply --dry-run=client -o json -f deploy/helm/kubestronaut-sim/files/session-pod.yaml
 //
 // and the Helm chart does it at render time with fromYaml | toJson. So
-// deploy/session-pod.yaml stays the single source of truth, comments and
-// all, and no second copy of the spec exists to drift.
+// the manifest in the chart's files/ stays the single source of truth,
+// comments and all, and no second copy of the spec exists to drift.
 type Template []byte
 
 // patch is what varies between one session and the next. Everything else

@@ -60,7 +60,7 @@ Known, chosen, and not currently worth the cost of changing.
   a candidate willing to search the web from an instance shell can
   already do that in the local product. Local behaviour is unchanged and
   remains the stricter of the two.
-  `deploy/session-networkpolicy.yaml` addresses the part that *is*
+  The chart's `networkpolicy.yaml` addresses the part that *is*
   fixable — a session reaching the infrastructure hosting it — and says
   the same thing at more length.
 - **In a hosted session, containers other than the two instances report

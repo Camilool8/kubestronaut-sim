@@ -128,7 +128,7 @@ one network namespace and `controlnet` has no equivalent: a TCP port
 would sit on the candidate's own loopback. The conductor listens on a
 unix socket in a volume mounted into itself and the facilitator, and
 into no other container — the mount is the boundary the network used to
-be (`deploy/session-pod.yaml`, gated in CI).
+be (`deploy/helm/kubestronaut-sim/files/session-pod.yaml`, gated in CI).
 
 This is defence in depth rather than a hole being closed. Every
 state-changing endpoint is already refused there on its own merits: a

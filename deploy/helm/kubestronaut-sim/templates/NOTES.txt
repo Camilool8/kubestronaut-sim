@@ -1,0 +1,35 @@
+{{ include "kubestronaut-sim.fullname" . }} is installed in namespace {{ .Release.Namespace }}.
+
+Images:  {{ .Values.images.prefix }}*:{{ .Values.images.tag | default .Chart.AppVersion }}
+Auth:    {{ .Values.hub.auth.mode }}{{ if .Values.hub.baseURL }} at {{ .Values.hub.baseURL }}{{ end }}
+Seats:   {{ .Values.sessions.practical.seats }} practical ({{ .Values.sessions.practical.bank }}), {{ .Values.sessions.mcq.seats }} MCQ ({{ .Values.sessions.mcq.bank }})
+History: {{ if .Values.hub.state.existingClaim }}{{ .Values.hub.state.existingClaim }} (existing){{ else }}{{ include "kubestronaut-sim.fullname" . }}-state, {{ .Values.hub.state.size }}{{ end }}
+
+{{ if not .Values.httpRoute.enabled -}}
+Nothing routes traffic to the hub yet. Point your Ingress, Gateway or
+tunnel at Service/{{ include "kubestronaut-sim.fullname" . }}:{{ .Values.hub.service.port }}, or try it directly:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "kubestronaut-sim.fullname" . }} 8080:{{ .Values.hub.service.port }}
+
+{{ end -}}
+{{- if gt (int .Values.sessions.practical.seats) 0 }}
+A practical session runs a privileged container: it builds a real
+two-node Kubernetes cluster and hands the candidate a root shell with a
+container runtime in it. Label the nodes you have decided may run that:
+
+  kubectl label node <node> {{ range $k, $v := .Values.sessions.practical.nodeSelector }}{{ $k }}={{ $v }} {{ end }}
+
+{{- if not .Values.sessions.networkPolicy.enabled }}
+
+  WARNING: sessions.networkPolicy.enabled is false. Nothing stops a
+  session reaching this cluster's API server, its other namespaces or
+  the node metadata service.
+{{- end }}
+{{- end }}
+
+{{- if and (eq .Values.hub.auth.mode "header") (not .Values.hub.existingSecret) (not .Values.hub.secret.cookieKey) }}
+
+  NOTE: AUTH_MODE=header with no COOKIE_KEY. Seats and the proxy work;
+  graded attempts are shown to the candidate and then lost with the Pod,
+  because nothing signs the ticket a session records history with.
+{{- end }}

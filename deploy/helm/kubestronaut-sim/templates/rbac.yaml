@@ -1,0 +1,40 @@
+{{- if or (gt (int .Values.sessions.practical.seats) 0) (gt (int .Values.sessions.mcq.seats) 0) }}
+# Everything the hub is allowed to do to the cluster.
+#
+# Four verbs on one resource in one namespace, which is the whole of the
+# hub's Kubernetes client: create a session Pod, watch it become ready,
+# delete it, and list them to re-adopt its own sessions after a restart.
+# It reads no Secrets, creates no workloads, and touches nothing outside
+# the session namespace.
+#
+# A Role, not a ClusterRole, deliberately: a session Pod is a privileged
+# container, and the process that creates them should not be able to
+# create one anywhere else in the cluster.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "kubestronaut-sim.fullname" . }}-sessions
+  namespace: {{ include "kubestronaut-sim.sessionNamespace" . }}
+  labels:
+    {{- include "kubestronaut-sim.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "kubestronaut-sim.fullname" . }}-sessions
+  namespace: {{ include "kubestronaut-sim.sessionNamespace" . }}
+  labels:
+    {{- include "kubestronaut-sim.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "kubestronaut-sim.fullname" . }}-sessions
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "kubestronaut-sim.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}
