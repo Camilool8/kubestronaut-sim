@@ -319,6 +319,23 @@ export interface QuestionResult {
   correct?: number[];
   options?: string[];
   multi?: boolean;
+  /**
+   * The bank's reference solution, on a STORED attempt only.
+   *
+   * A live result never carries one and must not: the same document is
+   * what a mid-session practice grade produces, and the solution
+   * endpoint is gated exactly there. Live, the explanation screen asks
+   * for it (`GET /api/questions/{id}/solution`) once the attempt has
+   * ended.
+   *
+   * A hosted attempt is read back after the Pod holding the bank is
+   * gone, so the facilitator attaches these on the way to the hub — see
+   * facilitator/cmd/facilitator/solutions.go. Absent on every attempt
+   * stored before that existed, which is why it is optional and why the
+   * screen still has something to say when it is missing.
+   */
+  solution?: string;
+  docs?: SolutionDoc[];
 }
 
 export interface Results {

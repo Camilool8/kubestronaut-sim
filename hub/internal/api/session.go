@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	"kubestronaut-sim/hub/internal/session"
 )
@@ -135,7 +137,99 @@ func (s *Server) handleSwitch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "body must be JSON with a non-empty \"bank\"")
 		return
 	}
+	user, ok := s.requireUser(w, r)
+	if !ok {
+		return
+	}
+	// The gate, and the only route that needs it: reset passes no bank,
+	// and every other way into recycle would have to add one. A new
+	// caller that lets a candidate name an exam has to come through here.
+	if !s.seatCanRun(w, user.UserID, body.Bank) {
+		return
+	}
 	s.recycle(w, r, body.Bank)
+}
+
+// seatCanRun reports whether this candidate's seat is the flavour their
+// chosen exam needs, writing the refusal itself when it is not.
+//
+// The authority on what an exam needs is the bank, and the bank is in
+// the session Pod — the hub has no /banks of its own — so this asks the
+// candidate's own facilitator. That is one request against a Pod the
+// proxy is already talking to, and it happens BEFORE anything is
+// destroyed: a switch that wipes the session and then discovers it
+// cannot finish is precisely the failure canRestart() exists to prevent.
+//
+// Every uncertain answer refuses. Not knowing whether a hands-on bank is
+// about to be booted into a Pod with no cluster is not a reason to try
+// it and find out.
+func (s *Server) seatCanRun(w http.ResponseWriter, user, bank string) bool {
+	live, err := s.Sessions.Get(user)
+	switch {
+	case errors.Is(err, session.ErrNoSession):
+		writeError(w, http.StatusNotFound, "you have no session to switch")
+		return false
+	case err != nil:
+		s.logf("hub: seat check for %s: %v", user, err)
+		writeError(w, http.StatusInternalServerError, "could not find your session")
+		return false
+	}
+	if live.Addr() == "" {
+		writeError(w, http.StatusConflict, "wait until your environment is ready before changing exams")
+		return false
+	}
+
+	kind, found, err := s.bankKind(live.Addr(), bank)
+	if err != nil {
+		s.logf("hub: reading the catalog for %s: %v", user, err)
+		writeError(w, http.StatusBadGateway, "could not check whether this seat can run that exam")
+		return false
+	}
+	if !found {
+		writeError(w, http.StatusNotFound, "no such exam")
+		return false
+	}
+	if kind != live.Kind {
+		writeError(w, http.StatusConflict,
+			"this seat cannot run that exam — end this session and start the other kind")
+		return false
+	}
+	return true
+}
+
+// bankKind asks a session Pod's facilitator what flavour of seat an exam
+// needs. The catalog is the same document the exam picker renders, so
+// the answer the hub enforces is the one the candidate was shown.
+func (s *Server) bankKind(addr, bank string) (session.Kind, bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+addr+"/api/catalog", nil)
+	if err != nil {
+		return "", false, err
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", false, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return "", false, fmt.Errorf("catalog: %s", res.Status)
+	}
+	var catalog struct {
+		Exams []struct {
+			ID       string `json:"id"`
+			ExamType string `json:"examType"`
+		} `json:"exams"`
+	}
+	if err := json.NewDecoder(io.LimitReader(res.Body, maxBody)).Decode(&catalog); err != nil {
+		return "", false, err
+	}
+	for _, e := range catalog.Exams {
+		if e.ID == bank {
+			return session.KindOf(e.ExamType), true, nil
+		}
+	}
+	return "", false, nil
 }
 
 // recycle answers reset and switch in the conductor's 202-plus-job

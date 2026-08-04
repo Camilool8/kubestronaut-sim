@@ -183,3 +183,25 @@ func TestNoBundleMeansTheOldJSONErrors(t *testing.T) {
 		t.Errorf("Content-Type = %q, want JSON", ct)
 	}
 }
+
+// A WebSocket handshake is a GET that is not under /api/, so the shell
+// would otherwise answer the desktop stream with an HTML page and the
+// browser would report code 1006 — an abnormal close with no reason,
+// while the Pod was merely still booting.
+func TestAWebSocketUpgradeIsNeverAnsweredWithHTML(t *testing.T) {
+	s := withShell(t)
+	c := login(t, s, "u1", "candidate")
+
+	r := httptest.NewRequest(http.MethodGet, "/desktop/websockify", nil)
+	r.Header.Set("Upgrade", "websocket")
+	r.Header.Set("Connection", "Upgrade")
+	r.AddCookie(c)
+	w := do(s, r)
+
+	if ct := w.Header().Get("Content-Type"); strings.HasPrefix(ct, "text/html") {
+		t.Fatalf("Content-Type = %q: a stream handshake was answered with the app", ct)
+	}
+	if w.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want the proxy's own 404 for a session that does not exist", w.Code)
+	}
+}

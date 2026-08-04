@@ -3959,13 +3959,20 @@
 .desktop-required {
   min-height: 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
   padding: var(--space-5) var(--space-4);
 }
 
+/* Centred by AUTO MARGINS, not by align-items/justify-content. A flex
+   centre whose item is taller than the line pushes the item's top edge
+   past the container's, and that overflow is unreachable — no scrollbar
+   goes there. This card grows: three paragraphs, a requirements list, a
+   live exam's clock and two controls, at 320px, at 200% text zoom. Auto
+   margins centre while there is room and collapse to zero when there is
+   not, which is the whole difference between a centred card and a
+   heading nobody can scroll back up to. */
 .desktop-required-card {
   width: min(34rem, 100%);
+  margin: auto;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-l);
@@ -4040,6 +4047,29 @@
 
   .score-actions .btn {
     width: 100%;
+  }
+
+  /* A single-purpose screen's single control is a full-width tap. Both
+     of these are the last thing on a card the reader has just scrolled
+     through, and a 90px button hugging the left edge below three
+     paragraphs is easy to miss entirely. */
+  .desktop-required-anyway,
+  .gate-session .btn,
+  .hosted-queue .btn,
+  .hosted-booting > .btn {
+    width: 100%;
+  }
+
+  /* The hosted screens close their gutters with everything else. The
+     sign-in card keeps a smaller inset than the lobby cards do: it is
+     the only content on its viewport, so its edge is the page's. */
+  .signin-card,
+  .hosted-flavour {
+    padding: var(--space-4);
+  }
+
+  .signin {
+    padding: var(--space-3);
   }
 }
 
@@ -5977,42 +6007,156 @@
   max-width: 56rem;
 }
 
-.hosted-card {
+/* ---- the sign-in screen ----
+
+   The only screen in the product with no header, which is why it is the
+   only one that draws its own mark, wordmark and theme control. It is
+   also the first thing anyone sees, so it is a centred door rather than
+   a page with its heading in the top-left corner of an empty viewport.
+
+   Centred with `margin: auto` on the child rather than `place-items:
+   center` on the parent: a flex/grid centre whose content outgrows the
+   viewport pushes the top edge out of reach, and this screen grows —
+   the unavailable copy is four lines, and 320px at 200% text zoom is a
+   size it must survive. auto margins collapse instead of overflowing. */
+.signin {
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.signin-chrome {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.signin-main {
+  width: min(27rem, 100%);
+  margin: auto;
+  padding: var(--space-5) 0 var(--space-6);
+}
+
+.signin-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
   padding: var(--space-6);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-l);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-2);
 }
 
-/* An anchor styled as the primary button. Anchors do not inherit the
-   button's line box, so the two would otherwise sit at different
-   heights on the same row. */
-.hosted-signin {
-  display: inline-flex;
+/* The header's lockup, at the one scale in the product where it is the
+   subject rather than the chrome. */
+.signin-brand {
+  display: flex;
   align-items: center;
+  gap: var(--space-3);
+}
+
+.signin-mark {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+}
+
+.signin-wordmark {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+}
+
+.signin-wordmark-tail {
+  color: var(--text-secondary);
+}
+
+.signin-title {
+  margin: 0;
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+}
+
+.signin-lead {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* Full width, because it is the only thing on this screen to do and a
+   button that fills its card cannot be missed or mis-tapped. The anchor
+   needs the flex line box explicitly: anchors do not inherit the
+   button's, so the mark and the label would otherwise sit off each
+   other's baseline. */
+.signin-github {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-l);
   text-decoration: none;
 }
 
-.hosted-seats,
-.hosted-flavour-seats {
+.signin-github-mark {
+  flex-shrink: 0;
+}
+
+.signin-scope {
   margin: 0;
   color: var(--text-muted);
   font-size: var(--text-s);
+  line-height: 1.55;
 }
 
-.hosted-unavailable {
+/* Live capacity, so it reads as a reading off a meter rather than as
+   copy: a dot, then the figure. */
+.signin-seats {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: var(--text-s);
+  line-height: 1.55;
+}
+
+.signin-seats-dot {
+  width: 7px;
+  height: 7px;
+  margin-top: 0.42em;
+  border-radius: var(--radius-pill);
+  background: var(--success);
+  flex-shrink: 0;
+}
+
+/* A full pool is not an error — the queue is the answer to it — so this
+   is the waiting colour and never the failure one. */
+.signin-seats-dot[data-full] {
+  background: var(--warn);
+}
+
+.signin-seats-mcq {
+  display: block;
+}
+
+.signin-unavailable {
   margin: 0;
   color: var(--text-body);
+  line-height: 1.6;
 }
 
-.hosted-local {
-  margin-top: var(--space-5);
+.signin-local {
+  margin: var(--space-5) 0 0;
+  padding: 0 var(--space-2);
   color: var(--text-muted);
   font-size: var(--text-s);
+  line-height: 1.55;
 }
 
 /* Two cards, side by side where there is room and stacked where there
@@ -6028,34 +6172,77 @@
   list-style: none;
 }
 
+/* Deliberately .exam-card's shape, token for token: this lobby is the
+   exam selector one step earlier — same choice, same furniture — and a
+   card that agreed with it in words while disagreeing in radius, shadow
+   and tile size is what made the hosted screens read as a different
+   application bolted on the front. */
 .hosted-flavour {
   height: 100%;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-3);
+  gap: var(--space-4);
   padding: var(--space-5);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-l);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-1);
 }
 
 /* A full pool is not an error and not a disabled card: the button still
-   works, and what it gets you is a place in the queue. Dashed, the same
-   language a not-yet-available exam speaks. */
+   works, it says "Join the queue", and that is what it does. Dashed and
+   flat, the same language a not-yet-available exam speaks. */
 .hosted-flavour[data-full] {
   background: var(--bg);
   border-style: dashed;
+  box-shadow: none;
 }
 
-.hosted-flavour h2 {
+.hosted-flavour-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+/* The exam avatar's tile, carrying a glyph instead of a certification
+   mark — there is no certification to name yet at this step. */
+.hosted-flavour-tile {
+  font-size: var(--text-xl);
+}
+
+.hosted-flavour-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.hosted-flavour-name h2 {
   margin: 0;
-  font-size: var(--text-l);
+  font-size: var(--text-xl);
+  font-weight: 600;
 }
 
-.hosted-flavour p {
+.hosted-flavour-body {
   margin: 0;
   color: var(--text-body);
+  line-height: 1.55;
+}
+
+.hosted-flavour-seats {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-s);
+  line-height: 1.4;
+}
+
+/* Pinned, so both cards' buttons sit on one line whatever the pitch
+   above them runs to — .exam-card-actions, for the same reason. */
+.hosted-flavour-actions {
+  margin-top: auto;
+  display: flex;
+}
+
+.hosted-flavour-actions .btn {
+  flex: 1;
 }
 
 /* Standing state rather than an interruption, so it reads as part of

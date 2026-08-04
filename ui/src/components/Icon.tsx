@@ -17,11 +17,12 @@ import type { ReactNode } from "react";
 // rather than imported, which keeps the offline promise absolute —
 // nothing about an icon can fail to arrive.
 //
-// The brand mark is deliberately NOT in this set. It is a filled,
-// multi-colour drawing on its own field (see BrandMark in AppHeader and
-// its mirror in ui/public/favicon.svg); these are monochrome outlines
-// that take `currentColor`, and mixing the two systems in one file would
-// invite a call site to tint the mark.
+// Brand marks are deliberately NOT in this set — neither this product's
+// (BrandMark.tsx, a filled multi-colour drawing on its own field, mirrored
+// in ui/public/favicon.svg) nor anyone else's (the GitHub mark, drawn in
+// HostedSignIn beside the button it belongs to). These are monochrome
+// outlines on a 24 grid that take `currentColor`, and mixing a logo into
+// them would invite a call site to restyle one.
 //
 // The <svg> hardcodes aria-hidden and takes no label prop, deliberately.
 // Every glyph in this product already sits beside .sr-only text or an

@@ -629,3 +629,83 @@ describe("Explain for a multiple-choice question", () => {
     expect(panes()).toHaveLength(0);
   });
 });
+
+// Reading back a stored attempt. The solution travels WITH the attempt
+// (the facilitator attaches it on the way to the hub) because the bank
+// lives in a session Pod and the whole point of a stored attempt is that
+// it outlives one. Nothing here may ask a session for it: with a session
+// running, that would answer from whichever exam is loaded NOW, which
+// need not be the exam being reviewed.
+describe("a historical attempt", () => {
+  test("does not ask a session for the reference solution", async () => {
+    const asked: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        asked.push(String(input));
+        return new Response(JSON.stringify({}), { status: 200 });
+      }),
+    );
+
+    render(<Explain results={attempt([withEvidence])} questionId="q19" live={false} />);
+
+    await screen.findByRole("heading", { level: 1 });
+    expect(asked.filter((url) => url.includes("/solution"))).toHaveLength(0);
+  });
+
+  test("renders the solution stored with the attempt", async () => {
+    const asked: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        asked.push(String(input));
+        return new Response(JSON.stringify({}), { status: 200 });
+      }),
+    );
+    const stored = {
+      ...withEvidence,
+      solution: "Set the target port to 8080 and re-apply the Service.",
+      docs: [{ label: "Service targetPort", url: "https://kubernetes.io/docs/x" }],
+    };
+
+    render(<Explain results={attempt([stored])} questionId="q19" live={false} />);
+
+    expect(await screen.findByText(/Set the target port to 8080/)).toBeTruthy();
+    // The attempt's own docs, from the same stored document.
+    expect(screen.getByRole("link", { name: /Service targetPort/ })).toBeTruthy();
+    expect(asked.filter((url) => url.includes("/solution"))).toHaveLength(0);
+    expect(document.querySelector(".explain-solution .error-text")).toBeNull();
+  });
+
+  test("an attempt stored before solutions were kept says so, and reports no error", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({}), { status: 200 })));
+
+    render(<Explain results={attempt([withEvidence])} questionId="q19" live={false} />);
+
+    expect(await screen.findByText(/saved before reference solutions were kept/i)).toBeTruthy();
+    expect(document.querySelector(".explain-solution .error-text")).toBeNull();
+  });
+
+  // A live attempt must never render a solution out of its own results
+  // document. The same document is what a mid-session practice grade
+  // produces, and the solution endpoint answers 403 in exactly that
+  // state — so the refusal is the case that matters: the screen must
+  // report it, not fall back to a copy that was never meant to be there.
+  test("a live screen never shows a solution carried in the results, even when the fetch is refused", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) =>
+        String(input).includes("/solution")
+          ? new Response(JSON.stringify({ error: "solutions are available once the session has ended" }), { status: 403 })
+          : new Response(JSON.stringify({}), { status: 200 }),
+      ),
+    );
+    const leaky = { ...withEvidence, solution: "Never render me." };
+
+    render(<Explain results={attempt([leaky])} questionId="q19" />);
+
+    expect(await screen.findByText(/solutions are available once the session has ended/i)).toBeTruthy();
+    expect(screen.queryByText("Never render me.")).toBeNull();
+  });
+});
+
