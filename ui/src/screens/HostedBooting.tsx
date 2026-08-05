@@ -47,6 +47,22 @@ export function HostedBooting({ session, onChanged }: HostedBootingProps) {
   // screen written to greet them.
   const rebuilding = session.op === "reset" || session.op === "switch";
 
+  // op clears the instant the job finishes, which happens just before a
+  // failed recycle's state flips to "failed" (session.go's runRecycle
+  // sets State before calling jobs.finish) — so by the time this screen
+  // can render the failure, the hub has already forgotten it was a
+  // rebuild. This component stays mounted for the whole of one boot
+  // (HostedHome keys its screen transition on "lobby", not on session
+  // state), so remembering the last true read across renders survives to
+  // explain the failure that follows it — "adjusting state during
+  // rendering", which is what React itself calls this pattern, rather
+  // than a ref: a ref may not be read or written during render. A page
+  // reload mid-failure loses the memory and falls back to the first-boot
+  // copy, the same gap every other in-memory read in this app has.
+  const [wasRebuilding, setWasRebuilding] = useState(false);
+  if (rebuilding && !wasRebuilding) setWasRebuilding(true);
+  const failedRebuild = failed && wasRebuilding;
+
   const retry = async () => {
     setBusy(true);
     // End first, then ask again: a failed session still holds its seat so
@@ -72,7 +88,7 @@ export function HostedBooting({ session, onChanged }: HostedBootingProps) {
   if (failed) {
     return (
       <div className="page hosted-screen">
-        <h1>{strings.hosted.bootFailedTitle}</h1>
+        <h1>{failedRebuild ? strings.hosted.rebuildFailedTitle : strings.hosted.bootFailedTitle}</h1>
         {session.error && <p className="error-text">{session.error}</p>}
         <div className="score-actions">
           <button
@@ -84,7 +100,7 @@ export function HostedBooting({ session, onChanged }: HostedBootingProps) {
             {strings.hosted.bootRetry}
           </button>
           <button type="button" className="btn" onClick={() => void giveUp()} disabled={busy}>
-            {strings.hosted.bootGiveUp}
+            {failedRebuild ? strings.hosted.rebuildGiveUp : strings.hosted.bootGiveUp}
           </button>
         </div>
       </div>
@@ -124,7 +140,7 @@ export function HostedBooting({ session, onChanged }: HostedBootingProps) {
           narrate it. */}
       {!pending && session.kind !== "mcq" && (
         <p className="hosted-boot-reassure" role="status">
-          {strings.hosted.bootReassure(elapsed)}
+          {rebuilding ? strings.hosted.rebuildReassure(elapsed) : strings.hosted.bootReassure(elapsed)}
         </p>
       )}
       <div className="score-loading-progress">

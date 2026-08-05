@@ -636,6 +636,13 @@ test("a rebuild says so, and a first boot still reads as a first boot", async ()
   expect(
     screen.getByRole("button", { name: strings.hosted.rebuildGiveUp }),
   ).toBeInTheDocument();
+  // The reassure line, not just the title: this is the sentence that used
+  // to say "a first build on a cold node pulls several gigabytes" about a
+  // node that already had every image, and past minute ten told a
+  // candidate trying to KEEP their seat to give it up.
+  expect(
+    screen.getByText("Tearing down the old cluster and starting a clean one."),
+  ).toBeInTheDocument();
   rebuild.unmount();
 
   identity = me({ session: booting });
@@ -644,6 +651,50 @@ test("a rebuild says so, and a first boot still reads as a first boot", async ()
   expect(
     screen.getByRole("button", { name: strings.hosted.bootGiveUp }),
   ).toBeInTheDocument();
+  expect(screen.getByText("Pulling images and starting the cluster.")).toBeInTheDocument();
+});
+
+// op clears the moment a recycle's job finishes, which session.go does
+// just before flipping state to "failed" — so by the time this screen
+// can render the failure, the hub's own answer no longer says it was a
+// rebuild. The screen has to remember what it watched happen across the
+// polls in between, or a failed rebuild reads as "your environment did
+// not start", which is false: a moment ago this seat had one running.
+test("a rebuild that fails still reads as a rebuild, not a first boot", async () => {
+  const rebuilding = {
+    kind: "practical" as const,
+    bank: "ckad-mock-01",
+    pod: "sim-session-practical-583231",
+    state: "starting" as const,
+    op: "reset" as const,
+    startedAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + 3_600_000).toISOString(),
+    lastSeen: new Date(now).toISOString(),
+  };
+  identity = me({ session: rebuilding });
+  render(<App />);
+  await screen.findByRole("heading", { name: strings.hosted.rebuildTitle });
+
+  // The hub's own answer once the recycle has actually failed: op is
+  // gone (the job finished), state is "failed", same as any other boot
+  // that died.
+  identity = me({
+    session: {
+      ...rebuilding,
+      state: "failed",
+      op: undefined,
+      error: "waiting for sim-session-practical-583231 to go away: context deadline exceeded",
+    },
+  });
+  await vi.advanceTimersByTimeAsync(2_000);
+
+  expect(
+    await screen.findByRole("heading", { name: strings.hosted.rebuildFailedTitle }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: strings.hosted.rebuildGiveUp }),
+  ).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: strings.hosted.bootFailedTitle })).toBeNull();
 });
 
 // A hosted seat is scoped to one exam — the Pod is stamped and sized for
