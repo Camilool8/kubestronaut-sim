@@ -166,7 +166,15 @@ export function AppHeader({
           <ThemeToggle />
           {compact && (nav?.length || session) && (
             <HeaderMenu label={strings.header.menuLabel}>
-              {nav && nav.length > 0 && <NavLinks nav={nav} />}
+              {/* Same landmark as the desktop nav, wrapped around the
+                  same links, for the same reason: without it a
+                  screen-reader user loses the navigation landmark on
+                  exactly the viewport where it is hardest to find. */}
+              {nav && nav.length > 0 && (
+                <nav className="header-menu-nav" aria-label={strings.header.navLabel}>
+                  <NavLinks nav={nav} />
+                </nav>
+              )}
               {session && (
                 <>
                   <div className="header-menu-rule" />

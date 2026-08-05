@@ -6568,10 +6568,22 @@
   box-shadow: var(--shadow-2);
 }
 
+/* The nav landmark inside the panel wraps the links in an actual <nav>,
+   which is one level deeper than the buttons and the label the panel's
+   other children render at. Its own flex column and gap match the
+   panel's exactly, so that extra level does not change the rhythm
+   between the nav links or between the nav block and what follows it. */
+.header-menu-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
 /* Every child is a full-width row with a real target, whatever element
-   it happens to be — the panel takes nav links, session buttons and a
-   plain label. */
+   it happens to be — the panel takes nav links (through the landmark
+   wrapper above), session buttons and a plain label. */
 .header-menu-panel > button,
+.header-menu-panel > .header-menu-nav > button,
 .header-menu-panel > .header-menu-item {
   display: flex;
   align-items: center;
@@ -6585,10 +6597,18 @@
   font: inherit;
   font-size: var(--text-s);
   text-align: left;
+}
+
+/* Only the buttons: the sole .header-menu-item is the login name, a
+   static <span>, and a pointer cursor over something that does not
+   respond to a click is a false affordance. */
+.header-menu-panel > button,
+.header-menu-panel > .header-menu-nav > button {
   cursor: pointer;
 }
 
-.header-menu-panel > button:hover {
+.header-menu-panel > button:hover,
+.header-menu-panel > .header-menu-nav > button:hover {
   background: var(--surface-hover);
 }
 
