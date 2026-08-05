@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../App";
 import type { Me } from "../api";
+import { strings } from "../strings";
 
 // The hosted tier, from the outside: what a browser sees when the SPA is
 // served by the hub instead of by a facilitator.
@@ -593,4 +594,54 @@ test("a real failure still raises the toast", async () => {
   window.dispatchEvent(new Event("focus"));
 
   expect(await screen.findByText(/cannot reach facilitator/i)).toBeInTheDocument();
+});
+
+// The rebuild screen names the exam and offers the honest way out. A
+// first boot must be untouched by all of this.
+test("a rebuild says so, and a first boot still reads as a first boot", async () => {
+  hubExams = [
+    {
+      id: "ckad-mock-01",
+      title: "CKAD Mock Exam 01",
+      certification: "CKAD",
+      examType: "hands-on",
+      kind: "practical",
+      available: true,
+      nodes: 2,
+      questionCount: 22,
+    },
+  ];
+  const booting = {
+    kind: "practical" as const,
+    bank: "ckad-mock-01",
+    pod: "sim-session-practical-583231",
+    state: "starting" as const,
+    startedAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + 3_600_000).toISOString(),
+    lastSeen: new Date(now).toISOString(),
+  };
+
+  identity = me({ session: { ...booting, op: "reset" } });
+  const rebuild = render(<App />);
+  await screen.findByRole("heading", { name: strings.hosted.rebuildTitle });
+  // The heading needs no exam data and renders on the first pass; the
+  // body names the exam only once GET /hub/exams has round-tripped. That
+  // is an independent, unbounded number of microtask hops behind the
+  // heading, so a positive `waitFor` — which keeps retrying on every DOM
+  // mutation rather than checking once — is what actually waits for it,
+  // where a single timer flush proved to still race it.
+  await waitFor(() => {
+    expect(screen.getByText(/clean CKAD environment/i)).toBeInTheDocument();
+  });
+  expect(
+    screen.getByRole("button", { name: strings.hosted.rebuildGiveUp }),
+  ).toBeInTheDocument();
+  rebuild.unmount();
+
+  identity = me({ session: booting });
+  render(<App />);
+  await screen.findByRole("heading", { name: strings.hosted.bootStartingTitle });
+  expect(
+    screen.getByRole("button", { name: strings.hosted.bootGiveUp }),
+  ).toBeInTheDocument();
 });

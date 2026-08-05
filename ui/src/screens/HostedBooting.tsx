@@ -41,6 +41,12 @@ export function HostedBooting({ session, onChanged }: HostedBootingProps) {
   const examsState = useAsync((signal) => getHostedExams(signal), []);
   const exam = examsState.data?.find((e) => e.id === session.bank);
 
+  // The hub says what it is doing to this Pod. Without it "not ready" is
+  // the only signal, and a first boot and a rebuild are indistinguishable
+  // — which is how the candidate who pressed "New attempt" ended up on a
+  // screen written to greet them.
+  const rebuilding = session.op === "reset" || session.op === "switch";
+
   const retry = async () => {
     setBusy(true);
     // End first, then ask again: a failed session still holds its seat so
@@ -86,15 +92,25 @@ export function HostedBooting({ session, onChanged }: HostedBootingProps) {
   }
 
   const pending = session.state === "pending";
-  const title = pending ? strings.hosted.bootPendingTitle : strings.hosted.bootStartingTitle;
+  const title = rebuilding
+    ? strings.hosted.rebuildTitle
+    : pending
+      ? strings.hosted.bootPendingTitle
+      : strings.hosted.bootStartingTitle;
   // The queue reads the same whatever is being queued for; the build does
   // not. A multiple-choice seat has no cluster to build and is up in
   // seconds, so the hands-on copy would be describing someone else's wait.
-  const body = pending
-    ? strings.hosted.bootPendingBody
-    : session.kind === "mcq"
-      ? strings.hosted.bootStartingBodyMcq
-      : strings.hosted.bootStartingBody(exam?.nodes, exam?.questionCount);
+  //
+  // A rebuild outranks both: it is the same work as a first build, but
+  // the sentence a candidate needs is what is happening to the attempt
+  // they just finished, not what a new environment contains.
+  const body = rebuilding
+    ? strings.hosted.rebuildBody(exam?.certification || exam?.title)
+    : pending
+      ? strings.hosted.bootPendingBody
+      : session.kind === "mcq"
+        ? strings.hosted.bootStartingBodyMcq
+        : strings.hosted.bootStartingBody(exam?.nodes, exam?.questionCount);
 
   return (
     <div className="page hosted-screen hosted-booting">
@@ -120,7 +136,7 @@ export function HostedBooting({ session, onChanged }: HostedBootingProps) {
         </p>
       </div>
       <button type="button" className="btn" onClick={() => void giveUp()} disabled={busy}>
-        {strings.hosted.bootGiveUp}
+        {rebuilding ? strings.hosted.rebuildGiveUp : strings.hosted.bootGiveUp}
       </button>
     </div>
   );

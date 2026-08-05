@@ -1549,6 +1549,22 @@ export const strings = {
     bootRetry: "Try again",
     bootGiveUp: "Give up this seat",
 
+    // A rebuild, not a first boot. The same wait, a different fact: this
+    // candidate already has a seat and asked for another attempt, so copy
+    // that welcomes them to a new environment and offers to give the seat
+    // up is describing somebody else's situation entirely.
+    rebuildTitle: "Rebuilding your environment",
+    // Named when the exam is known, because a candidate mid-rebuild wants
+    // to be sure it is being rebuilt as the exam they were sitting.
+    rebuildBody: (exam?: string) =>
+      exam
+        ? `Your last attempt is being cleared and a clean ${exam} environment built in its place. This takes a few minutes, and nothing is lost if you close this tab.`
+        : "Your last attempt is being cleared and a clean environment built in its place. This takes a few minutes, and nothing is lost if you close this tab.",
+    // Says what it does. "Give up this seat" during a rebuild reads as
+    // "cancel the rebuild", which is not what the button does — it ends
+    // the session and hands the seat back to the pool.
+    rebuildGiveUp: "End session and free the seat",
+
     // The header chip.
     chipLabel: "Session",
     chipTimeLeft: (left: string) => `${left} left`,
