@@ -522,13 +522,24 @@
   margin: 0 0 var(--space-4);
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+  /* min(330px, 100%), not a bare 330px, and the same everywhere this
+     file writes an auto-fit floor.
+     `minmax(330px, 1fr)` creates a track 330px wide even when its
+     container is 305px: minmax's minimum is a floor, not a preference.
+     At the 320px WCAG 1.4.10 reflow width that is a horizontally
+     scrolling page with the card's own button hanging off the right
+     edge of the screen — measured, in Chrome, at 320px: a 305px
+     viewport with a 346px document.
+     min() collapses the floor to the container's width exactly when it
+     would otherwise exceed it, and changes nothing at any width where
+     the track already fits. */
+  grid-template-columns: repeat(auto-fit, minmax(min(330px, 100%), 1fr));
   gap: var(--space-4);
 }
 
 /* Denser: these carry a name and a reason, not a stat strip. */
 .exam-grid-soon {
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
 }
 
 .exam-card {
@@ -787,7 +798,7 @@
   margin: 0 0 var(--space-5);
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
   gap: var(--space-4);
 }
 
@@ -5176,7 +5187,7 @@
 
 @media (max-width: 640px) {
   .mcq-body {
-    padding: var(--space-4) var(--space-2) 0;
+    padding: var(--space-4) var(--space-3) 0;
   }
 
   /* The action bar.
@@ -5202,7 +5213,13 @@
     padding: var(--space-2) var(--space-3);
     padding-bottom: calc(var(--space-2) + var(--safe-b));
     gap: var(--space-2);
-    flex-wrap: nowrap;
+    /* Wrapping stays ON, and the reassurance line below is why: it takes
+       a full-width row of its own above the controls, which is a wrap.
+       Setting nowrap here — the obvious way to keep three controls on
+       one line — instead squeezed that line into a 40px column beside
+       them, eight words stacked one per line, eating a fifth of the
+       viewport height. The controls hold their row through their own
+       flex values, not through the container forbidding a break. */
     background: var(--surface);
   }
 
@@ -5215,9 +5232,18 @@
      2.4.3). */
   .mcq-save-note {
     order: -1;
-    flex-basis: 100%;
+    flex: 0 0 100%;
     text-align: center;
     font-size: var(--text-2xs);
+  }
+
+  /* Their row is held here rather than by nowrap on the parent. Previous
+     and the navigator take their content's width and refuse to shrink
+     below it; the forward action takes everything left. Nothing in the
+     row can grow past its share, so nothing pushes a sibling onto a
+     second line. */
+  .mcq-footer > .btn:first-of-type {
+    flex: 0 0 auto;
   }
 
   .mcq-footer .btn {
@@ -5250,10 +5276,6 @@
     display: none;
   }
 
-  /* The keyboard hints go with the keyboard. */
-  .mcq-footer .key-hint {
-    display: none;
-  }
 
   /* The stem stays at its full reading size. It used to step DOWN here
      — --text-2xl to --text-xl — which is backwards: the token ramp now
@@ -5341,13 +5363,46 @@
     font-size: var(--text-s);
   }
 
-  /* The head row: position, domain, flag. The flag keeps its label on a
-     phone — it is the one control here whose glyph is genuinely
-     ambiguous, and "Mark for review" is four words. */
+  /* The head row becomes two rows, on purpose, in this order:
+       QUESTION 7 / 65                    [flag] Mark for review
+       Kubernetes Fundamentals
+   *
+   * It wrapped by default and produced the opposite arrangement — the
+   * domain filling row one beside the counter, and the flag stranded on
+   * row two, right-aligned under nothing.
+   *
+   * One row was tried first and does not fit at any phone width. The
+   * counter and the flag are ~220px together; "Kubernetes Fundamentals"
+   * wants 166 and gets 97 at 390px and 40 at 320px, which is "Kub…" —
+   * three characters that name nothing and still cost the width of a
+   * chip. DESIGN.md calls the domain the one per-question fact an mcq
+   * candidate can use, so twenty pixels of second row is the cheaper
+   * loss.
+   *
+   * `order` is safe because the chip is not focusable: the visual order
+   * and the tab order cannot disagree (WCAG 1.3.2 / 2.4.3). */
   .mcq-head {
-    gap: var(--space-2);
+    gap: var(--space-1) var(--space-2);
   }
 
+  /* Whole, on its own line, and no wider than the words in it. */
+  .mcq-domain {
+    order: 1;
+    flex-basis: 100%;
+    max-width: max-content;
+  }
+
+  /* Neither may give way: row one is where you are and how to come back
+     to it. Without this the counter wraps its own text into
+     "QUESTION 1 /" over "65". */
+  .mcq-counter,
+  .mcq-head .question-mark {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 640px) {
   /* The compact topbar: one row, one height, and the clock reading as
      the fixed point it is. */
   .topbar-compact {
@@ -5386,10 +5441,26 @@
     margin-bottom: var(--space-4);
   }
 
-  .topbar-sheet-extras > .btn,
+  /* Every direct child, not only the .btn ones: the sheet holds an
+     About button, a theme toggle and a tally, and each is a different
+     component with a different class. In a stack of full-width rows,
+     one control that kept its bar-sized circle reads as a mistake. */
+  .topbar-sheet-extras > *,
   .topbar-sheet-end {
     width: 100%;
     min-height: var(--tap-comfortable);
+  }
+
+  .topbar-sheet-extras > .mcq-tally {
+    min-height: 0;
+  }
+
+  .info-button-labelled {
+    gap: var(--space-2);
+    /* It is a pill circle at 28px in a bar. Full width it is a button,
+       and a 999px radius on a 340px-wide box is a lozenge. */
+    width: 100%;
+    border-radius: var(--radius-s);
   }
 
   .topbar-sheet .mcq-tally {
@@ -5449,7 +5520,7 @@
   margin: 0 0 var(--space-6);
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
   gap: var(--space-3);
 }
 
@@ -6586,7 +6657,7 @@
    here. */
 .hosted-flavours {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
   gap: var(--space-4);
   margin: var(--space-5) 0 0;
   padding: 0;
@@ -6970,6 +7041,20 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* The keyboard hints, keyed to the pointer rather than to the width.
+   A `kbd` badge reading F beside "Mark for review" is instruction on a
+   laptop and decoration on a phone — there is no key to press, and it
+   takes space from the label it is annotating. A touchscreen laptop
+   keeps them, because it has the keyboard they describe.
+   These are aria-hidden already, so nothing leaves the accessible name
+   with them. */
+@media (any-pointer: coarse) and (not (any-pointer: fine)) {
+  .key-hint,
+  .navigator-keys {
+    display: none;
+  }
+}
+
 /* Sticky hover, which is the defect this block mainly exists for.
  *
  * A phone has no hover, so a browser fakes one: it applies :hover on
@@ -7113,5 +7198,20 @@
      a toolbar and are now a stack. */
   .progress-actions .btn {
     min-height: var(--tap-comfortable);
+  }
+
+  /* The attempt history keeps its table and keeps scrolling inside its
+     own box — the Scroll-Inside rule, and the right answer for five
+     columns of mono that do not compress. What it drops is the one
+     column that is not part of identifying an attempt: how long it took.
+     Exam, mode, date and score are what a row is FOR, and four of them
+     fit a phone where five did not.
+     display: none on both the header cell and the data cell, not a
+     width of zero: a table cell that is still in the layout is still in
+     the accessibility tree, and a screen reader would read a header with
+     nothing under it. */
+  .history-table .history-time,
+  .history-table thead th:nth-child(4) {
+    display: none;
   }
 }

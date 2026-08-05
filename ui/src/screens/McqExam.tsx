@@ -268,7 +268,7 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
                 {scoring ? strings.practice.scoring : strings.practice.scoreNow}
               </button>
             )}
-            <InfoButton />
+            <InfoButton labelled={compact} />
           </>
         }
       />
