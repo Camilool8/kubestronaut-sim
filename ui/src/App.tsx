@@ -34,7 +34,6 @@ import { HostedBooting } from "./screens/HostedBooting";
 import { HostedSignIn } from "./screens/HostedSignIn";
 import { HostedStart } from "./screens/HostedStart";
 import { Review } from "./screens/Review";
-import { SessionChip } from "./components/SessionChip";
 import { useHosted } from "./lib/useHosted";
 import type { Me } from "./api";
 import { useRoute } from "./lib/useHashRoute";
@@ -173,13 +172,10 @@ function HostedHome({ hosted, route }: { hosted: Hosted; route: ReturnType<typeo
   return (
     <>
       <TopProgress />
-      <AppHeader {...headerProps}>
-        <SessionChip
-          login={me.user?.login ?? ""}
-          session={me.session}
-          onChanged={refresh}
-        />
-      </AppHeader>
+      <AppHeader
+        {...headerProps}
+        session={{ login: me.user?.login ?? "", session: me.session, onChanged: refresh }}
+      />
       <main>
         <ScreenTransition screenKey={reviewId ? `review:${reviewId}` : onProgress ? "progress" : "lobby"}>
           {screen}
@@ -674,24 +670,27 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
           button — and neither is the boot screen, which is a takeover with
           nothing to navigate to yet. */}
       {session && !booting && session.state !== "running" && (
-        <AppHeader {...headerProps}>
-          {/* Hosted only. It carries the lease countdown, which is the one
-              thing about a hosted session a candidate cannot be left to
-              guess: the seat is taken back at the cap whatever they are
-              doing. Deliberately NOT rendered over a running exam — that
-              screen has its own topbar with its own clock, and a second
-              countdown beside it would be read as the exam's. One good
-              consequence and one recorded cost: there is no way to
-              destroy an environment mid-attempt by misclick, and a lease
-              that expires mid-attempt gives no warning. See
-              docs/follow-ups.md. */}
-          {hosted && (
-            <SessionChip
-              login={hosted.me.user?.login ?? ""}
-              session={hosted.me.session}
-              onChanged={hosted.refresh}
-            />
-          )}
+        <AppHeader
+          {...headerProps}
+          // Hosted only. It carries the lease countdown, which is the one
+          // thing about a hosted session a candidate cannot be left to
+          // guess: the seat is taken back at the cap whatever they are
+          // doing. Deliberately NOT rendered over a running exam — that
+          // screen has its own topbar with its own clock, and a second
+          // countdown beside it would be read as the exam's. One good
+          // consequence and one recorded cost: there is no way to destroy
+          // an environment mid-attempt by misclick, and a lease that
+          // expires mid-attempt gives no warning. See docs/follow-ups.md.
+          session={
+            hosted
+              ? {
+                  login: hosted.me.user?.login ?? "",
+                  session: hosted.me.session,
+                  onChanged: hosted.refresh,
+                }
+              : undefined
+          }
+        >
           {/* A backgrounded rebuild used to run for 2-4 minutes with no
               indicator anywhere: the lobby behind it looked idle while the
               cluster it describes was being torn down. */}

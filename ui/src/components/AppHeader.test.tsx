@@ -100,4 +100,47 @@ describe("AppHeader", () => {
     );
     expect(screen.getByText("rebuilding")).toBeInTheDocument();
   });
+
+  describe("session", () => {
+    const liveSession = {
+      kind: "practical" as const,
+      bank: "ckad-mock-01",
+      pod: "sim-session-practical-583231",
+      state: "ready" as const,
+      startedAt: "2026-08-05T09:00:00Z",
+      expiresAt: "2026-08-05T19:00:00Z",
+      lastSeen: "2026-08-05T09:00:00Z",
+    };
+
+    test("carries the login, the countdown and both ways out", () => {
+      renderHeader(
+        <AppHeader session={{ login: "octocat", session: liveSession, onChanged: () => {} }} />,
+      );
+      expect(screen.getByText("octocat")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: strings.hosted.endSession }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: strings.hosted.signOut })).toBeInTheDocument();
+    });
+
+    // The dialog has to be a sibling of the controls that raise it, not a
+    // child. Task 10 puts those controls inside a popover that unmounts on
+    // close, and a dialog underneath them would go with it.
+    test("raises the confirmation from the header, not from the button", async () => {
+      const user = userEvent.setup();
+      renderHeader(
+        <AppHeader session={{ login: "octocat", session: liveSession, onChanged: () => {} }} />,
+      );
+      await user.click(screen.getByRole("button", { name: strings.hosted.endSession }));
+      const dialog = await screen.findByRole("dialog");
+      expect(dialog).toHaveTextContent(strings.hosted.endConfirmTitle);
+      expect(screen.getByRole("banner").contains(dialog)).toBe(false);
+    });
+
+    test("shows only sign-out when there is no environment", () => {
+      renderHeader(<AppHeader session={{ login: "octocat", onChanged: () => {} }} />);
+      expect(screen.getByRole("button", { name: strings.hosted.signOut })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: strings.hosted.endSession })).toBeNull();
+    });
+  });
 });

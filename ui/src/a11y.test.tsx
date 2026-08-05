@@ -848,7 +848,6 @@ describe("axe: no WCAG violations", () => {
           expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
           lastSeen: "2026-08-04T12:00:00Z",
         }}
-        onChanged={() => {}}
       />,
     );
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();

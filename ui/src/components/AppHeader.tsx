@@ -1,5 +1,8 @@
+import { useState } from "react";
 import type { ReactNode } from "react";
+import type { HostedSession } from "../api";
 import { BrandMark } from "./BrandMark";
+import { EndSessionDialog, SessionActions, SessionChip } from "./SessionChip";
 import { Icon } from "./Icon";
 import { InfoButton } from "./InfoButton";
 import { ThemeToggle } from "./ThemeToggle";
@@ -36,10 +39,19 @@ export interface AppHeaderProps {
   detail?: string;
   nav?: NavItem[];
   /**
-   * Anything that has to sit left of the theme toggle — today the
-   * backgrounded-rebuild chip, which must be visible on every screen it
-   * can reach or a 2-4 minute teardown happens behind an idle-looking
-   * page.
+   * Hosted only: the lease clock and the two ways out.
+   *
+   * A typed prop rather than more `children` because the header has to
+   * know which of the things it carries collapse into the menu on a
+   * narrow viewport and which stay in the bar — and because the
+   * confirmation the End control raises has to be rendered here, outside
+   * that menu, to survive it closing.
+   */
+  session?: { login: string; session?: HostedSession; onChanged: () => void };
+  /**
+   * Ambient status that never collapses — today the backgrounded-rebuild
+   * chip, which must be visible on every screen it can reach or a 2-4
+   * minute teardown happens behind an idle-looking page.
    */
   children?: ReactNode;
 }
@@ -60,67 +72,85 @@ export function AppHeader({
   crumb,
   detail,
   nav,
+  session,
   children,
 }: AppHeaderProps) {
+  // Owned here, not by the control that raises it. See SessionChip.
+  const [confirming, setConfirming] = useState(false);
+
   return (
-    <header className={`app-header app-header-${variant}`}>
-      <div className="app-header-lead">
-        {variant === "back" && back ? (
-          <button
-            type="button"
-            className="app-header-back"
-            onClick={() => navigate(back.to)}
-          >
-            {/* Icon, not a "←" literal: @fontsource declares a
-                unicode-range per face and U+2190 is outside both of this
-                app's, so the character would never reach the woff2 —
-                exactly the trap Icon.tsx exists to close. */}
-            <Icon name="chevron-left" /> {back.label}
-          </button>
-        ) : (
-          <a className="app-header-home" href="#/">
-            <BrandMark />
-            <span className="app-header-wordmark">
-              {strings.header.wordmark}
-              <span className="app-header-wordmark-tail">{strings.header.wordmarkTail}</span>
-            </span>
-          </a>
-        )}
+    <>
+      <header className={`app-header app-header-${variant}`}>
+        <div className="app-header-lead">
+          {variant === "back" && back ? (
+            <button
+              type="button"
+              className="app-header-back"
+              onClick={() => navigate(back.to)}
+            >
+              {/* Icon, not a "←" literal: @fontsource declares a
+                  unicode-range per face and U+2190 is outside both of this
+                  app's, so the character would never reach the woff2 —
+                  exactly the trap Icon.tsx exists to close. */}
+              <Icon name="chevron-left" /> {back.label}
+            </button>
+          ) : (
+            <a className="app-header-home" href="#/">
+              <BrandMark />
+              <span className="app-header-wordmark">
+                {strings.header.wordmark}
+                <span className="app-header-wordmark-tail">{strings.header.wordmarkTail}</span>
+              </span>
+            </a>
+          )}
 
-        {crumb && (
-          <>
-            <span className="app-header-rule" aria-hidden="true" />
-            <span className="app-header-crumb">{crumb}</span>
-          </>
-        )}
-        {detail && <span className="app-header-detail">{detail}</span>}
-      </div>
+          {crumb && (
+            <>
+              <span className="app-header-rule" aria-hidden="true" />
+              <span className="app-header-crumb">{crumb}</span>
+            </>
+          )}
+          {detail && <span className="app-header-detail">{detail}</span>}
+        </div>
 
-      <div className="app-header-tail">
-        {children}
-        {nav && nav.length > 0 && (
-          <nav className="app-header-nav" aria-label={strings.header.navLabel}>
-            {nav.map((item) =>
-              item.current ? (
-                <span key={item.to} className="app-header-link app-header-link-on" aria-current="page">
-                  {item.label}
-                </span>
-              ) : (
-                <button
-                  key={item.to}
-                  type="button"
-                  className="app-header-link"
-                  onClick={() => navigate(item.to)}
-                >
-                  {item.label}
-                </button>
-              ),
-            )}
-          </nav>
-        )}
-        <InfoButton />
-        <ThemeToggle />
-      </div>
-    </header>
+        <div className="app-header-tail">
+          {session && (
+            <>
+              <SessionChip login={session.login} session={session.session} />
+              <SessionActions session={session.session} onEnd={() => setConfirming(true)} />
+            </>
+          )}
+          {children}
+          {nav && nav.length > 0 && (
+            <nav className="app-header-nav" aria-label={strings.header.navLabel}>
+              {nav.map((item) =>
+                item.current ? (
+                  <span key={item.to} className="app-header-link app-header-link-on" aria-current="page">
+                    {item.label}
+                  </span>
+                ) : (
+                  <button
+                    key={item.to}
+                    type="button"
+                    className="app-header-link"
+                    onClick={() => navigate(item.to)}
+                  >
+                    {item.label}
+                  </button>
+                ),
+              )}
+            </nav>
+          )}
+          <InfoButton />
+          <ThemeToggle />
+        </div>
+      </header>
+      {confirming && session && (
+        <EndSessionDialog
+          onClose={() => setConfirming(false)}
+          onChanged={session.onChanged}
+        />
+      )}
+    </>
   );
 }
