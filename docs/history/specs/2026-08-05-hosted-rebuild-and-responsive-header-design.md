@@ -124,7 +124,17 @@ work: they tick identically whether or not the candidate accepts motion.
 release the seat. It stays: a candidate whose rebuild has wedged needs a
 way out, and it is the only one on the screen.
 
-**5. The landing is chosen, not fallen into.**
+**5. The rebuild's clock starts when the rebuild does.**
+
+`runRecycle` restamps `StartedAt` in its `start` phase, which is after the
+old Pod has been deleted and drained. The boot screen's elapsed counter is
+`now - StartedAt`, so for the whole of the first phase a rebuild would count
+from the session's original start — "4:21:07 so far", thirty seconds in. The
+restamp moves to `Recycle`, where the job is accepted. `ExpiresAt` stays
+where it is: it is the lease, and moving it is a different decision from
+fixing a displayed counter.
+
+**6. The landing is chosen, not fallen into.**
 
 When a hosted session goes ready and carries a bank, `App()` navigates
 to `#/exams/<bank>/mode` rather than letting `SimApp` mount on a bare
@@ -173,16 +183,25 @@ popover, and rendering both copies would give every button two
 accessible names — which breaks the a11y sweep and, more to the point,
 makes the header unusable with a screen reader.
 
-What collapses: the nav links, the login name, End session, Sign out,
-About, and the theme toggle.
+What collapses: the nav links, the login name, End session, Sign out.
 
-What stays in the bar: the brand mark, the lease countdown, the menu
-button, and `BackgroundJobChip` when a rebuild is running in the
-background. The countdown stays because a hosted session is taken back
-at its cap whatever the candidate is doing — that is the one number they
-cannot be left to guess, and it must never be a tap away. The job chip
-stays for the reason it was built: a 2-4 minute teardown behind an
-idle-looking page.
+What stays in the bar: the brand mark, the lease countdown, About, the
+theme toggle, the menu button, and `BackgroundJobChip` when a rebuild is
+running in the background. The countdown stays because a hosted session
+is taken back at its cap whatever the candidate is doing — that is the
+one number they cannot be left to guess, and it must never be a tap
+away. The job chip stays for the reason it was built: a 2-4 minute
+teardown behind an idle-looking page.
+
+About and the theme toggle stay for a reason found while planning rather
+than while writing this. `InfoButton` renders `InfoDrawer` itself, so
+inside a popover that unmounts on close the drawer would be destroyed by
+the click that opened it — precisely the hazard called out below for the
+End-session dialog. Moving them in would mean hoisting the drawer's state
+into the header as well, for two icon buttons that cost about 88px in a
+bar that has room for them. They stay, and the menu holds what the
+`AppHeader` can own without restructuring a component that has nothing to
+do with this change.
 
 **The menu** is a popover under its trigger with `aria-expanded` and
 `aria-controls`, Escape to close, focus returned to the trigger,
