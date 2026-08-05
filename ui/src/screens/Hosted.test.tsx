@@ -24,18 +24,21 @@ function me(overrides: Partial<Me> = {}): Me {
   };
 }
 
+/** A settled idle session, as the facilitator reports one. */
+const readySessionStub = {
+  state: "idle",
+  bank: "ckad-mock-01",
+  startedAt: "",
+  durationSeconds: 7200,
+  remainingSeconds: 0,
+  endReason: "",
+  mode: "exam",
+  untimed: false,
+};
+
 /** A ready local environment, so the ordinary app can mount over a hub. */
 const localStubs: Record<string, unknown> = {
-  "/api/session": {
-    state: "idle",
-    bank: "ckad-mock-01",
-    startedAt: "",
-    durationSeconds: 7200,
-    remainingSeconds: 0,
-    endReason: "",
-    mode: "exam",
-    untimed: false,
-  },
+  "/api/session": readySessionStub,
   "/api/boot": {
     state: "ready",
     phase: "ready",
@@ -162,6 +165,25 @@ function stubFetch() {
         });
       }
       if (url.includes("/api/history/")) return json(attemptResults);
+      // Two failure fixtures for the session poll, opted into by writing
+      // a sentinel into localStubs. `null` is the hub's answer while it
+      // replaces a Pod — an expected wait. "boom" is a facilitator that
+      // has actually fallen over, which must still be reported.
+      if (url.endsWith("/api/session")) {
+        if (localStubs["/api/session"] === null) {
+          return json(
+            {
+              error: "your exam environment is still starting",
+              code: "environment_starting",
+              state: "pending",
+            },
+            503,
+          );
+        }
+        if (localStubs["/api/session"] === "boom") {
+          return json({ error: "the facilitator is not answering" }, 500);
+        }
+      }
       for (const [path, body] of Object.entries(localStubs)) {
         if (url.endsWith(path)) return json(body);
       }
@@ -173,6 +195,7 @@ function stubFetch() {
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true, now });
   identity = me();
+  localStubs["/api/session"] = readySessionStub;
   startAnswer = { status: 202, body: { starting: true, state: "pending" } };
   hubExams = [];
   stubFetch();
@@ -520,4 +543,54 @@ test("the hosted dashboard exports but does not import", async () => {
 
   expect(await screen.findByRole("link", { name: /export/i })).toBeTruthy();
   expect(screen.queryByRole("button", { name: /^import$/i })).toBeNull();
+});
+
+/** A ready hosted seat, so SimApp mounts and its session poller runs. */
+function readySeat() {
+  return {
+    kind: "practical" as const,
+    bank: "ckad-mock-01",
+    pod: "sim-session-practical-583231",
+    state: "ready" as const,
+    startedAt: new Date(now - 600_000).toISOString(),
+    expiresAt: new Date(now + 2 * 3600_000).toISOString(),
+    lastSeen: new Date(now).toISOString(),
+  };
+}
+
+// The reported bug, in the window it actually happens in.
+//
+// SimApp has to be MOUNTED and its session poller running, because that
+// poller is what raises the toast. /api/me flips to "pending" about two
+// seconds after the POST and unmounts SimApp — but a toast pushed before
+// then lives in a module singleton and outlives it. So the fixture holds
+// /api/me at "ready" while the proxy has already started answering 503,
+// which is exactly the race.
+test("a Pod replacement raises no outage toast", async () => {
+  identity = me({ session: readySeat() });
+  render(<App />);
+  await screen.findByRole("heading", { name: /path to kubestronaut/i });
+
+  // The hub begins replacing the Pod. Every proxied request is a 503 from
+  // here on; /api/me has not caught up.
+  localStubs["/api/session"] = null;
+  window.dispatchEvent(new Event("focus")); // pollSession re-fetches on focus
+  await vi.advanceTimersByTimeAsync(0); // let the mocked 503 round-trip settle
+
+  await waitFor(() => {
+    expect(screen.queryByText(/cannot reach facilitator/i)).toBeNull();
+  });
+});
+
+// The other half, and the reason the guard is a code and not a blanket
+// mute: a facilitator that has genuinely fallen over must still say so.
+test("a real failure still raises the toast", async () => {
+  identity = me({ session: readySeat() });
+  render(<App />);
+  await screen.findByRole("heading", { name: /path to kubestronaut/i });
+
+  localStubs["/api/session"] = "boom"; // forces the 500 branch in stubFetch
+  window.dispatchEvent(new Event("focus"));
+
+  expect(await screen.findByText(/cannot reach facilitator/i)).toBeInTheDocument();
 });

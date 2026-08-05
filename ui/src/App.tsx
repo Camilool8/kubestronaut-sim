@@ -4,6 +4,7 @@ import {
   getControlStatus,
   getExam,
   getSession,
+  isEnvironmentStarting,
   pollSession,
   startControlReset,
   startControlSwitch,
@@ -278,6 +279,23 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
   const handlePollError = useCallback((err: unknown) => {
     setPollError(String(err));
     if (!seenSession.current) return;
+    // Two ways to know this is not a fault, and both are wanted.
+    //
+    // The hub answers every proxied request with 503 environment_starting
+    // while it replaces a session Pod, and a hosted "New attempt" IS a Pod
+    // replacement. That is the durable signal: it survives a reload
+    // landing mid-rebuild, where nothing in this tab remembers a click.
+    //
+    // A control job in flight covers the rest — the window between the
+    // 202 and /api/me reporting it, and the LOCAL product, where a reset
+    // restarts the facilitator in place and the poll fails for exactly
+    // the same non-reason. The overlay is already narrating it; a warning
+    // toast over the top says the thing the candidate asked for has gone
+    // wrong.
+    //
+    // pollError is set above either way, so the pre-first-session loading
+    // screen keeps its message.
+    if (isEnvironmentStarting(err) || wasBusy.current) return;
     pollToastId.current = toastStore.push({
       kind: "warning",
       message: strings.app.cannotReach(String(err)),
