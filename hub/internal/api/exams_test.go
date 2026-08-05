@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -8,7 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"kubestronaut-sim/hub/internal/auth"
 	"kubestronaut-sim/hub/internal/catalog"
@@ -40,9 +43,90 @@ func testBanks(t *testing.T) *catalog.Catalog {
 	return c
 }
 
+// heldPods is session.Pods with a hold on Delete, so a test can keep a
+// recycle job in flight for as long as it needs to look at something.
+//
+// It exists because the alternative is a race, and the race lost in CI.
+// Recycle registers its job synchronously and then runs it on a
+// goroutine; against fakes that whole run can finish inside the gap
+// between two calls in a test. A test asserting "the hub has a job in
+// flight" is then really asserting "the goroutine has not got there
+// yet" — true on a laptop, false often enough on a loaded runner.
+// Blocking the first thing the job does makes the precondition a fact.
+type heldPods struct {
+	session.Pods
+	mu      sync.Mutex
+	release chan struct{} // closed = not holding
+	entered chan struct{}
+	once    sync.Once
+}
+
+// Starts released, so a caller that never asks for the hold sees the
+// wrapped client's behaviour unchanged.
+func newHeldPods(inner session.Pods) *heldPods {
+	open := make(chan struct{})
+	close(open)
+	return &heldPods{Pods: inner, release: open, entered: make(chan struct{})}
+}
+
+// Hold makes the next Delete block until Release. Guarded, because the
+// goroutine running the job reads this while the test writes it — a bare
+// field swap here is a data race, and -race says so.
+func (h *heldPods) Hold() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.release = make(chan struct{})
+}
+
+func (h *heldPods) Release() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	select {
+	case <-h.release:
+	default:
+		close(h.release)
+	}
+}
+
+func (h *heldPods) gate() chan struct{} {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.release
+}
+
+func (h *heldPods) Delete(ctx context.Context, name string) error {
+	h.once.Do(func() { close(h.entered) })
+	select {
+	case <-h.gate():
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	return h.Pods.Delete(ctx, name)
+}
+
+// waitEntered blocks until the job under test has reached the hold, so
+// an assertion after it cannot run early either.
+func (h *heldPods) waitEntered(t *testing.T) {
+	t.Helper()
+	select {
+	case <-h.entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the recycle job never reached the pod delete")
+	}
+}
+
 // hostedWithExams is `hosted` plus a bank index and both flavours, which
 // is what a deployment that lets candidates choose actually looks like.
 func hostedWithExams(t *testing.T, upstream http.Handler) (*Server, *http.Cookie) {
+	t.Helper()
+	s, c, _ := hostedWithHeldPods(t, upstream)
+	return s, c
+}
+
+// hostedWithHeldPods is the same, and also hands back the hold. The hold
+// starts released, so every caller that ignores it behaves exactly as
+// before.
+func hostedWithHeldPods(t *testing.T, upstream http.Handler) (*Server, *http.Cookie, *heldPods) {
 	t.Helper()
 	s, _ := newServer(t, auth.ModeGitHub)
 	srv := httptest.NewServer(upstream)
@@ -52,7 +136,8 @@ func hostedWithExams(t *testing.T, upstream http.Handler) (*Server, *http.Cookie
 		t.Fatal(err)
 	}
 	s.Banks = testBanks(t)
-	s.Sessions = session.New(&session.Static{Host: u.Hostname()}, session.Config{
+	pods := newHeldPods(&session.Static{Host: u.Hostname()})
+	s.Sessions = session.New(pods, session.Config{
 		Flavours: map[session.Kind]session.Flavour{
 			session.Practical: {Seats: 1, Template: session.Template(podTemplate), Bank: "ckad-mock-01"},
 			session.MCQ:       {Seats: 1, Template: session.Template(podTemplate), Bank: "kcna-mock"},
@@ -62,7 +147,7 @@ func hostedWithExams(t *testing.T, upstream http.Handler) (*Server, *http.Cookie
 	})
 	s.DefaultKind = session.Practical
 	s.UI = shellFS()
-	return s, login(t, s, "u1", "candidate")
+	return s, login(t, s, "u1", "candidate"), pods
 }
 
 func okHandler() http.Handler {
@@ -251,7 +336,7 @@ func TestAConductorJobInTheSessionIsReportedThrough(t *testing.T) {
 // Pod is gone for most of it, so an answer from the Pod would be either
 // unreachable or about the Pod that is being thrown away.
 func TestTheHubsOwnJobWinsOverThePods(t *testing.T) {
-	s, c := hostedWithExams(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	s, c, pods := hostedWithHeldPods(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/control/status" {
 			w.Write([]byte(`{"busy":true,"job":{"id":"seed-1","op":"seed","phases":[]}}`))
 			return
@@ -262,17 +347,28 @@ func TestTheHubsOwnJobWinsOverThePods(t *testing.T) {
 		t.Fatalf("start: %d %s", w.Code, body(t, w))
 	}
 
+	// Take the hold BEFORE triggering the reset, so the job cannot run to
+	// completion before the assertion below. Without this the reset
+	// finishes against the fakes in microseconds, the hub's job settles,
+	// and the Pod's in-flight seed correctly wins — which is the right
+	// behaviour and the wrong thing for this test to be measuring.
+	pods.Hold()
 	reset := httptest.NewRequest(http.MethodPost, "/api/control/reset", strings.NewReader(`{}`))
 	reset.AddCookie(c)
 	if w := do(s, reset); w.Code != http.StatusAccepted {
 		t.Fatalf("reset: %d %s", w.Code, body(t, w))
 	}
+	pods.waitEntered(t)
+	defer pods.Release()
 
 	r := httptest.NewRequest(http.MethodGet, "/api/control/status", nil)
 	r.AddCookie(c)
 	got := body(t, do(s, r))
 	if strings.Contains(got, "seed-1") {
 		t.Errorf("status = %s, want the hub's own reset job", got)
+	}
+	if !strings.Contains(got, `"op":"reset"`) {
+		t.Errorf("status = %s, want the hub's reset job to be the one reported", got)
 	}
 }
 
