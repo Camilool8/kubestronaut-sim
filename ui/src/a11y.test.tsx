@@ -632,35 +632,44 @@ describe("axe: no WCAG violations", () => {
   // empty or closed panel and pass for the wrong reason.
   test("app header, compact, with the menu open", async () => {
     matchMediaMock([HEADER_COMPACT_QUERY]);
-    const user = userEvent.setup();
-    const { container } = render(
-      <AppHeader
-        nav={[
-          { label: "Exams", to: "/exams" },
-          { label: "Progress", to: "/progress", current: true },
-        ]}
-        session={{
-          login: "octocat",
-          session: {
-            kind: "practical",
-            pod: "sim-session-practical-1",
-            state: "ready",
-            startedAt: "2026-08-05T09:00:00Z",
-            expiresAt: "2026-08-05T19:00:00Z",
-            lastSeen: "2026-08-05T09:00:00Z",
-          },
-          onChanged: () => {},
-        }}
-      />,
-    );
-    await user.click(screen.getByRole("button", { name: strings.header.menuLabel }));
-    expect(screen.getByRole("button", { name: "Exams" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: strings.hosted.endSession })).toBeInTheDocument();
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
-    // Reset so compact mode does not leak into every scan that follows
-    // this one in the file — matchMediaMock replaces window.matchMedia
-    // wholesale rather than scoping to this render.
-    matchMediaMock([]);
+    // `finally`, not a trailing statement: matchMediaMock replaces
+    // window.matchMedia wholesale rather than scoping to this render, so
+    // a leaked mock does not fail HERE — it fails somewhere else, in
+    // whichever later test happens to render something that reads
+    // matchMedia next, which looks like an unrelated regression with no
+    // clue pointing back at this test. `finally` is what makes the reset
+    // survive a thrown assertion (a failed toBeInTheDocument, or axe
+    // itself finding a violation), rather than only the case where every
+    // assertion above it happened to pass.
+    try {
+      const user = userEvent.setup();
+      const { container } = render(
+        <AppHeader
+          nav={[
+            { label: "Exams", to: "/exams" },
+            { label: "Progress", to: "/progress", current: true },
+          ]}
+          session={{
+            login: "octocat",
+            session: {
+              kind: "practical",
+              pod: "sim-session-practical-1",
+              state: "ready",
+              startedAt: "2026-08-05T09:00:00Z",
+              expiresAt: "2026-08-05T19:00:00Z",
+              lastSeen: "2026-08-05T09:00:00Z",
+            },
+            onChanged: () => {},
+          }}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: strings.header.menuLabel }));
+      expect(screen.getByRole("button", { name: "Exams" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: strings.hosted.endSession })).toBeInTheDocument();
+      expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    } finally {
+      matchMediaMock([]);
+    }
   });
 
   test("modal dialog", async () => {
