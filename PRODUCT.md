@@ -159,8 +159,34 @@ The parts that constrain product decisions:
     candidate still has tomorrow — the local behaviour is unchanged and
     is the stricter of the two.
 - The timer is server-side. In Exam mode it cannot be paused.
-- The exam requires a desktop-sized screen. Small screens get an
-  explanation instead of a broken layout.
+- **A hands-on attempt cannot be started from a touch-only device**, and
+  the hub will not spend a seat on one. The refusal is at the door — the
+  lobby card, the catalog row and the mode screen offer no control, and
+  both Go services refuse the request — rather than at the exam screen,
+  which is where it used to be: after a seat, a Pod boot or a
+  two-to-four minute cluster rebuild had already been spent on an
+  environment nobody in front of that screen could use.
+  - Touch-only is `(any-pointer: coarse) and (not (any-pointer: fine))`,
+    checked without reference to width. A tablet in landscape is 1024
+    CSS px and has no more keyboard than a phone. A desktop window
+    merely dragged narrow — or zoomed to 400%, which reports the same
+    width — is a layout problem rather than a capability one and keeps
+    its way through, because WCAG 1.4.10 makes 320 CSS px equivalent to
+    1280px at 400% zoom.
+  - **The client measures and declares; the server decides.** The SPA
+    sends `X-Sim-Pointer` on every request and the rule lives in the hub
+    and the facilitator. This is the inverse of the mode-capability
+    pattern, and has one cause: no server can observe a pointer, and a
+    User-Agent is a string the browser chooses. An absent header
+    admits — `./sim`, `tests/smoke.sh` and every `curl` POST send none —
+    so this is UX fidelity like the gates below it, not security.
+- A running attempt on a small screen still gets its countdown and a
+  submit control. The server-side clock does not stop for a change of
+  device, and nobody may be stranded without a way to end an attempt.
+- **The multiple-choice engine is built for the phone that can sit it**,
+  rather than tolerated there: a collapsed topbar, a thumb-zone action
+  bar, the navigator as a bottom sheet, and reading type that steps up
+  rather than down. See DESIGN.md's Mobile section.
 - The environment works offline wherever it can; assets are bundled
   rather than fetched from a CDN.
 - **No third-party exam dump may ever be committed to this repository.**

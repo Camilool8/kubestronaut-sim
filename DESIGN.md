@@ -448,22 +448,95 @@ under someone mid-question moves text while they read it. The resizer
 holds noVNC's `resizeSession` false for a gesture, and is suppressed
 below 900px where the panel leaves the flow.
 
-Three breakpoints, each changing structure rather than scale:
+Six breakpoints, each changing structure rather than scale:
 
 | Query | Change |
 |---|---|
-| `max-width: 900px` | the question panel leaves the flow and becomes an overlay drawer at `min(85vw, 360px)` with `--shadow-3`, over a 36px collapsed rail |
+| `max-width: 1100px` | the deep dive's two document panes stack in reading order |
+| `max-width: 900px` | the question panel leaves the flow and becomes an overlay drawer at `min(85vw, 360px)` with `--shadow-3`, over a 36px collapsed rail; the results card and the dashboard go to one column |
+| `max-width: 48rem` | the app header collapses: the crumb, the rule, the detail and the wordmark's tail go, and the nav moves into `HeaderMenu`. Mirrored by `HEADER_COMPACT_QUERY`, which decides what is in the DOM while this only dresses what is left |
+| `max-width: 640px` | **the mobile line.** The reading type steps up (`--text-m` to 15px, `--text-l` to 16px, `--text-xl` to 18px); the exam topbar collapses to a clock and an overflow sheet; the mcq footer becomes a thumb-zone action bar and its navigator a modal sheet; the header menu becomes a sheet; the mcq head row splits in two; every page pays `--safe-b`; the task-verdict strip and the path cards stack. Mirrored by `MCQ_COMPACT_QUERY` |
 | `max-width: 600px` | dialogs and the boot panel go full-bleed (width 100%, `max-height: 100dvh`, radius 0), the clipboard panel and keyboard popover become bottom sheets, the page gutters close a step, the mode screen's fine print stacks, and the domain table's cells become blocks |
-| `any-pointer: coarse` | icon controls and the panel's `--control-size` go from 28px to a 44px minimum. Keyed to pointer type, not width |
+| `any-pointer: coarse` | icon controls and the panel's `--control-size` go from 28px to a 44px minimum, and press states appear. Keyed to pointer type, not width |
 
-Four structural rules constrain all of it:
+`hover: none` is a seventh query and asks a different question from
+`any-pointer: coarse`: whether a pointer can rest on something without
+pressing it. It governs STATE where coarse governs SIZE, and conflating
+them is how a touchscreen laptop loses its hover styling for having a
+touchscreen.
+
+Five structural rules constrain all of it:
 
 | Named rule | Statement |
 |---|---|
-| Unbroken Height | `html`, `body`, `#root` and `main` all assert `height: 100%`. Do not add a wrapper to that chain without giving it a height (`base.css:8-17`) |
+| Unbroken Height | `html`, `body`, `#root` and `main` all assert `height: 100%`, and the first three assert `100dvh` after it. Do not add a wrapper to that chain without giving it a height, and do not reorder those two declarations — mobile Safari resolves a percentage against the LARGE viewport, so `100%` is the fallback a browser keeps when it cannot parse `dvh` (`base.css:8-17`, pinned by `layout.test.ts`) |
+| Reflow Floor | never a bare length as an `auto-fit` minimum. `minmax(330px, 1fr)` builds a 330px track inside a 305px viewport, because minmax's minimum is a floor and not a preference — which is a horizontally scrolling page at the 320px WCAG 1.4.10 width. Always `minmax(min(Npx, 100%), 1fr)` |
 | Scroll-Inside | wide or long content scrolls inside its own container and never the page — tables with `overscroll-behavior-x: contain`, code blocks horizontally, and in the control dialog only the checklist while the header and actions stay pinned |
 | Fixed-Geometry Overlay | overlays inside the exam screen are out of flow and never flex children, because `.desktop-pane` carries noVNC's `ResizeObserver` and any sibling geometry change costs a framebuffer round-trip |
 | Table-Cell | never `display: flex` on a `<td>` or `<th>`. The cell leaves the table layout model, stops stretching to the row height and steps its `border-bottom` off its neighbours'; put the flex on a wrapper inside |
+
+## Mobile
+
+A phone is not a narrow desktop. It is a different set of capabilities,
+and the product's answer to that is two-sided: it refuses the exam that
+genuinely cannot work there, and it is built for the one that can.
+
+**The refusal.** A hands-on attempt is a question panel beside a live
+Linux desktop over VNC. It needs a physical keyboard and room for two
+panes, so a touch-only device is refused it — at any width, with no
+override, and before a seat, a queue place or a two-to-four minute
+cluster rebuild is spent on it. Touch-only is
+`(any-pointer: coarse) and (not (any-pointer: fine))` and is checked
+before width, not after: a tablet in landscape is 1024 CSS px and has no
+more keyboard than a phone, and rotating it does not grow one. A desktop
+window merely dragged narrow — or zoomed to 400%, which reports the same
+width — keeps the "Continue anyway" escape, because WCAG 1.4.10 makes
+320 CSS px equivalent to 1280px at 400% zoom and a width test would lock
+out the people who depend on that zoom.
+
+The rule lives on the server, in both Go services, and the client
+declares its own pointer type on every request (`X-Sim-Pointer`, from
+`lib/deviceCapability.ts`). That inversion of the `examMode` pattern —
+where the server owns a predicate and the client renders it — has one
+cause: no server can measure a pointer, and a User-Agent is a string the
+browser chooses. An absent header admits, because `./sim`,
+`tests/smoke.sh` and every curl POST send none; like the session-state
+gates, this is UX fidelity rather than security.
+
+Nothing that would be refused is offered. The hosted lobby's hands-on
+cards and the catalog's hands-on rows lose their buttons and say why, and
+the mode screen returns the explanation instead of three cards nobody may
+press — the "don't draw a control for something the product cannot do"
+rule, applied to a fact about the device rather than about the product.
+
+**The build.** Everything else is the multiple-choice engine and the
+screens around it, and five rules carry it.
+
+| Rule | Statement |
+|---|---|
+| Thumb Zone | a control reached for WITHOUT looking takes `--tap-comfortable` (48px) and sits at the bottom of the viewport; a control aimed at takes `--tap-min` (44px) and may sit anywhere. The mcq action bar is the first kind; an icon in a header row is the second |
+| Safe Area | `index.html` opts into `viewport-fit=cover`, so the page reaches the notch and the home indicator and owes them padding in return. Every surface that touches an edge pays `--safe-b` (or `-t`/`-l`/`-r`); a fixed bar pays it itself, and a scrolled page pays it once on `.page` |
+| Sheet | anything that would be a popover anchored to a corner becomes a panel rising from the bottom edge. One primitive — `Dialog`'s `sheet` variant — so focus management has one implementation. The navigator is the exception that proves it: it is a plain disclosure on a desktop and a modal sheet on a phone, because what it covers differs |
+| Move, Don't Hide | a control that collapses is re-rendered in its new place, never drawn twice with one copy `display: none`. Two spans in one button both reach its accessible name, and a screen reader is offered "Navigator, question 7 of 65, Navigator" with no way to tell which is drawn |
+| Press | touch feedback is a fill step, the same one hover uses. No scale, no spring, no shadow — and no haptics: iOS Safari exposes no Vibration API, and the `<input type="checkbox" switch>` workaround was patched in iOS 26.5 |
+
+**The one departure from the rules above.** The navigator is documented
+under Navigation as having no scrim, no `role="dialog"` and no focus
+trap, because dimming a live remote desktop to pick question 12 would
+read as a fault. On a phone, in the mcq engine, it takes all three. The
+stated reason is about the remote desktop, and there is none behind an
+mcq question; what is behind it there is the whole viewport, which is
+what a focus trap exists for. `useFocusTrap` takes an `enabled` flag for
+this rather than the component being forked.
+
+**What jsdom cannot see.** The suite has no CSS engine and no layout, so
+nothing above is proven by a render test. `styles/layout.test.ts` reads
+the stylesheet as text and pins the declarations that are load-bearing —
+including that every class the mobile overrides name is really put on an
+element, which caught three dead selectors on the day it was written. The
+rest is a browser pass at 320 / 390px in both themes, and it is not
+optional: the reflow bug in the Reflow Floor rule above had been shipping
+for the whole life of the exam catalog and no test could see it.
 
 ## Elevation and depth
 
@@ -760,6 +833,15 @@ region rather than a pending one once the pulse is off.
   page, the favicon, and the terminal palette with its xfconf twin.
 - **Do** make wide content scroll inside its own container, and keep pinned
   whatever the user is waiting on.
+- **Do** pay the safe-area inset on anything that reaches a viewport edge.
+  `viewport-fit=cover` is on, so those edges are the physical edges of the
+  device: a fixed bar pays `--safe-b` itself, and a scrolled page pays it
+  once on `.page`.
+- **Do** check a mobile change in a browser at 320 and 390px before
+  calling it done. jsdom has no layout engine, so the suite cannot see a
+  wrapped row, a clipped button or a page that scrolls sideways — the
+  reflow bug in the Don't below had been shipping for the whole life of
+  the exam catalog.
 - **Do** open panels over the exam screen out of flow, never as a flex
   child. Changing `.desktop-pane`'s geometry costs a framebuffer resize
   mid-exam.
@@ -799,6 +881,17 @@ region rather than a pending one once the pulse is off.
   native select can render — four states each on two channels, live
   filter counts, and the domain and points in every tile's accessible
   name.
+- **Don't** write a bare length as an `auto-fit` grid minimum. `minmax(330px,
+  1fr)` builds a 330px track inside a 305px viewport and scrolls the page
+  sideways at the 320px reflow width. Use `minmax(min(330px, 100%), 1fr)`.
+- **Don't** collapse a control by rendering it twice and hiding one copy.
+  Both copies reach the accessible name, and a screen reader is offered
+  each of them with no way to tell which is drawn. Branch in the
+  component.
+- **Don't** key a hover style to `any-pointer: coarse` or a touch target
+  to `hover: none`. One asks whether a finger could be used and governs
+  size; the other asks whether a pointer can rest without pressing and
+  governs state. A touchscreen laptop answers them differently.
 - **Don't** convey a control's state with `opacity`. It dims the border and
   the focus ring along with the label, and composites to a ratio nobody
   measured. Use `--text-disabled`.
@@ -818,14 +911,15 @@ region rather than a pending one once the pulse is off.
 
 ## Enforcement
 
-Three parts of this document are now enforced, and they are the three
-that went stale fastest when they were not:
+Four parts of this document are now enforced, and they are the ones that
+went stale fastest when they were not:
 
 | Check | What it holds |
 |---|---|
 | `ui/src/styles/contrast.test.ts` | re-derives every contrast ratio from the shipped `tokens.css` and fails the build on a pairing under its floor. Also asserts that the `prefers-color-scheme` twin matches the explicit dark block declaration for declaration, and that every colour token has a dark value |
 | `ui/src/styles/mirrors.test.ts` | holds the Three Mirrors rule: the terminal palette, the Go locked page and the favicon must carry the token values they mirror |
-| `ui/src/styles/layout.test.ts` | holds the load-bearing layout declarations, including the `.desktop-canvas` rules that stop noVNC's `ResizeObserver` feeding back, and the deep dive's no-truncation sweep — a task title may wrap but must never be clipped, which no jsdom render can see |
+| `ui/src/styles/layout.test.ts` | holds the load-bearing layout declarations, including the `.desktop-canvas` rules that stop noVNC's `ResizeObserver` feeding back, the height chain's `100%`-before-`100dvh` ordering, and the deep dive's no-truncation sweep — a task title may wrap but must never be clipped, which no jsdom render can see |
+| `ui/src/styles/layout.test.ts`, the touch-layer sweep | holds that every class the mobile overrides name is really put on an element by a component. These rules restyle components defined hundreds of lines above them, and a renamed or mistyped class produces no error, no warning and no visible change on any machine a developer is likely to be using — it simply does nothing, on phones, forever. It caught three the day it was written. It also holds that `touch-action: none` appears on `.panel-resizer` and nowhere else, because that value takes pinch zoom with it (WCAG 1.4.4) |
 
 Everything else here is convention: the prose, the component tables, the
 named rules. Where this document disagrees with
