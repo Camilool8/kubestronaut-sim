@@ -115,10 +115,10 @@ export function AppHeader({
 
         <div className="app-header-tail">
           {session && (
-            <>
+            <div className="session-cluster">
               <SessionChip login={session.login} session={session.session} />
               <SessionActions session={session.session} onEnd={() => setConfirming(true)} />
-            </>
+            </div>
           )}
           {children}
           {nav && nav.length > 0 && (

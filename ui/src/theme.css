@@ -6359,7 +6359,18 @@
   color: var(--text-muted);
 }
 
-/* The header chip: identity, the lease, and the two ways out. */
+/* Identity, the lease, and the two ways out, as one group. The chip and
+   the actions are separate components — the actions have to survive
+   being raised from inside a popover that unmounts them on Task 10's
+   narrow viewport — but without this wrapper they fall back to being
+   plain siblings in .app-header-tail and inherit its wider gap. */
+.session-cluster {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* The header chip: identity and the lease. */
 .session-chip {
   display: flex;
   align-items: center;
