@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from "vitest";
 import { render, renderHook, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DesktopRequired, gateOverridden, useDesktopGate } from "./DesktopRequired";
-import { NARROW_QUERY, TOUCH_ONLY_QUERY } from "../lib/useMediaQuery";
+import { NARROW_QUERY } from "../lib/useMediaQuery";
+import { TOUCH_ONLY_QUERY } from "../lib/deviceCapability";
 import { matchMediaMock } from "../test/setup";
 
 afterEach(() => {
@@ -34,6 +35,15 @@ describe("useDesktopGate", () => {
     // does not match and the exam stays available.
     matchMediaMock([]);
     expect(renderHook(() => useDesktopGate()).result.current).toBe("ok");
+  });
+
+  // The case the old ordering got wrong. A tablet in landscape is wide
+  // enough to fail NARROW_QUERY, and the gate returned "ok" for it — but
+  // width was never what it lacked. Rotating a tablet does not grow a
+  // keyboard.
+  test("a wide tablet is blocked, not waved through on width", () => {
+    matchMediaMock([TOUCH_ONLY_QUERY]); // coarse pointer, roomy viewport
+    expect(renderHook(() => useDesktopGate()).result.current).toBe("blocked");
   });
 });
 

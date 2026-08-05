@@ -25,18 +25,13 @@ export function useMediaQuery(query: string): boolean {
  */
 export const NARROW_QUERY = "(max-width: 767px)";
 
-/**
- * No precise pointer available anywhere — a phone or tablet, as opposed
- * to a touchscreen laptop, which reports both.
- *
- * `any-pointer` rather than `pointer` is deliberate: `pointer` reports
- * only the *primary* input, so a touchscreen laptop would look like a
- * phone. And the check for the absence of `fine` is what keeps a
- * low-vision desktop user out of the gate — WCAG 1.4.10 defines 320 CSS
- * px as equivalent to a 1280px window at 400% zoom, so a width-only
- * test would lock out exactly the people who most need the zoom.
+/*
+ * TOUCH_ONLY_QUERY lives in lib/deviceCapability.ts, not here. Every
+ * request carries the answer to it as a header, so the module that owns
+ * it must be importable by api.ts — which has no business pulling in a
+ * hook, and therefore React, to ask what kind of pointer it is talking
+ * to.
  */
-export const TOUCH_ONLY_QUERY = "(any-pointer: coarse) and (not (any-pointer: fine))";
 
 /**
  * The two-pane split is live, so the panel edge is a real boundary that

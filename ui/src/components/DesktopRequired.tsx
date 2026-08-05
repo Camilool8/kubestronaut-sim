@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useMediaQuery, NARROW_QUERY, TOUCH_ONLY_QUERY } from "../lib/useMediaQuery";
+import { useMediaQuery, NARROW_QUERY } from "../lib/useMediaQuery";
+import { TOUCH_ONLY_QUERY } from "../lib/deviceCapability";
 import { strings } from "../strings";
 
 const OVERRIDE_KEY = "sim.desktopGateOverride";
@@ -12,7 +13,7 @@ export type GateVerdict =
   | "ok";
 
 /**
- * Decides whether the exam screen can be shown.
+ * Decides whether a hands-on exam can be run here at all.
  *
  * The distinction matters: a touch-only device has no keyboard for a
  * terminal and no room for a desktop beside the questions, so there is
@@ -20,12 +21,19 @@ export type GateVerdict =
  * window — or zoomed to 400%, which reports the same width — is having
  * a layout problem, not a capability problem, and blocking them outright
  * would be a bug.
+ *
+ * Touch-only is checked FIRST and without reference to width. It used to
+ * be reached only after the narrow test, which meant a tablet held in
+ * landscape — 1024 CSS px, coarse pointer, no keyboard — was reported as
+ * "ok" and walked into the split screen. Width was never the question
+ * for that device: it is the missing keyboard, and rotating it does not
+ * grow one.
  */
 export function useDesktopGate(): GateVerdict {
   const narrow = useMediaQuery(NARROW_QUERY);
   const touchOnly = useMediaQuery(TOUCH_ONLY_QUERY);
-  if (!narrow) return "ok";
-  return touchOnly ? "blocked" : "narrow";
+  if (touchOnly) return "blocked";
+  return narrow ? "narrow" : "ok";
 }
 
 export function gateOverridden(): boolean {
@@ -72,7 +80,15 @@ export function DesktopRequired({ verdict, children }: DesktopRequiredProps) {
             <li key={r}>{r}</li>
           ))}
         </ul>
-        <p className="desktop-required-still">{strings.mobile.stillAvailable}</p>
+        {/* Only where it is true, which is not everywhere this screen is
+            drawn. Over a running attempt the catalog is not reachable at
+            all: session.state is the outer switch, so `#/exams` renders
+            the exam anyway and a link to it would change nothing. The
+            sentence was unconditional, and on the one screen a phone
+            actually sees mid-attempt it was describing a place the
+            candidate could not go. The clock and the submit button above
+            are that case's way forward, and they are already there. */}
+        {!children && <p className="desktop-required-still">{strings.mobile.stillAvailable}</p>}
         {/* Last, and that is the right place for it: it is the "I have
             read why this will not work" action, not an escape from a
             running exam. */}

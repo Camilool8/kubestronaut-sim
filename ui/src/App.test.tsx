@@ -4,6 +4,9 @@ import userEvent from "@testing-library/user-event";
 import App from "./App";
 import type { ControlJob, ControlStatus, SessionSnapshot } from "./api";
 import { toastStore } from "./components/toastStore";
+import { NARROW_QUERY } from "./lib/useMediaQuery";
+import { TOUCH_ONLY_QUERY } from "./lib/deviceCapability";
+import { matchMediaMock } from "./test/setup";
 
 const idleSession: SessionSnapshot = {
   state: "idle",
@@ -651,5 +654,85 @@ describe("App preparing an attempt", () => {
 
     expect(await screen.findByText(/no time was used/)).toBeInTheDocument();
     expect(screen.getByText(/seeding q03 failed/)).toBeInTheDocument();
+  });
+});
+
+// The screen switch under `session.state === "running"`, which nothing
+// asserted before this. Both branches are load-bearing and both were
+// only ever exercised by hand: one decides which engine a candidate
+// sits, the other decides whether they sit it at all.
+describe("App choosing the exam screen", () => {
+  const runningSession: SessionSnapshot = {
+    ...idleSession,
+    state: "running",
+    startedAt: "2026-08-02T10:16:00Z",
+    remainingSeconds: 7200,
+  };
+
+  const mcqExam = {
+    ...exam,
+    name: "kcna-mock-01",
+    title: "KCNA Mock Exam",
+    examType: "mcq",
+    questions: [
+      { id: "q01", domain: "Kubernetes Fundamentals", multi: false, hintCount: 0 },
+    ],
+  };
+
+  function stubRunning(examBody: unknown) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        const json = (body: unknown, status = 200) =>
+          new Response(JSON.stringify(body), { status });
+        if (url.endsWith("/api/me")) return json({ error: "not found" }, 404);
+        if (url.endsWith("/api/control/status")) return json({ busy: false });
+        if (url.endsWith("/api/boot")) return json(readyBoot);
+        if (url.endsWith("/api/session")) return json(runningSession);
+        if (url.endsWith("/api/answers")) return json({});
+        if (url.endsWith("/api/exam")) return json(examBody);
+        if (url.includes("/api/questions/")) {
+          return json({ markdown: "Which one?", options: ["A thing", "Another"] });
+        }
+        if (url.endsWith("/api/catalog")) return json(catalog);
+        return json({});
+      }),
+    );
+  }
+
+  afterEach(() => {
+    matchMediaMock([]);
+  });
+
+  // No terminal, no remote desktop, no keyboard — so the desktop gate
+  // never applies to it, at any width, on any device. This is the whole
+  // reason a phone is welcome in this product.
+  test("a phone sitting a multiple-choice exam gets the exam, not the gate", async () => {
+    matchMediaMock([NARROW_QUERY, TOUCH_ONLY_QUERY]);
+    stubRunning(mcqExam);
+    render(<App />);
+
+    expect(await screen.findByText("Which one?")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /needs a desktop/i })).toBeNull();
+  });
+
+  // The mirror, and the one that must never regress: the server-side
+  // clock is already running, so the gate has to render the submit
+  // control rather than only an explanation. Nobody may be stranded
+  // mid-attempt with no way to end it.
+  test("a phone sitting a hands-on exam gets the gate, and can still submit", async () => {
+    matchMediaMock([NARROW_QUERY, TOUCH_ONLY_QUERY]);
+    stubRunning(exam);
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: /needs a desktop/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Submit exam" })).toBeInTheDocument();
+    // And the clock it is counting against, which is the other half of
+    // "you are not stranded": a submit button with no time left to see
+    // is a control with no context.
+    expect(screen.getByRole("timer")).toBeInTheDocument();
   });
 });

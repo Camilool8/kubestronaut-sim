@@ -412,6 +412,10 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 const (
 	codeEnvironmentStarting    = "environment_starting"
 	codeEnvironmentUnreachable = "environment_unreachable"
+	// The caller's own device cannot run the exam it asked for. Coded
+	// because the SPA answers it with a screen rather than a toast, and
+	// because it is the one refusal here that is not about the server.
+	codeDesktopRequired = "desktop_required"
 )
 
 func writeErrorCode(w http.ResponseWriter, status int, code, msg string) {

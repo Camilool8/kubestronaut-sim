@@ -921,6 +921,20 @@ export const strings = {
     stillAvailable: "You can still browse the exam catalog and read past scores here.",
     continueAnyway: "Continue anyway",
     startDisabled: "Open this on a desktop to start the exam.",
+    // The card badge and body a hands-on exam wears on a touch-only
+    // device, in the catalog and in the hosted lobby. It replaces the
+    // Start button rather than greying one out: a control for something
+    // the product cannot do here is worse than no control, because the
+    // candidate spends their trust before they find out.
+    //
+    // The lobby's wording carries the cost the catalog's does not. There,
+    // pressing Start would take one of a handful of seats — or a place in
+    // the queue — and hold it for an environment nobody could sit.
+    needsDesktop: "Needs a desktop",
+    catalogNote:
+      "This exam is a Linux terminal and a remote desktop beside the questions. That needs a keyboard and a desktop browser, so it cannot be started from this device.",
+    lobbyNote:
+      "This exam is a Linux terminal and a remote desktop beside the questions, so it needs a keyboard and a desktop browser. Starting it here would hold a seat nobody could sit — open the hub on a desktop to take one.",
     sessionRunning:
       "An exam is running. The clock keeps going wherever you are; submit here if you cannot get to a desktop in time.",
     // Training has no deadline, so the urgency above would be a lie. The

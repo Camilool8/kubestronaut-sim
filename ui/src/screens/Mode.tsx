@@ -9,7 +9,7 @@ import {
   type SessionSnapshot,
 } from "../api";
 import { Async } from "../components/Async";
-import { useDesktopGate } from "../components/DesktopRequired";
+import { DesktopRequired, useDesktopGate } from "../components/DesktopRequired";
 import { ExamIntro, markIntroSeen } from "../components/ExamIntro";
 import { ExamTips } from "../components/ExamTips";
 import { Icon } from "../components/Icon";
@@ -425,6 +425,20 @@ export function Mode({ bankId, catalogVersion, onSessionChange }: ModeProps) {
             // rather than flashing a screen for the wrong exam.
             return <p className="page-loading">{strings.mode.wrongExam}</p>;
           }
+          // A touch-only device cannot sit this exam at all, so this
+          // screen has nothing to offer it: three cards it may not press,
+          // a domain filter for a draw that will not happen, and a tips
+          // list about a terminal it does not have. Say the one true
+          // thing instead.
+          //
+          // Not merely defensive. useSeatLanding navigates HERE by itself
+          // the moment a hosted Pod comes up, and a candidate can reach
+          // it from a bookmark or a drill link without passing the
+          // catalog — so this is a screen a phone arrives at without ever
+          // choosing to.
+          if (blocked) {
+            return <DesktopRequired verdict="blocked" />;
+          }
           const modes = loaded.modes?.length ? loaded.modes : DEFAULT_MODES;
           const fullSeconds =
             modes.find((m) => m.id === "exam")?.durationSeconds ?? loaded.durationSeconds;
@@ -446,7 +460,7 @@ export function Mode({ bankId, catalogVersion, onSessionChange }: ModeProps) {
                     mode={m}
                     fullSeconds={fullSeconds}
                     starting={starting === m.id}
-                    disabled={blocked || (starting !== null && starting !== m.id)}
+                    disabled={starting !== null && starting !== m.id}
                     filtered={selected.length > 0}
                     onStart={() => handleStart(m.id, selected)}
                   />
@@ -454,10 +468,12 @@ export function Mode({ bankId, catalogVersion, onSessionChange }: ModeProps) {
               </ul>
 
               {startError && <p className="error-text">{startError}</p>}
-              {/* Say why rather than leaving three dead buttons: the
-                  catalog is worth browsing on a phone, sitting an exam
-                  is not. */}
-              {blocked && <p className="mode-blocked">{strings.mobile.startDisabled}</p>}
+              {/* The disabled-with-a-reason state that used to live here
+                  is gone, and so is the reason for it. It said "open this
+                  on a desktop" beneath three dead cards, a domain filter
+                  and a tips list — a screen entirely about an exam the
+                  device could not start. That case now returns above,
+                  before any of it is drawn. */}
 
               <DrawPanel exam={loaded} selected={selected} onSelect={setPicked} />
 

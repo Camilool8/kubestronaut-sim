@@ -3,6 +3,9 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Mode } from "./Mode";
 import type { ExamInfo, SessionSnapshot } from "../api";
+import { NARROW_QUERY } from "../lib/useMediaQuery";
+import { TOUCH_ONLY_QUERY } from "../lib/deviceCapability";
+import { matchMediaMock } from "../test/setup";
 import { strings } from "../strings";
 
 const modes = [
@@ -472,5 +475,59 @@ describe("the exam tips opener", () => {
     const group = tips.closest(".mode-fine-actions") as HTMLElement;
     expect(group).not.toBeNull();
     expect(within(group).getByRole("button", { name: strings.intro.open })).toBeInTheDocument();
+  });
+});
+
+// The last screen before the clock, and the one a hosted phone reaches
+// without ever choosing to: useSeatLanding navigates here by itself the
+// moment a Pod comes up, and a drill link or a bookmark lands here
+// directly. So it has to be right for a device that cannot sit the exam
+// it is about, not merely defensive.
+describe("a device that cannot sit this exam", () => {
+  afterEach(() => {
+    matchMediaMock([]);
+  });
+
+  test("replaces the whole screen rather than greying three cards", async () => {
+    matchMediaMock([TOUCH_ONLY_QUERY]);
+    renderMode();
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: /needs a desktop/i }),
+    ).toBeInTheDocument();
+    // Not the mode cards, not the domain filter, and not a tips list
+    // about a terminal this device does not have.
+    expect(screen.queryByRole("heading", { name: strings.modes.exam.label })).toBeNull();
+    expect(screen.queryByRole("button", { name: /start/i })).toBeNull();
+  });
+
+  // The gate is about the terminal-and-desktop split screen, which an
+  // mcq exam does not have. This is the whole reason a phone is welcome.
+  test("a multiple-choice exam is offered exactly as before", async () => {
+    matchMediaMock([TOUCH_ONLY_QUERY]);
+    exam = { ...ckad, examType: "mcq" };
+    renderMode();
+
+    expect(await screen.findByRole("heading", { name: strings.modes.exam.label })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: /needs a desktop/i })).toBeNull();
+  });
+
+  // A desktop window dragged narrow has every capability the exam needs.
+  // WCAG 1.4.10 makes 320 CSS px the same as 1280px at 400% zoom, so a
+  // width test here would lock out the users who depend on that zoom.
+  test("a narrowed desktop window still gets the mode cards", async () => {
+    matchMediaMock([NARROW_QUERY]);
+    renderMode();
+
+    expect(await screen.findByRole("heading", { name: strings.modes.exam.label })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: /needs a desktop/i })).toBeNull();
+  });
+
+  test("no attempt can be started from it", async () => {
+    matchMediaMock([TOUCH_ONLY_QUERY]);
+    renderMode();
+
+    await screen.findByRole("heading", { level: 1, name: /needs a desktop/i });
+    expect(startCalls).toEqual([]);
   });
 });

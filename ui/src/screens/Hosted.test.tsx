@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../App";
 import type { Me } from "../api";
+import { NARROW_QUERY } from "../lib/useMediaQuery";
+import { TOUCH_ONLY_QUERY } from "../lib/deviceCapability";
+import { matchMediaMock } from "../test/setup";
 import { strings } from "../strings";
 
 // The hosted tier, from the outside: what a browser sees when the SPA is
@@ -207,6 +210,10 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   window.location.hash = "";
+  // Media mocks are module-global. A leaked one turns every later test
+  // in this file into a phone, and the ones that would then fail are
+  // exactly the ones asserting a Start button exists.
+  matchMediaMock([]);
 });
 
 // The property the whole design rests on: `./sim up` is byte-identical,
@@ -384,6 +391,94 @@ test("a flavour with no seats configured is not offered at all", async () => {
 
   expect(await screen.findByRole("heading", { name: /hands-on exam/i })).toBeTruthy();
   expect(screen.queryByRole("heading", { name: /multiple choice/i })).toBeNull();
+});
+
+// The lobby is the expensive door. Start claims one of a handful of
+// seats and boots a Pod, and when the pool is full it takes a place in
+// the queue — all of it for an environment a phone cannot use. The hub
+// refuses the request too (hub/internal/api/device.go); this is what
+// stops the candidate making the mistake at all.
+test("a phone is not offered a hands-on seat, and is told why", async () => {
+  matchMediaMock([NARROW_QUERY, TOUCH_ONLY_QUERY]);
+  render(<App />);
+
+  const practical = await screen.findByRole("heading", { name: /hands-on exam/i });
+  const card = practical.closest("article")!;
+  expect(within(card).queryByRole("button")).toBeNull();
+  expect(within(card).getByText(/needs a keyboard and a desktop browser/i)).toBeTruthy();
+  // Not "coming soon" and not a seat count: the exam is built, and
+  // someone on a laptop is sitting it right now.
+  expect(within(card).getByText(strings.mobile.needsDesktop)).toBeTruthy();
+  expect(within(card).queryByText(/free$/)).toBeNull();
+});
+
+// The other half of the same rule, and the one that would be easy to
+// break by gating the screen instead of the card. Multiple choice is
+// the whole reason a phone is welcome here.
+test("a phone can still take a multiple-choice seat", async () => {
+  matchMediaMock([NARROW_QUERY, TOUCH_ONLY_QUERY]);
+  const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+  render(<App />);
+
+  const mcq = await screen.findByRole("heading", { name: /multiple choice/i });
+  const card = mcq.closest("article")!;
+  await user.click(within(card).getByRole("button", { name: "Start" }));
+
+  await waitFor(() => {
+    const start = posted.find((p) => p.url.endsWith("/api/session/start"));
+    expect(JSON.parse(start!.body)).toEqual({ kind: "mcq" });
+  });
+});
+
+// A tablet held in landscape is wide enough to pass a width test and
+// has no more keyboard than a phone. Gating on NARROW_QUERY alone would
+// let it spend a seat.
+test("a wide tablet is refused a hands-on seat too", async () => {
+  matchMediaMock([TOUCH_ONLY_QUERY]);
+  render(<App />);
+
+  const practical = await screen.findByRole("heading", { name: /hands-on exam/i });
+  expect(within(practical.closest("article")!).queryByRole("button")).toBeNull();
+});
+
+// Certification cards take the same treatment as flavour cards: the
+// refusal is keyed on the exam's engine, not on which shape of card the
+// deployment happens to be showing.
+test("a phone is refused the hands-on certification card as well", async () => {
+  matchMediaMock([NARROW_QUERY, TOUCH_ONLY_QUERY]);
+  hubExams = [
+    {
+      id: "ckad-mock-01",
+      title: "CKAD Mock Exam 01",
+      certification: "CKAD",
+      description: "Twenty-two hands-on tasks.",
+      examType: "hands-on",
+      kind: "practical",
+      durationSeconds: 7200,
+      questionCount: 22,
+      nodes: 2,
+      available: true,
+    },
+    {
+      id: "kcna-mock-01",
+      title: "KCNA Mock Exam",
+      certification: "KCNA",
+      description: "Sixty-five multiple-choice questions.",
+      examType: "mcq",
+      kind: "mcq",
+      durationSeconds: 5400,
+      questionCount: 65,
+      nodes: 0,
+      available: true,
+    },
+  ];
+  render(<App />);
+
+  const ckad = await screen.findByRole("heading", { name: "CKAD" });
+  expect(within(ckad.closest("article")!).queryByRole("button")).toBeNull();
+
+  const kcna = screen.getByRole("heading", { name: "KCNA" });
+  expect(within(kcna.closest("article")!).getByRole("button", { name: "Start" })).toBeTruthy();
 });
 
 // The button stays enabled when every seat is taken — the queue is the
