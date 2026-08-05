@@ -165,9 +165,11 @@
   gap: var(--space-3);
 }
 
-/* Wider than the lead's gap on purpose: this cluster is three groups —
-   the session, the nav, the icon buttons — and at the lead's spacing they
-   read as one undifferentiated row of eight controls. */
+/* Wider than the lead's gap on purpose: this cluster is four groups —
+   the session, {children} (the backgrounded-job chip, between the
+   session and the nav — see AppHeader.tsx), the nav, the icon buttons —
+   and at the lead's spacing they read as one undifferentiated row of
+   controls. */
 .app-header-tail {
   gap: var(--space-4);
   flex-shrink: 0;

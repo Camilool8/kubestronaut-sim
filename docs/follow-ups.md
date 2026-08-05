@@ -131,9 +131,10 @@ Known, chosen, and not currently worth the cost of changing.
   screen — that screen has its own topbar with its own clock, and a
   second countdown beside it would be read as the exam's. Two
   consequences, one good and one not. The good one: there is no way to
-  destroy an environment mid-attempt by misclick, because the End
-  session control is on the same chip. The cost: a session whose hard
-  cap falls inside an attempt ends it with no warning on screen. Narrow
+  destroy an environment mid-attempt by misclick, because the whole
+  header — End session included — is simply not rendered over a running
+  exam; there is no control there to misclick. The cost: a session whose
+  hard cap falls inside an attempt ends it with no warning on screen. Narrow
   in practice — the cap defaults to ten hours against a two-hour exam —
   and the honest fix is a lease indicator in the exam's own topbar
   rather than a second header, which is a change to two exam screens
