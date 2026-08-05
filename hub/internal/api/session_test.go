@@ -2,6 +2,7 @@ package api
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"io"
 	"net"
@@ -9,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -385,5 +387,104 @@ func TestEndingASessionFreesTheSeat(t *testing.T) {
 	}
 	if _, err := m.Get("583231"); err == nil {
 		t.Error("the session outlived the request to end it")
+	}
+}
+
+// stalledPods creates Pods that never become ready. That is exactly the
+// state the proxy's 503 branch exists for — a session admitted, holding a
+// seat, with nowhere to send traffic yet — and it is the state a hosted
+// "New attempt" spends its first minutes in, because a reset here is Pod
+// replacement.
+type stalledPods struct {
+	mu   sync.Mutex
+	live map[string]bool
+}
+
+func (p *stalledPods) Create(_ context.Context, spec []byte) error {
+	var pod struct {
+		Metadata struct {
+			Name string `json:"name"`
+		} `json:"metadata"`
+	}
+	if err := json.Unmarshal(spec, &pod); err != nil {
+		return err
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.live == nil {
+		p.live = map[string]bool{}
+	}
+	if p.live[pod.Metadata.Name] {
+		return session.ErrPodExists
+	}
+	p.live[pod.Metadata.Name] = true
+	return nil
+}
+
+func (p *stalledPods) Get(_ context.Context, name string) (session.Pod, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !p.live[name] {
+		return session.Pod{}, session.ErrPodGone
+	}
+	return session.Pod{Name: name, IP: "10.42.0.9", Phase: "Running", Ready: false}, nil
+}
+
+func (p *stalledPods) Delete(_ context.Context, name string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !p.live[name] {
+		return session.ErrPodGone
+	}
+	delete(p.live, name)
+	return nil
+}
+
+func (p *stalledPods) List(context.Context, string) ([]session.Pod, error) {
+	return nil, nil
+}
+
+// The SPA has to tell an expected wait from an outage, and the sentence
+// in the body is copy — the next person to reword it would silently
+// break whatever was matching on it.
+func TestProxySaysWhetherAWaitIsAWaitOrAFault(t *testing.T) {
+	s, _ := newServer(t, auth.ModeGitHub)
+	s.Sessions = session.New(&stalledPods{}, session.Config{
+		Flavours: map[session.Kind]session.Flavour{
+			session.Practical: {Seats: 1, Template: session.Template(podTemplate)},
+		},
+		Logf: func(string, ...any) {},
+	})
+	s.DefaultKind = session.Practical
+
+	c := login(t, s, "583231", "octocat")
+	start := httptest.NewRequest(http.MethodPost, "/api/session/start", strings.NewReader("{}"))
+	start.AddCookie(c)
+	if w := do(s, start); w.Code != http.StatusAccepted {
+		t.Fatalf("start = %d, want 202", w.Code)
+	}
+
+	r := httptest.NewRequest(http.MethodGet, "/api/session", nil)
+	r.AddCookie(c)
+	w := do(s, r)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503", w.Code)
+	}
+	var body struct {
+		Error string `json:"error"`
+		Code  string `json:"code"`
+		State string `json:"state"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Code != "environment_starting" {
+		t.Errorf("code = %q, want environment_starting; body was %q", body.Code, body.Error)
+	}
+	if body.Error == "" {
+		t.Error("the sentence for a person went away — both are wanted, not one or the other")
+	}
+	if body.State == "" {
+		t.Error("state went away; the boot screen reads it")
 	}
 }
