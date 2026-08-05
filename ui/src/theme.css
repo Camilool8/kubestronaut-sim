@@ -7076,7 +7076,11 @@ button.nav-menu-item:hover {
 .navigator-chip,
 .question-mark,
 .info-button,
-.theme-toggle,
+.nav-menu-item,
+.nav-menu-trigger {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
 
 /* The keyboard hints, keyed to the pointer rather than to the width.
    A `kbd` badge reading F beside "Mark for review" is instruction on a

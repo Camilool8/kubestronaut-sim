@@ -339,6 +339,56 @@ describe("value chips that are too long for their column", () => {
  * `.exam-card-actions`, and `.header-menu-trigger` for
  * `.header-menu-button`.
  */
+/**
+ * The stylesheet is structurally whole.
+ *
+ * A selector list that runs into an at-rule instead of into a `{` is
+ * invalid CSS, and every downstream tool treats it as a warning rather
+ * than an error: esbuild prints `Unexpected "@media"` in the middle of a
+ * successful build, drops the rule, and ships. Nothing fails, the bundle
+ * is smaller by one rule, and the behaviour that rule carried is simply
+ * gone.
+ *
+ * That is exactly what happened to the touch layer here: a scripted edit
+ * matched a selector list whose closing line had already been removed by
+ * an earlier one, so the replacement silently no-opped and left
+ * `.info-button,\n.theme-toggle,` hanging in front of a media query.
+ * `touch-action: manipulation` and the tap-highlight reset stopped
+ * shipping, on phones, and the "still in the stylesheet" test below
+ * passed anyway — a `toContain(".nav-menu-item")` is satisfied by that
+ * class appearing in ANY rule, including its own.
+ *
+ * Braces balancing is not enough either: the file balanced.
+ */
+describe("theme.css is structurally whole", () => {
+  test("no selector list runs into an at-rule, a close brace or the end of the file", async () => {
+    const css = await readThemeCss();
+    const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
+
+    const dangling = [...withoutComments.matchAll(/,\s*(?=@|\}|$)/g)].map((m) =>
+      withoutComments.slice(Math.max(0, m.index - 120), m.index + 40).trim(),
+    );
+
+    expect(dangling, "a selector list with no declaration block — esbuild drops the rule and only warns").toEqual([]);
+  });
+
+  test("every brace opened is closed, and none closes early", async () => {
+    const css = await readThemeCss();
+    const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    let depth = 0;
+    let wentNegative = false;
+    for (const ch of withoutComments) {
+      if (ch === "{") depth++;
+      if (ch === "}") {
+        depth--;
+        if (depth < 0) wentNegative = true;
+      }
+    }
+    expect(wentNegative, "a stray closing brace ends a block early").toBe(false);
+    expect(depth, "an unclosed block swallows every rule after it").toBe(0);
+  });
+});
+
 describe("the touch layer names classes that exist", () => {
   // The classes the touch section targets, listed here rather than
   // parsed out of the CSS: a test that derives its expectations from the
