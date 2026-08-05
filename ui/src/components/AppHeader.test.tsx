@@ -227,6 +227,27 @@ describe("AppHeader", () => {
       expect(screen.getByRole("button", { name: /theme/i })).toBeInTheDocument();
     });
 
+    // `./sim up` never passes a `session` prop at all — it is `undefined`,
+    // not an object whose own `.session` happens to be undefined — and
+    // that is the one shape none of the tests above exercise: every one
+    // of them passes a session. It matters here specifically because it
+    // is what drives the `(nav?.length || session) &&` gate deciding
+    // whether the menu renders at all.
+    test("the local product's shape still gets a menu, holding only the nav", async () => {
+      const user = userEvent.setup();
+      renderHeader(
+        <AppHeader
+          nav={[{ label: "Exams", to: "/exams" }, { label: "Progress", to: "/progress" }]}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: strings.header.menuLabel }));
+      expect(screen.getByRole("button", { name: "Exams" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Progress" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: strings.hosted.signOut })).toBeNull();
+      expect(screen.queryByRole("button", { name: strings.hosted.endSession })).toBeNull();
+      expect(screen.queryByText(strings.header.menuAccount)).toBeNull();
+    });
+
     // The dialog is raised from inside the popover and must outlive it.
     test("the end-session confirmation survives the menu closing", async () => {
       const user = userEvent.setup();
