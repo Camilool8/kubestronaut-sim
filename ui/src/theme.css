@@ -6441,6 +6441,100 @@
   font-size: var(--text-s);
 }
 
+/* ---- header menu ----
+   Everything in the header that is not time-critical, on a viewport too
+   narrow to hold it. See HeaderMenu.tsx for why this is a popover and not
+   a sheet. */
+
+.header-menu {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.header-menu-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-s);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.header-menu-button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+/* Sits under the panel and over everything else, so a pointer anywhere
+   outside dismisses. */
+.header-menu-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-panel);
+}
+
+.header-menu-panel {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: var(--z-dialog);
+  min-width: 13rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-2);
+}
+
+/* Every child is a full-width row with a real target, whatever element
+   it happens to be — the panel takes nav links, session buttons and a
+   plain label. */
+.header-menu-panel > button,
+.header-menu-panel > .header-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-s);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-s);
+  text-align: left;
+  cursor: pointer;
+}
+
+.header-menu-panel > button:hover {
+  background: var(--surface-hover);
+}
+
+.header-menu-label {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.header-menu-rule {
+  height: 1px;
+  margin: var(--space-1) 0;
+  background: var(--border);
+}
+
 @media (max-width: 40rem) {
   .session-chip-user {
     display: none;

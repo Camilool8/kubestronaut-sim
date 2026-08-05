@@ -57,6 +57,7 @@ describe("Icon", () => {
       "theme-light",
       "theme-dark",
       "help",
+      "menu",
     ];
     expect(new Set(ICON_NAMES)).toEqual(new Set(declared));
   });

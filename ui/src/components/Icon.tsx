@@ -47,7 +47,8 @@ export type IconName =
   | "theme-auto"
   | "theme-light"
   | "theme-dark"
-  | "help";
+  | "help"
+  | "menu";
 
 const SUN_RAYS = [
   "M12 2.4v2.2",
@@ -128,6 +129,13 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <path d="M9.3 9.2a2.8 2.8 0 1 1 3.6 2.7c-.9.3-1.4 1-1.4 1.9v.5" />
       <path d="M11.5 17.6h.01" />
+    </>
+  ),
+  menu: (
+    <>
+      <path d="M4 7h16" />
+      <path d="M4 12h16" />
+      <path d="M4 17h16" />
     </>
   ),
 };

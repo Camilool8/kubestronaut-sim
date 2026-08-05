@@ -31,6 +31,10 @@ export const strings = {
     // from nowhere.
     navExams: "Exams",
     navProgress: "Progress",
+    // The narrow-viewport menu. The button is icon-only, so this is the
+    // whole of its accessible name.
+    menuLabel: "Menu",
+    menuAccount: "Account",
   },
 
   // 1b, the exam selector. The screen a candidate lands on.
