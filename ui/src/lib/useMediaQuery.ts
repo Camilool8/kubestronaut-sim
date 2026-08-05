@@ -50,3 +50,13 @@ export const TOUCH_ONLY_QUERY = "(any-pointer: coarse) and (not (any-pointer: fi
  * fractional-DPI displays, where neither rule would apply.
  */
 export const SPLIT_QUERY = "not (max-width: 900px)";
+
+/**
+ * Too narrow for the header's full row.
+ *
+ * At its fullest that row is a wordmark, a rule, a crumb, a detail line,
+ * two nav links, a login, a lease countdown and four buttons. It starts
+ * colliding well above the 560px the old rule used, which only ever hid
+ * the crumb and let the rest overflow.
+ */
+export const HEADER_COMPACT_QUERY = "(max-width: 48rem)";

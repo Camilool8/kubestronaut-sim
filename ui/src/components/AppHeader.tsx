@@ -3,10 +3,12 @@ import type { ReactNode } from "react";
 import type { HostedSession } from "../api";
 import { BrandMark } from "./BrandMark";
 import { EndSessionDialog, SessionActions, SessionChip } from "./SessionChip";
+import { HeaderMenu } from "./HeaderMenu";
 import { Icon } from "./Icon";
 import { InfoButton } from "./InfoButton";
 import { ThemeToggle } from "./ThemeToggle";
 import { navigate } from "../lib/useHashRoute";
+import { HEADER_COMPACT_QUERY, useMediaQuery } from "../lib/useMediaQuery";
 import { strings } from "../strings";
 
 /** One entry in the header's right-hand navigation. */
@@ -56,6 +58,29 @@ export interface AppHeaderProps {
   children?: ReactNode;
 }
 
+function NavLinks({ nav }: { nav: NavItem[] }) {
+  return (
+    <>
+      {nav.map((item) =>
+        item.current ? (
+          <span key={item.to} className="app-header-link app-header-link-on" aria-current="page">
+            {item.label}
+          </span>
+        ) : (
+          <button
+            key={item.to}
+            type="button"
+            className="app-header-link"
+            onClick={() => navigate(item.to)}
+          >
+            {item.label}
+          </button>
+        ),
+      )}
+    </>
+  );
+}
+
 /**
  * The chrome above every screen that is not the exam itself.
  *
@@ -77,6 +102,11 @@ export function AppHeader({
 }: AppHeaderProps) {
   // Owned here, not by the control that raises it. See SessionChip.
   const [confirming, setConfirming] = useState(false);
+  // Branched in JS rather than hidden in CSS, and that is the whole
+  // point: the controls MOVE. Rendering both copies and hiding one would
+  // give every button two accessible names, which is a worse bug than the
+  // overflow it fixes.
+  const compact = useMediaQuery(HEADER_COMPACT_QUERY);
 
   return (
     <>
@@ -114,35 +144,42 @@ export function AppHeader({
         </div>
 
         <div className="app-header-tail">
-          {session && (
+          {!compact && session && (
             <div className="session-cluster">
               <SessionChip login={session.login} session={session.session} />
               <SessionActions session={session.session} onEnd={() => setConfirming(true)} />
             </div>
           )}
-          {children}
-          {nav && nav.length > 0 && (
+          {!compact && nav && nav.length > 0 && (
             <nav className="app-header-nav" aria-label={strings.header.navLabel}>
-              {nav.map((item) =>
-                item.current ? (
-                  <span key={item.to} className="app-header-link app-header-link-on" aria-current="page">
-                    {item.label}
-                  </span>
-                ) : (
-                  <button
-                    key={item.to}
-                    type="button"
-                    className="app-header-link"
-                    onClick={() => navigate(item.to)}
-                  >
-                    {item.label}
-                  </button>
-                ),
-              )}
+              <NavLinks nav={nav} />
             </nav>
           )}
+          {/* The countdown never collapses: a hosted seat is taken back at
+              its cap whatever the candidate is doing, so the number they
+              cannot guess must not be behind a tap. */}
+          {compact && session?.session && (
+            <SessionChip login="" session={session.session} />
+          )}
+          {children}
           <InfoButton />
           <ThemeToggle />
+          {compact && (nav?.length || session) && (
+            <HeaderMenu label={strings.header.menuLabel}>
+              {nav && nav.length > 0 && <NavLinks nav={nav} />}
+              {session && (
+                <>
+                  <div className="header-menu-rule" />
+                  <span className="header-menu-label">{strings.header.menuAccount}</span>
+                  <span className="header-menu-item">{session.login}</span>
+                  <SessionActions
+                    session={session.session}
+                    onEnd={() => setConfirming(true)}
+                  />
+                </>
+              )}
+            </HeaderMenu>
+          )}
         </div>
       </header>
       {confirming && session && (

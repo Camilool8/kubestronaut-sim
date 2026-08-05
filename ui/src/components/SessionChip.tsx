@@ -38,7 +38,7 @@ export function SessionChip({
 
   return (
     <div className="session-chip">
-      <span className="session-chip-user">{login}</span>
+      {login && <span className="session-chip-user">{login}</span>}
       {live && (
         <span
           className="session-chip-clock"
