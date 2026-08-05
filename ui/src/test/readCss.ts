@@ -51,6 +51,58 @@ export function readTokensCss(): Promise<string> {
 }
 
 /**
+ * Every class name any component actually puts on an element.
+ *
+ * Collected from `className=` attributes, the template literals that
+ * build a conditional one (`mcq-option${on ? " mcq-option-on" : ""}`),
+ * and `classList` calls. Deliberately over-inclusive: this exists so a
+ * test can prove a SELECTOR is not dead, and a false "yes it is used"
+ * from some unrelated string is a missed catch, while a false "no" would
+ * be a failing build over nothing.
+ */
+export async function usedClassNames(): Promise<Set<string>> {
+  const fsMod = (await import("node:" + "fs")) as {
+    readFileSync: (path: string, encoding: string) => string;
+    readdirSync: (path: string, opts: { withFileTypes: true }) => {
+      name: string;
+      isDirectory: () => boolean;
+    }[];
+  };
+  const urlMod = (await import("node:" + "url")) as {
+    fileURLToPath: (url: string) => string;
+  };
+  const pathMod = (await import("node:" + "path")) as {
+    default: { join: (...segments: string[]) => string; dirname: (p: string) => string };
+  };
+  const nodePath = pathMod.default;
+  const src = nodePath.join(nodePath.dirname(urlMod.fileURLToPath(import.meta.url)), "..");
+
+  const names = new Set<string>();
+  const walk = (dir: string) => {
+    for (const entry of fsMod.readdirSync(dir, { withFileTypes: true })) {
+      const full = nodePath.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (!entry.name.endsWith(".tsx") && !entry.name.endsWith(".ts")) continue;
+      if (entry.name.includes(".test.")) continue;
+      const source = fsMod.readFileSync(full, "utf8");
+      // Any run of class-shaped characters inside a quoted or
+      // backticked string. Cheaper and more robust than parsing JSX,
+      // and the over-inclusiveness is the documented trade above.
+      for (const match of source.matchAll(/["'`]([^"'`\n]*)["'`]/g)) {
+        for (const token of match[1].split(/[\s${}]+/)) {
+          if (/^[a-z][a-z0-9-]*$/.test(token)) names.add(token);
+        }
+      }
+    }
+  };
+  walk(src);
+  return names;
+}
+
+/**
  * Returns the declaration block of the first rule whose selector list
  * matches `selector` exactly (after whitespace normalisation), or null.
  *

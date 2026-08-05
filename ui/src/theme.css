@@ -6627,3 +6627,108 @@
   margin: var(--space-1) 0;
   background: var(--border);
 }
+
+/* ---- touch input ----
+
+   Cross-cutting, and last in the file on purpose: these are overrides of
+   component rules above, and the cascade is what makes them win without
+   a single !important.
+
+   Two media features, and they answer different questions. `any-pointer:
+   coarse` asks "could a finger be used here" and governs SIZE — a
+   touchscreen laptop gets the bigger targets and keeps every hover
+   affordance. `hover: none` asks "is there a pointer that can rest on
+   something without pressing it" and governs STATE; it is false on a
+   phone and true on that same laptop. Conflating them is how a laptop
+   loses its hover styling for having a touchscreen. */
+
+/* The 300ms wait a mobile browser used to hold every tap for, in case a
+   second one arrived and meant "zoom". `touch-action: manipulation`
+   opts out of double-tap zoom on these controls only — pinch zoom is
+   untouched, which matters: WCAG 1.4.4 is not negotiable and disabling
+   page zoom to win a third of a second would be a poor trade.
+
+   The tap highlight goes with it. It is a translucent grey rectangle the
+   OS paints over the element's own box, so it ignores the border radius
+   and squares off every rounded control at the moment of contact. What
+   replaces it is not nothing — the :active rules below are the feedback,
+   and they are the same fill step hover uses, so the vocabulary is one
+   thing rather than two. */
+.btn,
+.mcq-option,
+.navigator-tile,
+.navigator-chip,
+.question-mark,
+.info-button,
+.theme-toggle,
+.header-menu-button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Sticky hover, which is the defect this block mainly exists for.
+ *
+ * A phone has no hover, so a browser fakes one: it applies :hover on
+ * touch and LEAVES IT THERE until something else is touched. On a screen
+ * where hover means "the control under your pointer", that reads as a
+ * selection — and on the mcq options, where selection is drawn with a
+ * fill step of its own, it reads as the wrong answer being chosen.
+ *
+ * Reset to the resting state rather than restyled. There is nothing a
+ * hover state can usefully say on a device that cannot hover, and the
+ * :active rules below carry the press.
+ */
+@media (hover: none) {
+  .btn:hover:not(:disabled) {
+    background: var(--surface-raised);
+    color: var(--text);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+  }
+
+  .mcq-option:hover {
+    background: var(--surface-raised);
+  }
+
+  .navigator-tile:hover:not(:disabled) {
+    background: var(--surface-raised);
+  }
+
+  .header-menu-panel > button:hover,
+  .header-menu-panel > .header-menu-nav > button:hover {
+    background: transparent;
+  }
+}
+
+/* The press, on a device where it is the only feedback there is.
+ *
+ * A fill step and nothing else — no scale, no spring, no shadow. The
+ * design forbids those and is right to: this is an instrument panel for
+ * someone about to sit a proctored exam, and a button that bounces reads
+ * as unserious. A fill step is also the vocabulary the whole system
+ * already uses for "reached for", so a press and a hover say the same
+ * thing in the same way.
+ *
+ * Outside a reduced-motion guard deliberately: there is no motion here
+ * to reduce. It is a colour change on an event, which is what the
+ * Non-Motion Channel Rule asks every state to have.
+ */
+@media (any-pointer: coarse) {
+  .mcq-option:active {
+    background: var(--raised-hover);
+  }
+
+  .navigator-tile:active:not(:disabled) {
+    background: var(--raised-hover);
+  }
+
+  /* The label and the flag, which are .btn-sized but not .btn. */
+  .question-mark:active,
+  .info-button:active {
+    background: var(--raised-hover);
+  }
+}

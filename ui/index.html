@@ -2,7 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover is what makes env(safe-area-inset-*) report
+         anything but zero. Without it the browser letterboxes the page
+         inside the safe area itself, so every inset is 0 and the
+         padding written against them is dead code — which is exactly
+         what the compact header's insets were until this line existed.
+         Opting in means the page now reaches the notch and the home
+         indicator, and owes them that padding in return. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta
       name="description"
       content="Kubestronaut Sim — a local Kubernetes certification exam simulator with a real remote desktop, timed sessions, and automated grading."

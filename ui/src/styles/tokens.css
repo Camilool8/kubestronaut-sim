@@ -281,6 +281,58 @@
   --mcq-measure: 720px;
   --page-max: 1160px;
   --results-sidebar: 340px;
+
+  /* Touch targets. Two values because the two floors are real and
+     different: 44px is Apple's HIG minimum and WCAG 2.5.5's, and is what
+     an icon control in a dense row may shrink to. 48px is Material's,
+     and is what a control the thumb reaches for WITHOUT looking gets —
+     the exam's action bar, where the candidate's eyes are on the
+     question and the target is found by feel.
+     Applied on `any-pointer: coarse` rather than on width, matching the
+     rule the rest of this system already uses: a mouse at 380px does not
+     need a 44px button, and a finger at 1024px does. */
+  --tap-min: 44px;
+  --tap-comfortable: 48px;
+
+  /* The safe area, named once so no component writes the env() call.
+     Every one of these is 0 until index.html opts in with
+     viewport-fit=cover, and 0 on every desktop — so they are free to
+     add unconditionally, which is the point. The fallback matters: a
+     browser that has never heard of env() drops the whole declaration
+     it appears in, taking the padding beside it with it. */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+}
+
+/* The reading sizes on a small screen.
+ *
+ * A token-level step rather than a per-component one, so it lifts every
+ * screen at once and no component has to know it happened. Only the
+ * three sizes that carry PROSE move: body, emphasised body and card
+ * titles. The label ramp below them is unchanged — an 11px stat label is
+ * a label at any size, and growing it would break the strips it sits in
+ * — and so is everything above, which is display type that is already
+ * large enough.
+ *
+ * 13.5px is a considered choice for a dense desktop instrument panel
+ * held at arm's length on a 27" display. It is the wrong number for a
+ * phone held at 30cm, where 16px is the floor iOS uses to decide a form
+ * control will not trigger a zoom, and where the same information has a
+ * fifth of the width to say itself in.
+ *
+ * Keyed on width and not on pointer, unlike the touch targets above.
+ * This is about how far the screen is from the eye and how little of it
+ * there is, which a tablet with a keyboard has exactly as much as a
+ * tablet without one.
+ */
+@media (max-width: 640px) {
+  :root {
+    --text-m: 0.9375rem; /* 15px — body */
+    --text-l: 1rem; /* 16px — emphasised body, option text */
+    --text-xl: 1.125rem; /* 18px — card titles */
+  }
 }
 
 /* The machine. Identical in both themes on purpose: a terminal does not
