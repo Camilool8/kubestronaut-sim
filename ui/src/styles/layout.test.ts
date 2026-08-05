@@ -355,6 +355,38 @@ describe("the touch layer names classes that exist", () => {
     "header-menu-button",
     "header-menu-panel",
     "header-menu-nav",
+    "header-menu-item",
+    // The mobile chrome block at the foot of the file, which is the same
+    // kind of override and fails the same silent way. `.signin-cta` was
+    // written here first and does not exist; the button is
+    // `.signin-github`.
+    "page",
+    "score-screen",
+    "signin",
+    "signin-github",
+    "page",
+    "signin",
+    "hosted-flavour-actions",
+    "hosted-booting",
+    "score-actions",
+    "desktop-required-anyway",
+    "gate-session",
+    "progress-actions",
+    // Classes this branch introduced. A style with no element is as dead
+    // as an element with no style, and these are new on both sides.
+    "hosted-flavour-badge",
+    "hosted-boot-blocked",
+    "mcq-jump-position",
+    "topbar-compact",
+    "topbar-more",
+    "topbar-sheet",
+    "topbar-sheet-extras",
+    "topbar-sheet-end",
+    "navigator-sheet",
+    "navigator-scrim",
+    "sheet-grip",
+    "confirm-overlay-sheet",
+    "confirm-dialog-sheet",
   ];
 
   test("every class the touch rules restyle is really put on an element", async () => {

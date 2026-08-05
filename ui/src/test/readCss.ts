@@ -88,13 +88,28 @@ export async function usedClassNames(): Promise<Set<string>> {
       if (!entry.name.endsWith(".tsx") && !entry.name.endsWith(".ts")) continue;
       if (entry.name.includes(".test.")) continue;
       const source = fsMod.readFileSync(full, "utf8");
-      // Any run of class-shaped characters inside a quoted or
-      // backticked string. Cheaper and more robust than parsing JSX,
-      // and the over-inclusiveness is the documented trade above.
-      for (const match of source.matchAll(/["'`]([^"'`\n]*)["'`]/g)) {
-        for (const token of match[1].split(/[\s${}]+/)) {
-          if (/^[a-z][a-z0-9-]*$/.test(token)) names.add(token);
-        }
+      // Split the whole file on anything a class name cannot contain,
+      // and keep the tokens that look like one.
+      //
+      // Not "does the file contain this substring", which is the obvious
+      // version and is wrong in the exact case this exists for:
+      // `exam-card-action` is a substring of `exam-card-actions`, so a
+      // substring check reports the typo as used. Splitting on
+      // non-class characters puts a boundary at each end of every token,
+      // and the two stop matching.
+      //
+      // Not a quoted-string scan either, which was the first attempt: a
+      // template literal like `navigator${on ? " navigator-sheet" : ""}`
+      // mixes backticks and double quotes, and pairing them left to
+      // right desynchronises for the rest of the file.
+      // Single words are kept as well as hyphenated ones — `btn`,
+      // `page` and `signin` are all real classes — which sweeps in every
+      // lowercase identifier in the file alongside them. That is only
+      // over-inclusion, and over-inclusion costs a missed catch rather
+      // than a false failure. A name that is WRONG still does not appear
+      // under any spelling, which is the property the check needs.
+      for (const token of source.split(/[^a-zA-Z0-9-]+/)) {
+        if (/^[a-z][a-z0-9-]*$/.test(token)) names.add(token);
       }
     }
   };

@@ -4943,6 +4943,15 @@
   gap: var(--space-2);
 }
 
+/* The position, on the face of the button that changes it. Tabular so
+   the bar does not twitch as the number grows a digit, and mono because
+   every other position in this product is. */
+.mcq-jump-position {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
 .mcq-jump-trigger[aria-expanded="true"] {
   background: var(--raised-hover);
   border-color: var(--border-strong);
@@ -6646,6 +6655,33 @@
   line-height: 1.4;
 }
 
+/* "Needs a desktop", in the slot the seat count occupies on a card that
+   can be started. It is a STATE the card is in, not a count, so it takes
+   the same flat pill the catalog's own refusals wear rather than a
+   figure's plain text. Muted, not danger: nothing has gone wrong, and
+   colouring it red would say the exam is broken rather than that the
+   device is the wrong shape for it. */
+.hosted-flavour-badge {
+  display: inline-block;
+  padding: 0.15em 0.6em;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+/* The same explanation on the failed-boot screen, where Try again is
+   the control it stands in for. Prose rather than a pill: this one is
+   answering "why is there no retry button", which is a sentence. */
+.hosted-boot-blocked {
+  max-width: 44ch;
+  color: var(--text-muted);
+}
+
 /* Pinned, so both cards' buttons sit on one line whatever the pitch
    above them runs to — .exam-card-actions, for the same reason. */
 .hosted-flavour-actions {
@@ -6998,5 +7034,84 @@
   .question-mark:active,
   .info-button:active {
     background: var(--raised-hover);
+  }
+}
+
+/* ---- the hub and its chrome, on a phone ----
+
+   Last in the file with the touch layer, and for the same reason: these
+   are overrides of components defined far above. */
+
+@media (max-width: 640px) {
+  /* The header menu becomes a sheet.
+   *
+   * It is an absolutely-positioned popover hanging off the top-right
+   * corner, which is where the button that opens it is — and on a phone
+   * that corner is the single hardest place on the screen to reach. The
+   * menu holds the nav, the login and Sign out: things you deliberately
+   * go to, arriving in the one region a thumb cannot get to without
+   * shifting grip.
+   *
+   * The scrim it already renders is doing the dismissal, so this is a
+   * position change and nothing else. It is not `role="dialog"` — it is
+   * a `role="group"` disclosure and stays one, because HeaderMenu's own
+   * comment records why, and moving it down the screen does not change
+   * what it is. */
+  .header-menu-panel {
+    position: fixed;
+    inset: auto 0 0 0;
+    min-width: 0;
+    padding: var(--space-2);
+    padding-bottom: calc(var(--space-2) + var(--safe-b));
+    border-radius: var(--radius-l) var(--radius-l) 0 0;
+    border-bottom: 0;
+    box-shadow: var(--shadow-3);
+  }
+
+  /* --text-s is 12.5px and the mobile ramp does not raise it, because it
+     is a label size and these are not labels — they are the destinations
+     of a navigation, read once and pressed. */
+  .header-menu-panel > button,
+  .header-menu-panel > .header-menu-nav > button,
+  .header-menu-panel > .header-menu-item {
+    font-size: var(--text-m);
+    min-height: var(--tap-comfortable);
+  }
+
+  /* The page's own bottom edge. Every screen that is a PAGE now reaches
+     the physical bottom of the display, so the last thing on it — a
+     Start button, an Erase history button, the tips list — would
+     otherwise sit under the home indicator. The exam screens do not need
+     this: their action bars pay the inset themselves, because they are
+     pinned rather than scrolled to. */
+  .page,
+  .score-screen {
+    padding-bottom: calc(var(--space-6) + var(--safe-b));
+  }
+
+  /* A control on a card is aimed at; a control that ENDS a card is
+     reached for. The lobby's Start, the boot screen's Give up and the
+     score screen's actions are all the last thing on a column the reader
+     has just scrolled through. */
+  .hosted-flavour-actions .btn,
+  .hosted-booting > .btn,
+  .score-actions .btn,
+  .desktop-required-anyway,
+  .gate-session .btn,
+  .signin-github {
+    min-height: var(--tap-comfortable);
+  }
+
+  /* The sign-in screen is the product's front door and the one screen
+     with no header, so it carries its own edges. */
+  .signin {
+    padding-top: calc(var(--space-4) + var(--safe-t));
+    padding-bottom: calc(var(--space-4) + var(--safe-b));
+  }
+
+  /* The dashboard's history controls: three buttons that were sized for
+     a toolbar and are now a stack. */
+  .progress-actions .btn {
+    min-height: var(--tap-comfortable);
   }
 }
