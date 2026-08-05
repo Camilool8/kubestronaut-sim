@@ -645,3 +645,69 @@ test("a rebuild says so, and a first boot still reads as a first boot", async ()
     screen.getByRole("button", { name: strings.hosted.bootGiveUp }),
   ).toBeInTheDocument();
 });
+
+// A hosted seat is scoped to one exam — the Pod is stamped and sized for
+// it — so the picker at the end of a boot has one card on it and asks the
+// candidate to re-confirm what they chose in the lobby. After a rebuild
+// it reads as having been thrown out of the attempt they asked to repeat.
+test("an environment that comes up lands on its exam, not on the picker", async () => {
+  identity = me({
+    session: {
+      kind: "practical",
+      bank: "ckad-mock-01",
+      pod: "sim-session-practical-583231",
+      state: "starting",
+      op: "reset",
+      startedAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + 3_600_000).toISOString(),
+      lastSeen: new Date(now).toISOString(),
+    },
+  });
+  render(<App />);
+  await screen.findByRole("heading", { name: strings.hosted.rebuildTitle });
+
+  identity = me({
+    session: {
+      kind: "practical",
+      bank: "ckad-mock-01",
+      pod: "sim-session-practical-583231",
+      state: "ready",
+      startedAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + 3_600_000).toISOString(),
+      lastSeen: new Date(now).toISOString(),
+    },
+  });
+
+  await vi.advanceTimersByTimeAsync(2_000);
+  await waitFor(() => {
+    expect(window.location.hash).toBe("#/exams/ckad-mock-01/mode");
+  });
+});
+
+// A tab that was already on a ready session is not mid-anything, and
+// yanking it to the mode screen would lose whatever the candidate was
+// reading.
+test("a page load into a ready seat is left where it is", async () => {
+  window.location.hash = "#/progress";
+  identity = me({
+    session: {
+      kind: "practical",
+      bank: "ckad-mock-01",
+      pod: "sim-session-practical-583231",
+      state: "ready",
+      startedAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + 3_600_000).toISOString(),
+      lastSeen: new Date(now).toISOString(),
+    },
+  });
+  render(<App />);
+  // A bare waitFor on an assertion that is already true on its first
+  // synchronous check resolves instantly, before the mocked /api/me
+  // round-trip (and the effect it would drive) ever runs — passing
+  // whether or not the hook is wired correctly. Flush that round-trip
+  // first so a wrongly-navigating hook has actually had its turn before
+  // the hash is checked. See Score.test.tsx and the Pod-replacement test
+  // above for the same pattern.
+  await vi.advanceTimersByTimeAsync(0);
+  await waitFor(() => expect(window.location.hash).toBe("#/progress"));
+});

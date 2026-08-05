@@ -38,6 +38,7 @@ import { SessionChip } from "./components/SessionChip";
 import { useHosted } from "./lib/useHosted";
 import type { Me } from "./api";
 import { useRoute } from "./lib/useHashRoute";
+import { useSeatLanding } from "./lib/useSeatLanding";
 import { strings } from "./strings";
 
 // Control-status poll cadence: fast while a job is running (the overlay
@@ -94,6 +95,11 @@ export interface Hosted {
 export default function App() {
   const { state, refresh } = useHosted();
   const route = useRoute();
+
+  // Before the gate below, not inside a branch: hooks may not be
+  // conditional, and this one has to keep watching across every state the
+  // gate switches between.
+  useSeatLanding(state);
 
   if (state.status === "unknown") {
     return (
