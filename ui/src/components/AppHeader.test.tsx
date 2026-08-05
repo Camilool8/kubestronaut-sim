@@ -103,6 +103,24 @@ describe("AppHeader", () => {
     expect(screen.getByText("rebuilding")).toBeInTheDocument();
   });
 
+  // .app-header-tail has no `order` property, so DOM order is what a
+  // candidate sees and tabs through. A backgrounded rebuild's chip has to
+  // stay beside the session controls, not slide past the nav links: a
+  // silent reorder here shipped once already because nothing pinned it.
+  test("keeps the caller's children ahead of the nav links", () => {
+    const { container } = renderHeader(
+      <AppHeader nav={[{ label: "Exams", to: "/exams" }]}>
+        <span>rebuilding</span>
+      </AppHeader>,
+    );
+    const tail = container.querySelector(".app-header-tail")!;
+    const kids = Array.from(tail.children);
+    const chipIndex = kids.findIndex((el) => el.textContent === "rebuilding");
+    const navIndex = kids.findIndex((el) => el.tagName === "NAV");
+    expect(chipIndex).toBeGreaterThanOrEqual(0);
+    expect(navIndex).toBeGreaterThan(chipIndex);
+  });
+
   describe("session", () => {
     const liveSession = {
       kind: "practical" as const,
@@ -194,6 +212,7 @@ describe("AppHeader", () => {
       await user.click(screen.getByRole("button", { name: strings.header.menuLabel }));
       expect(screen.getAllByRole("button", { name: "Exams" })).toHaveLength(1);
       expect(screen.getAllByRole("button", { name: strings.hosted.signOut })).toHaveLength(1);
+      expect(screen.getAllByRole("button", { name: strings.hosted.endSession })).toHaveLength(1);
     });
 
     // The lease is taken back at its cap whatever the candidate is doing.

@@ -150,6 +150,7 @@ export function AppHeader({
               <SessionActions session={session.session} onEnd={() => setConfirming(true)} />
             </div>
           )}
+          {children}
           {!compact && nav && nav.length > 0 && (
             <nav className="app-header-nav" aria-label={strings.header.navLabel}>
               <NavLinks nav={nav} />
@@ -161,7 +162,6 @@ export function AppHeader({
           {compact && session?.session && (
             <SessionChip login="" session={session.session} />
           )}
-          {children}
           <InfoButton />
           <ThemeToggle />
           {compact && (nav?.length || session) && (
