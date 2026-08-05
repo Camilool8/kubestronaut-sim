@@ -515,8 +515,12 @@ func (m *Manager) Get(user string) (Session, error) {
 	// and nothing that holds it ever reaches for m.mu, so nesting the two
 	// here would make this the first place in the package that could
 	// deadlock — for no gain, since `out` is already a copy.
-	if snap := e.jobs.snapshot(); snap.Busy && snap.Job != nil {
-		out.Op = snap.Job.Op
+	//
+	// op(), not snapshot(): this runs on every proxied request by way of
+	// handleProxy, and snapshot deep-copies two Jobs and their []Phase
+	// slices to answer a question that only needs one string.
+	if op := e.jobs.op(); op != "" {
+		out.Op = op
 		out.addr = ""
 	}
 	return out, nil
@@ -606,6 +610,13 @@ func (m *Manager) Recycle(user, bank string) (Job, error) {
 		op = "switch"
 		phases[1].Label = "Start a session on the new exam"
 	}
+	// Beginning a job here is what makes Get stop reporting an address
+	// for this session until the job ends — Get clears it the moment
+	// jobs.op() reports one in flight, on the theory that a Pod being
+	// replaced has nowhere for the proxy to send traffic. That rule
+	// lives in Get, not here, so whoever adds a third job type to
+	// jobStore and reads this line rather than Get's needs to know that
+	// starting a job here has that side effect there.
 	j, ok := e.jobs.begin(op, bank, phases)
 	if !ok {
 		return Job{}, ErrBusy

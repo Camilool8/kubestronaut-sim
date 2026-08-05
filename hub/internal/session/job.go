@@ -183,6 +183,22 @@ func (s *jobStore) snapshot() Snapshot {
 	return Snapshot{Busy: s.current != nil, Job: s.current.copy(), Last: s.last.copy()}
 }
 
+// op reports the operation of the job in flight, or "" when there is
+// none. A narrower read than snapshot(): snapshot deep-copies both
+// current and last, phases slice and all, to hand a caller a Job it can
+// keep past the lock — which Status needs and Manager.Get does not.
+// handleProxy calls Get on every proxied request, so before this existed
+// every asset and every poll paid for two Job copies and two []Phase
+// allocations to learn one string.
+func (s *jobStore) op() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.current == nil {
+		return ""
+	}
+	return s.current.Op
+}
+
 func (s *jobStore) logLines() (string, []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
