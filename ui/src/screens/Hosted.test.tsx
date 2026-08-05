@@ -678,6 +678,11 @@ test("an environment that comes up lands on its exam, not on the picker", async 
     },
   });
 
+  // useHosted only re-polls /api/me every POLL_ACTIVE_MS (useHosted.ts) —
+  // 2s — while a session is not yet ready, so the ready state above sits
+  // unseen until that timer fires. Advance past it explicitly rather than
+  // trusting shouldAdvanceTime's real-time pace to outrun waitFor's
+  // shorter default timeout.
   await vi.advanceTimersByTimeAsync(2_000);
   await waitFor(() => {
     expect(window.location.hash).toBe("#/exams/ckad-mock-01/mode");
@@ -709,5 +714,56 @@ test("a page load into a ready seat is left where it is", async () => {
   // the hash is checked. See Score.test.tsx and the Pod-replacement test
   // above for the same pattern.
   await vi.advanceTimersByTimeAsync(0);
+  await waitFor(() => expect(window.location.hash).toBe("#/progress"));
+});
+
+// The other guard the docstring calls "both matter" — and neither test
+// above reaches it. The first arrives on the default route, so the
+// yield list is passed through without being evaluated; the second's
+// session is already ready at mount, so it only exercises the baseline
+// guard, and being on /progress there is incidental. A rebuild finishing
+// behind a candidate who is deliberately reading their progress page
+// must not close it under them. `history` and `exams` are the same
+// branch of the same condition as `progress`, so proving this one yields
+// is enough — three near-copies would not cover anything more.
+test("a rebuild finishing behind a deliberate route does not close it", async () => {
+  window.location.hash = "#/progress";
+  identity = me({
+    session: {
+      kind: "practical",
+      bank: "ckad-mock-01",
+      pod: "sim-session-practical-583231",
+      state: "starting",
+      op: "reset",
+      startedAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + 3_600_000).toISOString(),
+      lastSeen: new Date(now).toISOString(),
+    },
+  });
+  render(<App />);
+  // /progress answers from the hub's own store regardless of session
+  // state — HostedHome renders it ahead of the booting screen for
+  // exactly that reason — so the export link, not a rebuild heading, is
+  // the settled signal to wait for here.
+  await screen.findByRole("link", { name: /export/i });
+
+  identity = me({
+    session: {
+      kind: "practical",
+      bank: "ckad-mock-01",
+      pod: "sim-session-practical-583231",
+      state: "ready",
+      startedAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + 3_600_000).toISOString(),
+      lastSeen: new Date(now).toISOString(),
+    },
+  });
+
+  // Same poll-cadence wait as the sibling starting->ready test above:
+  // advance past useHosted's POLL_ACTIVE_MS before checking, so the
+  // guard has actually run (in either direction) before the assertion
+  // does, rather than a bare waitFor resolving on its already-true first
+  // check.
+  await vi.advanceTimersByTimeAsync(2_000);
   await waitFor(() => expect(window.location.hash).toBe("#/progress"));
 });
