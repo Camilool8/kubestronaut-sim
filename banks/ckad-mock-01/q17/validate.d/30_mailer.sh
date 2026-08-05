@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 4
+# points: 3
 # desc: the unpullable image was recorded and the mailer Deployment repaired
 set -uo pipefail
 . /banks/_lib/checks.sh

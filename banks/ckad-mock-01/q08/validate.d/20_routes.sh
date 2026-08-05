@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 5
+# points: 6
 # desc: the controller really routes / to storefront and /checkout to checkout
 set -uo pipefail
 . /banks/_lib/checks.sh

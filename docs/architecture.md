@@ -63,7 +63,7 @@ diagram can reach the internet.
 
 | Service | Build | What it does | Privilege |
 |---|---|---|---|
-| `k8s-env` | `images/k8s-env` | Runs Docker-in-Docker, hosts the two-node kind cluster, serves the local Helm repository on :8879, and runs the boot sequence. | `privileged: true` |
+| `k8s-env` | `images/k8s-env` | Runs Docker-in-Docker, hosts the kind cluster (sized by the active bank's `spec.environment.nodes`), serves the local Helm repository on :8879, and runs the boot sequence. | `privileged: true` |
 | `instance-1`, `instance-2` | `images/instance` | The two shells the candidate works in. sshd, kubectl, helm, podman, and per-question working directories under `/opt/course`. | Five capabilities, `cgroup: host`, writable `/sys/fs/cgroup`, `/dev/fuse`, seccomp and apparmor unconfined |
 | `registry` | `registry:2` image | Plain-HTTP push target at `registry:5000` for the image-building questions. | none |
 | `docs-proxy` | `proxy` | HTTP proxy on :3128 enforcing the documentation allowlist for the desktop's Firefox. | none |
@@ -144,9 +144,9 @@ Pod cannot restart a container under `restartPolicy: Never`, so reset
 and switch return 501 before touching anything
 (`conductor/internal/control/control.go:192,299`); re-seeding is Training
 mode only and the conductor asks the facilitator, not the caller
-(`reseed.go`); and `seed` fires only for a pooled bank, of which the tree
-has none. The socket is what keeps that list from having to stay
-complete — an endpoint added later without its own gate is not
+(`reseed.go`); and `seed` fires only for a pooled bank, which
+`ckad-mock-01` now is. The socket is what keeps that list from having to
+stay complete — an endpoint added later without its own gate is not
 reachable in the first place.
 
 The conductor speaks the Docker Engine API directly over the socket
@@ -395,14 +395,19 @@ re-seeding would overwrite candidate work
 
 ### Where seeding happens, and why it can move
 
-For every bank in this repo, seeding happens at boot, in phase 7, inside
-the progress screen a cold start already shows. A **pooled** hands-on bank
+For an unpooled hands-on bank, seeding happens at boot, in phase 7,
+inside the progress screen a cold start already shows. A **pooled** one
 (`spec.examLength`, see [bank-spec.md](bank-spec.md)) cannot work that way:
 which questions an attempt asks is decided by the draw, and the draw
 happens when the candidate presses Start. So its boot skips the seed loop
 and the drawn questions are seeded then instead — `POST /api/session/start`
 answers 202, the facilitator asks the conductor for a `seed` job, and the
 clock does not start until that job succeeds.
+
+`ckad-mock-01` takes that path — it draws 22 of 26 — so a CKAD boot is
+now materially shorter than it was and the wait moves to the moment Start
+is pressed. The images are still pulled at boot, which is the slow and
+network-fragile half and is identical whichever questions get drawn.
 
 That is the facilitator's **second** server-side call to the conductor,
 after the bank-list fetch behind `GET /api/catalog`, and the first one that

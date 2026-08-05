@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -293,6 +294,40 @@ const persistedVersion = 6
 // running process experiences. Callers that need to notice an
 // already-ended, not-yet-graded session on boot should inspect the first
 // Snapshot themselves.
+// DrawnIDs reads the drawn question ids out of the session file at path,
+// without constructing a Manager, arming a timer, resuming an attempt or
+// writing anything back.
+//
+// It exists for `facilitator grade`, a read-only scoreboard that runs as
+// a second process beside the live server. That command has to know
+// which questions the open attempt asks — on a pooled bank the ones it
+// did not draw were never seeded, so scoring them prints a confident
+// wrong number — and it must not do so by taking a second Manager over
+// the same file: New resumes, re-arms and can PERSIST an expiry
+// correction, which is a running server's business and not a
+// scoreboard's.
+//
+// Returns an empty slice for an idle session, an absent file, or an
+// attempt drawn before subsets existed. The caller decides what to do
+// with that; here it simply is not an error.
+func DrawnIDs(path string) ([]string, error) {
+	raw, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var doc persistedState
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return nil, fmt.Errorf("session: parse %s: %w", path, err)
+	}
+	if doc.State == stateIdle {
+		return nil, nil
+	}
+	return append([]string(nil), doc.QuestionIDs...), nil
+}
+
 func New(path, bank string, dur time.Duration, clock func() time.Time, onExpire func()) (*Manager, error) {
 	m := &Manager{
 		path:     path,

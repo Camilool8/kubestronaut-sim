@@ -1,7 +1,8 @@
 # Question bank specification (v1alpha2)
 
-A bank lives at `banks/<bank-id>/` and holds `exam.yaml` plus one directory
-per question. The conductor scans every `banks/*/exam.yaml` into the catalog
+A bank lives at `banks/<bank-id>/` and holds `exam.yaml`, one directory
+per question, and optionally a [`tips.md`](#exam-tips-banksbank-idtipsmd).
+The conductor scans every `banks/*/exam.yaml` into the catalog
 the exam selector renders; [banks/catalog.yaml](../banks/catalog.yaml) adds
 coming-soon entries whose exam engine does not exist yet.
 
@@ -99,7 +100,8 @@ stopped looking.
 | `spec.kubernetesVersion` | Informational; shown on the catalog card |
 | `spec.domainWeights` | The certification's published weights, and a runtime value in three places: `exam.Load` builds `Exam.Domains` from it, `exam.Draw` stratifies a pooled or filtered draw by it, and both graders weight the final score by it. [bank-weights.sh](../tests/bank-weights.sh) still gates it too. Getting it wrong now moves real scores, not just a build check |
 | `spec.examLength` | Optional, **both engines**. Pools the bank: author more questions than one attempt should ask, set this to the smaller per-attempt count, and `exam.Draw` takes a fresh domain-stratified subset every start. Must be positive and no larger than the pool — `exam.Load` rejects both, because an `examLength` typo that silently turns pooling *off* is worse than one that fails the boot. A pooled bank must declare `spec.domainWeights`; the draw stratifies against them and errors without. Absent or `>=` the pool means no pooling, which is every bank in this repo. **A pooled hands-on bank also changes when its cluster is seeded** — see below |
-| `spec.environment.provider`, `.nodes` | Informational; read by nothing |
+| `spec.environment.nodes` | **The size of this exam's cluster.** [bootstrap.sh](../images/k8s-env/bootstrap.sh) copies `kind-config.yaml` — which holds the control-plane node and nothing else — and appends one `- role: worker` per extra node before `kind create cluster`. Absent means 2; anything that is not a positive integer fails the boot rather than falling back, because a cluster silently the wrong size is discovered by a drain question grading zero. Also served on `GET /api/exam` so the screens that describe the environment while it builds describe the one being built |
+| `spec.environment.provider` | Informational; `kind` is the only one that exists. Served on `GET /api/exam` beside `nodes` |
 | `spec.environment.allowedDomains` | Domain suffixes the desktop browser may reach through the docs proxy, subdomains included ([proxy/entrypoint.sh](../proxy/entrypoint.sh)). Omit it to inherit `allow.DefaultDomains` ([allow.go](../proxy/internal/allow/allow.go)), the smallest set that leaves the documentation sites usable |
 | `spec.instances` | 1 or 2 entries. Convention: names outside `instance-1`/`instance-2` only mark the bank unavailable in the exam selector ([catalog.go:218-230](../conductor/internal/catalog/catalog.go)), and the facilitator's exam loader never parses the block at all |
 | `spec.questions[].id`, `.instance` | Question directory name, and the ssh host the grader runs its checks on |
@@ -173,12 +175,44 @@ the drawn questions are seeded when the attempt starts instead:
 and the candidate's clock does not begin until that job succeeds. See
 [api.md](api.md) for the contract.
 
-The consequence for an author: pooling is a good trade when the pool is
-much larger than an attempt, and a bad one when it is not. A bank that
-pools 22 down to 20 has moved four minutes of seeding out of the boot
-screen and into the moment the candidate presses Start, and gained almost
-no variety for it. Neither shipped bank pools its hands-on questions;
-CKAD draws all 22.
+The consequence for an author: pooling for VARIETY is a good trade when
+the pool is much larger than an attempt, and a bad one when it is not. A
+bank that pools 22 down to 20 has moved four minutes of seeding out of
+the boot screen and into the moment the candidate presses Start, and
+gained almost no variety for it.
+
+`ckad-mock-01` pools 26 down to 22, and its reason is the other one:
+**holding the sitting to the right length.** The real CKAD is around
+twenty tasks in two hours, so the four questions added in this bank's
+last expansion went into the pool rather than into the exam — putting
+them in the sitting would have made it a harder exam rather than a fuller
+one. The variety that comes with it is modest and worth stating honestly:
+with a pool that close to the draw, three of its five domains are asked
+in full every time, and only Application Design and Build (4 of 7) and
+Application Observability and Maintenance (3 of 4) rotate. Deepening a
+domain widens its rotation.
+
+### Points in a pooled bank
+
+Derive them against the **pool**, exactly as an unpooled bank does:
+`domain budget / questions in that domain`, counting every authored
+question. `ckad-mock-01`'s 26 questions total 217 points that way, and
+every domain's share of them lands within one percentage point of its
+curriculum weight.
+
+What that does *not* give you is a drawn attempt whose raw points divide
+in the curriculum's ratios, and it cannot: a domain that contributes 4 of
+its 7 questions to the draw contributes 4/7 of its pool points with it.
+Two other things keep the promise instead, which is why
+[bank-weights.sh](../tests/bank-weights.sh) checks pool DEPTH here rather
+than point share:
+
+- **the draw is stratified by count**, so every attempt holds each
+  domain's published share of the *questions* — which is the candidate's
+  effort;
+- **the graders weight the final score by `spec.domainWeights`**
+  (`evaluate.Results.Finalize`) whether or not the points agree, because
+  a subset of a bank cannot inherit a promise the whole bank makes.
 
 ## Points and domain weights
 
@@ -619,6 +653,36 @@ The rest of what the gate enforces:
 
 Hints are served one tier at a time by `GET /api/questions/{id}/hints/{n}`,
 gated on the attempt being in Training mode.
+
+## Exam tips: `banks/<bank-id>/tips.md`
+
+One optional file beside `exam.yaml`, for the whole bank rather than per
+question: how to sit THIS exam quickly. Aliases and completion, the
+generators that write a manifest so nobody types one, `explain` and `-h`
+before the documentation, editor settings for YAML, what to look at when
+a Pod will not start, and when to give up on a question and move on.
+
+It is bank data, not UI copy, on the same reasoning that governs
+`spec.environment.nodes`: what makes a CKAD sitting fast is not what
+makes a KCNA one fast, and a panel of strings in the client would have to
+claim one of them was the other. CKA and CKS will each ship their own.
+
+- **Served ungated** by `GET /api/exam/tips` as `{"markdown": "…"}` —
+  unlike solutions and hints, which check the attempt's mode first.
+  Technique is not answers: the same advice is true before, during and
+  after an attempt, and it is most useful before one.
+- **Read per request**, like `question.md` and `solution.md`, so editing
+  it needs no facilitator restart. Only its existence is loaded at boot,
+  and it reaches the client as `hasTips` on `GET /api/exam`.
+- **A bank with no `tips.md` draws no control at all.** An empty file
+  counts as none, for the same reason — a control that opens an empty
+  sheet is worse than no control.
+- Rendered through the same Markdown component the questions use, so
+  fenced blocks get their copy buttons and inline backticks become
+  copyable values. Write commands as commands: the point of the page is
+  that nobody retypes them under a clock.
+- No gate script. There is nothing to cross-check — no ids, no points and
+  no answer key — and a length floor would only encourage padding.
 
 ## Attempt modes
 

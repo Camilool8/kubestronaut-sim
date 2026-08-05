@@ -9,9 +9,10 @@ It is built to stay with you across the whole path rather than one
 sitting: every graded attempt is kept, so you can see which domains are
 still weak and how far along the five certifications you are.
 
-Two banks ship today. **CKAD Mock Exam 01** is hands-on: 22 questions
-across all five curriculum domains, 120 minutes, 66% to pass, against a
-two-node Kubernetes 1.35 cluster. **KCNA Mock Exam** is multiple-choice
+Two banks ship today. **CKAD Mock Exam 01** is hands-on: 26 original
+questions across all five curriculum domains, 22 drawn per attempt and
+stratified to the curriculum weights every time, 120 minutes, 66% to
+pass, against a two-node Kubernetes 1.35 cluster. **KCNA Mock Exam** is multiple-choice
 in the real exam's shape: 97 original questions, 65 drawn per attempt
 and weighted to the post-November-2025 curriculum on every draw, 90
 minutes, 75% to pass, every question with a full explanation for
@@ -35,13 +36,14 @@ Requires Docker Desktop (or docker + compose v2), python3, and about
 
 ```bash
 ./sim doctor                 # optional preflight: RAM, disk, cgroups, tools
-./sim up                     # boots everything (first run: several minutes)
+./sim up                     # up in seconds; pick an exam in the browser
 open http://localhost:8080   # then never touch the CLI again
 ```
 
-The UI comes up before the cluster does, so `http://localhost:8080`
-shows the same boot progress the terminal does. `./sim doctor` catches
-the environmental problems that are cheaper to find before a boot than
+Nothing is built until you choose an exam: the app is up in seconds and
+picking a certification in the browser is what creates its cluster,
+narrating each phase as it goes. `./sim doctor` catches the
+environmental problems that are cheaper to find before a build than
 during one.
 
 Everything after `up` happens in the browser. See [docs/cli.md](docs/cli.md)
@@ -112,9 +114,11 @@ layout.
 
 ## The cluster you get
 
-A two-node kind cluster (one control plane, one worker) with **Calico**
-rather than kindnet, so NetworkPolicies are genuinely enforced and a
-policy question can be graded on behaviour. It also carries
+A kind cluster sized by the exam you picked — `spec.environment.nodes`
+in its bank decides how many nodes get built, so a bank that needs
+somewhere to drain to gets one — with **Calico** rather than kindnet, so
+NetworkPolicies are genuinely enforced and a policy question can be
+graded on behaviour. It also carries
 ingress-nginx, a local Helm repository, and a plain-HTTP registry for
 the image-building questions.
 

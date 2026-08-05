@@ -1,12 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import { endSession, getResults, type Results, type ResultsResponse, type SessionMode } from "../api";
+import {
+  endSession,
+  getExam,
+  getResults,
+  type Results,
+  type ResultsResponse,
+  type SessionMode,
+} from "../api";
 import { DomainBreakdown } from "../components/DomainBreakdown";
+import { ExamTips } from "../components/ExamTips";
 import { PendingBar } from "../components/Pending";
 import { ResultsBanner } from "../components/ResultsBanner";
 import { rollupDomains } from "../components/resultsModel";
 import { TaskVerdicts } from "../components/TaskVerdicts";
 import { drillHref } from "../lib/attemptHistory";
 import { formatElapsed } from "../lib/format";
+import { useAsync } from "../lib/useAsync";
 import { navigate, useRoute } from "../lib/useHashRoute";
 import { useTick } from "../lib/useTick";
 import { strings } from "../strings";
@@ -51,6 +60,13 @@ export function Score({ onNewAttempt, endReason, mode }: ScoreProps) {
   // between views inside `idle`. Read unconditionally, above every early
   // return, because it is a hook.
   const route = useRoute();
+
+  // Whether this bank has tips to offer, which decides whether the
+  // control below exists. One fetch, once, and a failure is silent: the
+  // button is an offer, not a result, and a screen that has just finished
+  // grading must not grow an error about a sidebar.
+  const [tipsOpen, setTipsOpen] = useState(false);
+  const hasTips = useAsync((signal) => getExam(signal), []).data?.hasTips === true;
 
   const clearPoll = () => {
     if (intervalRef.current !== null) {
@@ -192,8 +208,18 @@ export function Score({ onNewAttempt, endReason, mode }: ScoreProps) {
         <button className="btn btn-primary" onClick={handleNewAttempt} disabled={starting}>
           {starting ? strings.control.starting : strings.control.newAttempt}
         </button>
+        {/* Beside "New attempt" on purpose. This is the screen where a
+            candidate finds out they ran out of time, and the tips are the
+            answer to that rather than to any question they got wrong. */}
+        {hasTips && (
+          <button type="button" className="btn" onClick={() => setTipsOpen(true)}>
+            {strings.tips.open}
+          </button>
+        )}
         <p className="score-actions-hint">{strings.control.newAttemptHint}</p>
       </div>
+
+      {tipsOpen && <ExamTips onClose={() => setTipsOpen(false)} />}
     </div>
   );
 }

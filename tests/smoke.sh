@@ -38,6 +38,51 @@ bash tests/bank-mcq.sh || fail "mcq banks are malformed"
 
 ./sim purge   # cold start: the fresh-grade-0 assertion needs pristine cluster state
 
+echo "== nothing is built until an exam is chosen =="
+# The state a fresh `./sim up` now lands in, and the only place it is
+# exercised end to end. Cheap on purpose: it is one compose up and down
+# with no cluster in it, and it runs BEFORE the cold boot below so a
+# stack that cannot idle fails in a minute rather than forty.
+#
+# What it is really checking is the compose change underneath. The
+# instances and the desktop used to declare
+# `depends_on: k8s-env: {condition: service_healthy}`, which would have
+# made `docker compose up` block forever on a cluster nobody asked for.
+# Those gates are gone, so the containers now start into an environment
+# that has no kubeconfig and no bank — and they have to WAIT there,
+# without their own deadlines killing them for being correctly idle.
+idle_started=$SECONDS
+if ! ./sim up; then
+  fail "a bare ./sim up did not bring the shell up"
+else
+  echo "bare up took $((SECONDS - idle_started))s"
+
+  [ "$(req GET /api/boot)" = "200" ] || fail "idle: GET /api/boot did not answer 200"
+  [ "$(json_field state)" = "idle" ] || fail "idle: /api/boot state is '$(json_field state)', want idle"
+
+  # The split the facilitator has to hold with no bank loaded: routes
+  # that need one refuse with an explanation, and the catalog — which is
+  # HOW an exam gets chosen — still answers.
+  [ "$(req GET /api/exam)" = "503" ] || fail "idle: /api/exam should be 503 with no exam loaded"
+  [ -n "$(json_field error)" ] || fail "idle: /api/exam refused with no explanation"
+  [ "$(req GET /api/catalog)" = "200" ] || fail "idle: /api/catalog must answer — it is how an exam is chosen"
+  [ "$(json_field active)" = "" ] || fail "idle: /api/catalog names an active bank when none was chosen"
+
+  # Nothing built. A cluster here would mean the guess this whole change
+  # exists to avoid: minutes spent on an exam nobody picked.
+  docker compose exec -T k8s-env kind get clusters 2>/dev/null | grep -qx sim \
+    && fail "idle: a kind cluster exists before any exam was chosen" || true
+
+  # ...and the containers that no longer wait on it are up rather than
+  # dead. `compose ps` prints only running services by default, so their
+  # absence here is the failure.
+  for svc in instance-1 instance-2 desktop facilitator; do
+    docker compose ps --services --filter status=running | grep -qx "$svc" \
+      || fail "idle: ${svc} is not running (it should be waiting for an exam, not exiting)"
+  done
+fi
+./sim down
+
 # Bounded. `./sim up` used to be able to hang indefinitely (compose's
 # --wait defaults to no timeout), and because this script is `set -e`
 # with no timeout of its own, a hung boot hung the whole suite — the one
@@ -45,7 +90,13 @@ bash tests/bank-mcq.sh || fail "mcq banks are malformed"
 # ./sim up internally; this is the belt to that braces.
 SMOKE_BOOT_BUDGET=${SMOKE_BOOT_BUDGET:-3600}
 boot_started=$SECONDS
-if ! SIM_BOOT_BUDGET="$SMOKE_BOOT_BUDGET" ./sim up; then
+# The bank is named on purpose. A bare `./sim up` now brings up the shell
+# and stops — nothing is built until a candidate chooses an exam — so it
+# would return in seconds with no cluster and every assertion below would
+# fail against an environment that was never asked to exist. Naming one
+# is the "I already know what I want" path, and it still blocks until
+# that exam's environment is ready.
+if ! SIM_BOOT_BUDGET="$SMOKE_BOOT_BUDGET" ./sim up ckad-mock-01; then
   echo "SMOKE FAIL: ./sim up did not reach a ready environment within ${SMOKE_BOOT_BUDGET}s"
   docker compose logs --tail 80 k8s-env || true
   exit 1
@@ -194,6 +245,28 @@ bank_title=$(grep -m1 -E '^[[:space:]]*title:' banks/ckad-mock-01/exam.yaml | se
 api_title=$(json_field title)
 [ "$api_title" = "$bank_title" ] || fail "/api/exam title mismatch: bank='$bank_title' api='$api_title'"
 
+# Before any attempt exists, the two counts are the bank's two numbers:
+# `questionCount` is the DECLARED length (spec.examLength) and the
+# `questions` array is still the whole pool. Read off the bank file so
+# this tracks an edit to it rather than pinning today's figures.
+declared=$(grep -m1 -E '^[[:space:]]*examLength:' banks/ckad-mock-01/exam.yaml | sed -E 's/.*:[[:space:]]*//')
+pool=$(grep -cE '^[[:space:]]*- id: q' banks/ckad-mock-01/exam.yaml)
+[ "$(json_field questionCount)" = "$declared" ] \
+  || fail "/api/exam questionCount should be the declared ${declared}, got '$(json_field questionCount)'"
+api_pool=$(RESP="$RESP" python3 -c '
+import json, os
+with open(os.environ["RESP"]) as f:
+    print(len(json.load(f).get("questions", [])))
+')
+[ "$api_pool" = "$pool" ] \
+  || fail "/api/exam should list the whole ${pool}-question pool before an attempt, got ${api_pool}"
+
+# The bank ships tips, and they are readable with no attempt running —
+# the whole point of leaving that endpoint ungated.
+[ "$(json_field hasTips)" = "True" ] || fail "/api/exam hasTips should be True for ckad-mock-01"
+[ "$(req GET /api/exam/tips)" = "200" ] || fail "/api/exam/tips should be 200 with no attempt running"
+[ -n "$(json_field markdown)" ] || fail "/api/exam/tips returned an empty body"
+
 status=$(req GET /)
 grep -q 'assets/' "$RESP" || fail "exam UI '/' did not serve the built assets"
 
@@ -268,13 +341,12 @@ SMOKE_PREPARE_BUDGET=${SMOKE_PREPARE_BUDGET:-900}
 #
 # 202 means the attempt was DRAWN but not started, because a pooled
 # hands-on bank seeds the subset it just drew before the clock may run
-# (docs/api.md, "Preparing an attempt"). No bank here pools on the
-# hands-on engine today — ckad-mock-01 asks all 22 of its 22 questions,
-# and kcna-mock is mcq, which never seeds — so every start below still
-# takes the 200 path and every assertion after one is untouched. This
-# exists so that the day one exam.yaml gains a spec.examLength, the suite
-# waits for the attempt instead of asserting against one that never
-# started.
+# (docs/api.md, "Preparing an attempt"). ckad-mock-01 takes that path:
+# it pools 22 of 26, so nothing is seeded at boot and every start below
+# waits here for the conductor's seed job before the clock exists. This
+# helper was written one milestone before the first bank needed it;
+# kcna-mock is mcq and still takes the 200 path, which is why both are
+# handled.
 #
 # On the 202 path it polls GET /api/session until `preparing` clears.
 # That is the terminal condition, and NOT the control job going idle: the
@@ -425,14 +497,36 @@ wait_workloads() {
     || fail "cluster workloads did not become Available within 300s"
 }
 
-# Solve every question, each on the instance its exam.yaml entry names.
-# Driven from the bank rather than a hand-kept list: a question added
-# without a solution script, or pointed at the wrong instance, fails here
-# instead of quietly costing points in the 100% assertion below.
+# Solve every question THIS ATTEMPT asks, each on the instance its
+# exam.yaml entry names.
+#
+# Driven from GET /api/exam rather than from exam.yaml, and that is not a
+# refactor — it is the difference between passing and failing on a pooled
+# bank. ckad-mock-01 draws 22 of 26, and only the drawn subset is ever
+# seeded (images/k8s-env/bootstrap.sh skips the boot seed loop entirely;
+# the conductor's seed job runs the drawn questions' setup.sh at start).
+# The four questions left out have no Namespace, no workloads and no
+# pre-state, so running their solution scripts would fail against a
+# cluster that was deliberately never given their state — and would say
+# nothing about the exam anyone actually sat.
+#
+# `questions` on that response is narrowed to the draw exactly once an
+# attempt is running (facilitator/internal/api/api.go), which makes it
+# the one honest answer to "what is this attempt". It still lists every
+# question for an unpooled bank, so nothing about the smoke-01 or
+# kcna-mock sections changes.
+#
+# The cross-check that used to come free from reading the bank file is
+# kept explicitly below: a drawn question with no solution script fails
+# here rather than quietly costing points in the 100% assertion.
 solve_bank() {
-  local bank=$1 qid inst
+  local bank=$1 qid inst drawn=0
+  [ "$(req GET /api/exam)" = "200" ] || { fail "solve: GET /api/exam did not answer 200"; return; }
+  [ "$(json_field name)" = "$bank" ] \
+    || { fail "solve: the loaded exam is '$(json_field name)', want ${bank}"; return; }
   while read -r qid inst; do
     [ -n "$qid" ] || continue
+    drawn=$((drawn + 1))
     [ -f "tests/solutions/${bank}/${qid}.sh" ] \
       || { fail "no solution script for ${bank}/${qid}"; continue; }
     # </dev/null is load-bearing: `compose exec -T` reads stdin, and
@@ -442,9 +536,51 @@ solve_bank() {
       -c "bash /tests/solutions/${bank}/${qid}.sh" \
       >"/tmp/smoke-${bank}-${qid}.log" 2>&1 </dev/null \
       || fail "${bank}/${qid} solution failed (see /tmp/smoke-${bank}-${qid}.log)"
-  done < <(docker compose exec -T k8s-env yq -r \
-    ".spec.questions[] | .id + \" \" + .instance" "/banks/${bank}/exam.yaml" | tr -d '\r')
+  done < <(RESP="$RESP" python3 -c '
+import json, os
+with open(os.environ["RESP"]) as f:
+    data = json.load(f)
+for q in data.get("questions", []):
+    print(q["id"], q.get("instance", "instance-1"))
+')
+  echo "  solved ${drawn} drawn question(s) of ${bank}"
+  [ "$drawn" -gt 0 ] || fail "solve: the attempt drew no questions at all"
 }
+
+# Every solution script in the bank must be reachable by SOME draw, which
+# the loop above cannot prove — it only ever sees one attempt's 22. A
+# question authored without one would otherwise sit undetected until the
+# draw that finally picked it, on somebody else's run.
+missing=$(docker compose exec -T k8s-env yq -r '.spec.questions[].id' \
+  /banks/ckad-mock-01/exam.yaml | tr -d '\r' \
+  | while read -r qid; do
+      [ -n "$qid" ] || continue
+      [ -f "tests/solutions/ckad-mock-01/${qid}.sh" ] || printf '%s ' "$qid"
+    done)
+[ -z "$missing" ] || fail "ckad-mock-01 pool questions with no solution script: ${missing}"
+
+# q01 is referenced by id all over this suite (solution and hint gates,
+# the reseed calls). On a pooled bank that only holds while its domain's
+# pool is exactly its draw target — true today, and the reason to assert
+# it is that the failure mode otherwise is a confusing 404 several
+# hundred lines from here rather than a sentence naming the cause.
+[ "$(req GET /api/exam)" = "200" ] || fail "GET /api/exam did not answer 200 during the attempt"
+drawn_ids=$(RESP="$RESP" python3 -c '
+import json, os
+with open(os.environ["RESP"]) as f:
+    print(" ".join(q["id"] for q in json.load(f).get("questions", [])))
+')
+# The pooled draw itself: the response narrowed from the whole pool to
+# exactly the declared length the moment an attempt started. This is the
+# first hands-on bank in the repo to take that path, so it is asserted
+# here rather than reasoned about.
+drawn_n=$(printf '%s' "$drawn_ids" | wc -w | tr -d ' ')
+[ "$drawn_n" = "$declared" ] \
+  || fail "a running attempt should ask the declared ${declared} of ${pool}, got ${drawn_n}"
+case " $drawn_ids " in
+  *" q01 "*) ;;
+  *) fail "q01 was not drawn; the gate assertions below name it by id" ;;
+esac
 
 solve_bank ckad-mock-01
 
@@ -505,16 +641,23 @@ status=$(req GET /api/questions/q01/solution)
 status=$(req GET /desktop/vnc.html)
 [ "$status" = "403" ] || fail "desktop should be 403 once the session has ended, got $status"
 
-status=$(req DELETE /api/session)
-[ "$status" = "204" ] || fail "DELETE /api/session expected 204, got $status"
-
-status=$(req GET /api/session)
-state=$(json_field state)
-[ "$state" = "idle" ] || fail "session should be idle right after DELETE, got $state"
+# The DELETE that used to sit here now runs AFTER the resumed grade
+# below, and the reason is pooling. Grading reads the SESSION's drawn
+# question ids; with no session there are none, and the grader falls back
+# to every question in the bank — all 26, including the four this attempt
+# never drew and whose state was therefore never seeded. That scored
+# 191/217 on a cluster that had just been solved perfectly, which reads
+# as "the restart lost state" and is nothing of the kind. Keeping the
+# ended attempt until it has been re-graded also makes the assertion
+# stronger: it proves the DRAW survived the restart, not just the cluster.
 
 # warm restart: down + up must resume exam state
 ./sim down
-./sim up
+# Named for the same reason as the cold boot above — this needs to block
+# until the cluster is back, not merely until the UI answers. /shared/bank
+# survives `down` and wins over this anyway, so it changes nothing about
+# WHICH exam resumes; it only decides whether `up` waits.
+./sim up ckad-mock-01
 # `./sim up --wait` waits for *container* health; the cluster's own
 # workloads come back well after that, and several checks assert on ready
 # replicas or make live requests. Grading straight away measures how fast
@@ -523,6 +666,16 @@ wait_workloads
 ./sim grade | tee /tmp/grade2.txt
 read -r _ e2 t2 _ < <(grep '^RESULT ' /tmp/grade2.txt)
 [ "$e2" = "$t2" ] || fail "resumed env should keep score ${t2}/${t2}, got ${e2}/${t2}"
+# The drawn subset is persisted with the session, so a facilitator that
+# restarted mid-attempt grades the same questions it started with.
+[ "$t2" = "$t1" ] || fail "resumed attempt is worth ${t2}, the attempt that ended was worth ${t1}"
+
+status=$(req DELETE /api/session)
+[ "$status" = "204" ] || fail "DELETE /api/session expected 204, got $status"
+
+status=$(req GET /api/session)
+state=$(json_field state)
+[ "$state" = "idle" ] || fail "session should be idle right after DELETE, got $state"
 
 # reset: fresh exam state, /opt/course dirs re-created empty, session cleared too
 ./sim reset
@@ -892,6 +1045,10 @@ status=$(start_session '{"mode":"training"}')
 [ "$status" = "200" ] || fail "training: start expected 200, got $status"
 [ "$(json_field mode)" = "training" ] || fail "training: mode is '$(json_field mode)'"
 [ "$(json_field untimed)" = "True" ] || fail "training: untimed is '$(json_field untimed)', want True"
+# Kept for the exam-gate block below, which has to draw the SAME
+# questions to be allowed to start without a cluster rebuild in between.
+training_seed=$(json_field seed)
+[ -n "$training_seed" ] || fail "training: the attempt reported no seed"
 
 # Hints: served one tier at a time, and only in this mode.
 [ "$(req GET /api/questions/q01/hints/1)" = "200" ] || fail "training: hint 1 not served"
@@ -933,19 +1090,36 @@ status=$(req DELETE /api/session)
 # And the same gates must REFUSE in an exam attempt.
 #
 # This is a SECOND attempt with no environment reset since the training
-# one above. Harmless today — ckad-mock-01 is unpooled, so nothing was
-# seeded per-draw and there is nothing of the last draw left over — but
-# it is precisely the sequence a pooled hands-on bank may refuse. A
-# refusal is reported by start_session with the facilitator's own words,
-# and the gates are then SKIPPED rather than run: every one of them
-# answers 403 for an idle session too, so against a failed start they
-# would all pass for the wrong reason and prove nothing.
-status=$(start_session)
+# one above, which a pooled hands-on bank refuses outright: seeding a
+# different draw over the last one's objects would hand a candidate a
+# task that is already half done, so checkClusterFree answers 409 and
+# names the reset that would clear it.
+#
+# Replaying the training attempt's SEED is the way through, and it is not
+# a workaround — it is the documented retry path. The same seed against
+# the same pool draws the same 22 questions, the seeded set matches, and
+# re-running those setup.sh scripts over their own output is the
+# idempotent apply the conductor's seed job already is. So this asserts
+# something real that no unit test can: that a re-seed of an identical
+# draw is allowed and works against a live cluster.
+#
+# A refusal is reported by start_session with the facilitator's own
+# words, and the gates are then SKIPPED rather than run: every one of
+# them answers 403 for an idle session too, so against a failed start
+# they would all pass for the wrong reason and prove nothing.
+status=$(start_session "{\"seed\":\"${training_seed}\"}")
 [ "$status" = "200" ] || fail "exam-gate: start expected 200, got $status"
+[ "$(json_field seed)" = "$training_seed" ] \
+  || fail "exam-gate: replayed seed ${training_seed}, got '$(json_field seed)'"
 if [ "$status" = "200" ]; then
   [ "$(json_field mode)" = "exam" ] || fail "exam-gate: mode is '$(json_field mode)', want exam"
   [ "$(req GET /api/questions/q01/hints/1)" = "403" ] || fail "exam-gate: hints must be 403 in an exam"
   [ "$(req GET /api/questions/q01/solution)" = "403" ] || fail "exam-gate: solutions must be 403 mid-exam"
+  # And the tips are NOT one of these gates, which is the distinction the
+  # endpoint exists to make: hints and solutions carry answers, technique
+  # does not. Asserted beside the two refusals so the difference is one
+  # place rather than an argument in a doc.
+  [ "$(req GET /api/exam/tips)" = "200" ] || fail "exam-gate: tips must stay readable mid-exam"
   [ "$(req POST /api/session/grade)" = "403" ] || fail "exam-gate: mid-attempt scoring must be 403 in an exam"
   curl -s -o "$RESP" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
     -d '{"question":"q01"}' "${BASE}/api/control/reseed" > /tmp/smoke-reseed-exam.txt
@@ -956,13 +1130,31 @@ status=$(req DELETE /api/session)
 [ "$status" = "204" ] || fail "exam-gate: cleanup DELETE expected 204, got $status"
 
 echo "== auto-end: session expires unattended and re-locks the desktop =="
+# The reset here is load-bearing on a pooled bank, and for two separate
+# reasons that the restart below turns into one failure.
+#
+# The cluster still holds the exam-gate attempt's draw, so a fresh start
+# would be refused by checkClusterFree — that is the same 409 the block
+# above dodges by replaying a seed, and it cannot be dodged twice: the
+# facilitator is about to be recreated, and a new process has no seeded
+# set to match against. What it has instead is probeSeeded, which sees an
+# idle session beside a conductor whose last job was a SEED, correctly
+# concludes that the cluster was prepared for an attempt nobody is
+# sitting, and marks the contents unknown — a set that matches nothing.
+#
+# Resetting settles both: the conductor's last job becomes a reset rather
+# than a seed, and the cluster it leaves behind is empty, because a
+# pooled bank seeds nothing at boot.
+./sim reset
+status=$(req GET /api/session)
+[ "$(json_field state)" = "idle" ] || fail "auto-end: session should be idle after the reset"
+
 SESSION_DURATION_OVERRIDE=20s docker compose up -d --wait facilitator
-# Another second attempt with no environment reset (see the exam-gate
-# block above), and the facilitator has just been recreated on top of it
-# — a restart abandons any in-flight preparation, since a preparation is
-# deliberately in-memory only. Neither matters on an unpooled bank; both
-# would matter on a pooled one, and start_session says so out loud rather
-# than leaving the 25s sleep below to expire an attempt that never began.
+# The clock starts when the seeding SUCCEEDS, not when the request lands
+# — which is exactly why the 20s override is safe here even though
+# preparing this draw takes minutes. start_session returns once the
+# attempt is really running, so the sleep below measures the clock and
+# not the seed.
 status=$(start_session)
 [ "$status" = "200" ] || fail "auto-end: session start expected 200, got $status"
 

@@ -1,5 +1,5 @@
 // Command facilitator serves the exam session HTTP API (and, in its
-// `grade` argv form, a session-free scoring run). docs/api.md is the
+// `grade` argv form, a read-only scoring run). docs/api.md is the
 // current reference; the original design is frozen at
 // docs/history/specs/2026-07-24-milestone-c-facilitator-design.md.
 package main
@@ -61,15 +61,15 @@ func loadExamConfig() examConfig {
 	}
 }
 
-// runGrade implements the session-free `facilitator grade` subcommand:
-// load the exam, grade it synchronously over the real ssh Runner, print
-// the grade.sh-parity scoreboard to stdout, done. No session file, no
-// HTTP server.
+// runGrade implements the `facilitator grade` subcommand: load the exam,
+// grade it synchronously over the real ssh Runner, print the
+// grade.sh-parity scoreboard to stdout, done. No HTTP server, and no
+// session state is written — this only ever reads.
 //
 // An mcq exam has no cluster to inspect — the only answer sheet is the
-// live session's stored selections, which this session-free path
-// deliberately does not read. Refusing beats grading an empty answer map
-// and printing a misleading 0%.
+// live session's stored selections, and scoring those is the running
+// server's job. Refusing beats grading an empty answer map and printing
+// a misleading 0%.
 func runGrade() error {
 	cfg := loadExamConfig()
 
@@ -82,11 +82,50 @@ func runGrade() error {
 	}
 
 	runner := evaluate.NewSSHRunner(cfg.sshKey)
-	// No session, so no drawn subset: this path grades the whole bank,
-	// which is the only thing it can mean without one.
-	res := evaluate.Grade(ex, ex.Name, runner, checkTimeout, nil)
+	res := evaluate.Grade(ex, ex.Name, runner, checkTimeout, gradeScope(ex))
 	fmt.Print(res.Scoreboard())
 	return nil
+}
+
+// gradeScope returns the question ids `facilitator grade` should score,
+// or nil for "the whole bank" — which is what evaluate.Grade reads an
+// empty list as, and what every unpooled bank gets.
+//
+// This subcommand used to be session-free on principle, and for an
+// unpooled bank the principle and the answer agree: every question in
+// the bank is seeded at boot, so scoring all of them IS scoring the
+// exam. A POOLED bank breaks that. Only the drawn subset is ever seeded,
+// so the questions left out cannot pass and cannot be made to — and
+// grading the pool anyway prints a confident, wrong number: a perfect
+// CKAD attempt scored 191/217 (88%) rather than 100%, on a cluster where
+// every task the candidate was actually set had been done correctly.
+//
+// So the scope comes from the attempt when there is one. Best-effort in
+// every direction, because this is a scoreboard and not the grader of
+// record: an unreadable session file, an idle session, or a bank that
+// does not pool all fall back to the whole bank, which is the behaviour
+// this command has always had.
+func gradeScope(ex *exam.Exam) []string {
+	if !exam.Pooled(ex) {
+		return nil
+	}
+	ids, err := session.DrawnIDs(envOr("SESSION_FILE", "/session/session.json"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr,
+			"grade: %s draws %d of its %d questions per attempt, and this attempt could not be read (%v);\n"+
+				"       scoring the whole bank instead, so questions no attempt drew will score 0\n",
+			ex.Name, ex.ExamLength, len(ex.Questions), err)
+		return nil
+	}
+	if len(ids) == 0 {
+		fmt.Fprintf(os.Stderr,
+			"grade: %s draws %d of its %d questions per attempt and no attempt is open,\n"+
+				"       so no question has been seeded; scoring the whole bank against an\n"+
+				"       environment that holds none of it\n",
+			ex.Name, ex.ExamLength, len(ex.Questions))
+		return nil
+	}
+	return ids
 }
 
 // runServer wires every package into the long-running facilitator HTTP
@@ -121,22 +160,42 @@ func runServer() error {
 		log.Printf("ssh key not usable yet (%v); grading will fail until the environment finishes starting", err)
 	}
 
-	ex, err := exam.Load(cfg.examJSON, cfg.bankDir)
-	if err != nil {
-		return fmt.Errorf("load exam: %w", err)
-	}
+	// No exam is a legitimate state, not a failure.
+	//
+	// An environment that has not been told which exam to be has no bank
+	// to load, and the screen where the candidate chooses one is served by
+	// this process — so refusing to start without one would mean the only
+	// route to picking a bank required a bank to already be picked. The
+	// entrypoint leaves EXAM_JSON empty in that case; `ex` stays nil, and
+	// every handler that needs an exam answers 503 rather than assuming
+	// one (see internal/api).
+	//
+	// A NAMED bank that will not load is still fatal. That is a broken
+	// bank or a bad mount, and serving a catalog while silently ignoring
+	// the exam someone explicitly asked for would hide it.
+	var ex *exam.Exam
+	var dur time.Duration
+	if cfg.examJSON != "" {
+		loaded, err := exam.Load(cfg.examJSON, cfg.bankDir)
+		if err != nil {
+			return fmt.Errorf("load exam: %w", err)
+		}
+		ex = loaded
 
-	dur, err := resolveDuration(ex.Duration, durOverride)
-	if err != nil {
-		return fmt.Errorf("parse SESSION_DURATION_OVERRIDE: %w", err)
-	}
-	ex.Duration = dur
-	// The override is a test knob ("end this attempt in 20s"), so it has
-	// to reach every timed mode — a speed attempt still running for an
-	// hour under SESSION_DURATION_OVERRIDE=20s would be a trap. Training
-	// is deliberately untouched: it has no clock to override.
-	if durOverride != "" {
-		ex.SpeedDuration = dur
+		dur, err = resolveDuration(ex.Duration, durOverride)
+		if err != nil {
+			return fmt.Errorf("parse SESSION_DURATION_OVERRIDE: %w", err)
+		}
+		ex.Duration = dur
+		// The override is a test knob ("end this attempt in 20s"), so it
+		// has to reach every timed mode — a speed attempt still running
+		// for an hour under SESSION_DURATION_OVERRIDE=20s would be a trap.
+		// Training is deliberately untouched: it has no clock to override.
+		if durOverride != "" {
+			ex.SpeedDuration = dur
+		}
+	} else {
+		log.Printf("no exam selected; serving the exam selector until one is chosen")
 	}
 
 	// onExpire must be wired into session.New before the grader that
@@ -149,8 +208,14 @@ func runServer() error {
 	// see session.New's doc comment on the load-time-expiry case).
 	// The active bank id comes from the entrypoint (ACTIVE_BANK, derived
 	// from /shared/bank); ex.Name matches it by bank convention and is
-	// the natural fallback for direct/dev runs.
-	activeBank := envOr("ACTIVE_BANK", ex.Name)
+	// the natural fallback for direct/dev runs. With no exam loaded it is
+	// empty, which is the right identity for a session manager that will
+	// refuse to start anything: a persisted session belonging to a real
+	// bank is then correctly not resumed into a bank-less process.
+	activeBank := os.Getenv("ACTIVE_BANK")
+	if activeBank == "" && ex != nil {
+		activeBank = ex.Name
+	}
 
 	var onExpire atomic.Pointer[func()]
 	mgr, err := session.New(sessionFile, activeBank, dur, time.Now, func() {

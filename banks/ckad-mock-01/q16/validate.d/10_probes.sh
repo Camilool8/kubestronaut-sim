@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 5
+# points: 4
 # desc: startup, readiness and liveness probes with the requested settings
 set -uo pipefail
 . /banks/_lib/checks.sh

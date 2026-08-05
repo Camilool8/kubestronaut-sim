@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 4
 # desc: the Service selects the Pods and targets the port they listen on
 set -uo pipefail
 . /banks/_lib/checks.sh

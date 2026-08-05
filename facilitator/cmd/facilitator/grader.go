@@ -46,7 +46,15 @@ type grader struct {
 // newGrader returns a grader for ex, scoring against bank ex.Name (the
 // bank id evaluate.Grade needs to build each check's remote command).
 func newGrader(ex *exam.Exam, mgr *session.Manager, runner evaluate.Runner, timeout time.Duration) *grader {
-	return &grader{ex: ex, bank: ex.Name, mgr: mgr, runner: runner, timeout: timeout}
+	// ex is nil when no exam has been chosen. Nothing can be graded then —
+	// there is no attempt to grade and no way to start one — so this is
+	// constructed inert rather than not constructed at all, which keeps
+	// the wiring below it identical in both cases.
+	bank := ""
+	if ex != nil {
+		bank = ex.Name
+	}
+	return &grader{ex: ex, bank: bank, mgr: mgr, runner: runner, timeout: timeout}
 }
 
 // Grade kicks an asynchronous grading run unless one is already in

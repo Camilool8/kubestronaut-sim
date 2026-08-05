@@ -13,7 +13,7 @@ change the product.
 | Divergence | Why |
 |---|---|
 | Harder than the real exam | The whole point. A candidate who passes here should be comfortable there. |
-| 22 questions against a real CKAD's 15-20 | More coverage per sitting. Point budgets still track the published curriculum weights within 2 points. |
+| 22 questions against a real CKAD's 15-20 | More coverage per sitting. Point budgets still track the published curriculum weights within 2 points. The bank authors 26 and draws 22, so the sitting stays this length as the pool grows. |
 | Two-node cluster | The real exam has more. Two is enough for scheduling, affinity and DaemonSet questions, and it is what fits in 9GB. |
 | Ingress and NodePorts published to the host | The real exam does not do this. Opening your own Ingress in a browser is a fast way to learn why it is not matching. No `validate.d` check may depend on it. |
 | The documentation allowlist has no deny-override | Permitting `kubernetes.io` necessarily permits `discuss.kubernetes.io`, which the real exam disallows. Subdomain matching is what the proxy does. |
@@ -23,6 +23,19 @@ change the product.
 
 Known, chosen, and not currently worth the cost of changing.
 
+- **The instances' `/opt/course` seeding is pooling-unaware.**
+  `images/instance/entrypoint.sh` creates a working directory per
+  question and copies each question's `files/` **for the whole pool**, at
+  container start — before any draw exists, and never again. On a pooled
+  bank that means a candidate can see `/opt/course/23` for a question
+  they were not asked, and a question that ships starting material would
+  hand it over whether or not it was drawn. Harmless today: no question
+  in `ckad-mock-01` ships a `files/` directory, so the only artefact is
+  an empty directory. It is recorded here because the fix is not small —
+  the conductor's seed job runs on `k8s-env`, which has no access to the
+  per-instance `/opt/course` volumes, which is the same reason `files/`
+  cannot come from `setup.sh` — and because the day a pooled bank ships
+  starting material, this stops being cosmetic.
 - **Podman on the instances runs with the `vfs` storage driver.** Slower
   and more disk-hungry than overlay, but it works without granting the
   instances more than the five capabilities they already hold.
@@ -81,15 +94,18 @@ Known, chosen, and not currently worth the cost of changing.
   so the UI needs no hosted branch. Two consequences, both accepted: the
   phases differ from a local reset's (there is no cluster to rebuild in
   place), and a hosted reset costs a full boot rather than a partial one.
-- **In a hosted session, seeding a pooled bank would report no
-  progress.** The hub answers `/api/control/status` and `/api/control/log`
-  from its own job store, because reset and switch are its operations and
-  the Pod they describe may not exist while they run. The conductor's one
-  remaining job type, `seed`, is triggered by the facilitator
-  server-to-server and would therefore be invisible to the browser. No
-  hands-on bank in the tree is pooled — `exam.Pooled()` is false for
-  every one — so nothing is currently affected. Recorded rather than
-  guessed at, because the first pooled hands-on bank will need this.
+- ~~**In a hosted session, seeding a pooled bank would report no
+  progress.**~~ **Closed with the per-exam seat work.** The hub still
+  answers `/api/control/status` and `/api/control/log` from its own job
+  store while one of ITS jobs is in flight — reset and switch are Pod
+  replacement, and the Pod they describe does not exist for most of the
+  time they run — but when it has none running it now asks the session
+  Pod and forwards the conductor's answer untouched. That is what makes
+  the conductor's one remaining job type, `seed`, visible: it is
+  triggered by the facilitator server-to-server, between the candidate
+  pressing Start and their clock beginning. In-flight beats settled, and
+  the hub's own settled job still wins over an idle Pod, so a failed
+  reset the candidate has not dismissed does not vanish from under them.
 - **Hosted history cannot be imported into, and reports no summary.**
   Both are refused with 501 and an explanation rather than proxied. The
   Pod's own `/state` is ephemeral by design, so a history route answered
@@ -184,5 +200,14 @@ Recorded because each has been proposed at least once and is settled.
   Struck through rather than deleted, because this entry was cited as
   settled and a reader who remembers it needs to find out it was reversed
   rather than simply not find it.
-- **`spec.environment.kubernetesVersion` and `nodes` are
-  informational.** They are surfaced to the UI and drive nothing.
+- ~~**`spec.environment.kubernetesVersion` and `nodes` are
+  informational.**~~ **`nodes` is load-bearing as of the per-exam
+  environment work.** `bootstrap.sh` generates the kind config from it —
+  `kind-config.yaml` now ships the control-plane node only, and the
+  workers are appended per the active bank — so the cluster is the size
+  the certification needs rather than the size CKAD needs. Changing it in
+  a bank changes the cluster the next build produces. `provider` and
+  `kubernetesVersion` are still informational; both are served on
+  `GET /api/exam`. Struck through rather than deleted because "read by
+  nothing" was cited as settled, and a reader who remembers it needs to
+  find out it stopped being true rather than simply not find it.

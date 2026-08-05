@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Mode } from "./Mode";
 import type { ExamInfo, SessionSnapshot } from "../api";
+import { strings } from "../strings";
 
 const modes = [
   {
@@ -110,6 +111,11 @@ function mockApi() {
     "fetch",
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      if (url.endsWith("/api/exam/tips")) {
+        return new Response(JSON.stringify({ markdown: "## Set the terminal up\n\nalias." }), {
+          status: 200,
+        });
+      }
       if (url.endsWith("/api/exam")) {
         return new Response(JSON.stringify(exam), { status: 200 });
       }
@@ -430,5 +436,41 @@ describe("a route that names an exam the server does not have", () => {
     await waitFor(() => expect(window.location.hash).toBe("#/exams"));
     expect(screen.queryByRole("heading", { name: "Training" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Start/ })).not.toBeInTheDocument();
+  });
+});
+
+// The tips sheet is bank data, so the control for it can only exist when
+// the loaded bank actually ships one. Drawing it unconditionally would
+// open an empty sheet on every bank that does not.
+describe("the exam tips opener", () => {
+  test("is absent when the bank ships no tips", async () => {
+    renderMode();
+    await screen.findByRole("heading", { name: "Training" });
+
+    expect(screen.queryByRole("button", { name: strings.tips.open })).not.toBeInTheDocument();
+  });
+
+  test("opens the bank's own tips when it does", async () => {
+    exam = { ...ckad, hasTips: true };
+    const user = userEvent.setup();
+    renderMode();
+
+    await user.click(await screen.findByRole("button", { name: strings.tips.open }));
+
+    expect(screen.getByRole("dialog", { name: strings.tips.title })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Set the terminal up" })).toBeInTheDocument();
+  });
+
+  // Both openers are one flex child of .mode-fine so its space-between
+  // still means "tips list, then buttons"; three loose children spread
+  // the first button into the middle of the row.
+  test("shares a group with the layout card's opener", async () => {
+    exam = { ...ckad, hasTips: true };
+    renderMode();
+
+    const tips = await screen.findByRole("button", { name: strings.tips.open });
+    const group = tips.closest(".mode-fine-actions") as HTMLElement;
+    expect(group).not.toBeNull();
+    expect(within(group).getByRole("button", { name: strings.intro.open })).toBeInTheDocument();
   });
 });

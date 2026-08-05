@@ -189,6 +189,11 @@ type prepareResponse struct {
 // bank at boot, and re-running setup.sh would cost minutes to arrive
 // back where it already was.
 func (s *server) seedRequired() bool {
+	// No exam, nothing to seed. Called from New before any request, so
+	// this has to hold at construction as well as per attempt.
+	if s.ex == nil {
+		return false
+	}
 	return s.ex.Type != exam.TypeMCQ && exam.Pooled(s.ex)
 }
 
