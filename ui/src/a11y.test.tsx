@@ -27,11 +27,13 @@ import { McqAnswerReview } from "./components/McqAnswerReview";
 import { HostedBooting } from "./screens/HostedBooting";
 import { HostedSignIn } from "./screens/HostedSignIn";
 import { HostedStart } from "./screens/HostedStart";
-import { SessionChip } from "./components/SessionChip";
-import { SPLIT_QUERY } from "./lib/useMediaQuery";
+import { EndSessionDialog, SessionActions, SessionChip } from "./components/SessionChip";
+import { HeaderMenu } from "./components/HeaderMenu";
+import { HEADER_COMPACT_QUERY, SPLIT_QUERY } from "./lib/useMediaQuery";
 import { matchMediaMock } from "./test/setup";
 import { marksStore } from "./components/marksStore";
 import { toastStore } from "./components/toastStore";
+import { strings } from "./strings";
 import type { ControlJob, ExamQuestionInfo, SessionSnapshot } from "./api";
 
 // Component-level scans run outside App's <main>, so the page-level
@@ -608,6 +610,59 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
+  test("the header menu, open", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <HeaderMenu label="Menu">
+        <button type="button">Exams</button>
+        <button type="button">Progress</button>
+      </HeaderMenu>,
+    );
+    await user.click(screen.getByRole("button", { name: "Menu" }));
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  // HeaderMenu on its own above is a stand-in — two placeholder buttons,
+  // no real controls. The surface a phone actually renders is AppHeader
+  // in its compact state: the nav links, the login and both ways out of
+  // a session all move into this panel there, and that composition was
+  // never scanned open. Assert the nav and session controls are actually
+  // on screen before sweeping — a mis-set matchMediaMock, or a menu that
+  // silently failed to open, would otherwise leave this scanning an
+  // empty or closed panel and pass for the wrong reason.
+  test("app header, compact, with the menu open", async () => {
+    matchMediaMock([HEADER_COMPACT_QUERY]);
+    const user = userEvent.setup();
+    const { container } = render(
+      <AppHeader
+        nav={[
+          { label: "Exams", to: "/exams" },
+          { label: "Progress", to: "/progress", current: true },
+        ]}
+        session={{
+          login: "octocat",
+          session: {
+            kind: "practical",
+            pod: "sim-session-practical-1",
+            state: "ready",
+            startedAt: "2026-08-05T09:00:00Z",
+            expiresAt: "2026-08-05T19:00:00Z",
+            lastSeen: "2026-08-05T09:00:00Z",
+          },
+          onChanged: () => {},
+        }}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: strings.header.menuLabel }));
+    expect(screen.getByRole("button", { name: "Exams" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: strings.hosted.endSession })).toBeInTheDocument();
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    // Reset so compact mode does not leak into every scan that follows
+    // this one in the file — matchMediaMock replaces window.matchMedia
+    // wholesale rather than scoping to this render.
+    matchMediaMock([]);
+  });
+
   test("modal dialog", async () => {
     const { container } = render(
       <Dialog title="End the exam?" onClose={() => {}}>
@@ -834,6 +889,30 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
+  // The rebuild variant of the same screen: `op: "reset"` is what a
+  // hosted candidate sees for the 2-4 minutes their environment is torn
+  // down and rebuilt in place, and it renders different copy from a
+  // first boot (see the hub-side comments on why a rebuild must not read
+  // as an outage). Never scanned before this suite existed either.
+  test("the boot screen, rebuilding", async () => {
+    const { container } = render(
+      <HostedBooting
+        session={{
+          kind: "practical",
+          bank: "ckad-mock-01",
+          pod: "sim-session-practical-583231",
+          state: "starting",
+          op: "reset",
+          startedAt: "2026-08-05T09:00:00Z",
+          expiresAt: "2026-08-05T19:00:00Z",
+          lastSeen: "2026-08-05T09:00:00Z",
+        }}
+        onChanged={() => {}}
+      />,
+    );
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
   // The one hosted surface that lives inside the header, beside the
   // theme toggle and a backgrounded-job chip.
   test("session chip with a lease running out", async () => {
@@ -850,6 +929,43 @@ describe("axe: no WCAG violations", () => {
         }}
       />,
     );
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  // SessionChip above is presentational only (see its own file comment);
+  // the two ways out of a session live in SessionActions, and the
+  // confirmation they raise lives in EndSessionDialog. An earlier task
+  // split those out of what used to be one component, and this suite
+  // kept scanning only the chip — the controls and the dialog never had
+  // an axe pass of their own.
+  test("session actions with an active session", async () => {
+    // A session is set so both controls render: the always-present
+    // sign-out and the end-session button that exists only when there is
+    // an environment to end. The bare-session case would leave the
+    // second button unswept.
+    const { container } = render(
+      <SessionActions
+        session={{
+          kind: "practical",
+          pod: "sim-session-practical-1",
+          state: "ready",
+          startedAt: "2026-08-04T11:00:00Z",
+          expiresAt: "2026-08-04T21:00:00Z",
+          lastSeen: "2026-08-04T12:00:00Z",
+        }}
+        onEnd={() => {}}
+      />,
+    );
+    expect(screen.getByRole("button", { name: strings.hosted.endSession })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: strings.hosted.signOut })).toBeInTheDocument();
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  test("end-session confirmation dialog", async () => {
+    const { container } = render(<EndSessionDialog onClose={() => {}} onChanged={() => {}} />);
+    // Confirms the dialog actually rendered its body rather than an
+    // empty modal shell, which axe would sweep and pass trivially.
+    expect(screen.getByRole("dialog")).toHaveTextContent(strings.hosted.endConfirmTitle);
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 });

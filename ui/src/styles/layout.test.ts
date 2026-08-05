@@ -67,6 +67,25 @@ describe("full-height chain", () => {
   });
 });
 
+// `.app-header` is a sibling of `main` inside #root's column flex, so
+// `height: 56px` here is only a flex BASE size — with the default shrink
+// factor the score screen's 1500px of results squashed it to its
+// min-content height (29px, the label text) while the lobby, whose
+// content fits, kept the full 56. A header that is a different height
+// depending on how long the page below it is. Neither half is visible to
+// a render test: jsdom has no layout engine to shrink it in the first
+// place.
+describe("the app header does not shrink with the page below it", () => {
+  test("keeps its 56px base and refuses to give it up", async () => {
+    const css = await readThemeCss();
+    const header = ruleBody(css, ".app-header");
+
+    expect(header, "the header's own rule was renamed or removed").not.toBeNull();
+    expect(header).toContain("height: 56px");
+    expect(header).toContain("flex-shrink: 0");
+  });
+});
+
 describe("desktop viewport", () => {
   test("the noVNC mount is out of flow, so it can never size itself from its canvas", async () => {
     // noVNC observes this element and asks the server for a framebuffer of
