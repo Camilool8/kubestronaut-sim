@@ -4,7 +4,10 @@ import userEvent from "@testing-library/user-event";
 import { McqExam } from "./McqExam";
 import { marksStore } from "../components/marksStore";
 import { toastStore } from "../components/toastStore";
+import { MCQ_COMPACT_QUERY } from "../lib/useMediaQuery";
+import { matchMediaMock } from "../test/setup";
 import type { SessionSnapshot } from "../api";
+import { strings } from "../strings";
 
 const session: SessionSnapshot = {
   state: "running",
@@ -112,6 +115,11 @@ function stubFetch(
     }),
   );
   return log;
+}
+
+/** Everything an attempt can DO now lives in the navbar menu. */
+async function openMenu(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: strings.header.menuLabel }));
 }
 
 afterEach(() => {
@@ -222,10 +230,11 @@ describe("McqExam answering", () => {
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
     await screen.findByText("Which component persists cluster state?");
+    await openMenu(user);
     // On the last question the footer's Submit exam button joins the
     // header's — same action, same label, two locations. Either
     // opens the identical dialog; the header's is first in the DOM.
-    await user.click(screen.getAllByRole("button", { name: /submit exam/i })[0]);
+    await user.click(screen.getByRole("button", { name: /submit exam/i }));
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText(/1 question is unanswered/)).toBeInTheDocument();
@@ -244,8 +253,9 @@ describe("McqExam answering", () => {
     await screen.findByText("Which component persists cluster state?");
     // The educational mode must not wear exam urgency at the moment of
     // commitment: label, dialog title and confirm all say Training.
+    await openMenu(user);
     expect(screen.queryByRole("button", { name: /submit exam/i })).not.toBeInTheDocument();
-    await user.click(screen.getAllByRole("button", { name: /submit session/i })[0]);
+    await user.click(screen.getByRole("button", { name: /submit session/i }));
     expect(await screen.findByRole("dialog")).toHaveAccessibleName(/training/i);
     expect(screen.queryByText(/cannot be undone/i)).not.toBeInTheDocument();
   });
@@ -256,11 +266,14 @@ describe("McqExam answering", () => {
 // all three numbers honestly: answers are server state, flags and
 // first-opens are the attempt's own marks.
 describe("McqExam attempt state", () => {
-  test("the topbar counts answered, flagged and unseen", async () => {
+  test("the menu counts answered, flagged and unseen", async () => {
     stubFetch({ q01: [1] });
+    const user = userEvent.setup();
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+    await screen.findByText("Which component persists cluster state?");
 
     // Q1 is answered and on screen (so seen); Q2 is neither.
+    await openMenu(user);
     await waitFor(() =>
       expect(screen.getByText(/Answered 1 · Flagged 0 · Unseen 1/)).toBeInTheDocument(),
     );
@@ -278,6 +291,7 @@ describe("McqExam attempt state", () => {
       "aria-pressed",
       "true",
     );
+    await openMenu(user);
     expect(screen.getByText(/Flagged 1/)).toBeInTheDocument();
   });
 
@@ -414,12 +428,14 @@ describe("McqExam footer navigation", () => {
     await screen.findByText("Which are container interface standards? Choose all that apply.");
 
     // No more "Next" in the footer — the exam's last question replaces
-    // it with the same Submit exam control the header carries throughout.
+    // it with a Submit. Exactly one is on screen: the bar no longer
+    // carries a second copy, because every command an attempt has lives
+    // in the navbar menu now and is not drawn until it is opened.
     expect(screen.queryByRole("button", { name: /next question/i })).not.toBeInTheDocument();
     const submitButtons = screen.getAllByRole("button", { name: /submit exam/i });
-    expect(submitButtons).toHaveLength(2);
+    expect(submitButtons).toHaveLength(1);
 
-    await user.click(submitButtons[1]);
+    await user.click(submitButtons[0]);
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
@@ -433,5 +449,114 @@ describe("McqExam footer navigation", () => {
     expect(
       await screen.findByText(/answers save as you go · nothing is graded until submit/i),
     ).toBeInTheDocument();
+  });
+});
+
+// The one exam a phone can sit, so the phone layout is not a fallback
+// here — it is the product. jsdom cannot see any of the CSS that makes
+// it work, but it can see the half that matters most: which controls
+// exist, where, and what they are called. Every branch below is a JS
+// branch precisely so that it IS testable, and so that no button ends up
+// with two accessible names.
+describe("McqExam on a phone", () => {
+  afterEach(() => {
+    matchMediaMock([]);
+  });
+
+  const renderCompact = () => {
+    matchMediaMock([MCQ_COMPACT_QUERY]);
+    return render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+  };
+
+  // The bar keeps the clock and the identity, and one control opens
+  // everything else. It is the SAME control, in the same corner, as on
+  // every other screen in both products — that is the whole point of the
+  // rebuild, and the reason this asserts the shared menu label rather
+  // than a name the exam invented for itself.
+  test("the bar keeps the clock, and the menu is the same one every screen has", async () => {
+    stubFetch();
+    renderCompact();
+    await screen.findByText(/persists cluster state/);
+
+    expect(screen.getByRole("timer")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: strings.header.menuLabel })).toBeInTheDocument();
+    // Submit is not in the bar. It ends the attempt, it cannot be
+    // undone, and the bar is where a thumb reaching for the notch lands.
+    expect(screen.queryByRole("button", { name: "Submit exam" })).toBeNull();
+  });
+
+  test("the menu holds the attempt's progress and its one irreversible action", async () => {
+    stubFetch({ q01: [1] });
+    const user = userEvent.setup();
+    renderCompact();
+    await screen.findByText(/persists cluster state/);
+
+    await openMenu(user);
+    const panel = screen.getByRole("group", { name: strings.header.menuLabel });
+    expect(within(panel).getByText(/Answered 1/)).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "Submit exam" })).toBeInTheDocument();
+    // And the sections every screen's menu has, in the same order.
+    expect(within(panel).getByRole("button", { name: /Theme/ })).toBeInTheDocument();
+  });
+
+  test("submitting from the menu opens the confirmation", async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    renderCompact();
+    await screen.findByText(/persists cluster state/);
+
+    await openMenu(user);
+    await user.click(screen.getByRole("button", { name: "Submit exam" }));
+
+    // The menu closes behind it: two stacked panels over one decision is
+    // one too many, and the confirmation is the one that matters.
+    expect(await screen.findByRole("dialog", { name: /submit/i })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: strings.header.menuLabel })).toBeNull();
+  });
+
+  // Three labelled controls do not fit a 320px row without every one of
+  // them ellipsing. The labels give way to the glyphs they already sit
+  // beside — and the navigator trades the word "Navigator" for the
+  // position it is the way to change.
+  test("the action bar drops its labels but keeps every accessible name", async () => {
+    stubFetch();
+    renderCompact();
+    await screen.findByText(/persists cluster state/);
+
+    const previous = screen.getByRole("button", { name: /previous/i });
+    expect(previous).toBeInTheDocument();
+    expect(previous.textContent).not.toMatch(/prev/i);
+
+    expect(screen.getByText("1/2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /question 1 of 2/i })).toBeInTheDocument();
+  });
+
+  // The reasoning that makes the desktop navigator a plain disclosure —
+  // a scrim over a live remote desktop reads as a fault — is about the
+  // remote desktop, and there is none behind an mcq question.
+  test("the navigator opens as a modal sheet, not an inline panel", async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    renderCompact();
+    await screen.findByText(/persists cluster state/);
+
+    await user.click(screen.getByRole("button", { name: /question 1 of 2/i }));
+
+    const sheet = screen.getByRole("dialog", { name: /questions/i });
+    expect(sheet).toHaveAttribute("aria-modal", "true");
+    expect(within(sheet).getByRole("button", { name: /^Q1/ })).toBeInTheDocument();
+  });
+
+  test("and stays a plain disclosure on a desktop", async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    matchMediaMock([]);
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+    await screen.findByText(/persists cluster state/);
+
+    await user.click(screen.getByRole("button", { name: /navigator/i }));
+
+    expect(screen.queryByRole("dialog", { name: /questions/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /^Q1/ })).toBeInTheDocument();
   });
 });

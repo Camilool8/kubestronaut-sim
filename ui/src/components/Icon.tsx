@@ -48,7 +48,15 @@ export type IconName =
   | "theme-light"
   | "theme-dark"
   | "help"
-  | "menu";
+  | "menu"
+  // The navbar menu's rows. Every row carries a glyph so the labels
+  // align down one edge, which is the whole reason the menu reads as a
+  // list rather than as a pile of borrowed controls.
+  | "chart"
+  | "user"
+  | "exit"
+  | "send"
+  | "home";
 
 const SUN_RAYS = [
   "M12 2.4v2.2",
@@ -136,6 +144,45 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="M4 7h16" />
       <path d="M4 12h16" />
       <path d="M4 17h16" />
+    </>
+  ),
+  // Three bars of increasing height on a baseline: progress over a set
+  // of exams, which is what the dashboard ranks.
+  chart: (
+    <>
+      <path d="M4 20h16" />
+      <path d="M7.5 20v-5.5" />
+      <path d="M12 20V8.5" />
+      <path d="M16.5 20v-9" />
+    </>
+  ),
+  user: (
+    <>
+      <circle cx="12" cy="8.5" r="3.4" />
+      <path d="M5.5 19.5a6.5 6.5 0 0 1 13 0" />
+    </>
+  ),
+  // A door with an arrow leaving it. Sign out, not "close": the arrow
+  // points away from the panel rather than at a cross.
+  exit: (
+    <>
+      <path d="M14.5 5.5h-7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h7" />
+      <path d="M15 12h5.5" />
+      <path d="M18 9l3 3-3 3" />
+    </>
+  ),
+  // Submit: a sheet with a tick, not a paper plane. Nothing is being
+  // sent anywhere — the attempt is being handed in for grading.
+  send: (
+    <>
+      <path d="M18.5 11V6.5a2 2 0 0 0-2-2h-9a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2H12" />
+      <path d="M14.5 17.5l2 2 4-4.5" />
+    </>
+  ),
+  home: (
+    <>
+      <path d="M4.5 10.8L12 4.8l7.5 6" />
+      <path d="M6.5 10v9h11v-9" />
     </>
   ),
 };

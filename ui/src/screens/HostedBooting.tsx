@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { endHostedSession, getHostedExams, startHostedSession, type HostedSession } from "../api";
 import { PendingBar } from "../components/Pending";
+import { useDesktopGate } from "../components/DesktopRequired";
 import { formatElapsed } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 import { useTick } from "../lib/useTick";
@@ -27,6 +28,10 @@ interface HostedBootingProps {
 export function HostedBooting({ session, onChanged }: HostedBootingProps) {
   const [busy, setBusy] = useState(false);
   const failed = session.state === "failed";
+  // Only ever consulted for a hands-on seat: an mcq environment is one
+  // this device can use, and refusing to rebuild it would strand a
+  // candidate on a failure screen with nothing but Give up.
+  const blocked = useDesktopGate() === "blocked" && session.kind !== "mcq";
   const now = useTick(!failed);
   const started = Date.parse(session.startedAt);
   const elapsed = Number.isNaN(started) ? 0 : now - started;
@@ -90,15 +95,27 @@ export function HostedBooting({ session, onChanged }: HostedBootingProps) {
       <div className="page hosted-screen">
         <h1>{failedRebuild ? strings.hosted.rebuildFailedTitle : strings.hosted.bootFailedTitle}</h1>
         {session.error && <p className="error-text">{session.error}</p>}
+        {/* Retry re-books the same hands-on seat, so it is refused on
+            the same device the lobby refused it on. The seat behind this
+            failure was taken on a desktop; a tab reopened on a phone
+            must not be able to spend it again from here — that is the
+            one path into a practical seat that does not pass the
+            lobby. Give up is always offered, because someone holding a
+            failed seat must always be able to let it go. */}
+        {blocked ? (
+          <p className="hosted-boot-blocked">{strings.mobile.lobbyNote}</p>
+        ) : null}
         <div className="score-actions">
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => void retry()}
-            disabled={busy}
-          >
-            {strings.hosted.bootRetry}
-          </button>
+          {!blocked && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => void retry()}
+              disabled={busy}
+            >
+              {strings.hosted.bootRetry}
+            </button>
+          )}
           <button type="button" className="btn" onClick={() => void giveUp()} disabled={busy}>
             {failedRebuild ? strings.hosted.rebuildGiveUp : strings.hosted.bootGiveUp}
           </button>

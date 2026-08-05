@@ -22,10 +22,11 @@ import {
 } from "../api";
 import { useAsync } from "../lib/useAsync";
 import { isTypingTarget } from "../lib/typing";
+import { MCQ_COMPACT_QUERY, useMediaQuery } from "../lib/useMediaQuery";
 import { Async } from "../components/Async";
 import { TimerBar } from "../components/TimerBar";
+import { NavMenuFact, NavMenuItem } from "../components/NavMenu";
 import { Dialog } from "../components/Dialog";
-import { InfoButton } from "../components/InfoButton";
 import { Icon } from "../components/Icon";
 import { InlineCode, Markdown } from "../components/Markdown";
 import { CheckList } from "../components/CheckList";
@@ -68,6 +69,11 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
 
   const examState = useAsync((signal) => getExam(signal), []);
   const exam = examState.data;
+
+  // One read, passed down. Both the topbar and the action bar branch on
+  // it, and two independent matchMedia subscriptions for one breakpoint
+  // is two chances for them to disagree mid-resize.
+  const compact = useMediaQuery(MCQ_COMPACT_QUERY);
 
   // Resume: the server's stored selections are the truth this screen
   // starts from. Failure is non-fatal (the candidate can still answer —
@@ -244,21 +250,23 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
         fetchedAt={fetchedAt}
         title={exam?.title ?? strings.exam.fallbackTitle}
         onEndClick={() => setConfirmOpen(true)}
+        // Rows in the navbar menu's attempt section, in the same shape
+        // as every other row there. The tally used to sit in the bar as
+        // free-floating text, which is what pushed the row onto three
+        // lines on a phone; it is a fact about the attempt, and facts
+        // belong beside the things you can do to it.
         extras={
           <>
             {questions.length > 0 && (
               <McqTally questions={questions} answeredCount={answeredCount} />
             )}
             {session.mode === "training" && (
-              <button
-                className="btn"
-                onClick={() => void scoreNow()}
-                disabled={scoring}
-              >
-                {scoring ? strings.practice.scoring : strings.practice.scoreNow}
-              </button>
+              <NavMenuItem
+                icon="check"
+                label={scoring ? strings.practice.scoring : strings.practice.scoreNow}
+                onSelect={() => void scoreNow()}
+              />
             )}
-            <InfoButton />
           </>
         }
       />
@@ -300,6 +308,7 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
             answers={answers}
             selectedId={selected.id}
             mode={session.mode}
+            compact={compact}
             prev={prev}
             next={next}
             onSelect={setPickedId}
@@ -394,6 +403,8 @@ interface McqQuestionProps {
   answers: Record<string, number[]>;
   selectedId: string;
   mode: SessionSnapshot["mode"];
+  /** Phone-sized: the action bar drops its labels for its glyphs. */
+  compact: boolean;
   prev?: ExamQuestionInfo;
   next?: ExamQuestionInfo;
   onSelect: (id: string) => void;
@@ -411,6 +422,7 @@ function McqQuestion({
   answers,
   selectedId,
   mode,
+  compact,
   prev,
   next,
   onSelect,
@@ -570,6 +582,16 @@ function McqQuestion({
           or hesitates. Submit exam replaces Next on the last question and
           opens the same confirm dialog the topbar's does — the
           unanswered/marked review lives there once, not twice. */}
+      {/* The action bar. On a phone the labels give way to the glyphs
+          they already sit beside, and the navigator trades the word
+          "Navigator" for the position it is the way to change — the one
+          fact a candidate reaching for it actually wants.
+
+          Branched in JS rather than hidden with CSS, deliberately. Two
+          spans in one button, one of them display:none, still contribute
+          BOTH to its accessible name: a screen reader would hear
+          "Navigator, question 7 of 65, Navigator" with no way to tell
+          that only one is drawn. Same rule the app header follows. */}
       <footer className="mcq-footer">
         <button
           className="btn"
@@ -578,7 +600,7 @@ function McqQuestion({
           aria-label={strings.questionPanel.prev}
         >
           <Icon name="chevron-left" />
-          {strings.questionPanel.prevShort}
+          {!compact && strings.questionPanel.prevShort}
         </button>
         <span className="mcq-save-note">{strings.mcq.saveNote}</span>
         <div className="mcq-footer-end">
@@ -590,10 +612,18 @@ function McqQuestion({
             aria-controls={jumpOpen ? "mcq-jump" : undefined}
           >
             <Icon name="grid" className="trigger-glyph" />
-            {strings.mcq.navigator}
-            <kbd className="key-hint" aria-hidden="true">
-              {strings.navigator.keyGridKey}
-            </kbd>
+            {compact ? (
+              <span className="mcq-jump-position" aria-hidden="true">
+                {strings.exam.positionShort(index + 1, total)}
+              </span>
+            ) : (
+              <>
+                {strings.mcq.navigator}
+                <kbd className="key-hint" aria-hidden="true">
+                  {strings.navigator.keyGridKey}
+                </kbd>
+              </>
+            )}
             <span className="sr-only">
               {strings.navigator.position(index + 1, total)}
             </span>
@@ -618,6 +648,7 @@ function McqQuestion({
       {jumpOpen && (
         <Navigator
           id="mcq-jump"
+          asSheet={compact}
           questions={toNavigator(questions, answers)}
           selectedId={selectedId}
           // "answered" is a fact here, not a guess: the answers are server
@@ -654,9 +685,11 @@ function McqTally({
   const unseen = questions.filter((q) => !marksStore.isViewed(q.id)).length;
 
   return (
-    <span className="mcq-tally">
-      {strings.mcq.tally(answeredCount, flagged, unseen)}
-    </span>
+    <NavMenuFact
+      icon="grid"
+      label={strings.mcq.answeredLabel}
+      detail={strings.mcq.tally(answeredCount, flagged, unseen)}
+    />
   );
 }
 

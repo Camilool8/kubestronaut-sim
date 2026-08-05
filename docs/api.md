@@ -77,6 +77,43 @@ was.
 None of these gates is a security control. Every `solution.md` and
 `hints.md` sits unencrypted in `banks/` on your own disk throughout.
 
+## The device gate
+
+A hands-on attempt is a question panel beside a live Linux desktop over
+VNC. It needs a physical keyboard and room for two panes, so a touch-only
+client is refused one — by the hub before a seat is claimed, and by the
+facilitator before a clock starts.
+
+| Header | Values | Sent by |
+|---|---|---|
+| `X-Sim-Pointer` | `coarse` (no precise pointer anywhere) or `fine` | every SPA request, from `ui/src/lib/deviceCapability.ts` |
+
+The client measures and declares; the server decides. That is the
+inverse of the mode-capability pattern, where the server owns a predicate
+and the client only renders it, and it has one cause: no server can
+observe a pointer type, and a `User-Agent` is a string the browser
+chooses — desktop mode on a phone walks straight through one, and some
+laptops are turned away by it.
+
+| Request | Refused when | Response |
+|---|---|---|
+| `POST /api/session/start` (hub) | the resolved kind is `practical` | 409 `{"code": "desktop_required", "error": "…"}`, **before** a seat is claimed or a queue place taken |
+| `POST /api/control/switch` (hub) | the named bank's engine is hands-on | the same 409, before a two-to-four minute rebuild |
+| `POST /api/session/start` (facilitator) | the loaded exam is not `mcq` | the same 409, beside the readiness gate. This is the backstop every attempt passes through, local or hosted |
+
+**An absent or unrecognised value admits.** `./sim`, `tests/smoke.sh` and
+every `curl` POST send no header at all, and an older SPA sends none
+either; all of them must keep working unchanged. Like the session-state
+gates above, this is UX fidelity rather than security — it stops a mobile
+browser starting an exam it cannot sit, and claims nothing stronger.
+
+```console
+$ curl -s -X POST localhost:8080/api/session/start \
+    -H 'Content-Type: application/json' -H 'X-Sim-Pointer: coarse' \
+    -d '{"mode":"exam"}'
+{"code":"desktop_required","error":"this exam runs a Linux desktop beside the questions, so it needs a desktop browser and a keyboard"}
+```
+
 ## Facilitator
 
 ### GET /healthz
@@ -382,7 +419,7 @@ one field appears here and nowhere else.
 | 200 | Started. The clock is running. |
 | 202 | **Drawn, not started** — a pooled hands-on bank only. The cluster is being prepared for the questions just drawn and the clock has not begun. See [Preparing an attempt](#preparing-an-attempt). |
 | 400 | `mode` is not `exam`, `training` or `speed`; the body is non-empty and not JSON; `seed` is not six lowercase hex digits, or `domains` names a domain the bank does not have. |
-| 409 | The environment is still starting; a session is already running or ended; a preparation is already in flight; the conductor refused or could not be reached (the body carries its own words); or — pooled hands-on only — **the cluster is still holding a different draw's objects**. |
+| 409 | The environment is still starting; the caller declared a coarse pointer and this is not an mcq exam (`code: "desktop_required"` — see [The device gate](#the-device-gate)); a session is already running or ended; a preparation is already in flight; the conductor refused or could not be reached (the body carries its own words); or — pooled hands-on only — **the cluster is still holding a different draw's objects**. |
 | 500 | The bank's pool cannot satisfy its own `domainWeights` at this draw size — an authoring bug `tests/bank-weights.sh` should have caught first. |
 | 503 | This build has no route to the conductor, so a pooled hands-on bank's cluster cannot be prepared. |
 

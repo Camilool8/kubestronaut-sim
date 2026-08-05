@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { readBaseCss, readThemeCss, ruleBody } from "../test/readCss";
+import { readBaseCss, readThemeCss, ruleBody, usedClassNames } from "../test/readCss";
 
 // Two declarations that look cosmetic and are not. Both were regressions
 // once — the second one for the whole of milestones C through F — and
@@ -16,6 +16,26 @@ describe("full-height chain", () => {
 
     expect(body, "the html/body/#root height rule was renamed or removed").not.toBeNull();
     expect(body).toContain("height: 100%");
+  });
+
+  // The dvh half of the same rule, and the ORDER is the whole of it. A
+  // browser that does not parse `100dvh` drops that declaration and
+  // keeps the `100%` above it, so the fallback is the cascade rather
+  // than an @supports block. Swap the two and every such browser gets a
+  // chain that resolves to auto — the failure the test above exists for,
+  // reintroduced by a tidy-up that sorted the declarations.
+  test("the chain also tracks the dynamic viewport, with the percentage as its fallback", async () => {
+    const css = await readBaseCss();
+    const body = ruleBody(css, "html, body, #root")!;
+
+    expect(
+      body,
+      "mobile Safari resolves a percentage height against the LARGE viewport, so the bottom of every screen sits under the URL bar",
+    ).toContain("height: 100dvh");
+    expect(
+      body.indexOf("height: 100%"),
+      "100% must come FIRST — it is the fallback a browser keeps when it cannot parse dvh",
+    ).toBeLessThan(body.indexOf("height: 100dvh"));
   });
 
   // `main` used to be in the rule above. It is now the flexible row of a
@@ -67,7 +87,7 @@ describe("full-height chain", () => {
   });
 });
 
-// `.app-header` is a sibling of `main` inside #root's column flex, so
+// `.navbar` is a sibling of `main` inside #root's column flex, so
 // `height: 56px` here is only a flex BASE size — with the default shrink
 // factor the score screen's 1500px of results squashed it to its
 // min-content height (29px, the label text) while the lobby, whose
@@ -75,14 +95,14 @@ describe("full-height chain", () => {
 // depending on how long the page below it is. Neither half is visible to
 // a render test: jsdom has no layout engine to shrink it in the first
 // place.
-describe("the app header does not shrink with the page below it", () => {
+describe("the navbar does not shrink with the page below it", () => {
   test("keeps its 56px base and refuses to give it up", async () => {
     const css = await readThemeCss();
-    const header = ruleBody(css, ".app-header");
+    const bar = ruleBody(css, ".navbar");
 
-    expect(header, "the header's own rule was renamed or removed").not.toBeNull();
-    expect(header).toContain("height: 56px");
-    expect(header).toContain("flex-shrink: 0");
+    expect(bar, "the navbar's own rule was renamed or removed").not.toBeNull();
+    expect(bar).toContain("height: 56px");
+    expect(bar).toContain("flex-shrink: 0");
   });
 });
 
@@ -302,5 +322,159 @@ describe("value chips that are too long for their column", () => {
     // column until it rendered "ImagePullBackOf" and a lone "f".
     // `break-word` lets the column size to the token instead.
     expect(ruleBody(css, ".md th code, .md td code")).toContain("overflow-wrap: break-word");
+  });
+});
+
+/**
+ * The touch layer, which is entirely made of overrides.
+ *
+ * Every rule in theme.css's `touch input` section restyles a component
+ * defined hundreds of lines above it, and it does so by naming that
+ * component's class. A class that has been renamed — or was mistyped in
+ * the first place — produces no error, no warning and no visible change
+ * on any machine a developer is likely to be using. It simply does
+ * nothing, on phones, forever.
+ *
+ * This caught two on the day it was written: `.exam-card-action` for
+ * `.exam-card-actions`, and `.header-menu-trigger` for
+ * `.header-menu-button`.
+ */
+/**
+ * The stylesheet is structurally whole.
+ *
+ * A selector list that runs into an at-rule instead of into a `{` is
+ * invalid CSS, and every downstream tool treats it as a warning rather
+ * than an error: esbuild prints `Unexpected "@media"` in the middle of a
+ * successful build, drops the rule, and ships. Nothing fails, the bundle
+ * is smaller by one rule, and the behaviour that rule carried is simply
+ * gone.
+ *
+ * That is exactly what happened to the touch layer here: a scripted edit
+ * matched a selector list whose closing line had already been removed by
+ * an earlier one, so the replacement silently no-opped and left
+ * `.info-button,\n.theme-toggle,` hanging in front of a media query.
+ * `touch-action: manipulation` and the tap-highlight reset stopped
+ * shipping, on phones, and the "still in the stylesheet" test below
+ * passed anyway — a `toContain(".nav-menu-item")` is satisfied by that
+ * class appearing in ANY rule, including its own.
+ *
+ * Braces balancing is not enough either: the file balanced.
+ */
+describe("theme.css is structurally whole", () => {
+  test("no selector list runs into an at-rule, a close brace or the end of the file", async () => {
+    const css = await readThemeCss();
+    const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
+
+    const dangling = [...withoutComments.matchAll(/,\s*(?=@|\}|$)/g)].map((m) =>
+      withoutComments.slice(Math.max(0, m.index - 120), m.index + 40).trim(),
+    );
+
+    expect(dangling, "a selector list with no declaration block — esbuild drops the rule and only warns").toEqual([]);
+  });
+
+  test("every brace opened is closed, and none closes early", async () => {
+    const css = await readThemeCss();
+    const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    let depth = 0;
+    let wentNegative = false;
+    for (const ch of withoutComments) {
+      if (ch === "{") depth++;
+      if (ch === "}") {
+        depth--;
+        if (depth < 0) wentNegative = true;
+      }
+    }
+    expect(wentNegative, "a stray closing brace ends a block early").toBe(false);
+    expect(depth, "an unclosed block swallows every rule after it").toBe(0);
+  });
+});
+
+describe("the touch layer names classes that exist", () => {
+  // The classes the touch section targets, listed here rather than
+  // parsed out of the CSS: a test that derives its expectations from the
+  // thing it is testing cannot fail.
+  const targeted = [
+    "btn",
+    "btn-primary",
+    "mcq-option",
+    "navigator-tile",
+    "navigator-chip",
+    "question-mark",
+    "info-button",
+    "nav-menu-trigger",
+    "nav-menu-panel",
+    "nav-menu-item",
+    // The mobile chrome block at the foot of the file, which is the same
+    // kind of override and fails the same silent way. `.signin-cta` was
+    // written here first and does not exist; the button is
+    // `.signin-github`.
+    "page",
+    "score-screen",
+    "signin",
+    "signin-github",
+    "page",
+    "signin",
+    "hosted-flavour-actions",
+    "hosted-booting",
+    "score-actions",
+    "desktop-required-anyway",
+    "gate-session",
+    "progress-actions",
+    // Classes this branch introduced. A style with no element is as dead
+    // as an element with no style, and these are new on both sides.
+    "hosted-flavour-badge",
+    "hosted-boot-blocked",
+    "mcq-jump-position",
+    "navbar",
+    "navbar-home",
+    "navbar-wordmark",
+    "navbar-back",
+    "navbar-crumb-here",
+    "nav-menu-bars",
+    "nav-menu-scrim",
+    "nav-menu-panel-sheet",
+    "nav-menu-section",
+    "navigator-sheet",
+    "navigator-scrim",
+    "sheet-grip",
+    "confirm-overlay-sheet",
+    "confirm-dialog-sheet",
+  ];
+
+  test("every class the touch rules restyle is really put on an element", async () => {
+    const used = await usedClassNames();
+    const dead = targeted.filter((name) => !used.has(name));
+    expect(dead, "these touch rules match nothing and do nothing on a phone").toEqual([]);
+  });
+
+  test("and the rules that name them are still in the stylesheet", async () => {
+    const css = await readThemeCss();
+    for (const name of targeted) {
+      expect(css, `.${name} lost its touch rule`).toContain(`.${name}`);
+    }
+  });
+
+  // Pinch-to-zoom is WCAG 1.4.4 and is not ours to disable. The value
+  // that opts out of double-tap zoom is `manipulation`; `none` would
+  // take the pinch with it, and the two differ by one word.
+  //
+  // `.panel-resizer` is the one legitimate `none` in the file: it is a
+  // drag handle, and without it the browser claims the gesture for
+  // scrolling and the pointermove stream stops after a few events. It is
+  // 6px wide and suppressed below 900px, so it is not a surface anyone
+  // pinches. Any OTHER rule reaching for `none` is the mistake this
+  // guards.
+  test("double-tap zoom is opted out of, and pinch zoom is not", async () => {
+    const css = await readThemeCss();
+    expect(css).toContain("touch-action: manipulation");
+
+    const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    const owners = [...withoutComments.matchAll(/([^{}]*)\{([^{}]*)\}/g)]
+      .filter(([, , body]) => /touch-action:\s*none/.test(body))
+      .map(([, selector]) => selector.replace(/\s+/g, " ").trim());
+
+    expect(owners, "touch-action: none disables pinch zoom on whatever it names").toEqual([
+      ".panel-resizer",
+    ]);
   });
 });

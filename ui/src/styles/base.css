@@ -19,6 +19,22 @@ html,
 body,
 #root {
   height: 100%;
+  /* And then again in dynamic viewport units, which is the same number
+     on every desktop and a different one on a phone.
+     On mobile Safari and Chrome the "viewport" a percentage resolves
+     against is the LARGE one — the height the page would have if the
+     URL bar were fully retracted — so 100% is taller than what is
+     actually on screen whenever the bar is showing. Everything pinned to
+     the bottom of this chain (the exam's footer, a full-bleed sheet's
+     last button) then sits under the browser's own chrome.
+     100dvh tracks the real height as the bar shows and hides. The cost
+     is a reflow on each of those transitions, which is why the rest of
+     this system uses dvh only where something must reach the bottom
+     edge, never for a hero or a decorative fill.
+     Declared second so it simply wins where it is understood, and is
+     dropped as an unparsable value where it is not — leaving the 100%
+     above as the fallback rather than needing @supports. */
+  height: 100dvh;
 }
 
 /* `main` used to be in that list. It cannot be, now that `.app-header`

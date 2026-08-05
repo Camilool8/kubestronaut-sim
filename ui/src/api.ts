@@ -4,6 +4,8 @@
 // serving the SPA from the same origin as the API — see §3 of the
 // milestone design doc for the exact JSON contract mirrored here.
 
+import { pointerHeader } from "./lib/deviceCapability";
+
 export type SessionState = "idle" | "running" | "ended";
 
 /** How an attempt is being run. Chosen at Start, immutable after. */
@@ -480,9 +482,19 @@ function withTimeout(ms: number, external?: AbortSignal): AbortSignal {
 }
 
 async function request(path: string, opts: RequestOptions = {}): Promise<Response> {
-  const { signal, timeoutMs = FETCH_TIMEOUT_MS, ...init } = opts;
+  const { signal, timeoutMs = FETCH_TIMEOUT_MS, headers, ...init } = opts;
   try {
-    return await fetch(path, { ...init, signal: withTimeout(timeoutMs, signal) });
+    return await fetch(path, {
+      ...init,
+      // The device fact goes on every request rather than on the two
+      // that currently need it. A call site that has to remember a
+      // header is a call site that will forget one, and the server has
+      // to be able to trust that a client which knows its own pointer
+      // always says so — an absent header means "could not tell", and
+      // it must not also mean "this particular fetch was written later".
+      headers: { ...pointerHeader(), ...headers },
+      signal: withTimeout(timeoutMs, signal),
+    });
   } catch (err) {
     // "signal is aborted without reason" tells a candidate nothing. Name
     // the two cases apart: their own navigation, versus a server that went

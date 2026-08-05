@@ -283,7 +283,7 @@ carries light, the `:root` default; dark comes from
 | Token | Light | Dark | Role |
 |---|---|---|---|
 | `--bg` | `#f6f8fc` | `#101728` | the page, and the resting fill for panels inset within a card |
-| `--surface` | `#ffffff` | `#182033` | raised surfaces — cards, dialogs, drawer, topbar, toasts, question panel |
+| `--surface` | `#ffffff` | `#182033` | raised surfaces — cards, dialogs, drawer, navbar, toasts, question panel |
 | `--surface-raised` | `#eef1f6` | `#212a40` | third tone — default button fill, fenced code bodies, progress tracks, chips |
 | `--overlay` | `rgba(16, 23, 40, 0.55)` | `rgba(2, 6, 16, 0.7)` | scrim behind dialogs, drawer, control overlay |
 | `--border` | `#d7dde8` | `#3a4560` | structural edges, always 1px |
@@ -399,11 +399,11 @@ reads identically in the question panel and in the candidate's vim.
 ## Layout
 
 Two panes and a stack: a resizable question panel beside a fluid desktop
-viewport under a wrapping topbar, and a single centred column everywhere
+viewport under the navbar, and a single centred column everywhere
 else. There are seven full-page surfaces — `screens/Exams.tsx`,
 `screens/Mode.tsx`, `screens/Exam.tsx`, `screens/McqExam.tsx`,
 `screens/Score.tsx`, `screens/BootProgress.tsx` and
-`components/DesktopRequired.tsx` — the first two under `.app-header`,
+`components/DesktopRequired.tsx` — the first two under `.navbar`,
 the rest owning their whole viewport.
 
 | Surface | Width |
@@ -448,22 +448,95 @@ under someone mid-question moves text while they read it. The resizer
 holds noVNC's `resizeSession` false for a gesture, and is suppressed
 below 900px where the panel leaves the flow.
 
-Three breakpoints, each changing structure rather than scale:
+Six breakpoints, each changing structure rather than scale:
 
 | Query | Change |
 |---|---|
-| `max-width: 900px` | the question panel leaves the flow and becomes an overlay drawer at `min(85vw, 360px)` with `--shadow-3`, over a 36px collapsed rail |
+| `max-width: 1100px` | the deep dive's two document panes stack in reading order |
+| `max-width: 900px` | the question panel leaves the flow and becomes an overlay drawer at `min(85vw, 360px)` with `--shadow-3`, over a 36px collapsed rail; the results card and the dashboard go to one column |
+| `max-width: 48rem` | the navbar stops promoting: the navigation section drops back into the menu, and the trail collapses to one back control. Mirrored by `HEADER_COMPACT_QUERY`, which decides what is in the DOM while the CSS only dresses what is left |
+| `max-width: 640px` | **the mobile line.** The reading type steps up (`--text-m` to 15px, `--text-l` to 16px, `--text-xl` to 18px); the navbar's wordmark clips and its menu becomes a bottom sheet; the mcq footer becomes a thumb-zone action bar and its navigator a modal sheet; the mcq head row splits in two; every page pays `--safe-b`; the task-verdict strip and the path cards stack. Mirrored by `MCQ_COMPACT_QUERY` |
 | `max-width: 600px` | dialogs and the boot panel go full-bleed (width 100%, `max-height: 100dvh`, radius 0), the clipboard panel and keyboard popover become bottom sheets, the page gutters close a step, the mode screen's fine print stacks, and the domain table's cells become blocks |
-| `any-pointer: coarse` | icon controls and the panel's `--control-size` go from 28px to a 44px minimum. Keyed to pointer type, not width |
+| `any-pointer: coarse` | icon controls and the panel's `--control-size` go from 28px to a 44px minimum, and press states appear. Keyed to pointer type, not width |
 
-Four structural rules constrain all of it:
+`hover: none` is a seventh query and asks a different question from
+`any-pointer: coarse`: whether a pointer can rest on something without
+pressing it. It governs STATE where coarse governs SIZE, and conflating
+them is how a touchscreen laptop loses its hover styling for having a
+touchscreen.
+
+Five structural rules constrain all of it:
 
 | Named rule | Statement |
 |---|---|
-| Unbroken Height | `html`, `body`, `#root` and `main` all assert `height: 100%`. Do not add a wrapper to that chain without giving it a height (`base.css:8-17`) |
+| Unbroken Height | `html`, `body`, `#root` and `main` all assert `height: 100%`, and the first three assert `100dvh` after it. Do not add a wrapper to that chain without giving it a height, and do not reorder those two declarations — mobile Safari resolves a percentage against the LARGE viewport, so `100%` is the fallback a browser keeps when it cannot parse `dvh` (`base.css:8-17`, pinned by `layout.test.ts`) |
+| Reflow Floor | never a bare length as an `auto-fit` minimum. `minmax(330px, 1fr)` builds a 330px track inside a 305px viewport, because minmax's minimum is a floor and not a preference — which is a horizontally scrolling page at the 320px WCAG 1.4.10 width. Always `minmax(min(Npx, 100%), 1fr)` |
 | Scroll-Inside | wide or long content scrolls inside its own container and never the page — tables with `overscroll-behavior-x: contain`, code blocks horizontally, and in the control dialog only the checklist while the header and actions stay pinned |
 | Fixed-Geometry Overlay | overlays inside the exam screen are out of flow and never flex children, because `.desktop-pane` carries noVNC's `ResizeObserver` and any sibling geometry change costs a framebuffer round-trip |
 | Table-Cell | never `display: flex` on a `<td>` or `<th>`. The cell leaves the table layout model, stops stretching to the row height and steps its `border-bottom` off its neighbours'; put the flex on a wrapper inside |
+
+## Mobile
+
+A phone is not a narrow desktop. It is a different set of capabilities,
+and the product's answer to that is two-sided: it refuses the exam that
+genuinely cannot work there, and it is built for the one that can.
+
+**The refusal.** A hands-on attempt is a question panel beside a live
+Linux desktop over VNC. It needs a physical keyboard and room for two
+panes, so a touch-only device is refused it — at any width, with no
+override, and before a seat, a queue place or a two-to-four minute
+cluster rebuild is spent on it. Touch-only is
+`(any-pointer: coarse) and (not (any-pointer: fine))` and is checked
+before width, not after: a tablet in landscape is 1024 CSS px and has no
+more keyboard than a phone, and rotating it does not grow one. A desktop
+window merely dragged narrow — or zoomed to 400%, which reports the same
+width — keeps the "Continue anyway" escape, because WCAG 1.4.10 makes
+320 CSS px equivalent to 1280px at 400% zoom and a width test would lock
+out the people who depend on that zoom.
+
+The rule lives on the server, in both Go services, and the client
+declares its own pointer type on every request (`X-Sim-Pointer`, from
+`lib/deviceCapability.ts`). That inversion of the `examMode` pattern —
+where the server owns a predicate and the client renders it — has one
+cause: no server can measure a pointer, and a User-Agent is a string the
+browser chooses. An absent header admits, because `./sim`,
+`tests/smoke.sh` and every curl POST send none; like the session-state
+gates, this is UX fidelity rather than security.
+
+Nothing that would be refused is offered. The hosted lobby's hands-on
+cards and the catalog's hands-on rows lose their buttons and say why, and
+the mode screen returns the explanation instead of three cards nobody may
+press — the "don't draw a control for something the product cannot do"
+rule, applied to a fact about the device rather than about the product.
+
+**The build.** Everything else is the multiple-choice engine and the
+screens around it, and five rules carry it.
+
+| Rule | Statement |
+|---|---|
+| Thumb Zone | a control reached for WITHOUT looking takes `--tap-comfortable` (48px) and sits at the bottom of the viewport; a control aimed at takes `--tap-min` (44px) and may sit anywhere. The mcq action bar is the first kind; an icon in a header row is the second |
+| Safe Area | `index.html` opts into `viewport-fit=cover`, so the page reaches the notch and the home indicator and owes them padding in return. Every surface that touches an edge pays `--safe-b` (or `-t`/`-l`/`-r`); a fixed bar pays it itself, and a scrolled page pays it once on `.page` |
+| Sheet | anything that would be a popover anchored to a corner becomes a panel rising from the bottom edge. One primitive — `Dialog`'s `sheet` variant — so focus management has one implementation. The navigator is the exception that proves it: it is a plain disclosure on a desktop and a modal sheet on a phone, because what it covers differs |
+| Move, Don't Hide | a control that collapses is re-rendered in its new place, never drawn twice with one copy `display: none`. Two spans in one button both reach its accessible name, and a screen reader is offered "Navigator, question 7 of 65, Navigator" with no way to tell which is drawn |
+| Press | touch feedback is a fill step, the same one hover uses. No scale, no spring, no shadow — and no haptics: iOS Safari exposes no Vibration API, and the `<input type="checkbox" switch>` workaround was patched in iOS 26.5 |
+
+**The one departure from the rules above.** The navigator is documented
+under Navigation as having no scrim, no `role="dialog"` and no focus
+trap, because dimming a live remote desktop to pick question 12 would
+read as a fault. On a phone, in the mcq engine, it takes all three. The
+stated reason is about the remote desktop, and there is none behind an
+mcq question; what is behind it there is the whole viewport, which is
+what a focus trap exists for. `useFocusTrap` takes an `enabled` flag for
+this rather than the component being forked.
+
+**What jsdom cannot see.** The suite has no CSS engine and no layout, so
+nothing above is proven by a render test. `styles/layout.test.ts` reads
+the stylesheet as text and pins the declarations that are load-bearing —
+including that every class the mobile overrides name is really put on an
+element, which caught three dead selectors on the day it was written. The
+rest is a browser pass at 320 / 390px in both themes, and it is not
+optional: the reflow bug in the Reflow Floor rule above had been shipping
+for the whole life of the exam catalog and no test could see it.
 
 ## Elevation and depth
 
@@ -540,7 +613,7 @@ own type, weight 600.
 | Instance chip | which box to ssh into, the most load-bearing fact per question. Mono, accent text on `--accent-soft`, accent border, pill — the only pill with a full accent treatment |
 | Exam badge | `--text-2xs` mono uppercase at `--tracking-label`, `--radius-xs`, on a fill of its own: `--success-soft`/`--success-strong` for LIVE, `--muted-soft`/`--text-muted` for SOON. A live and a coming-soon card must be told apart by a word, never only by a hue |
 | Points counter | mono, muted ink, hairline on the page fill, pill. Goes accent when its row is selected |
-| Mode chip | the topbar's name for any attempt that is not a plain exam, so a training result is never mistaken for a real one |
+| Mode chip | the navbar's name for any attempt that is not a plain exam, so a training result is never mistaken for a real one |
 | Card fill | `--surface` for cards that float, `--bg` for panels inset *within* a card — an inversion that reads correctly because the page tone is darker than the card in light and lighter in dark |
 | Card padding | `--space-5` on exam and mode cards, `--space-5` on dialogs and the drawer, `--space-3`/`--space-4` on dense containers; page gutters close a step below 600px |
 | Exam card | `--surface` under a `--border` hairline at `--radius-xl` with `--shadow-1`. A card is not a control, so its edge is structural and takes the weaker tier; what lifts it is the shadow. A coming-soon card drops the shadow, dashes the border and sits on `--bg` |
@@ -594,16 +667,48 @@ the accent border that was byte-identical to the current question tile's.
 
 ### Navigation
 
-There is no site nav. What stands in for it:
+**One navbar, one anatomy, every screen in both products.**
+
+```
+[ mark  wordmark ]  [ › trail ]  ……  [ status ]  [ menu ]
+  always              contextual        ambient     always
+```
+
+What this replaced had two layouts and no single rule. A `brand` variant
+led with the mark; a `back` variant *replaced* the mark and the wordmark
+with a full-width labelled button, so the product's identity disappeared
+on the mode and review screens and the left of the bar became one large
+clickable thing. The menu was rendered only when
+`compact && (nav?.length || session)`, so it vanished outright on the
+score screen and its contents rearranged by route. The exam had a fourth
+bar of its own. Three complaints, one cause: there was no arrangement to
+predict from anywhere else.
+
+| Rule | Statement |
+|---|---|
+| The mark never leaves the left | Going back is a trail beside it, never a replacement for it. Mid-attempt the mark stays and stops being a link, because `session.state` is the outer switch and going home would render the exam again |
+| The menu never leaves the right | Present on every screen at every width, including signed out and mid-exam. Its sections are always in the same order: **Go to → This app → Account**, with an attempt section between the first two on an exam. A section with nothing in it is absent; no section ever moves |
+| Width promotes, it does not rearrange | A wide bar lifts the *navigation* section out of the menu and into the row, with the same glyph, label and order. That is the only thing width changes |
+| One row shape | Every item the menu holds — a destination, a preference, a fact, a way out — is the same 48px row with a leading glyph on a fixed rail, a label, and an optional trailing value. A nav link and a sign-out read as members of one list rather than as three borrowed widgets |
 
 | Element | Treatment |
 |---|---|
-| Topbar (exam only) | `--surface` under a hairline bottom border, wrapping rather than compressing, title flexing from an 8rem basis and ellipsing |
-| Task pane header | `TASK n / m` zero-padded to the total's width, the flag pill, an `h2` title, then a wrapping chip row: domain, weight share, target time, instance. It carries no navigation — the header used to hold prev/next steppers as well as the footer, and two sets of the same control on one pane is one too many. Weight is rendered as a *share* because `spec.questions[].weight` is a point budget, not a percentage: it sums to 180 in `ckad-mock-01` |
-| Task pane footer | `← Previous` / `⊞ All tasks (G)` / `Next →`, the pane's only navigation. Minimum 44px for a coarse pointer |
-| Navigator | one component (`.navigator`) for both engines, a full-panel disclosure in three bands: filter chips (`All` / flagged / unseen-or-unanswered), a flat ten-column grid of mono tiles, and a foot naming the four states and the keys. Ten to a row only pays off if row two starts at eleven, so the grid is sequential and the domain travels in each tile's accessible name rather than as a visual grouping. Five columns below a 320px container and for a coarse pointer. Its vocabulary is a prop, not a fork: hands-on says opened/unseen, mcq says answered/unanswered, because `marksStore` may not call a viewed question attempted. No scrim, no `role="dialog"`, no focus trap: dimming a live remote desktop to pick question 12 would read as a fault |
-| App header | `.app-header`, 56px, on every screen that is a PAGE and deliberately not on the exam (which has a topbar carrying a clock and a submit button) or the boot screen. Two variants of one component: `brand` leads with the mark and wordmark, `back` replaces both with a labelled way out for a screen reached FROM another. `flex-shrink: 0` is load-bearing — as a flex item its `height` is only a base size, and a tall page squashed it to its min-content height |
-| Skip link | the `.sr-only` clip idiom, never a transform; on focus it becomes `position: fixed`, so its visible state is anchored to the viewport rather than to the pane it lives in |
+| `.navbar` | 56px, `--surface` under a hairline. `flex-shrink: 0` is load-bearing — as a flex item its `height` is only a base size, and a tall page squashed it to its min-content height |
+| `.navbar-home` | The mark always, the wordmark clipped with the `.sr-only` idiom below 640px. Clipped and **not** `display: none`: `BrandMark` is `aria-hidden`, so that span is the home link's only accessible name |
+| Trail | Wide: every step, earlier ones as links, the last in ink and `aria-current`. Narrow: one control — a back chevron labelled with where you **are**, navigating to the nearest ancestor with a route. The visible word answers "what screen is this", which is what a 390px row has room for; the accessible name answers "where does this go" |
+| Ambient slot | The hosted lease countdown, the backgrounded-rebuild chip, the exam clock. Never collapses at any width: these are the numbers that must not be behind a tap |
+| `.nav-menu-trigger` | 36px on a laptop, `--tap-min` on a phone. Three bars that become a cross — the same three lines moving, not a swapped glyph, because swapping icons is a change of subject and moving them says the thing you opened is the thing now closing |
+| Panel | A popover under the trigger on a laptop; a bottom sheet below 640px, because the trigger sits in the one corner a thumb cannot reach and the panel should not |
+| Theme row | The one row that does not close the menu. The preference cycles System → Light → Dark, and a menu that shut on the first press would make the third a three-tap job |
+| Exam bar | The same navbar with three substitutions, each a fact about an exam rather than a style choice: the brand does not link, the trail names the exam because there is no route to name, and the navigation section is absent because there is nowhere to go |
+
+**Keyboard accelerators.** `[` and `]` step between questions and `?`
+opens the shortcut reference. Bare keys are safe because both handlers
+stand down on `target?.closest("input, textarea, [contenteditable]")`
+(`QuestionPanel.tsx:101`, `Exam.tsx:175`), inside `.desktop-pane` where
+the RFB canvas owns the keyboard, and while a dialog is open. Alt+arrows
+were rejected: those are Back/Forward on Windows and Linux, and in a
+router-less SPA Back leaves a running exam.
 
 **Tile states — four states, four channels, no two sharing a value.**
 Unopened takes `--border`, opened `--border-strong`, hover moves the fill
@@ -651,8 +756,8 @@ itself once the rebuild lands.
 ### The MCQ exam surface
 
 `screens/McqExam.tsx`: a single centred `--mcq-measure` reading column
-under the same topbar, no desktop pane, with a 5px determinate rail
-directly beneath the topbar. Its head row is its own (`.mcq-head`) rather
+under the same navbar, no desktop pane, with a 5px determinate rail
+directly beneath it. Its head row is its own (`.mcq-head`) rather
 than the hands-on pane's classes — the two engines diverged when the task
 pane grew a chip row and a footer nav, and sharing a header past that
 point meant each change had to be safe for both. What they still share is
@@ -667,7 +772,7 @@ dialog.
 |---|---|
 | `.mcq-option` | an anchored control: `--surface-raised` fill on `--border`, 6px corners, 44px minimum touch target. Hover steps the fill to `--raised-hover` and never moves the edge |
 | `.mcq-option-on` | the full three-channel selection: accent edge, `--accent-soft` wash, 3px inset bar — plus the visible native checkbox as the non-visual channel. The option letter goes `--accent-strong` on the wash |
-| `.mcq-footer` | Previous / the save reassurance / Navigator + Next, with the final question's Next giving way to the one primary button. The tally that used to sit here moved to the topbar: the footer's job is moving and reassuring, and a completion count competing with the head row's position was two numbers both claiming to locate the candidate |
+| `.mcq-footer` | Previous / the save reassurance / Navigator + Next, with the final question's Next giving way to the one primary button. The tally that used to sit here is now a row in the navbar menu: the footer's job is moving and reassuring, and a completion count competing with the head row's position was two numbers both claiming to locate the candidate |
 | `.mcq-option-letter` | a 24px circle carrying A–F, filling accent when selected. Scoped under `.mcq-question` so the score screen's answer review keeps the flat letter it already had |
 | Answered tile | the navigator's `is-done` tile under `progress="answered"`: `--surface-raised` behind the strong hairline, plus "answered" in the accessible name — server state, not a rendering guess, because mcq answers are saved per click |
 
@@ -760,6 +865,15 @@ region rather than a pending one once the pulse is off.
   page, the favicon, and the terminal palette with its xfconf twin.
 - **Do** make wide content scroll inside its own container, and keep pinned
   whatever the user is waiting on.
+- **Do** pay the safe-area inset on anything that reaches a viewport edge.
+  `viewport-fit=cover` is on, so those edges are the physical edges of the
+  device: a fixed bar pays `--safe-b` itself, and a scrolled page pays it
+  once on `.page`.
+- **Do** check a mobile change in a browser at 320 and 390px before
+  calling it done. jsdom has no layout engine, so the suite cannot see a
+  wrapped row, a clipped button or a page that scrolls sideways — the
+  reflow bug in the Don't below had been shipping for the whole life of
+  the exam catalog.
 - **Do** open panels over the exam screen out of flow, never as a flex
   child. Changing `.desktop-pane`'s geometry costs a framebuffer resize
   mid-exam.
@@ -799,6 +913,17 @@ region rather than a pending one once the pulse is off.
   native select can render — four states each on two channels, live
   filter counts, and the domain and points in every tile's accessible
   name.
+- **Don't** write a bare length as an `auto-fit` grid minimum. `minmax(330px,
+  1fr)` builds a 330px track inside a 305px viewport and scrolls the page
+  sideways at the 320px reflow width. Use `minmax(min(330px, 100%), 1fr)`.
+- **Don't** collapse a control by rendering it twice and hiding one copy.
+  Both copies reach the accessible name, and a screen reader is offered
+  each of them with no way to tell which is drawn. Branch in the
+  component.
+- **Don't** key a hover style to `any-pointer: coarse` or a touch target
+  to `hover: none`. One asks whether a finger could be used and governs
+  size; the other asks whether a pointer can rest without pressing and
+  governs state. A touchscreen laptop answers them differently.
 - **Don't** convey a control's state with `opacity`. It dims the border and
   the focus ring along with the label, and composites to a ratio nobody
   measured. Use `--text-disabled`.
@@ -818,14 +943,15 @@ region rather than a pending one once the pulse is off.
 
 ## Enforcement
 
-Three parts of this document are now enforced, and they are the three
-that went stale fastest when they were not:
+Four parts of this document are now enforced, and they are the ones that
+went stale fastest when they were not:
 
 | Check | What it holds |
 |---|---|
 | `ui/src/styles/contrast.test.ts` | re-derives every contrast ratio from the shipped `tokens.css` and fails the build on a pairing under its floor. Also asserts that the `prefers-color-scheme` twin matches the explicit dark block declaration for declaration, and that every colour token has a dark value |
 | `ui/src/styles/mirrors.test.ts` | holds the Three Mirrors rule: the terminal palette, the Go locked page and the favicon must carry the token values they mirror |
-| `ui/src/styles/layout.test.ts` | holds the load-bearing layout declarations, including the `.desktop-canvas` rules that stop noVNC's `ResizeObserver` feeding back, and the deep dive's no-truncation sweep — a task title may wrap but must never be clipped, which no jsdom render can see |
+| `ui/src/styles/layout.test.ts` | holds the load-bearing layout declarations, including the `.desktop-canvas` rules that stop noVNC's `ResizeObserver` feeding back, the height chain's `100%`-before-`100dvh` ordering, and the deep dive's no-truncation sweep — a task title may wrap but must never be clipped, which no jsdom render can see |
+| `ui/src/styles/layout.test.ts`, the touch-layer sweep | holds that every class the mobile overrides name is really put on an element by a component. These rules restyle components defined hundreds of lines above them, and a renamed or mistyped class produces no error, no warning and no visible change on any machine a developer is likely to be using — it simply does nothing, on phones, forever. It caught three the day it was written. It also holds that `touch-action: none` appears on `.panel-resizer` and nowhere else, because that value takes pinch zoom with it (WCAG 1.4.4) |
 
 Everything else here is convention: the prose, the component tables, the
 named rules. Where this document disagrees with

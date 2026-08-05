@@ -12,6 +12,7 @@ import { Async } from "../components/Async";
 import { CertMark, hasCertMark } from "../components/CertMark";
 import { Dialog } from "../components/Dialog";
 import { Icon, type IconName } from "../components/Icon";
+import { useDesktopGate } from "../components/DesktopRequired";
 import { useAsync } from "../lib/useAsync";
 import { strings } from "../strings";
 
@@ -48,10 +49,25 @@ interface Choice {
   icon: IconName;
   /** Set for a certification on the path whose bank is not written. */
   soonNote?: string;
+  /** Set for a hands-on exam opened on a device that cannot sit one. */
+  deviceNote?: string;
+}
+
+/**
+ * The exam exists and is finished — this device just cannot sit it.
+ *
+ * Kept apart from `soonNote` even though both suppress the button,
+ * because the two are different facts and the card says which. "Coming
+ * soon" on a live exam a colleague is sitting right now reads as a
+ * fault, and the same mistake in reverse would be worse: a candidate who
+ * concluded CKAD was unbuilt because they opened the lobby on a phone.
+ */
+function deviceNote(kind: SessionKind, blocked: boolean): string | undefined {
+  return blocked && kind === "practical" ? strings.mobile.lobbyNote : undefined;
 }
 
 /** The two-card fallback: what this screen offered before exams existed. */
-function flavourChoices(me: Me): Choice[] {
+function flavourChoices(me: Me, blocked: boolean): Choice[] {
   return [
     {
       key: "practical",
@@ -60,6 +76,7 @@ function flavourChoices(me: Me): Choice[] {
       body: strings.hosted.practicalBody,
       seats: me.seats?.practical,
       icon: "keyboard",
+      deviceNote: deviceNote("practical", blocked),
     },
     {
       key: "mcq",
@@ -80,7 +97,7 @@ function flavourChoices(me: Me): Choice[] {
  * CKA draw from the same pool. A per-exam seat count would be inventing
  * capacity that does not exist.
  */
-function examChoices(me: Me, exams: HostedExam[]): Choice[] {
+function examChoices(me: Me, exams: HostedExam[], blocked: boolean): Choice[] {
   return exams
     .filter((e) => me.seats?.[e.kind] !== undefined || !e.available)
     .map((e) => ({
@@ -94,6 +111,10 @@ function examChoices(me: Me, exams: HostedExam[]): Choice[] {
       seats: me.seats?.[e.kind],
       icon: e.kind === "mcq" ? "grid" : "keyboard",
       soonNote: e.available ? undefined : e.note || strings.exams.soon,
+      // Only for an exam that exists. An unwritten bank is already
+      // saying why it has no button, and two reasons for one absence is
+      // one reason too many.
+      deviceNote: e.available ? deviceNote(e.kind, blocked) : undefined,
     }));
 }
 
@@ -133,6 +154,16 @@ export function HostedStart({ me, onChanged }: HostedStartProps) {
   // Fetched once. The exam list is an image layer on the hub's side and
   // cannot change while this screen is open.
   const examsState = useAsync((signal) => getHostedExams(signal), []);
+
+  // A phone or tablet may sign in, read its history and sit a
+  // multiple-choice exam. It may not take a hands-on seat, and the
+  // refusal belongs here rather than twenty minutes later: Start claims
+  // one of a handful of seats and boots a Pod, and where the pool is
+  // full it takes a place in the queue from someone who could have used
+  // it. The hub refuses the request too — see hub/internal/api/device.go
+  // — so a hand-rolled POST gains nothing; this is what stops a
+  // candidate making the mistake in the first place.
+  const blocked = useDesktopGate() === "blocked";
 
   const leaveQueue = async () => {
     setQueued(null);
@@ -204,11 +235,15 @@ export function HostedStart({ me, onChanged }: HostedStartProps) {
         // A hub whose exam list will not load still has seats. Falling
         // back is better than a dead lobby, and the deployment default is
         // the exam it would have started anyway.
-        error={() => <ChoiceList choices={flavourChoices(me)} starting={starting} onStart={start} />}
+        error={() => (
+          <ChoiceList choices={flavourChoices(me, blocked)} starting={starting} onStart={start} />
+        )}
       >
         {(exams) => (
           <ChoiceList
-            choices={exams.length > 0 ? examChoices(me, exams) : flavourChoices(me)}
+            choices={
+              exams.length > 0 ? examChoices(me, exams, blocked) : flavourChoices(me, blocked)
+            }
             starting={starting}
             onStart={start}
           />
@@ -249,9 +284,14 @@ function ChoiceList({
     <ul className="hosted-flavours">
       {choices.map((c) => {
         const full = c.seats !== undefined && c.seats.used >= c.seats.total;
+        // Both suppress the button, and the card says which is true.
+        // soonNote wins: an exam that is not written yet is not a device
+        // problem, and telling someone to find a laptop for a bank that
+        // does not exist would send them on an errand for nothing.
+        const note = c.soonNote ?? c.deviceNote;
         return (
           <li key={c.key}>
-            <article className="hosted-flavour" data-full={(full && !c.soonNote) || undefined}>
+            <article className="hosted-flavour" data-full={(full && !note) || undefined}>
               <div className="hosted-flavour-head">
                 <span className="exam-avatar hosted-flavour-tile" aria-hidden="true">
                   {/* An exam card wears its certification's own mark, the
@@ -265,18 +305,24 @@ function ChoiceList({
                 </span>
                 <div className="hosted-flavour-name">
                   <h2>{c.title}</h2>
+                  {/* A seat count is an invitation to take one. On a
+                      device that cannot, it is noise at best and a tease
+                      at worst, so the card names the certification
+                      instead — the same slot the unwritten banks use. */}
                   <p className="hosted-flavour-seats">
-                    {c.soonNote
-                      ? c.subtitle
-                      : c.seats === undefined
-                        ? null
-                        : full
-                          ? strings.hosted.seatsFull(c.seats.total)
-                          : strings.hosted.seatsFree(c.seats.used, c.seats.total)}
+                    {c.deviceNote && !c.soonNote ? (
+                      <span className="hosted-flavour-badge">{strings.mobile.needsDesktop}</span>
+                    ) : note ? (
+                      c.subtitle
+                    ) : c.seats === undefined ? null : full ? (
+                      strings.hosted.seatsFull(c.seats.total)
+                    ) : (
+                      strings.hosted.seatsFree(c.seats.used, c.seats.total)
+                    )}
                   </p>
                 </div>
               </div>
-              <p className="hosted-flavour-body">{c.soonNote ?? c.body}</p>
+              <p className="hosted-flavour-body">{note ?? c.body}</p>
               {/* Enabled even when full, deliberately, and it says what
                   it will actually do. The answer to a full pool is a
                   place in the queue: a greyed-out button offers no way
@@ -285,8 +331,10 @@ function ChoiceList({
 
                   A certification with no bank behind it has no button at
                   all — there is nothing to press it for, and the note
-                  above says why. */}
-              {!c.soonNote && (
+                  above says why. The same goes for a hands-on exam on a
+                  touch-only device: the button would spend a seat on an
+                  environment nobody in front of it could use. */}
+              {!note && (
                 <div className="hosted-flavour-actions">
                   <button
                     type="button"

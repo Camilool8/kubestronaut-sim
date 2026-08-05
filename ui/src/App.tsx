@@ -23,7 +23,7 @@ import { McqExam } from "./screens/McqExam";
 import { Progress } from "./screens/Progress";
 import { Score } from "./screens/Score";
 import { DesktopRequired, gateOverridden, useDesktopGate } from "./components/DesktopRequired";
-import { AppHeader, type AppHeaderProps } from "./components/AppHeader";
+import { NavBar, type Crumb, type NavItem } from "./components/NavBar";
 import { BackgroundJobChip } from "./components/BackgroundJobChip";
 import { ControlProgress } from "./components/ControlProgress";
 import { ToastLayer } from "./components/Toast";
@@ -155,25 +155,24 @@ function HostedHome({ hosted, route }: { hosted: Hosted; route: ReturnType<typeo
     screen = <HostedStart me={me} onChanged={refresh} />;
   }
 
-  const headerProps: Partial<AppHeaderProps> = reviewId
-    ? {
-        variant: "back",
-        back: { label: strings.review.back, to: "/progress" },
-        crumb: strings.review.crumb,
-      }
-    : {
-        crumb: onProgress ? strings.header.crumbProgress : strings.hosted.chipLabel,
-        nav: [
-          { label: strings.hosted.chipLabel, to: "/", current: !onProgress && !reviewId },
-          { label: strings.header.navProgress, to: "/progress", current: onProgress },
-        ],
-      };
+  // One shape, filled differently — never a different shape. The trail
+  // always starts after the mark, and the nav is always the same two
+  // destinations so the menu's first section does not change between
+  // screens of the same product.
+  const nav: NavItem[] = [
+    { label: strings.hosted.chipLabel, to: "/", icon: "home", current: !onProgress && !reviewId },
+    { label: strings.header.navProgress, to: "/progress", icon: "chart", current: onProgress },
+  ];
+  const trail: Crumb[] = reviewId
+    ? [{ label: strings.header.navProgress, to: "/progress" }, { label: strings.review.crumb }]
+    : [{ label: onProgress ? strings.header.crumbProgress : strings.hosted.chipLabel }];
 
   return (
     <>
       <TopProgress />
-      <AppHeader
-        {...headerProps}
+      <NavBar
+        trail={trail}
+        nav={nav}
         session={{ login: me.user?.login ?? "", session: me.session, onChanged: refresh }}
       />
       <main>
@@ -547,10 +546,15 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
 
   // Two destinations, and the dashboard is otherwise reachable from
   // nowhere. Only offered where both of them work.
-  const nav = idle
+  // Only while idle: session.state is the outer switch, so asking for
+  // either destination mid-attempt or on the results screen renders the
+  // exam or the score anyway — and a link that lands you somewhere else
+  // is worse than one that is not there. The MENU is still present on
+  // those screens; it is this section inside it that has nothing in it.
+  const nav: NavItem[] | undefined = idle
     ? [
-        { label: strings.header.navExams, to: "/exams", current: !onProgress },
-        { label: strings.header.navProgress, to: "/progress", current: onProgress },
+        { label: strings.header.navExams, to: "/exams", icon: "grid", current: !onProgress },
+        { label: strings.header.navProgress, to: "/progress", icon: "chart", current: onProgress },
       ]
     : undefined;
 
@@ -561,26 +565,25 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
   // The mode screen is the one screen reached FROM another, so it takes
   // the back variant. Its crumb waits on /api/exam rather than blocking
   // the header on it: the way out must be there from the first frame.
-  const headerProps: Partial<AppHeaderProps> =
+  // The path, not a variant. The mode screen is one step deeper than the
+  // selector, so it says so — and the mark stays where it always is
+  // instead of being replaced by the way back out of it.
+  const trail: Crumb[] =
     idle && modeBankId
-      ? {
-          variant: "back",
-          back: { label: strings.header.backToExams, to: "/exams" },
-          crumb: exam?.certification || exam?.title,
-          detail: exam?.certification
-            ? strings.exams.certNames[exam.certification]
-            : undefined,
-          nav,
-        }
-      : {
-          crumb:
-            session?.state === "ended"
-              ? strings.header.crumbResults
-              : idle && onProgress
-                ? strings.header.crumbProgress
-                : strings.header.crumbLobby,
-          nav,
-        };
+      ? [
+          { label: strings.header.navExams, to: "/exams" },
+          { label: exam?.certification || exam?.title || strings.header.crumbLobby },
+        ]
+      : [
+          {
+            label:
+              session?.state === "ended"
+                ? strings.header.crumbResults
+                : idle && onProgress
+                  ? strings.header.crumbProgress
+                  : strings.header.crumbLobby,
+          },
+        ];
 
   // A page about the candidate's RECORD rather than their environment.
   // Above the session switch for the same reason the boot screen is: it
@@ -670,8 +673,9 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
           button — and neither is the boot screen, which is a takeover with
           nothing to navigate to yet. */}
       {session && !booting && session.state !== "running" && (
-        <AppHeader
-          {...headerProps}
+        <NavBar
+          trail={trail}
+          nav={nav}
           // Hosted only. It carries the lease countdown, which is the one
           // thing about a hosted session a candidate cannot be left to
           // guess: the seat is taken back at the cap whatever they are
@@ -701,7 +705,7 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
               onReopen={() => setBackgroundedJobId(null)}
             />
           )}
-        </AppHeader>
+        </NavBar>
       )}
       <main>
         {/* Keyed on the VIEW, not just the session state: the exam

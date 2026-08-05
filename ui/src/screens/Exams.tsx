@@ -11,6 +11,7 @@ import {
 import { Async } from "../components/Async";
 import { CertMark, hasCertMark } from "../components/CertMark";
 import { Dialog } from "../components/Dialog";
+import { useDesktopGate } from "../components/DesktopRequired";
 import { pathStatus } from "../lib/attemptHistory";
 import { formatDuration } from "../lib/format";
 import { navigate } from "../lib/useHashRoute";
@@ -273,6 +274,36 @@ function seatFor(
   return { offered, wrongSeat };
 }
 
+/**
+ * The same treatment for a fact about the DEVICE rather than the seat.
+ *
+ * Composed after seatFor rather than folded into it: one answers "does
+ * this environment have a cluster in it", the other "does the person
+ * looking at this have a keyboard", and they are true independently. A
+ * card already refused by the seat keeps that reason — it is the one the
+ * candidate can act on without finding another computer.
+ *
+ * Choosing a hands-on exam here is not a navigation. It is a two-to-four
+ * minute destructive rebuild of the cluster, and on a phone it ends at a
+ * screen explaining that the exam it just built cannot be sat. The cost
+ * is why this is refused at the card rather than at the mode screen.
+ */
+function deviceFor(exams: CatalogExam[], blocked: boolean): CatalogExam[] {
+  if (!blocked) return exams;
+  return exams.map((bank) => {
+    if (!bank.available || bank.examType === "mcq") return bank;
+    return {
+      ...bank,
+      available: false,
+      // Not "coming soon", for the same reason the wrong-seat rows are
+      // not: it exists, it is finished, and the only thing missing is
+      // in front of the screen rather than behind it.
+      comingSoon: false,
+      note: strings.mobile.catalogNote,
+    };
+  });
+}
+
 interface ExamsProps {
   // Bumped by App whenever a control job finishes: a completed switch
   // changes which bank is active while this screen stays mounted.
@@ -332,6 +363,12 @@ export function Exams({
   // render. What the effect below waits on is `active` changing, which
   // is the catalog refetch App triggers when the job finishes.
   const pendingMode = useRef<string | null>(null);
+
+  // The catalog is worth reading on a phone — past scores, what each
+  // exam asks, how far along the path you are. Starting a hands-on one
+  // is not, and the button that does it costs minutes of rebuilding to
+  // find out.
+  const blocked = useDesktopGate() === "blocked";
 
   // GET /api/catalog, not GET /api/control/banks: the same bank fields,
   // joined to attempt history and served by the facilitator rather than
@@ -402,8 +439,9 @@ export function Exams({
           // above counts certifications passed on the path, which is a
           // fact about the candidate and not about the Pod they are in.
           const { offered, wrongSeat } = seatFor(loaded.exams, seatKind, seatBank);
-          const live = offered.filter((b) => b.available);
-          const soon = offered.filter((b) => !b.available);
+          const shown = deviceFor(offered, blocked);
+          const live = shown.filter((b) => b.available);
+          const soon = shown.filter((b) => !b.available);
           return (
             <>
               <header className="page-head">

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { SessionSnapshot } from "../api";
 import { formatClock, formatClockSpoken, formatElapsed } from "../lib/format";
+import { NavBar } from "./NavBar";
+import { NavMenuItem, NavMenuSection } from "./NavMenu";
 import { strings } from "../strings";
-import { ThemeToggle } from "./ThemeToggle";
 import { toastStore } from "./toastStore";
 
 interface TimerBarProps {
@@ -10,6 +11,18 @@ interface TimerBarProps {
   fetchedAt: number;
   title: string;
   onEndClick: () => void;
+  /**
+   * Controls that stay in the BAR.
+   *
+   * The hands-on engine's clipboard bridge and keymap toggle live here:
+   * they are reached repeatedly while working, they are icon-sized, and
+   * that engine never renders below 768px anyway — the device gate
+   * refuses it. Burying a tool you use every few minutes behind a tap
+   * would be consistency bought at the cost of the thing consistency is
+   * for.
+   */
+  barExtras?: React.ReactNode;
+  /** Extra rows in the menu's attempt section. */
   extras?: React.ReactNode;
 }
 
@@ -27,12 +40,42 @@ const WARNING_LADDER: { fraction: number; kind: "info" | "warning" }[] = [
   { fraction: 1 / 24, kind: "warning" },
 ];
 
-// TimerBar ticks a local clock at 1Hz purely to trigger re-renders; the
-// displayed remaining time is always recomputed from
-// (session.remainingSeconds, fetchedAt, now) rather than decremented in
-// place, so it never drifts and resyncs automatically the moment a new
-// poll updates session/fetchedAt.
-export function TimerBar({ session, fetchedAt, title, onEndClick, extras }: TimerBarProps) {
+/**
+ * The exam's bar: the same navbar, carrying what an exam has instead of
+ * what a page has.
+ *
+ * It used to be a separate `<header className="topbar">` with its own
+ * wrapping flex row, its own theme toggle and its own About button — a
+ * bar that looked related to the app header and shared nothing with it,
+ * so the two drifted and neither could be predicted from the other.
+ *
+ * Now it is `NavBar` with three substitutions, and every one of them is
+ * a fact about an exam rather than a style choice:
+ *
+ *  - the brand does not link home, because `session.state` is the outer
+ *    switch and going home mid-attempt renders the exam again;
+ *  - the trail names the exam instead of a route, because there is no
+ *    route to name;
+ *  - the navigation section is absent and an attempt section takes its
+ *    place, because there is nowhere to go and one thing to do.
+ *
+ * The clock rides the ambient slot — the same slot that carries the
+ * hosted lease countdown, for the same reason: it is the number that
+ * must never be behind a tap.
+ *
+ * TimerBar still ticks a local clock at 1Hz purely to trigger re-renders;
+ * the displayed remaining time is always recomputed from
+ * (session.remainingSeconds, fetchedAt, now) rather than decremented in
+ * place, so it never drifts and resyncs the moment a new poll lands.
+ */
+export function TimerBar({
+  session,
+  fetchedAt,
+  title,
+  onEndClick,
+  barExtras,
+  extras,
+}: TimerBarProps) {
   const [now, setNow] = useState(() => Date.now());
   const firedRef = useRef<Set<number>>(new Set());
 
@@ -70,10 +113,22 @@ export function TimerBar({ session, fetchedAt, title, onEndClick, extras }: Time
   }, [remaining, untimed, session.durationSeconds]);
 
   return (
-    <header className="topbar">
-      <h1 className="topbar-title">{title}</h1>
-      {extras}
-      <ThemeToggle />
+    <NavBar
+      home={false}
+      trail={[{ label: title }]}
+      menuExtra={
+        <NavMenuSection label={strings.header.menuExam}>
+          {extras}
+          <NavMenuItem
+            icon="send"
+            label={strings.exam.endAttempt(session.mode)}
+            onSelect={onEndClick}
+            danger
+          />
+        </NavMenuSection>
+      }
+    >
+      {barExtras}
       {session.mode && session.mode !== "exam" && (
         <span className="mode-chip">{strings.modes[session.mode].label}</span>
       )}
@@ -92,9 +147,6 @@ export function TimerBar({ session, fetchedAt, title, onEndClick, extras }: Time
           </>
         )}
       </div>
-      <button id="end-exam-button" className="btn btn-danger" onClick={onEndClick}>
-        {strings.exam.endAttempt(session.mode)}
-      </button>
-    </header>
+    </NavBar>
   );
 }

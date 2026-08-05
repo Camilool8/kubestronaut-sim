@@ -879,6 +879,16 @@ func (s *server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusConflict, "the exam environment is still starting")
 		return
 	}
+	// The same shape of refusal, for the same reason, one line down: a
+	// hands-on attempt is a terminal and a remote desktop beside the
+	// questions, and starting a clock a phone cannot answer against is
+	// worse than saying no. mcq needs none of it and is never gated. See
+	// device.go.
+	if s.ex.Type != exam.TypeMCQ && touchOnly(r) {
+		writeJSONErrorCode(w, http.StatusConflict, codeDesktopRequired,
+			"this exam runs a Linux desktop beside the questions, so it needs a desktop browser and a keyboard")
+		return
+	}
 	// Body is optional and defaults to an unseeded, unfiltered exam
 	// attempt: ./sim and tests/smoke.sh both POST with no body at all,
 	// and must keep working unchanged. An empty body decodes as io.EOF,
@@ -1202,4 +1212,14 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeJSONError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
+}
+
+// writeJSONErrorCode adds a machine-readable code beside the sentence.
+//
+// The `error` field is prose for a person and stays that way; the code
+// is for the SPA, which has to tell one refusal from another and must
+// not do it by matching copy that will be reworded by someone with no
+// idea a client is parsing it. Mirrors the hub's writeErrorCode.
+func writeJSONErrorCode(w http.ResponseWriter, status int, code, msg string) {
+	writeJSON(w, status, map[string]string{"error": msg, "code": code})
 }

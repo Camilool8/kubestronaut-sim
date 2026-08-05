@@ -3,6 +3,9 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Exams } from "./Exams";
 import type { CatalogResponse, ExamProgress } from "../api";
+import { NARROW_QUERY } from "../lib/useMediaQuery";
+import { TOUCH_ONLY_QUERY } from "../lib/deviceCapability";
+import { matchMediaMock } from "../test/setup";
 
 /** No attempt has ever been graded against this exam. */
 const untouched: ExamProgress = { attempts: 0, counted: 0, passed: false, weakDomains: [] };
@@ -454,5 +457,58 @@ describe("a hosted seat", () => {
 
     expect(within(cardFor("CKAD")).getByText("Not in this seat")).toBeTruthy();
     expect(within(cardFor("KCNA")).getByRole("button", { name: "Choose a mode" })).toBeTruthy();
+  });
+});
+
+// A fact about the person in front of the screen rather than about the
+// environment behind it, and the two are independent: a laptop in an
+// mcq seat and a phone in a hands-on one are refused for different
+// reasons and told different things.
+describe("a device that cannot sit a hands-on exam", () => {
+  afterEach(() => {
+    matchMediaMock([]);
+  });
+
+  // Pressing "Choose a mode" on a hands-on card is not a navigation. It
+  // is a two-to-four minute destructive rebuild of the cluster, and on a
+  // phone it ends at a screen explaining that what it just built cannot
+  // be sat. That cost is why this is refused at the card.
+  test("the hands-on card loses its button and says why", async () => {
+    matchMediaMock([TOUCH_ONLY_QUERY]);
+    renderExams();
+    await screen.findByRole("heading", { name: "CKAD" });
+
+    const card = cardFor("CKAD");
+    expect(within(card).queryByRole("button")).toBeNull();
+    expect(within(card).getByText(/needs a keyboard and a desktop browser/i)).toBeTruthy();
+  });
+
+  test("the question bank is untouched — it is why a phone is here", async () => {
+    matchMediaMock([TOUCH_ONLY_QUERY]);
+    renderExams();
+    await screen.findByRole("heading", { name: "KCNA" });
+
+    expect(within(cardFor("KCNA")).getByRole("button", { name: "Choose a mode" })).toBeTruthy();
+  });
+
+  // A desktop window dragged narrow, or zoomed to 400%, reports the same
+  // width as a phone and has every capability the exam needs. WCAG
+  // 1.4.10 makes that the case a width-only rule would get wrong.
+  test("a narrowed desktop window is not refused", async () => {
+    matchMediaMock([NARROW_QUERY]);
+    renderExams();
+    await screen.findByRole("heading", { name: "CKAD" });
+
+    expect(within(cardFor("CKAD")).getByRole("button", { name: "Choose a mode" })).toBeTruthy();
+  });
+
+  // An exam already refused by the seat keeps that reason. It is the one
+  // the candidate can act on without finding another computer.
+  test("the seat's reason wins over the device's", async () => {
+    matchMediaMock([TOUCH_ONLY_QUERY]);
+    renderExams(0, noop as never, "mcq");
+    await screen.findByRole("heading", { name: "CKAD" });
+
+    expect(within(cardFor("CKAD")).getByText("Not in this seat")).toBeTruthy();
   });
 });

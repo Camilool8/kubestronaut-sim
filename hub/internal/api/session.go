@@ -85,6 +85,15 @@ func (s *Server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 		kind = session.KindOf(entry.ExamType)
 	}
 
+	// Before Start, and that placement is the whole point: Start claims a
+	// seat, and where the pool is full it takes a place in the queue. A
+	// refusal after either of those has already cost the candidate — and
+	// everyone behind them — something this request was never going to
+	// use. See device.go.
+	if refuseTouchOnlyPractical(w, r, kind) {
+		return
+	}
+
 	live, err := s.Sessions.Start(r.Context(), user.UserID, kind, bank)
 	var queued *session.Queued
 	switch {
@@ -173,6 +182,19 @@ func (s *Server) handleSwitch(w http.ResponseWriter, r *http.Request) {
 	// caller that lets a candidate name an exam has to come through here.
 	if !s.seatCanRun(w, user.UserID, body.Bank) {
 		return
+	}
+	// A switch rebuilds the environment for a named exam, which is two
+	// to four destructive minutes. Refusing here saves them; the seat
+	// itself was already granted to a client that could use it, so this
+	// only catches a device that changed under the session — a laptop
+	// closed and the tab reopened on a phone. Skipped when the hub has
+	// no catalog to read the engine from: the facilitator's own start
+	// gate is the backstop either way, and guessing here would refuse a
+	// legitimate mcq switch.
+	if entry, ok := s.bank(body.Bank); ok {
+		if refuseTouchOnlyPractical(w, r, session.KindOf(entry.ExamType)) {
+			return
+		}
 	}
 	s.recycle(w, r, body.Bank)
 }

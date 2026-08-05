@@ -21,7 +21,7 @@ import { useAsync } from "../lib/useAsync";
 import { TimerBar } from "../components/TimerBar";
 import { QuestionPanel } from "../components/QuestionPanel";
 import { Dialog } from "../components/Dialog";
-import { InfoButton } from "../components/InfoButton";
+import { NavMenuItem } from "../components/NavMenu";
 import { KeyboardSettings } from "../components/KeyboardSettings";
 import { ShortcutHelp } from "../components/ShortcutHelp";
 import { ClipboardPanel } from "../components/ClipboardPanel";
@@ -329,7 +329,10 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
         fetchedAt={fetchedAt}
         title={exam?.title ?? strings.exam.fallbackTitle}
         onEndClick={() => setConfirmOpen(true)}
-        extras={
+        // In the BAR, not the menu. These are reached every few minutes
+        // while working, and this engine never renders narrow — the
+        // device gate refuses a viewport that would need them collapsed.
+        barExtras={
           <>
             {exam && (
               <span className="exam-env">
@@ -360,13 +363,16 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
                 <Icon name="keyboard" />
               </button>
             )}
-            {session.mode === "training" && (
-              <button className="btn" onClick={() => void scoreNow()} disabled={scoring}>
-                {scoring ? strings.practice.scoring : strings.practice.scoreNow}
-              </button>
-            )}
-            <InfoButton onShowIntro={() => setIntroOpen(true)} />
           </>
+        }
+        extras={
+          session.mode === "training" ? (
+            <NavMenuItem
+              icon="check"
+              label={scoring ? strings.practice.scoring : strings.practice.scoreNow}
+              onSelect={() => void scoreNow()}
+            />
+          ) : undefined
         }
       />
       <div className="exam-body">

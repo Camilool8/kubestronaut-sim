@@ -129,63 +129,63 @@
   transform: translateY(1px);
 }
 
-/* ---- app header ----
-   The chrome above every screen that is not the exam itself. It replaced
-   a fixed cluster of two icon buttons pinned to the top-right corner:
-   with more than one destination to reach, floating controls had nowhere
-   to put a breadcrumb or a nav, and the page below them started at the
-   very top of the viewport with nothing naming it. */
+/* ---- the navbar ----
 
-.app-header {
+   One bar, one anatomy, every screen in both products:
+
+     [ mark  wordmark ]  [ › trail ]  ……  [ status ]  [ menu ]
+       always              contextual        ambient     always
+
+   What this replaced had two layouts and a menu that came and went by
+   route. The rules now: the mark never leaves the left, the menu never
+   leaves the right, and width PROMOTES the navigation into the row
+   rather than rearranging anything. See DESIGN.md's Navigation section. */
+
+.navbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  height: 56px;
-  /* Not optional. #root is a column flex container, so `height` here is
-     only a flex BASE size — with the default shrink factor the score
-     screen's 1500px of results squashed this to its min-content height
-     (29px, the label text) while the lobby, whose content fits, kept the
-     full 56. A header that is a different height depending on how long
-     the page below it is. */
-  flex-shrink: 0;
-  padding: 0 var(--space-5);
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-}
-
-.app-header-lead,
-.app-header-tail {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-}
-
-.app-header-lead {
   gap: var(--space-3);
-}
-
-/* Wider than the lead's gap on purpose: this cluster is four groups —
-   the session, {children} (the backgrounded-job chip, between the
-   session and the nav — see AppHeader.tsx), the nav, the icon buttons —
-   and at the lead's spacing they read as one undifferentiated row of
-   controls. */
-.app-header-tail {
-  gap: var(--space-4);
+  height: 56px;
+  /* A flex BASE size only, without this. As a flex item inside #root's
+     column, a tall page squashed the bar to its min-content height —
+     29px on the score screen and 56 on the lobby, a header that was a
+     different height depending on how long the page below it was. */
   flex-shrink: 0;
+  padding: 0 var(--space-4);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
-/* Not .app-header-brand: that name is already the variant modifier on
-   the <header> itself, so styling the link with it would have applied
-   this gap to the header too and quietly narrowed the space between the
-   two clusters. */
-.app-header-home {
+/* Identity and place, in that order and never swapped. */
+.navbar-lead {
   display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.navbar-home {
+  display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  text-decoration: none;
   color: inherit;
+  text-decoration: none;
   border-radius: var(--radius-s);
+  /* Its own min-width: 0 before the wordmark inside it can shrink at
+     all — a flex item's default floor is its content. */
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.navbar-home:hover .navbar-wordmark {
+  color: var(--accent-strong);
+}
+
+/* Mid-attempt the mark is identity and not a link, so it must not wear
+   a link's affordances. Nothing hover-able, nothing focusable. */
+.navbar-home-static {
+  cursor: default;
 }
 
 .brand-mark {
@@ -194,168 +194,414 @@
   flex-shrink: 0;
 }
 
-.app-header-wordmark {
+.navbar-wordmark {
   font-size: var(--text-l);
   font-weight: 600;
   letter-spacing: var(--tracking-tight);
   white-space: nowrap;
-}
-
-/* The product is "kubestronaut"; "-sim" says this is the rehearsal. */
-.app-header-wordmark-tail {
-  color: var(--text-secondary);
-}
-
-/* A hairline, not a bullet: it separates the mark from the crumb without
-   reading as punctuation between two names. */
-.app-header-rule {
-  width: 1px;
-  height: 16px;
-  background: var(--border);
-  flex-shrink: 0;
-}
-
-.app-header-crumb {
-  font-size: var(--text-s);
-  font-weight: 500;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-/* Truncates rather than wraps: the header is a fixed 56px and a long
-   exam name must not push the nav out of it. */
-.app-header-detail {
-  font-size: var(--text-s);
-  color: var(--text-subtle);
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
   min-width: 0;
 }
 
-.app-header-back,
-.app-header-link {
+/* The product is "kubestronaut"; "-sim" says this is the rehearsal. */
+.navbar-wordmark-tail {
+  color: var(--text-secondary);
+}
+
+/* The path, read left to right from the mark beside it. */
+.navbar-trail {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.navbar-crumb-step {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  /* 44px, which is the floor for a pointer target. This was
-     `var(--space-1) 0` — about 24px tall and no wider than its word. */
-  min-height: 44px;
-  padding: 0 var(--space-3);
+  min-width: 0;
+}
+
+.navbar-crumb-sep {
+  display: inline-flex;
+  color: var(--text-decorative);
+  font-size: var(--text-s);
+  padding: 0 var(--space-1);
+}
+
+.navbar-crumb {
+  font-size: var(--text-s);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-s);
+}
+
+.navbar-crumb-link {
   background: none;
   border: 0;
-  border-radius: var(--radius-s);
+  color: var(--text-muted);
   font: inherit;
   font-size: var(--text-s);
-  font-weight: 500;
   cursor: pointer;
 }
 
-.app-header-back {
-  color: var(--accent);
-  white-space: nowrap;
-}
-
-.app-header-back:hover {
-  color: var(--accent-strong);
+.navbar-crumb-link:hover {
   background: var(--surface-hover);
+  color: var(--accent-strong);
 }
 
-/* Tight, because the links are now padded: the gap used to be doing the
-   separating that the targets do. */
-.app-header-nav {
+/* Where you are. Ink rather than accent, and weight rather than colour:
+   under the Rare Accent Rule blue is for what you can act on, and the
+   last crumb is the one thing in the trail you cannot. */
+.navbar-crumb-on {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Status, promoted nav, and the menu — in that order, always. */
+.navbar-tail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.navbar-nav {
   display: flex;
   align-items: center;
   gap: var(--space-1);
 }
 
-.app-header-link {
-  color: var(--text-secondary);
+/* A promoted menu row. Same glyph, same label, same order as the row it
+   was lifted out of — so a candidate who learns the menu on a phone
+   already knows this bar on a laptop. */
+.navbar-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: none;
+  border: 0;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-s);
+  font-weight: 600;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-s);
+  cursor: pointer;
 }
 
-.app-header-link:hover {
-  color: var(--text);
+.navbar-link:hover {
   background: var(--surface-hover);
+  color: var(--accent-strong);
 }
 
-/* A rule under the word, not a hue change alone. aria-current is the
-   only thing that said "you are here", and a state carried by colour
-   alone is not a state to everyone. */
-.app-header-link-on {
-  color: var(--text);
-  box-shadow: inset 0 -2px 0 var(--accent);
+.navbar-link-glyph {
+  color: var(--text-decorative);
+  font-size: var(--text-l);
+}
+
+/* Two channels, never hue alone: the fill AND the ink both move, and
+   aria-current carries it for anyone reading neither. */
+.navbar-link-on {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
   cursor: default;
 }
 
-/* One breakpoint for the whole header, and it must stay in step with
-   HEADER_COMPACT_QUERY in lib/useMediaQuery.ts — that is what decides
-   which controls are in the DOM, and this only dresses what is left.
-   Under it the crumb goes first: the mark still says where you are, and
-   the nav has moved into the menu rather than being dropped.
+.navbar-link-on .navbar-link-glyph {
+  color: var(--accent-strong);
+}
 
-   This replaced two unrelated rules — a 560px block here and a 40rem
-   block for .session-chip-user at the bottom of the file — that between
-   them hid four things and let the other eight overflow. */
-@media (max-width: 48rem) {
-  .app-header {
-    /* Physical, not logical: the inset describes a hardware cutout,
-       which sits on a physical edge of the device and does not move
-       with writing direction. max() keeps the ordinary padding on
-       every device that reports no inset. */
-    padding-left: max(var(--space-3), env(safe-area-inset-left));
-    padding-right: max(var(--space-3), env(safe-area-inset-right));
+/* ---- the navbar's menu ---- */
+
+.nav-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.nav-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.nav-menu-trigger:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.nav-menu-trigger[aria-expanded="true"] {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+/* Three bars that become a cross.
+   Drawn here rather than swapped for a different glyph: swapping icons
+   is a change of subject, and moving the same three lines says the thing
+   you opened is the thing now closing. The middle bar fades while the
+   outer two rotate onto each other — one transform each, both
+   compositor-only. */
+.nav-menu-bars {
+  position: relative;
+  width: 16px;
+  height: 12px;
+  display: block;
+}
+
+.nav-menu-bars > span {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 1.75px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+.nav-menu-bars > span:nth-child(1) {
+  top: 0;
+}
+.nav-menu-bars > span:nth-child(2) {
+  top: 5.1px;
+}
+.nav-menu-bars > span:nth-child(3) {
+  top: 10.2px;
+}
+
+.nav-menu-bars[data-open] > span:nth-child(1) {
+  top: 5.1px;
+  transform: rotate(45deg);
+}
+.nav-menu-bars[data-open] > span:nth-child(2) {
+  opacity: 0;
+}
+.nav-menu-bars[data-open] > span:nth-child(3) {
+  top: 5.1px;
+  transform: rotate(-45deg);
+}
+
+.nav-menu-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-panel);
+}
+
+.nav-menu-panel {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: var(--z-dialog);
+  min-width: 15rem;
+  padding: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-3);
+}
+
+/* One row shape for everything the menu holds — a destination, a
+   preference, a fact, a way out. A fixed height, a leading glyph on a
+   fixed rail so every label starts on the same edge, and an optional
+   trailing value. The point is that a nav link and a sign-out read as
+   members of one list rather than as borrowed widgets. */
+.nav-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-s);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-s);
+  text-align: left;
+}
+
+button.nav-menu-item {
+  cursor: pointer;
+}
+
+button.nav-menu-item:hover {
+  background: var(--surface-hover);
+}
+
+.nav-menu-item-glyph {
+  color: var(--text-decorative);
+  font-size: var(--text-l);
+  flex-shrink: 0;
+}
+
+/* Pushed to the trailing edge: a value, not a second label. */
+.nav-menu-item-detail {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  white-space: nowrap;
+}
+
+.nav-menu-item-on {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.nav-menu-item-on .nav-menu-item-glyph {
+  color: var(--accent-strong);
+}
+
+/* The one row that ends something. Ink until reached for, then danger:
+   a red row at rest would make the menu look like a warning. */
+.nav-menu-item-danger:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.nav-menu-item-danger:hover .nav-menu-item-glyph {
+  color: var(--danger);
+}
+
+/* A statement, not a control. No pointer, no hover, no focus stop. */
+.nav-menu-item-fact {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.nav-menu-section + .nav-menu-section {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.nav-menu-section-label {
+  display: block;
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Only transform and opacity, both compositor-only, and both written
+     inside the guard rather than as a default a reduce-rule undoes. */
+  .nav-menu-bars > span {
+    transition:
+      transform var(--dur-quick) var(--ease-out),
+      top var(--dur-quick) var(--ease-out),
+      opacity var(--dur-quick) var(--ease-out);
+  }
+
+  .nav-menu-panel {
+    animation: dialog-in var(--dur-modal-in) var(--ease-out);
+  }
+
+  .nav-menu-panel-sheet {
+    animation: sheet-in var(--dur-modal-in) var(--ease-out);
+  }
+
+  .navbar-link,
+  .navbar-crumb-link,
+  button.nav-menu-item {
+    transition:
+      background var(--dur-quick) var(--ease-out),
+      color var(--dur-quick) var(--ease-out);
+  }
+}
+
+@media (max-width: 640px) {
+  .navbar {
+    padding-left: max(var(--space-3), var(--safe-l));
+    padding-right: max(var(--space-3), var(--safe-r));
     gap: var(--space-2);
   }
 
-  .app-header-crumb,
-  .app-header-rule,
-  .app-header-detail,
-  .app-header-wordmark-tail {
-    display: none;
+  /* Clipped, not display:none, and that is load-bearing: BrandMark is
+     aria-hidden, so this span is the home link's ONLY accessible name.
+     Three characters of an ellipsed brand is worse than none when the
+     mark beside it already IS the brand. */
+  .navbar-wordmark {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
   }
 
-  /* .app-header-home has to give up its flex item's default min-width
-     (its own content size) before the wordmark inside it can shrink at
-     all, and at the 320px reflow width the full word "kubestronaut-sim"
-     no longer fits. */
-  .app-header-home {
+  /* One control: a back chevron labelled with where you ARE. The label
+     answers "what screen is this", which is what a 390px row has room to
+     say; the chevron already says the other thing, and the accessible
+     name says where it goes. */
+  .navbar-back {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
     min-width: 0;
+    min-height: var(--tap-min);
+    padding: 0 var(--space-2) 0 var(--space-1);
+    background: none;
+    border: 0;
+    border-radius: var(--radius-s);
+    color: var(--text);
+    font: inherit;
+    font-size: var(--text-s);
+    font-weight: 600;
+    cursor: pointer;
   }
 
-  /* Ellipsises rather than running into the tail at 320px, the WCAG
-     reflow width. .app-header-detail already does this; the wordmark
-     never needed it until the row itself could get this narrow. */
-  .app-header-wordmark {
+  .navbar-crumb-here {
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
     min-width: 0;
   }
 
-  /* .job-chip-label already truncates with its own min-width: 0 and
-     text-overflow: ellipsis — the chip's 11rem floor was the only thing
-     still stopping the whole chip from shrinking, and with
-     .app-header-tail's flex-shrink: 0 that floor was reachable in both
-     products (locally, a `./sim reset` from a terminal while the lobby
-     is backgrounded; hosted, during a recycle's stop phase with SimApp
-     still mounted). A comfortable resting width is not worth a
-     scrollbar on a phone. */
-  .app-header .job-chip {
+  .nav-menu-trigger {
+    width: var(--tap-min);
+    height: var(--tap-min);
+  }
+
+  /* The panel rises from the bottom edge instead of hanging off the
+     top-right corner — which is where the trigger is, and the one place
+     on a phone a thumb cannot reach. Same panel, same rows, same order. */
+  .nav-menu-panel-sheet {
+    position: fixed;
+    inset: auto 0 0 0;
     min-width: 0;
+    border-radius: var(--radius-l) var(--radius-l) 0 0;
+    border-bottom: 0;
+    padding-bottom: calc(var(--space-2) + var(--safe-b));
+    max-height: 85dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
-  .app-header-tail {
-    gap: var(--space-1);
-  }
-
-  /* The compact bar's only two survivors: About and the theme toggle
-     stay here rather than move into the menu (see the design spec), so
-     they are the controls a thumb actually has to hit directly. Scoped
-     to the header — .info-button is shared with the exam topbar, which
-     this branch has no business resizing. */
-  .app-header .info-button,
-  .app-header .theme-toggle {
-    min-width: 44px;
-    min-height: 44px;
+  /* Reached for rather than aimed at, like every other control that
+     arrives under the thumb. */
+  .nav-menu-panel-sheet .nav-menu-item {
+    min-height: var(--tap-comfortable);
+    font-size: var(--text-m);
   }
 }
 
@@ -522,13 +768,24 @@
   margin: 0 0 var(--space-4);
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+  /* min(330px, 100%), not a bare 330px, and the same everywhere this
+     file writes an auto-fit floor.
+     `minmax(330px, 1fr)` creates a track 330px wide even when its
+     container is 305px: minmax's minimum is a floor, not a preference.
+     At the 320px WCAG 1.4.10 reflow width that is a horizontally
+     scrolling page with the card's own button hanging off the right
+     edge of the screen — measured, in Chrome, at 320px: a 305px
+     viewport with a 346px document.
+     min() collapses the floor to the container's width exactly when it
+     would otherwise exceed it, and changes nothing at any width where
+     the track already fits. */
+  grid-template-columns: repeat(auto-fit, minmax(min(330px, 100%), 1fr));
   gap: var(--space-4);
 }
 
 /* Denser: these carry a name and a reason, not a stat strip. */
 .exam-grid-soon {
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
 }
 
 .exam-card {
@@ -787,7 +1044,7 @@
   margin: 0 0 var(--space-5);
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
   gap: var(--space-4);
 }
 
@@ -1111,38 +1368,6 @@
 /* Wraps rather than compressing: the row packs a title, two icon
    buttons, the countdown and Submit exam, and below ~500px the countdown
    and the button were being squeezed off the edge. */
-.topbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-4);
-  padding: var(--space-2) var(--space-4);
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-
-/* This is the exam screen's <h1>. font-size and margin are pinned so the
-   heading level carries no visual weight of its own — the topbar title
-   has always read at body size, and the browser's 2em / 0.67em h1
-   defaults would resize the row and break the wrap behaviour above. */
-.topbar-title {
-  flex: 1 1 8rem;
-  min-width: 0;
-  font-size: inherit;
-  font-weight: 600;
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* The environment line: which cluster is behind the desktop, and which
-   boxes the drawn tasks are graded on. A second grower beside the title so
-   the two share the row's slack and both ellipse rather than pushing the
-   clock off the edge — it is context, and the first thing that should give
-   way when the row runs out of room (it is hidden outright below 900px,
-   where the panel becomes a drawer). */
 .exam-env {
   flex: 1 1 8rem;
   min-width: 0;
@@ -2259,6 +2484,78 @@
 
 .confirm-dialog-wide {
   width: min(560px, 92%);
+}
+
+/* The sheet variant: the same dialog, anchored to the bottom edge.
+ *
+ * On a wide screen it stays a centred dialog — a panel pinned to the
+ * bottom of a 27" display is further from the pointer than the middle
+ * is, and the thumb-zone argument that justifies it on a phone is an
+ * argument about a hand holding the device. So everything below is
+ * inside the mobile query; on a desktop `.confirm-dialog-sheet` adds
+ * nothing but the grip, which is hidden there for the same reason. */
+.sheet-grip {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .confirm-overlay-sheet {
+    align-items: flex-end;
+  }
+
+  /* Scoped through the overlay for SPECIFICITY, not for clarity. The
+     600px block further down makes every .confirm-dialog full-bleed —
+     width 100%, max-height 100dvh, radius 0 — and it appears later in
+     this file, so at equal specificity it would win and the sheet would
+     become an ordinary full-screen dialog on exactly the widths it
+     exists for. Two classes beat one wherever they are written. */
+  .confirm-overlay-sheet .confirm-dialog-sheet {
+    width: 100%;
+    max-width: 100%;
+    /* Not 100dvh, unlike the full-bleed dialogs above. A sheet that
+       covers everything is a screen and should have been one; leaving
+       the top of the page visible is what says "this is a layer over
+       what you were doing, and dismissing it puts you back". */
+    max-height: 85dvh;
+    /* Corners at the top only: the bottom edge reaches the physical
+       edge of the display and rounding it would float the sheet on a
+       sliver of scrim no thumb can hit. */
+    border-radius: var(--radius-l) var(--radius-l) 0 0;
+    border-bottom: 0;
+    /* The home indicator lives in the last ~20px. Without this the final
+       control in the sheet sits under it. */
+    padding-bottom: calc(var(--space-5) + var(--safe-b));
+  }
+
+  .sheet-grip {
+    display: block;
+    width: 36px;
+    height: 4px;
+    margin: 0 auto var(--space-3);
+    border-radius: var(--radius-pill);
+    background: var(--border-strong);
+  }
+}
+
+/* Rises from the edge it is anchored to rather than fading in place.
+   transform only, so it composites, and inside the no-preference guard
+   like every other animation in this file — a reduced-motion reader gets
+   the sheet already in position, which is the same layout. */
+@media (prefers-reduced-motion: no-preference) {
+  .confirm-overlay-sheet .confirm-dialog-sheet {
+    animation: sheet-in var(--dur-modal-in) var(--ease-out);
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .confirm-dialog h2 {
@@ -4833,6 +5130,12 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* The flick at the end of a question stops here instead of scrolling
+     the page behind it — which on a phone means the address bar sliding
+     back into view and the whole layout resizing, mid-read, because the
+     candidate reached the bottom of a stem. Same declaration, same
+     reason, as .navigator-body and .confirm-dialog. */
+  overscroll-behavior: contain;
   padding: var(--space-4) 0;
 }
 
@@ -4863,6 +5166,15 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+/* The position, on the face of the button that changes it. Tabular so
+   the bar does not twitch as the number grows a digit, and mono because
+   every other position in this product is. */
+.mcq-jump-position {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
 
 .mcq-jump-trigger[aria-expanded="true"] {
@@ -5089,27 +5401,103 @@
 
 @media (max-width: 640px) {
   .mcq-body {
-    padding: var(--space-4) var(--space-2) var(--space-3);
+    padding: var(--space-4) var(--space-3) 0;
   }
 
-  /* A phone gets the controls on one row and the reassurance line under
-     them, rather than three items squeezed into a third of the width
-     each. `order` is safe here because the line is not focusable, so the
-     visual order and the tab order cannot disagree (WCAG 1.3.2 / 2.4.3).
-     This is a real media query and not a container one: the column is the
-     viewport here, and nothing drags its width the way .panel-resizer
-     drags the task pane's. */
+  /* The action bar.
+   *
+   * The footer used to be three controls and a sentence sharing a
+   * wrapped flex row, and it sat on the literal bottom edge of the
+   * viewport — under the home indicator on any recent iPhone, and under
+   * the URL bar whenever it was showing. Both are fixed here: the safe
+   * inset is real now that index.html opts into it, and the height chain
+   * tracks dvh.
+   *
+   * Full width, 48px tall, and the three targets in the order the thumb
+   * expects: back, where-am-I, forward. 48 rather than the 44 the rest of
+   * this system uses because these are the controls a candidate reaches
+   * for WITHOUT looking — their eyes are on the question — and a target
+   * found by feel wants Material's floor rather than the minimum.
+   *
+   * A surface of its own, not the page: it stays put while the question
+   * scrolls behind it, and a bar that shares the reading surface's fill
+   * looks like it scrolled off. */
+  .mcq-footer {
+    margin-inline: calc(-1 * var(--space-2));
+    padding: var(--space-2) var(--space-3);
+    padding-bottom: calc(var(--space-2) + var(--safe-b));
+    gap: var(--space-2);
+    /* Wrapping stays ON, and the reassurance line below is why: it takes
+       a full-width row of its own above the controls, which is a wrap.
+       Setting nowrap here — the obvious way to keep three controls on
+       one line — instead squeezed that line into a 40px column beside
+       them, eight words stacked one per line, eating a fifth of the
+       viewport height. The controls hold their row through their own
+       flex values, not through the container forbidding a break. */
+    background: var(--surface);
+  }
+
+  /* The reassurance line moves ABOVE the bar. It used to take a row of
+     its own beneath the controls, which put a permanent sentence in the
+     one band of the screen a thumb can reach without moving — paid for
+     every question, to say something that is only news once.
+     `order` is safe here because the line is not focusable, so the
+     visual order and the tab order cannot disagree (WCAG 1.3.2 /
+     2.4.3). */
   .mcq-save-note {
-    order: 1;
-    flex-basis: 100%;
+    order: -1;
+    flex: 0 0 100%;
     text-align: center;
+    font-size: var(--text-2xs);
   }
 
-  /* The stem steps back down: --text-2xl in a 340px measure is four words
-     to a line. */
-  .mcq-question .mcq-pane > .md > p {
-    font-size: var(--text-xl);
+  /* Their row is held here rather than by nowrap on the parent. Previous
+     and the navigator take their content's width and refuse to shrink
+     below it; the forward action takes everything left. Nothing in the
+     row can grow past its share, so nothing pushes a sibling onto a
+     second line. */
+  .mcq-footer > .btn:first-of-type {
+    flex: 0 0 auto;
   }
+
+  .mcq-footer .btn {
+    min-height: var(--tap-comfortable);
+    justify-content: center;
+  }
+
+  /* Previous and the navigator hold their size; the forward action takes
+     the rest. It is the one pressed on nearly every question, and on the
+     last one it becomes Submit — the only button on the screen that ends
+     the attempt, and the only one worth making unmissable. */
+  .mcq-footer-end {
+    flex: 1;
+    gap: var(--space-2);
+  }
+
+  .mcq-footer-end .btn-primary {
+    flex: 1;
+  }
+
+  /* Icon-only Previous: the label is on the button as an accessible
+     name already, and three labelled controls do not fit a 320px row
+     without every one of them ellipsing. */
+  .mcq-footer > .btn:first-child {
+    flex-shrink: 0;
+    padding-inline: var(--space-3);
+  }
+
+  .mcq-footer > .btn:first-child .btn-label {
+    display: none;
+  }
+
+
+  /* The stem stays at its full reading size. It used to step DOWN here
+     — --text-2xl to --text-xl — which is backwards: the token ramp now
+     raises the body text underneath it, and a stem that shrank while its
+     own body grew would invert the hierarchy on the one screen where the
+     question is the whole point. What made 19px feel wrong at this width
+     was the four-words-to-a-line measure, and `text-wrap: pretty` on the
+     rule this overrides already handles that. */
 
   .mcq-review-option {
     flex-wrap: wrap;
@@ -5119,7 +5507,115 @@
     width: 100%;
     justify-content: flex-end;
   }
+
+  /* The navigator as a sheet.
+   *
+   * As a panel it is `position: absolute; inset: 0` inside
+   * .mcq-question, which on a desktop is a 720px column with room for a
+   * ten-wide grid. On a phone that box is the width of the screen and
+   * the height of one question, and sixty-five tiles at a coarse-pointer
+   * size are thirteen rows plus filter chips plus a legend — so the
+   * panel became a scrolling box inside a scrolling column, opened by a
+   * control at the bottom, drawing its grid at the top.
+   *
+   * As a sheet it rises from the edge the thumb pressed, keeps its
+   * filters and legend pinned, and scrolls only the grid. Fixed rather
+   * than absolute, so it escapes the column entirely — which is also why
+   * it needs the scrim and the focus trap the panel deliberately does
+   * without. */
+  .navigator-sheet {
+    position: fixed;
+    inset: auto 0 0 0;
+    max-height: 85dvh;
+    z-index: var(--z-dialog);
+    border-radius: var(--radius-l) var(--radius-l) 0 0;
+    border-top: 1px solid var(--border);
+    box-shadow: var(--shadow-3);
+    padding-top: var(--space-3);
+    /* The home indicator, again. The legend is the last thing in the
+       sheet and it is the thing that would sit under it. */
+    padding-bottom: var(--safe-b);
+  }
+
+  .navigator-scrim {
+    position: fixed;
+    inset: 0;
+    background: var(--overlay);
+    z-index: var(--z-dialog);
+  }
+
+  /* Bigger than the 44px the coarse-pointer block gives them. This is a
+     grid of sixty-five adjacent targets with no gaps to miss into, and
+     hitting Q34 instead of Q35 costs a candidate the same gesture
+     again. */
+  .navigator-sheet .navigator-tile {
+    min-height: var(--tap-comfortable);
+  }
+
+  /* The answer rows. 44px is the floor for a control you aim at; these
+     are the screen's whole purpose, they are read before they are
+     pressed, and the option text is often two lines anyway — so the
+     height comes from real padding rather than from a min-height
+     propping up a cramped row.
+
+     The letter circle grows with it. At 24px on a phone it was a detail
+     beside the text; at 28px it is the thing you press, which is what it
+     already is on a touchscreen. */
+  .mcq-options {
+    gap: var(--space-3);
+  }
+
+  .mcq-option {
+    min-height: var(--tap-comfortable);
+    padding: var(--space-4) var(--space-3);
+    gap: var(--space-3);
+  }
+
+  .mcq-question .mcq-option-letter {
+    width: 28px;
+    height: 28px;
+    font-size: var(--text-s);
+  }
+
+  /* The head row becomes two rows, on purpose, in this order:
+       QUESTION 7 / 65                    [flag] Mark for review
+       Kubernetes Fundamentals
+   *
+   * It wrapped by default and produced the opposite arrangement — the
+   * domain filling row one beside the counter, and the flag stranded on
+   * row two, right-aligned under nothing.
+   *
+   * One row was tried first and does not fit at any phone width. The
+   * counter and the flag are ~220px together; "Kubernetes Fundamentals"
+   * wants 166 and gets 97 at 390px and 40 at 320px, which is "Kub…" —
+   * three characters that name nothing and still cost the width of a
+   * chip. DESIGN.md calls the domain the one per-question fact an mcq
+   * candidate can use, so twenty pixels of second row is the cheaper
+   * loss.
+   *
+   * `order` is safe because the chip is not focusable: the visual order
+   * and the tab order cannot disagree (WCAG 1.3.2 / 2.4.3). */
+  .mcq-head {
+    gap: var(--space-1) var(--space-2);
+  }
+
+  /* Whole, on its own line, and no wider than the words in it. */
+  .mcq-domain {
+    order: 1;
+    flex-basis: 100%;
+    max-width: max-content;
+  }
+
+  /* Neither may give way: row one is where you are and how to come back
+     to it. Without this the counter wraps its own text into
+     "QUESTION 1 /" over "65". */
+  .mcq-counter,
+  .mcq-head .question-mark {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
 }
+
 
 /* ===== Progress dashboard (1k) =====
    Owned by the progress screen alone. It is a PAGE, so it inherits
@@ -5172,7 +5668,7 @@
   margin: 0 0 var(--space-6);
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
   gap: var(--space-3);
 }
 
@@ -6309,7 +6805,7 @@
    here. */
 .hosted-flavours {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
   gap: var(--space-4);
   margin: var(--space-5) 0 0;
   padding: 0;
@@ -6376,6 +6872,33 @@
   color: var(--text-muted);
   font-size: var(--text-s);
   line-height: 1.4;
+}
+
+/* "Needs a desktop", in the slot the seat count occupies on a card that
+   can be started. It is a STATE the card is in, not a count, so it takes
+   the same flat pill the catalog's own refusals wear rather than a
+   figure's plain text. Muted, not danger: nothing has gone wrong, and
+   colouring it red would say the exam is broken rather than that the
+   device is the wrong shape for it. */
+.hosted-flavour-badge {
+  display: inline-block;
+  padding: 0.15em 0.6em;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+/* The same explanation on the failed-boot screen, where Try again is
+   the control it stands in for. Prose rather than a pill: this one is
+   answering "why is there no retry button", which is a sentence. */
+.hosted-boot-blocked {
+  max-width: 44ch;
+  color: var(--text-muted);
 }
 
 /* Pinned, so both cards' buttons sit on one line whatever the pitch
@@ -6519,111 +7042,328 @@
    narrow to hold it. See HeaderMenu.tsx for why this is a popover and not
    a sheet. */
 
-.header-menu {
-  position: relative;
-  display: flex;
-  align-items: center;
+
+
+/* ---- touch input ----
+
+   Cross-cutting, and last in the file on purpose: these are overrides of
+   component rules above, and the cascade is what makes them win without
+   a single !important.
+
+   Two media features, and they answer different questions. `any-pointer:
+   coarse` asks "could a finger be used here" and governs SIZE — a
+   touchscreen laptop gets the bigger targets and keeps every hover
+   affordance. `hover: none` asks "is there a pointer that can rest on
+   something without pressing it" and governs STATE; it is false on a
+   phone and true on that same laptop. Conflating them is how a laptop
+   loses its hover styling for having a touchscreen. */
+
+/* The 300ms wait a mobile browser used to hold every tap for, in case a
+   second one arrived and meant "zoom". `touch-action: manipulation`
+   opts out of double-tap zoom on these controls only — pinch zoom is
+   untouched, which matters: WCAG 1.4.4 is not negotiable and disabling
+   page zoom to win a third of a second would be a poor trade.
+
+   The tap highlight goes with it. It is a translucent grey rectangle the
+   OS paints over the element's own box, so it ignores the border radius
+   and squares off every rounded control at the moment of contact. What
+   replaces it is not nothing — the :active rules below are the feedback,
+   and they are the same fill step hover uses, so the vocabulary is one
+   thing rather than two. */
+.btn,
+.mcq-option,
+.navigator-tile,
+.navigator-chip,
+.question-mark,
+.info-button,
+.nav-menu-item,
+.nav-menu-trigger {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.header-menu-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  background: none;
-  border: 0;
-  border-radius: var(--radius-s);
-  color: var(--text-secondary);
-  cursor: pointer;
+/* The keyboard hints, keyed to the pointer rather than to the width.
+   A `kbd` badge reading F beside "Mark for review" is instruction on a
+   laptop and decoration on a phone — there is no key to press, and it
+   takes space from the label it is annotating. A touchscreen laptop
+   keeps them, because it has the keyboard they describe.
+   These are aria-hidden already, so nothing leaves the accessible name
+   with them. */
+@media (any-pointer: coarse) and (not (any-pointer: fine)) {
+  .key-hint,
+  .navigator-keys {
+    display: none;
+  }
 }
 
-.header-menu-button:hover {
-  background: var(--surface-hover);
-  color: var(--text);
+/* Sticky hover, which is the defect this block mainly exists for.
+ *
+ * A phone has no hover, so a browser fakes one: it applies :hover on
+ * touch and LEAVES IT THERE until something else is touched. On a screen
+ * where hover means "the control under your pointer", that reads as a
+ * selection — and on the mcq options, where selection is drawn with a
+ * fill step of its own, it reads as the wrong answer being chosen.
+ *
+ * Reset to the resting state rather than restyled. There is nothing a
+ * hover state can usefully say on a device that cannot hover, and the
+ * :active rules below carry the press.
+ */
+@media (hover: none) {
+  .btn:hover:not(:disabled) {
+    background: var(--surface-raised);
+    color: var(--text);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+  }
+
+  .mcq-option:hover {
+    background: var(--surface-raised);
+  }
+
+  .navigator-tile:hover:not(:disabled) {
+    background: var(--surface-raised);
+  }
+
 }
 
-/* Sits under the panel and over everything else, so a pointer anywhere
-   outside dismisses. */
-.header-menu-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-panel);
+/* The press, on a device where it is the only feedback there is.
+ *
+ * A fill step and nothing else — no scale, no spring, no shadow. The
+ * design forbids those and is right to: this is an instrument panel for
+ * someone about to sit a proctored exam, and a button that bounces reads
+ * as unserious. A fill step is also the vocabulary the whole system
+ * already uses for "reached for", so a press and a hover say the same
+ * thing in the same way.
+ *
+ * Outside a reduced-motion guard deliberately: there is no motion here
+ * to reduce. It is a colour change on an event, which is what the
+ * Non-Motion Channel Rule asks every state to have.
+ */
+@media (any-pointer: coarse) {
+  .mcq-option:active {
+    background: var(--raised-hover);
+  }
+
+  .navigator-tile:active:not(:disabled) {
+    background: var(--raised-hover);
+  }
+
+  /* The label and the flag, which are .btn-sized but not .btn. */
+  .question-mark:active,
+  .info-button:active {
+    background: var(--raised-hover);
+  }
 }
 
-.header-menu-panel {
-  position: absolute;
-  top: calc(100% + var(--space-2));
-  right: 0;
-  z-index: var(--z-dialog);
-  min-width: 13rem;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-2);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-m);
-  box-shadow: var(--shadow-2);
+/* The header's brand lockup and theme toggle, on a phone.
+ *
+ * At 390px the row carries a mark, the wordmark, the hosted lease
+ * countdown, About, the theme toggle and the menu — and the wordmark is
+ * the item that gives way, ellipsing to "kube…". Three characters of a
+ * brand is worse than none: the mark beside it already IS the brand, and
+ * it is the same mark as the favicon.
+ *
+ * Clipped rather than `display: none`, and that is load-bearing.
+ * BrandMark is aria-hidden, so this span is the home link's ONLY
+ * accessible name — removing it from the tree leaves an unnamed link.
+ * The .sr-only idiom keeps the name and takes the pixels.
+ *
+ * The theme toggle drops its word for the same reason and by a different
+ * rule: it has an explicit aria-label, which replaces its contents for a
+ * screen reader, so hiding the visible text costs nothing and cannot
+ * produce the double-name the Move-Don't-Hide rule warns about. */
+@media (max-width: 640px) {
+  .app-header-wordmark {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .theme-toggle-label {
+    display: none;
+  }
+
+  .app-header .theme-toggle {
+    width: var(--tap-min);
+    padding: 0;
+    justify-content: center;
+    border-radius: var(--radius-pill);
+  }
 }
 
-/* The nav landmark inside the panel wraps the links in an actual <nav>,
-   which is one level deeper than the buttons and the label the panel's
-   other children render at. Its own flex column and gap match the
-   panel's exactly, so that extra level does not change the rhythm
-   between the nav links or between the nav block and what follows it. */
-.header-menu-nav {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+/* The About drawer, on a phone.
+ *
+ * It is a side drawer at min(480px, 92vw), which on a 390px screen is
+ * 359px — a panel that covers all but a 31px sliver of scrim. That is
+ * neither a drawer (there is nothing left beside it to see) nor a
+ * screen, and the sliver is too narrow to be the dismiss target it looks
+ * like. Full width, and the 32px side padding closes a step: it was
+ * chosen against a 480px panel and costs a phone a fifth of its
+ * measure.
+ *
+ * The comparison table inside it is the real defect. Three columns —
+ * Aspect, This simulator, Real exam — want 307px in a 279px content box,
+ * so the third one was CLIPPED at the drawer's edge: "REAL EXAI", with
+ * every value under it cut in half. It scrolled sideways inside its own
+ * wrapper, which is the Scroll-Inside rule working exactly as written
+ * and still the wrong answer here, because nothing about a clipped
+ * heading says "this scrolls".
+ *
+ * So it stacks, the same treatment .tv-row already takes at 640px: one
+ * block per row, the aspect as its heading, and each value carrying the
+ * column label it lost. `display: block` on table elements would take
+ * the table semantics with it, so the cells become grid rows and the
+ * labels come from data attributes on a wrapper — see the Table-Cell
+ * rule. */
+@media (max-width: 640px) {
+  .info-drawer {
+    width: 100%;
+    border-left: 0;
+    padding: var(--space-5) var(--space-4);
+    padding-bottom: calc(var(--space-6) + var(--safe-b));
+  }
+
+  /* Nothing left to scroll: the table below is no longer wider than its
+     box, and a scroll container that never scrolls is a scrollbar
+     gutter for nothing. */
+  .compare-table-scroll {
+    overflow-x: visible;
+  }
+
+  .compare-table thead {
+    /* Not display:none — the column labels are still what each value
+       means, and they are re-announced per cell below. This hides them
+       visually while keeping them for a screen reader reading the table
+       the ordinary way. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .compare-table tbody tr {
+    display: block;
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .compare-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .compare-table tbody th,
+  .compare-table tbody td {
+    display: block;
+    border-bottom: 0;
+    padding: 0;
+  }
+
+  .compare-table tbody th {
+    margin-bottom: var(--space-2);
+  }
+
+  /* The label each value lost when its column heading was hidden.
+     Content from a data attribute the markup sets, so the words live in
+     strings.ts with every other piece of copy. */
+  .compare-table tbody td::before {
+    content: attr(data-label);
+    display: block;
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .compare-table tbody td + td {
+    margin-top: var(--space-2);
+  }
 }
 
-/* Every child is a full-width row with a real target, whatever element
-   it happens to be — the panel takes nav links (through the landmark
-   wrapper above), session buttons and a plain label. */
-.header-menu-panel > button,
-.header-menu-panel > .header-menu-nav > button,
-.header-menu-panel > .header-menu-item {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  min-height: 44px;
-  padding: 0 var(--space-3);
-  background: none;
-  border: 0;
-  border-radius: var(--radius-s);
-  color: var(--text);
-  font: inherit;
-  font-size: var(--text-s);
-  text-align: left;
-}
+/* ---- the hub and its chrome, on a phone ----
 
-/* Only the buttons: the sole .header-menu-item is the login name, a
-   static <span>, and a pointer cursor over something that does not
-   respond to a click is a false affordance. */
-.header-menu-panel > button,
-.header-menu-panel > .header-menu-nav > button {
-  cursor: pointer;
-}
+   Last in the file with the touch layer, and for the same reason: these
+   are overrides of components defined far above. */
 
-.header-menu-panel > button:hover,
-.header-menu-panel > .header-menu-nav > button:hover {
-  background: var(--surface-hover);
-}
+@media (max-width: 640px) {
+  /* The header menu becomes a sheet.
+   *
+   * It is an absolutely-positioned popover hanging off the top-right
+   * corner, which is where the button that opens it is — and on a phone
+   * that corner is the single hardest place on the screen to reach. The
+   * menu holds the nav, the login and Sign out: things you deliberately
+   * go to, arriving in the one region a thumb cannot get to without
+   * shifting grip.
+   *
+   * The scrim it already renders is doing the dismissal, so this is a
+   * position change and nothing else. It is not `role="dialog"` — it is
+   * a `role="group"` disclosure and stays one, because HeaderMenu's own
+   * comment records why, and moving it down the screen does not change
+   * what it is. */
 
-.header-menu-label {
-  padding: var(--space-2) var(--space-3) var(--space-1);
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-}
 
-.header-menu-rule {
-  height: 1px;
-  margin: var(--space-1) 0;
-  background: var(--border);
+  /* The page's own bottom edge. Every screen that is a PAGE now reaches
+     the physical bottom of the display, so the last thing on it — a
+     Start button, an Erase history button, the tips list — would
+     otherwise sit under the home indicator. The exam screens do not need
+     this: their action bars pay the inset themselves, because they are
+     pinned rather than scrolled to. */
+  .page,
+  .score-screen {
+    padding-bottom: calc(var(--space-6) + var(--safe-b));
+  }
+
+  /* A control on a card is aimed at; a control that ENDS a card is
+     reached for. The lobby's Start, the boot screen's Give up and the
+     score screen's actions are all the last thing on a column the reader
+     has just scrolled through. */
+  .hosted-flavour-actions .btn,
+  .hosted-booting > .btn,
+  .score-actions .btn,
+  .desktop-required-anyway,
+  .gate-session .btn,
+  .signin-github {
+    min-height: var(--tap-comfortable);
+  }
+
+  /* The sign-in screen is the product's front door and the one screen
+     with no header, so it carries its own edges. */
+  .signin {
+    padding-top: calc(var(--space-4) + var(--safe-t));
+    padding-bottom: calc(var(--space-4) + var(--safe-b));
+  }
+
+  /* The dashboard's history controls: three buttons that were sized for
+     a toolbar and are now a stack. */
+  .progress-actions .btn {
+    min-height: var(--tap-comfortable);
+  }
+
+  /* The attempt history keeps its table and keeps scrolling inside its
+     own box — the Scroll-Inside rule, and the right answer for five
+     columns of mono that do not compress. What it drops is the one
+     column that is not part of identifying an attempt: how long it took.
+     Exam, mode, date and score are what a row is FOR, and four of them
+     fit a phone where five did not.
+     display: none on both the header cell and the data cell, not a
+     width of zero: a table cell that is still in the layout is still in
+     the accessibility tree, and a screen reader would read a header with
+     nothing under it. */
+  .history-table .history-time,
+  .history-table thead th:nth-child(4) {
+    display: none;
+  }
 }
