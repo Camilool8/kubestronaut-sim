@@ -58,5 +58,8 @@ export const SPLIT_QUERY = "not (max-width: 900px)";
  * two nav links, a login, a lease countdown and four buttons. It starts
  * colliding well above the 560px the old rule used, which only ever hid
  * the crumb and let the rest overflow.
+ *
+ * Mirrored in theme.css's compact-header media query on .app-header —
+ * the two breakpoints must agree.
  */
 export const HEADER_COMPACT_QUERY = "(max-width: 48rem)";

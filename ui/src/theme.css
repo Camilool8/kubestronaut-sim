@@ -165,8 +165,11 @@
   gap: var(--space-3);
 }
 
+/* Wider than the lead's gap on purpose: this cluster is three groups —
+   the session, the nav, the icon buttons — and at the lead's spacing they
+   read as one undifferentiated row of eight controls. */
 .app-header-tail {
-  gap: var(--space-3);
+  gap: var(--space-4);
   flex-shrink: 0;
 }
 
@@ -233,9 +236,13 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
+  /* 44px, which is the floor for a pointer target. This was
+     `var(--space-1) 0` — about 24px tall and no wider than its word. */
+  min-height: 44px;
+  padding: 0 var(--space-3);
   background: none;
   border: 0;
-  padding: var(--space-1) 0;
+  border-radius: var(--radius-s);
   font: inherit;
   font-size: var(--text-s);
   font-weight: 500;
@@ -249,12 +256,15 @@
 
 .app-header-back:hover {
   color: var(--accent-strong);
+  background: var(--surface-hover);
 }
 
+/* Tight, because the links are now padded: the gap used to be doing the
+   separating that the targets do. */
 .app-header-nav {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-1);
 }
 
 .app-header-link {
@@ -263,26 +273,47 @@
 
 .app-header-link:hover {
   color: var(--text);
+  background: var(--surface-hover);
 }
 
+/* A rule under the word, not a hue change alone. aria-current is the
+   only thing that said "you are here", and a state carried by colour
+   alone is not a state to everyone. */
 .app-header-link-on {
   color: var(--text);
+  box-shadow: inset 0 -2px 0 var(--accent);
   cursor: default;
 }
 
-/* Under ~560px the crumb is the first thing to go: the mark still says
-   where you are, and the nav is the only part that cannot be reached any
-   other way. */
-@media (max-width: 560px) {
+/* One breakpoint for the whole header, and it must stay in step with
+   HEADER_COMPACT_QUERY in lib/useMediaQuery.ts — that is what decides
+   which controls are in the DOM, and this only dresses what is left.
+   Under it the crumb goes first: the mark still says where you are, and
+   the nav has moved into the menu rather than being dropped.
+
+   This replaced two unrelated rules — a 560px block here and a 40rem
+   block for .session-chip-user at the bottom of the file — that between
+   them hid four things and let the other eight overflow. */
+@media (max-width: 48rem) {
   .app-header {
-    padding: 0 var(--space-3);
+    /* Physical, not logical: the inset describes a hardware cutout,
+       which sits on a physical edge of the device and does not move
+       with writing direction. max() keeps the ordinary padding on
+       every device that reports no inset. */
+    padding-left: max(var(--space-3), env(safe-area-inset-left));
+    padding-right: max(var(--space-3), env(safe-area-inset-right));
     gap: var(--space-2);
   }
 
   .app-header-crumb,
   .app-header-rule,
-  .app-header-detail {
+  .app-header-detail,
+  .app-header-wordmark-tail {
     display: none;
+  }
+
+  .app-header-tail {
+    gap: var(--space-1);
   }
 }
 
@@ -6533,10 +6564,4 @@
   height: 1px;
   margin: var(--space-1) 0;
   background: var(--border);
-}
-
-@media (max-width: 40rem) {
-  .session-chip-user {
-    display: none;
-  }
 }
