@@ -256,11 +256,12 @@ test("a signed-out visitor gets the sign-in screen and the seat count", async ()
   expect(screen.getByText(/No permissions are requested/i)).toBeTruthy();
 });
 
-// It is the only screen in the product with no header, so it is the only
-// one that has to carry the header's furniture itself — otherwise a
-// visitor's first impression is a heading alone in the top-left corner of
-// an empty page, with no mark, no wordmark and no way to set the theme.
-test("the sign-in screen carries the product's own chrome", async () => {
+// It used to be the only screen with no header, carrying a bespoke theme
+// button in a corner of its own — which made the front door the one place
+// the app's chrome was a different object. It has the same navbar as
+// everything else now, and the card below still draws the mark large,
+// because that is this screen's subject rather than its furniture.
+test("the sign-in screen carries the same navbar as every other screen", async () => {
   identity = {
     authenticated: false,
     authMode: "github",
@@ -271,8 +272,10 @@ test("the sign-in screen carries the product's own chrome", async () => {
 
   await screen.findByRole("link", { name: /continue with github/i });
   expect(document.querySelector(".signin-mark")).toBeTruthy();
-  expect(screen.getByText("kubestronaut")).toBeTruthy();
-  expect(screen.getByRole("button", { name: /theme/i })).toBeTruthy();
+  expect(screen.getByRole("banner")).toBeTruthy();
+  // The menu is on every screen at every width, including this one —
+  // signed out, there is simply nothing in its account section.
+  expect(screen.getByRole("button", { name: strings.header.menuLabel })).toBeTruthy();
   // The GitHub mark rides the button it belongs to.
   expect(document.querySelector(".signin-github .signin-github-mark")).toBeTruthy();
 });
@@ -581,6 +584,7 @@ test("a failed boot keeps the seat, says why, and offers both ways out", async (
 });
 
 test("a ready session renders the ordinary app with a lease countdown over it", async () => {
+  const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
   identity = me({
     session: {
       kind: "practical",
@@ -596,8 +600,14 @@ test("a ready session renders the ordinary app with a lease countdown over it", 
   // The exam selector: the same screen a local candidate sees, reaching
   // the same facilitator through the hub's proxy.
   expect(await screen.findByRole("heading", { name: /path to kubestronaut/i })).toBeTruthy();
-  expect(screen.getByText("octocat")).toBeTruthy();
+  // The countdown stays in the BAR at every width — it is the one number
+  // a hosted candidate cannot guess, and the seat is taken back at its
+  // cap whatever they are doing. Who they are is not urgent in the same
+  // way and moved into the menu with the rest of the account section.
   expect(screen.getByText("2:00:00 left")).toBeTruthy();
+
+  await user.click(screen.getByRole("button", { name: strings.header.menuLabel }));
+  expect(screen.getByText("octocat")).toBeTruthy();
 });
 
 // The whole argument for hosted history: a record you can read without

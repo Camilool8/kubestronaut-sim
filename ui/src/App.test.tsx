@@ -639,9 +639,10 @@ describe("App preparing an attempt", () => {
     // the job. What must not happen is the lobby sitting there with an
     // exam running behind it — which is what the 10s session poll alone
     // would give, for most of an interval.
-    expect(
-      await screen.findByRole("button", { name: "Submit exam" }, { timeout: 4000 }),
-    ).toBeInTheDocument();
+    // The clock, not the submit button: Submit moved into the navbar
+    // menu with every other command, and what proves the attempt is UP
+    // is that a countdown is running for it.
+    expect(await screen.findByRole("timer", {}, { timeout: 4000 })).toBeInTheDocument();
   });
 
   // The clock never started, so nothing was lost. That has to be the
@@ -732,7 +733,9 @@ describe("App choosing the exam screen", () => {
     expect(screen.getByRole("button", { name: "Submit exam" })).toBeInTheDocument();
     // And the clock it is counting against, which is the other half of
     // "you are not stranded": a submit button with no time left to see
-    // is a control with no context.
+    // is a control with no context. This one is NOT behind the menu —
+    // the gate screen carries its own controls, because a candidate
+    // whose exam is running needs the way out in front of them.
     expect(screen.getByRole("timer")).toBeInTheDocument();
   });
 });

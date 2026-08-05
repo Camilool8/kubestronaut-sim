@@ -62,7 +62,10 @@ export function SessionChip({
 // A full reload rather than a state update. Signing out invalidates a
 // cookie that every open fetch and the desktop's WebSocket are carrying,
 // and there is no partial version of that.
-async function signOut() {
+//
+// Exported for the navbar's menu, which is now the only place either way
+// out of a session is offered.
+export async function signOut() {
   await logout().catch(() => undefined);
   window.location.assign("/");
 }

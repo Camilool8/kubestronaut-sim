@@ -1,6 +1,6 @@
 import type { Me } from "../api";
 import { BrandMark } from "../components/BrandMark";
-import { ThemeToggle } from "../components/ThemeToggle";
+import { NavBar } from "../components/NavBar";
 import { strings } from "../strings";
 
 /**
@@ -60,11 +60,15 @@ export function HostedSignIn({ me }: { me: Me }) {
 
   return (
     <div className="signin">
-      {/* The theme is the visitor's before the account is, and this is
-          the only screen where no header offers it. */}
-      <div className="signin-chrome">
-        <ThemeToggle />
-      </div>
+      {/* The same navbar as every other screen, with the sections that
+          need an account simply absent. It used to carry a bespoke
+          theme button in a corner of its own, which made this the one
+          screen where the app's chrome was a different object — and the
+          front door is the worst place to teach someone a layout they
+          will not see again. The card below still draws the mark large,
+          because that is this screen's subject rather than its
+          furniture. */}
+      <NavBar />
 
       <main className="signin-main">
         <div className="signin-card">

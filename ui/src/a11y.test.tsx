@@ -14,7 +14,7 @@ import { HintTray } from "./components/HintTray";
 import { KeyboardSettings } from "./components/KeyboardSettings";
 import { ShortcutHelp } from "./components/ShortcutHelp";
 import { DesktopRequired } from "./components/DesktopRequired";
-import { AppHeader } from "./components/AppHeader";
+import { NavBar } from "./components/NavBar";
 import { Dialog } from "./components/Dialog";
 import { ExamIntro } from "./components/ExamIntro";
 import { InfoDrawer } from "./components/InfoDrawer";
@@ -28,7 +28,6 @@ import { HostedBooting } from "./screens/HostedBooting";
 import { HostedSignIn } from "./screens/HostedSignIn";
 import { HostedStart } from "./screens/HostedStart";
 import { EndSessionDialog, SessionActions, SessionChip } from "./components/SessionChip";
-import { HeaderMenu } from "./components/HeaderMenu";
 import { HEADER_COMPACT_QUERY, MCQ_COMPACT_QUERY, SPLIT_QUERY } from "./lib/useMediaQuery";
 import { matchMediaMock } from "./test/setup";
 import { marksStore } from "./components/marksStore";
@@ -590,68 +589,55 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // The header is on nearly every screen, so anything wrong here is
-  // wrong everywhere. Both variants are scanned: they differ in what
-  // leads the left cluster, which is exactly where the landmark, the
-  // link and the nav all live.
-  test("app header, brand variant", async () => {
+  // The navbar is on every screen in both products, so anything wrong
+  // here is wrong everywhere. Three states are scanned because three is
+  // all there are: at the top of the app, one step down it, and narrow
+  // with the menu open. There is no longer a second variant to scan —
+  // the arrangement is one arrangement.
+  test("navbar at the top of the app", async () => {
     const { container } = render(
-      <AppHeader
-        crumb="Choose an exam"
+      <NavBar
+        trail={[{ label: "Choose an exam" }]}
         nav={[
-          { label: "History", to: "/progress" },
-          { label: "Packs", to: "/packs", current: true },
+          { label: "Exams", to: "/exams", icon: "grid" },
+          { label: "Progress", to: "/progress", icon: "chart", current: true },
         ]}
       />,
     );
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  test("app header, back variant", async () => {
+  // The state that used to replace the mark with a back button. The
+  // trail is a nav landmark of its own beside the banner's, and the
+  // clickable step and the current one must not both be links.
+  test("navbar one step down, with a trail", async () => {
     const { container } = render(
-      <AppHeader
-        variant="back"
-        back={{ label: "Exams", to: "/exams" }}
-        crumb="CKAD"
-        detail="Certified Kubernetes Application Developer"
+      <NavBar
+        trail={[{ label: "Exams", to: "/exams" }, { label: "CKAD" }]}
+        nav={[{ label: "Exams", to: "/exams", icon: "grid" }]}
       />,
     );
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  test("the header menu, open", async () => {
-    const user = userEvent.setup();
-    const { container } = render(
-      <HeaderMenu label="Menu">
-        <button type="button">Exams</button>
-        <button type="button">Progress</button>
-      </HeaderMenu>,
-    );
-    await user.click(screen.getByRole("button", { name: "Menu" }));
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
-  });
-
-  // HeaderMenu on its own above is a stand-in — two placeholder buttons,
-  // no real controls. The surface a phone actually renders is AppHeader
-  // in its compact state: the nav links, the login and both ways out of
-  // a session all move into this panel there, and that composition was
-  // never scanned open. Assert the nav and session controls are actually
-  // on screen before sweeping — a mis-set matchMediaMock, or a menu that
-  // silently failed to open, would otherwise leave this scanning an
-  // empty or closed panel and pass for the wrong reason.
+  // What a phone actually renders: the nav links, the login and both
+  // ways out of a session all move into this panel, and that composition
+  // is the one worth sweeping open. The assertions before the scan are
+  // load-bearing — a mis-set matchMediaMock, or a menu that silently
+  // failed to open, would otherwise leave axe scanning a closed panel
+  // and pass for the wrong reason.
   //
-  // No try/finally around the matchMediaMock call here: the describe's
-  // own afterEach resets it unconditionally now, pass or fail, so a
-  // second reset here would only restate what that one already
-  // guarantees for every test in the file.
-  test("app header, compact, with the menu open", async () => {
-    matchMediaMock([HEADER_COMPACT_QUERY]);
+  // No try/finally around matchMediaMock: the describe's own afterEach
+  // resets it unconditionally, pass or fail.
+  test("navbar, narrow, with the menu open", async () => {
+    matchMediaMock([HEADER_COMPACT_QUERY, MCQ_COMPACT_QUERY]);
     const user = userEvent.setup();
     const { container } = render(
-      <AppHeader
+      <NavBar
+        trail={[{ label: "Your path" }]}
         nav={[
-          { label: "Exams", to: "/exams" },
-          { label: "Progress", to: "/progress", current: true },
+          { label: "Exams", to: "/exams", icon: "grid" },
+          { label: "Progress", to: "/progress", icon: "chart", current: true },
         ]}
         session={{
           login: "octocat",
@@ -668,8 +654,8 @@ describe("axe: no WCAG violations", () => {
       />,
     );
     await user.click(screen.getByRole("button", { name: strings.header.menuLabel }));
-    expect(screen.getByRole("button", { name: "Exams" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: strings.hosted.endSession })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Exams/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /End session/ })).toBeInTheDocument();
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
@@ -795,16 +781,16 @@ describe("axe: no WCAG violations", () => {
   // The two surfaces a phone gets instead of the wide bar and the inline
   // panel. Both are modal, both are new, and an unscanned state is
   // exactly how the violations above survived as long as they did.
-  test("mcq compact topbar sheet", async () => {
-    matchMediaMock([MCQ_COMPACT_QUERY]);
+  test("mcq navbar menu, narrow, with the attempt section open", async () => {
+    matchMediaMock([HEADER_COMPACT_QUERY, MCQ_COMPACT_QUERY]);
     stubMcqFetch();
     const user = userEvent.setup();
     const { container } = render(
       <McqExam session={mcqSession} fetchedAt={Date.now()} onSessionChange={() => {}} />,
     );
     await screen.findByText("Which component persists cluster state?");
-    await user.click(screen.getByRole("button", { name: /exam controls/i }));
-    expect(screen.getByRole("dialog", { name: "KCNA Mock Exam" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: strings.header.menuLabel }));
+    expect(screen.getByRole("button", { name: /submit exam/i })).toBeInTheDocument();
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
@@ -831,6 +817,7 @@ describe("axe: no WCAG violations", () => {
       <McqExam session={mcqSession} fetchedAt={Date.now()} onSessionChange={() => {}} />,
     );
     await screen.findByText("Which component persists cluster state?");
+    await user.click(screen.getByRole("button", { name: strings.header.menuLabel }));
     await user.click(screen.getByRole("button", { name: /submit exam/i }));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText(/1 question is unanswered/)).toBeInTheDocument();

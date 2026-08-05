@@ -283,7 +283,7 @@ carries light, the `:root` default; dark comes from
 | Token | Light | Dark | Role |
 |---|---|---|---|
 | `--bg` | `#f6f8fc` | `#101728` | the page, and the resting fill for panels inset within a card |
-| `--surface` | `#ffffff` | `#182033` | raised surfaces — cards, dialogs, drawer, topbar, toasts, question panel |
+| `--surface` | `#ffffff` | `#182033` | raised surfaces — cards, dialogs, drawer, navbar, toasts, question panel |
 | `--surface-raised` | `#eef1f6` | `#212a40` | third tone — default button fill, fenced code bodies, progress tracks, chips |
 | `--overlay` | `rgba(16, 23, 40, 0.55)` | `rgba(2, 6, 16, 0.7)` | scrim behind dialogs, drawer, control overlay |
 | `--border` | `#d7dde8` | `#3a4560` | structural edges, always 1px |
@@ -399,11 +399,11 @@ reads identically in the question panel and in the candidate's vim.
 ## Layout
 
 Two panes and a stack: a resizable question panel beside a fluid desktop
-viewport under a wrapping topbar, and a single centred column everywhere
+viewport under the navbar, and a single centred column everywhere
 else. There are seven full-page surfaces — `screens/Exams.tsx`,
 `screens/Mode.tsx`, `screens/Exam.tsx`, `screens/McqExam.tsx`,
 `screens/Score.tsx`, `screens/BootProgress.tsx` and
-`components/DesktopRequired.tsx` — the first two under `.app-header`,
+`components/DesktopRequired.tsx` — the first two under `.navbar`,
 the rest owning their whole viewport.
 
 | Surface | Width |
@@ -454,8 +454,8 @@ Six breakpoints, each changing structure rather than scale:
 |---|---|
 | `max-width: 1100px` | the deep dive's two document panes stack in reading order |
 | `max-width: 900px` | the question panel leaves the flow and becomes an overlay drawer at `min(85vw, 360px)` with `--shadow-3`, over a 36px collapsed rail; the results card and the dashboard go to one column |
-| `max-width: 48rem` | the app header collapses: the crumb, the rule, the detail and the wordmark's tail go, and the nav moves into `HeaderMenu`. Mirrored by `HEADER_COMPACT_QUERY`, which decides what is in the DOM while this only dresses what is left |
-| `max-width: 640px` | **the mobile line.** The reading type steps up (`--text-m` to 15px, `--text-l` to 16px, `--text-xl` to 18px); the exam topbar collapses to a clock and an overflow sheet; the mcq footer becomes a thumb-zone action bar and its navigator a modal sheet; the header menu becomes a sheet; the mcq head row splits in two; every page pays `--safe-b`; the task-verdict strip and the path cards stack. Mirrored by `MCQ_COMPACT_QUERY` |
+| `max-width: 48rem` | the navbar stops promoting: the navigation section drops back into the menu, and the trail collapses to one back control. Mirrored by `HEADER_COMPACT_QUERY`, which decides what is in the DOM while the CSS only dresses what is left |
+| `max-width: 640px` | **the mobile line.** The reading type steps up (`--text-m` to 15px, `--text-l` to 16px, `--text-xl` to 18px); the navbar's wordmark clips and its menu becomes a bottom sheet; the mcq footer becomes a thumb-zone action bar and its navigator a modal sheet; the mcq head row splits in two; every page pays `--safe-b`; the task-verdict strip and the path cards stack. Mirrored by `MCQ_COMPACT_QUERY` |
 | `max-width: 600px` | dialogs and the boot panel go full-bleed (width 100%, `max-height: 100dvh`, radius 0), the clipboard panel and keyboard popover become bottom sheets, the page gutters close a step, the mode screen's fine print stacks, and the domain table's cells become blocks |
 | `any-pointer: coarse` | icon controls and the panel's `--control-size` go from 28px to a 44px minimum, and press states appear. Keyed to pointer type, not width |
 
@@ -613,7 +613,7 @@ own type, weight 600.
 | Instance chip | which box to ssh into, the most load-bearing fact per question. Mono, accent text on `--accent-soft`, accent border, pill — the only pill with a full accent treatment |
 | Exam badge | `--text-2xs` mono uppercase at `--tracking-label`, `--radius-xs`, on a fill of its own: `--success-soft`/`--success-strong` for LIVE, `--muted-soft`/`--text-muted` for SOON. A live and a coming-soon card must be told apart by a word, never only by a hue |
 | Points counter | mono, muted ink, hairline on the page fill, pill. Goes accent when its row is selected |
-| Mode chip | the topbar's name for any attempt that is not a plain exam, so a training result is never mistaken for a real one |
+| Mode chip | the navbar's name for any attempt that is not a plain exam, so a training result is never mistaken for a real one |
 | Card fill | `--surface` for cards that float, `--bg` for panels inset *within* a card — an inversion that reads correctly because the page tone is darker than the card in light and lighter in dark |
 | Card padding | `--space-5` on exam and mode cards, `--space-5` on dialogs and the drawer, `--space-3`/`--space-4` on dense containers; page gutters close a step below 600px |
 | Exam card | `--surface` under a `--border` hairline at `--radius-xl` with `--shadow-1`. A card is not a control, so its edge is structural and takes the weaker tier; what lifts it is the shadow. A coming-soon card drops the shadow, dashes the border and sits on `--bg` |
@@ -667,16 +667,48 @@ the accent border that was byte-identical to the current question tile's.
 
 ### Navigation
 
-There is no site nav. What stands in for it:
+**One navbar, one anatomy, every screen in both products.**
+
+```
+[ mark  wordmark ]  [ › trail ]  ……  [ status ]  [ menu ]
+  always              contextual        ambient     always
+```
+
+What this replaced had two layouts and no single rule. A `brand` variant
+led with the mark; a `back` variant *replaced* the mark and the wordmark
+with a full-width labelled button, so the product's identity disappeared
+on the mode and review screens and the left of the bar became one large
+clickable thing. The menu was rendered only when
+`compact && (nav?.length || session)`, so it vanished outright on the
+score screen and its contents rearranged by route. The exam had a fourth
+bar of its own. Three complaints, one cause: there was no arrangement to
+predict from anywhere else.
+
+| Rule | Statement |
+|---|---|
+| The mark never leaves the left | Going back is a trail beside it, never a replacement for it. Mid-attempt the mark stays and stops being a link, because `session.state` is the outer switch and going home would render the exam again |
+| The menu never leaves the right | Present on every screen at every width, including signed out and mid-exam. Its sections are always in the same order: **Go to → This app → Account**, with an attempt section between the first two on an exam. A section with nothing in it is absent; no section ever moves |
+| Width promotes, it does not rearrange | A wide bar lifts the *navigation* section out of the menu and into the row, with the same glyph, label and order. That is the only thing width changes |
+| One row shape | Every item the menu holds — a destination, a preference, a fact, a way out — is the same 48px row with a leading glyph on a fixed rail, a label, and an optional trailing value. A nav link and a sign-out read as members of one list rather than as three borrowed widgets |
 
 | Element | Treatment |
 |---|---|
-| Topbar (exam only) | `--surface` under a hairline bottom border, wrapping rather than compressing, title flexing from an 8rem basis and ellipsing |
-| Task pane header | `TASK n / m` zero-padded to the total's width, the flag pill, an `h2` title, then a wrapping chip row: domain, weight share, target time, instance. It carries no navigation — the header used to hold prev/next steppers as well as the footer, and two sets of the same control on one pane is one too many. Weight is rendered as a *share* because `spec.questions[].weight` is a point budget, not a percentage: it sums to 180 in `ckad-mock-01` |
-| Task pane footer | `← Previous` / `⊞ All tasks (G)` / `Next →`, the pane's only navigation. Minimum 44px for a coarse pointer |
-| Navigator | one component (`.navigator`) for both engines, a full-panel disclosure in three bands: filter chips (`All` / flagged / unseen-or-unanswered), a flat ten-column grid of mono tiles, and a foot naming the four states and the keys. Ten to a row only pays off if row two starts at eleven, so the grid is sequential and the domain travels in each tile's accessible name rather than as a visual grouping. Five columns below a 320px container and for a coarse pointer. Its vocabulary is a prop, not a fork: hands-on says opened/unseen, mcq says answered/unanswered, because `marksStore` may not call a viewed question attempted. No scrim, no `role="dialog"`, no focus trap: dimming a live remote desktop to pick question 12 would read as a fault |
-| App header | `.app-header`, 56px, on every screen that is a PAGE and deliberately not on the exam (which has a topbar carrying a clock and a submit button) or the boot screen. Two variants of one component: `brand` leads with the mark and wordmark, `back` replaces both with a labelled way out for a screen reached FROM another. `flex-shrink: 0` is load-bearing — as a flex item its `height` is only a base size, and a tall page squashed it to its min-content height |
-| Skip link | the `.sr-only` clip idiom, never a transform; on focus it becomes `position: fixed`, so its visible state is anchored to the viewport rather than to the pane it lives in |
+| `.navbar` | 56px, `--surface` under a hairline. `flex-shrink: 0` is load-bearing — as a flex item its `height` is only a base size, and a tall page squashed it to its min-content height |
+| `.navbar-home` | The mark always, the wordmark clipped with the `.sr-only` idiom below 640px. Clipped and **not** `display: none`: `BrandMark` is `aria-hidden`, so that span is the home link's only accessible name |
+| Trail | Wide: every step, earlier ones as links, the last in ink and `aria-current`. Narrow: one control — a back chevron labelled with where you **are**, navigating to the nearest ancestor with a route. The visible word answers "what screen is this", which is what a 390px row has room for; the accessible name answers "where does this go" |
+| Ambient slot | The hosted lease countdown, the backgrounded-rebuild chip, the exam clock. Never collapses at any width: these are the numbers that must not be behind a tap |
+| `.nav-menu-trigger` | 36px on a laptop, `--tap-min` on a phone. Three bars that become a cross — the same three lines moving, not a swapped glyph, because swapping icons is a change of subject and moving them says the thing you opened is the thing now closing |
+| Panel | A popover under the trigger on a laptop; a bottom sheet below 640px, because the trigger sits in the one corner a thumb cannot reach and the panel should not |
+| Theme row | The one row that does not close the menu. The preference cycles System → Light → Dark, and a menu that shut on the first press would make the third a three-tap job |
+| Exam bar | The same navbar with three substitutions, each a fact about an exam rather than a style choice: the brand does not link, the trail names the exam because there is no route to name, and the navigation section is absent because there is nowhere to go |
+
+**Keyboard accelerators.** `[` and `]` step between questions and `?`
+opens the shortcut reference. Bare keys are safe because both handlers
+stand down on `target?.closest("input, textarea, [contenteditable]")`
+(`QuestionPanel.tsx:101`, `Exam.tsx:175`), inside `.desktop-pane` where
+the RFB canvas owns the keyboard, and while a dialog is open. Alt+arrows
+were rejected: those are Back/Forward on Windows and Linux, and in a
+router-less SPA Back leaves a running exam.
 
 **Tile states — four states, four channels, no two sharing a value.**
 Unopened takes `--border`, opened `--border-strong`, hover moves the fill
@@ -724,8 +756,8 @@ itself once the rebuild lands.
 ### The MCQ exam surface
 
 `screens/McqExam.tsx`: a single centred `--mcq-measure` reading column
-under the same topbar, no desktop pane, with a 5px determinate rail
-directly beneath the topbar. Its head row is its own (`.mcq-head`) rather
+under the same navbar, no desktop pane, with a 5px determinate rail
+directly beneath it. Its head row is its own (`.mcq-head`) rather
 than the hands-on pane's classes — the two engines diverged when the task
 pane grew a chip row and a footer nav, and sharing a header past that
 point meant each change had to be safe for both. What they still share is
@@ -740,7 +772,7 @@ dialog.
 |---|---|
 | `.mcq-option` | an anchored control: `--surface-raised` fill on `--border`, 6px corners, 44px minimum touch target. Hover steps the fill to `--raised-hover` and never moves the edge |
 | `.mcq-option-on` | the full three-channel selection: accent edge, `--accent-soft` wash, 3px inset bar — plus the visible native checkbox as the non-visual channel. The option letter goes `--accent-strong` on the wash |
-| `.mcq-footer` | Previous / the save reassurance / Navigator + Next, with the final question's Next giving way to the one primary button. The tally that used to sit here moved to the topbar: the footer's job is moving and reassuring, and a completion count competing with the head row's position was two numbers both claiming to locate the candidate |
+| `.mcq-footer` | Previous / the save reassurance / Navigator + Next, with the final question's Next giving way to the one primary button. The tally that used to sit here is now a row in the navbar menu: the footer's job is moving and reassuring, and a completion count competing with the head row's position was two numbers both claiming to locate the candidate |
 | `.mcq-option-letter` | a 24px circle carrying A–F, filling accent when selected. Scoped under `.mcq-question` so the score screen's answer review keeps the flat letter it already had |
 | Answered tile | the navigator's `is-done` tile under `progress="answered"`: `--surface-raised` behind the strong hairline, plus "answered" in the accessible name — server state, not a rendering guess, because mcq answers are saved per click |
 

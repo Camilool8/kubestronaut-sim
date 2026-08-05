@@ -58,6 +58,11 @@ describe("Icon", () => {
       "theme-dark",
       "help",
       "menu",
+      "chart",
+      "user",
+      "exit",
+      "send",
+      "home",
     ];
     expect(new Set(ICON_NAMES)).toEqual(new Set(declared));
   });

@@ -87,7 +87,7 @@ describe("full-height chain", () => {
   });
 });
 
-// `.app-header` is a sibling of `main` inside #root's column flex, so
+// `.navbar` is a sibling of `main` inside #root's column flex, so
 // `height: 56px` here is only a flex BASE size — with the default shrink
 // factor the score screen's 1500px of results squashed it to its
 // min-content height (29px, the label text) while the lobby, whose
@@ -95,14 +95,14 @@ describe("full-height chain", () => {
 // depending on how long the page below it is. Neither half is visible to
 // a render test: jsdom has no layout engine to shrink it in the first
 // place.
-describe("the app header does not shrink with the page below it", () => {
+describe("the navbar does not shrink with the page below it", () => {
   test("keeps its 56px base and refuses to give it up", async () => {
     const css = await readThemeCss();
-    const header = ruleBody(css, ".app-header");
+    const bar = ruleBody(css, ".navbar");
 
-    expect(header, "the header's own rule was renamed or removed").not.toBeNull();
-    expect(header).toContain("height: 56px");
-    expect(header).toContain("flex-shrink: 0");
+    expect(bar, "the navbar's own rule was renamed or removed").not.toBeNull();
+    expect(bar).toContain("height: 56px");
+    expect(bar).toContain("flex-shrink: 0");
   });
 });
 
@@ -351,11 +351,9 @@ describe("the touch layer names classes that exist", () => {
     "navigator-chip",
     "question-mark",
     "info-button",
-    "theme-toggle",
-    "header-menu-button",
-    "header-menu-panel",
-    "header-menu-nav",
-    "header-menu-item",
+    "nav-menu-trigger",
+    "nav-menu-panel",
+    "nav-menu-item",
     // The mobile chrome block at the foot of the file, which is the same
     // kind of override and fails the same silent way. `.signin-cta` was
     // written here first and does not exist; the button is
@@ -377,11 +375,15 @@ describe("the touch layer names classes that exist", () => {
     "hosted-flavour-badge",
     "hosted-boot-blocked",
     "mcq-jump-position",
-    "topbar-compact",
-    "topbar-more",
-    "topbar-sheet",
-    "topbar-sheet-extras",
-    "topbar-sheet-end",
+    "navbar",
+    "navbar-home",
+    "navbar-wordmark",
+    "navbar-back",
+    "navbar-crumb-here",
+    "nav-menu-bars",
+    "nav-menu-scrim",
+    "nav-menu-panel-sheet",
+    "nav-menu-section",
     "navigator-sheet",
     "navigator-scrim",
     "sheet-grip",

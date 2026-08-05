@@ -31,10 +31,24 @@ export const strings = {
     // from nowhere.
     navExams: "Exams",
     navProgress: "Progress",
-    // The narrow-viewport menu. The button is icon-only, so this is the
-    // whole of its accessible name.
+    // The menu. Present on every screen at every width, so this is the
+    // whole of its accessible name — the button is icon-only.
     menuLabel: "Menu",
+    // The section headings, in the order they always appear: somewhere
+    // to go, something to do here, then this session. A section with
+    // nothing in it is absent; none of them ever moves.
+    menuGo: "Go to",
+    menuThisApp: "This app",
     menuAccount: "Account",
+    menuExam: "This attempt",
+    // The trail beside the mark. Its landmark name is not "breadcrumb":
+    // that is the name of the pattern, not of the thing it does here.
+    trailLabel: "Where you are",
+    // The compact trail is one control, labelled with where you ARE and
+    // named for where it GOES — the visible word answers "what screen is
+    // this", which is what a 390px row has room to say, and the
+    // accessible name answers "what does this button do".
+    backTo: (parent: string) => `Back to ${parent}`,
   },
 
   // 1b, the exam selector. The screen a candidate lands on.
@@ -559,6 +573,10 @@ export const strings = {
   theme: {
     labels: { system: "Auto", light: "Light", dark: "Dark" } as Record<string, string>,
     ariaLabel: (current: string) => `Theme: ${current}. Activate to change.`,
+    // In the menu the row needs a noun of its own: every other row there
+    // names a thing, and a row reading only "Auto" names a value with no
+    // subject. The current value rides beside it as the row's detail.
+    menuLabel: "Theme",
   },
 
   desktop: {
@@ -697,6 +715,9 @@ export const strings = {
     // The topbar's running state of the whole attempt. Three numbers
     // because this screen genuinely knows all three: answers are server
     // state, flags and first-opens are this attempt's own scratch marks.
+    // The menu row's noun. The three numbers ride beside it as the
+    // row's detail, the same shape the theme row uses for its value.
+    answeredLabel: "Progress",
     tally: (answered: number, flagged: number, unseen: number) =>
       `Answered ${answered} · Flagged ${flagged} · Unseen ${unseen}`,
     // The footer's reassurance line. Both halves matter: every click is

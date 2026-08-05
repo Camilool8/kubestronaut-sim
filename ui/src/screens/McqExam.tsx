@@ -25,8 +25,8 @@ import { isTypingTarget } from "../lib/typing";
 import { MCQ_COMPACT_QUERY, useMediaQuery } from "../lib/useMediaQuery";
 import { Async } from "../components/Async";
 import { TimerBar } from "../components/TimerBar";
+import { NavMenuFact, NavMenuItem } from "../components/NavMenu";
 import { Dialog } from "../components/Dialog";
-import { InfoButton } from "../components/InfoButton";
 import { Icon } from "../components/Icon";
 import { InlineCode, Markdown } from "../components/Markdown";
 import { CheckList } from "../components/CheckList";
@@ -250,25 +250,23 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
         fetchedAt={fetchedAt}
         title={exam?.title ?? strings.exam.fallbackTitle}
         onEndClick={() => setConfirmOpen(true)}
-        // The one engine that collapses. It has no remote desktop, so
-        // nothing here depends on the full bar the way the hands-on
-        // screen's skip link depends on the submit button's id.
-        compactable
+        // Rows in the navbar menu's attempt section, in the same shape
+        // as every other row there. The tally used to sit in the bar as
+        // free-floating text, which is what pushed the row onto three
+        // lines on a phone; it is a fact about the attempt, and facts
+        // belong beside the things you can do to it.
         extras={
           <>
             {questions.length > 0 && (
               <McqTally questions={questions} answeredCount={answeredCount} />
             )}
             {session.mode === "training" && (
-              <button
-                className="btn"
-                onClick={() => void scoreNow()}
-                disabled={scoring}
-              >
-                {scoring ? strings.practice.scoring : strings.practice.scoreNow}
-              </button>
+              <NavMenuItem
+                icon="check"
+                label={scoring ? strings.practice.scoring : strings.practice.scoreNow}
+                onSelect={() => void scoreNow()}
+              />
             )}
-            <InfoButton labelled={compact} />
           </>
         }
       />
@@ -687,9 +685,11 @@ function McqTally({
   const unseen = questions.filter((q) => !marksStore.isViewed(q.id)).length;
 
   return (
-    <span className="mcq-tally">
-      {strings.mcq.tally(answeredCount, flagged, unseen)}
-    </span>
+    <NavMenuFact
+      icon="grid"
+      label={strings.mcq.answeredLabel}
+      detail={strings.mcq.tally(answeredCount, flagged, unseen)}
+    />
   );
 }
 
