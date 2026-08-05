@@ -121,6 +121,15 @@ let posted: Posted[];
 let identity: Me | null;
 /** Status for the next POST /api/session/start, and what it answers with. */
 let startAnswer: { status: number; body: unknown };
+/**
+ * What GET /hub/exams answers.
+ *
+ * Empty by default, which is a real deployment state — a hub with no
+ * bank index staged — and the one the flavour-card tests below cover.
+ * The tests that set it are the ordinary case: candidates choose the
+ * certification.
+ */
+let hubExams: unknown[];
 
 function stubFetch() {
   posted = [];
@@ -144,6 +153,7 @@ function stubFetch() {
       if (url.endsWith("/api/session/start") && init?.method === "POST") {
         return json(startAnswer.body, startAnswer.status);
       }
+      if (url.endsWith("/hub/exams")) return json({ exams: hubExams });
       if (url.endsWith("/hub/session/end")) return new Response(null, { status: 204 });
       if (url.endsWith("/api/history")) {
         return json({
@@ -164,6 +174,7 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true, now });
   identity = me();
   startAnswer = { status: 202, body: { starting: true, state: "pending" } };
+  hubExams = [];
   stubFetch();
   window.location.hash = "";
 });
@@ -243,6 +254,80 @@ test("no login URL means no sign-in button", async () => {
 
   expect(await screen.findByRole("alert")).toBeTruthy();
   expect(screen.queryByRole("link", { name: /continue with github/i })).toBeNull();
+});
+
+// The ordinary lobby: the candidate picks the certification they came
+// for. It used to offer "hands-on" or "multiple choice" and the exam
+// behind each was a chart value they never saw, which worked only while
+// there was exactly one of each.
+test("the lobby offers certifications and starts the one that is chosen", async () => {
+  const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+  hubExams = [
+    {
+      id: "ckad-mock-01",
+      title: "CKAD Mock Exam 01",
+      certification: "CKAD",
+      description: "Twenty-two hands-on tasks.",
+      examType: "hands-on",
+      kind: "practical",
+      durationSeconds: 7200,
+      questionCount: 22,
+      nodes: 2,
+      available: true,
+    },
+    {
+      id: "kcna-mock",
+      title: "KCNA Mock Exam",
+      certification: "KCNA",
+      examType: "mcq",
+      kind: "mcq",
+      durationSeconds: 5400,
+      questionCount: 60,
+      available: true,
+    },
+  ];
+  render(<App />);
+
+  expect(await screen.findByRole("heading", { name: "CKAD" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "KCNA" })).toBeTruthy();
+  // Seats stay per ENGINE: what a seat costs is a Pod, and every
+  // hands-on exam is one, so CKAD and CKA draw from the same pool.
+  expect(screen.getByText("2 of 3 free")).toBeTruthy();
+  expect(screen.getByText("30 of 30 free")).toBeTruthy();
+
+  await user.click(screen.getAllByRole("button", { name: "Start" })[1]);
+
+  await waitFor(() => {
+    const start = posted.find((p) => p.url.endsWith("/api/session/start"));
+    expect(start).toBeTruthy();
+    // The exam decides the seat. The kind rides along, but the hub
+    // derives the flavour from the bank's own engine.
+    expect(JSON.parse(start!.body)).toEqual({ kind: "mcq", bank: "kcna-mock" });
+  });
+});
+
+// A certification on the path whose bank is not written is listed —
+// seeing that CKS is coming is worth something — but there is nothing to
+// press, and the card says why rather than failing on the click.
+test("a certification with no bank yet is shown without a start button", async () => {
+  hubExams = [
+    {
+      id: "cks-mock",
+      title: "CKS Mock Exam",
+      certification: "CKS",
+      examType: "hands-on",
+      kind: "practical",
+      available: false,
+      comingSoon: true,
+      note: "Requires security add-ons the environment has not got yet",
+    },
+  ];
+  render(<App />);
+
+  expect(await screen.findByRole("heading", { name: "CKS" })).toBeTruthy();
+  expect(screen.getByText(/security add-ons/i)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Start" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /join the queue/i })).toBeNull();
 });
 
 test("signed in with no session, the lobby offers a flavour and posts a kind", async () => {

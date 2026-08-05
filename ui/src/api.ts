@@ -190,6 +190,32 @@ export interface ExamInfo {
    * show the drawn questions as if they were the whole curriculum.
    */
   domains?: DomainInfo[];
+  /**
+   * The cluster this exam is sat in. Absent for a bank that declares
+   * none — every mcq bank, which has no cluster at all — so any copy
+   * built from it has to survive not having it.
+   *
+   * This is the field that lets the product stop asserting CKAD's shape
+   * at candidates sitting something else: `nodes` is what the bank asked
+   * for and what `bootstrap.sh` actually builds, from the same value.
+   */
+  environment?: ExamEnvironment;
+  /**
+   * The bank ships a `tips.md`, so `GET /api/exam/tips` has something to
+   * serve. Absent means it does not, and the entry points must not be
+   * drawn at all — a control that opens an empty sheet is worse than no
+   * control (DESIGN.md: don't draw a control for something the product
+   * cannot yet do).
+   */
+  hasTips?: boolean;
+}
+
+/** See `ExamInfo.environment`. */
+export interface ExamEnvironment {
+  /** How the cluster is built; "kind" is the only one today. */
+  provider?: string;
+  /** How many nodes it has. */
+  nodes?: number;
 }
 
 export interface QuestionDetail {
@@ -432,8 +458,15 @@ export async function getSession(signal?: AbortSignal): Promise<SessionSnapshot>
   return (await res.json()) as SessionSnapshot;
 }
 
-/** Lifecycle of the exam environment's own start-up. */
-export type BootState = "booting" | "ready" | "failed";
+/**
+ * Lifecycle of the exam environment's own start-up.
+ *
+ * "idle" is not a stage of booting — it is the absence of one. The
+ * environment is up and has not been told which exam to be, so no
+ * cluster exists and none is coming until a candidate chooses. Nothing
+ * should render progress for it.
+ */
+export type BootState = "booting" | "ready" | "failed" | "idle";
 
 export interface BootStatus {
   state: BootState;
@@ -471,6 +504,22 @@ export async function getExam(signal?: AbortSignal): Promise<ExamInfo> {
     throw new Error(await readError(res));
   }
   return (await res.json()) as ExamInfo;
+}
+
+/**
+ * The loaded bank's exam technique notes.
+ *
+ * Ungated, unlike solutions and hints: this is how to drive kubectl and
+ * an editor quickly, not what any answer is, and it is most useful before
+ * the clock starts. Only call it when `ExamInfo.hasTips` is true — the
+ * server answers 404 for a bank that ships none.
+ */
+export async function getExamTips(signal?: AbortSignal): Promise<string> {
+  const res = await request("/api/exam/tips", { signal });
+  if (!res.ok) {
+    throw new Error(await readError(res));
+  }
+  return ((await res.json()) as { markdown: string }).markdown;
 }
 
 export async function getQuestion(id: string, signal?: AbortSignal): Promise<QuestionDetail> {
@@ -777,8 +826,14 @@ export interface ControlJob {
    * not started — only ever a pooled hands-on bank, whose boot skips the
    * seed loop precisely because the draw decides what to seed. It renders
    * through the same overlay as the other two, which is why it is a job.
+   *
+   * "provision" is the first exam an environment is ever given: the same
+   * sequence as a switch, minus the phases that need an outgoing one. A
+   * separate op because nothing about it is a switch — there is no
+   * previous bank and nothing is destroyed, and the copy must not say
+   * otherwise to somebody choosing their first exam.
    */
-  op: "reset" | "switch" | "seed";
+  op: "reset" | "switch" | "provision" | "seed";
   bank: string;
   startedAt: string;
   /** RFC3339Nano; absent while the job is in flight. */
@@ -853,6 +908,18 @@ export interface BankEntry {
    * not one.
    */
   poolCount?: number;
+  /**
+   * How many nodes this exam's cluster has — the bank's
+   * `spec.environment.nodes`, and the same number the bootstrap builds
+   * from. Absent for a bank that declares none, which is every
+   * multiple-choice one: they have no cluster, and copy built from this
+   * has to survive not knowing.
+   *
+   * Served by the hub's catalog. The local `/api/control/banks` and
+   * `/api/catalog` do not carry it — the local product asks the loaded
+   * exam directly, through `ExamInfo.environment`.
+   */
+  nodes?: number;
   available: boolean;
   comingSoon?: boolean;
   note?: string;
@@ -1253,8 +1320,35 @@ export type HostedStartResponse =
   | { ok: false; error: string };
 
 /**
- * POST /api/session/start with a flavour — hosted admission, not the
- * start of an attempt.
+ * GET /hub/exams — every exam this deployment offers.
+ *
+ * The lobby's one call, and the reason it exists is timing: a candidate
+ * choosing a certification has no session Pod yet, so the exam selector
+ * they know — served by their own facilitator — is not reachable. The
+ * hub answers from a bank index staged beside it.
+ *
+ * `kind` is the seat pool the card competes for, derived by the hub from
+ * the bank's own engine rather than here, because the same mapping
+ * decides admission.
+ *
+ * An empty list is a hub with no index staged, and the lobby falls back
+ * to offering a flavour — which is what it did before exams were
+ * choosable.
+ */
+export interface HostedExam extends BankEntry {
+  kind: SessionKind;
+}
+
+export async function getHostedExams(signal?: AbortSignal): Promise<HostedExam[]> {
+  const res = await request("/hub/exams", { signal });
+  if (!res.ok) throw new Error(await readError(res));
+  const body = (await res.json()) as { exams?: HostedExam[] };
+  return body.exams ?? [];
+}
+
+/**
+ * POST /api/session/start naming the exam to sit — hosted admission, not
+ * the start of an attempt.
  *
  * The same path does both, in that order: the hub grants a seat and
  * boots a Pod, and only once that Pod answers does it forward the
@@ -1263,19 +1357,26 @@ export type HostedStartResponse =
  * once they have one, the ordinary startSession() reaches the
  * facilitator through the same door and configures the attempt properly.
  *
- * The 200 case is therefore not modelled here: reaching it would mean a
- * ready Pod was handed a body naming a kind and no mode, and starting an
- * unconfigured attempt is precisely what the caller must not do by
+ * `bank` decides the seat: the hub derives the flavour from the exam's
+ * engine, so a caller that knows which exam it wants does not have to
+ * know — or agree about — which pool that draws from. `kind` alone
+ * remains valid and takes the deployment's default exam for that
+ * flavour, which is what a hub with no bank index offers.
+ *
+ * The 200 case is deliberately not modelled: reaching it would mean a
+ * ready Pod was handed a body naming an exam and no mode, and starting
+ * an unconfigured attempt is precisely what the caller must not do by
  * accident.
  */
 export async function startHostedSession(
   kind: SessionKind,
+  bank?: string,
   signal?: AbortSignal,
 ): Promise<HostedStartResponse> {
   const res = await request("/api/session/start", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ kind }),
+    body: JSON.stringify(bank ? { kind, bank } : { kind }),
     signal,
   });
   if (res.status === 409) {

@@ -134,7 +134,17 @@ sessions:
   practical:
     # 0 seats disables the flavour: no template is loaded and
     # /api/session/start refuses it.
+    #
+    # Seats are counted per ENGINE, not per exam. Every hands-on
+    # certification draws from this one pool, because what a seat costs
+    # the cluster is a session Pod and every hands-on session is one.
     seats: 3
+    # The exam a session sits when the candidate names none.
+    #
+    # It used to be THE exam: the lobby offered a flavour and this
+    # decided which bank was behind it, so nobody sitting the exam ever
+    # chose it. The lobby offers certifications now and sends the one
+    # that was picked; this is the fallback for a request without one.
     bank: ckad-mock-01
     # A practical session is a privileged Pod that hands a stranger a
     # root shell with a container runtime in it. Confine it to nodes you
@@ -155,6 +165,24 @@ sessions:
     #       limits: {memory: 8Gi}
     resources: {}
 
+    # Per-EXAM overrides, merged over `resources` above, which is itself
+    # merged over the manifest. One seat pool, one queue; the Pod is
+    # sized for the exam that will run in it.
+    #
+    # This exists because the cluster is per-exam now:
+    # spec.environment.nodes in the bank decides how many kind nodes get
+    # built, and a CKA bank asking for three cannot be sized by what
+    # CKAD's two measured. A bank with no entry here gets the numbers
+    # above, which is every bank the product ships today.
+    #
+    #   banks:
+    #     cka-mock-01:
+    #       resources:
+    #         k8s-env:
+    #           requests: {memory: 6Gi}
+    #           limits: {memory: 10Gi}
+    banks: {}
+
   mcq:
     # An MCQ session is a facilitator and 128Mi. It needs no cluster, no
     # shells and no privilege, so it schedules anywhere and the cap is
@@ -164,6 +192,10 @@ sessions:
     nodeSelector: {}
     tolerations: []
     resources: {}
+    # As above. A multiple-choice session is a facilitator and 128Mi
+    # whichever bank it serves, so nothing here is likely ever to need
+    # one — it exists so the two flavours are configured the same way.
+    banks: {}
 
   # What a session Pod may talk to. Not optional in any deployment that
   # sells seats to strangers: without it a session reaches the cluster's

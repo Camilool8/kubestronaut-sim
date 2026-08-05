@@ -59,6 +59,12 @@ export const strings = {
     wrongSeat: "Not in this seat",
     wrongSeatNote: (needs: string) =>
       `This is a ${needs} exam and you are in the other kind of seat. End this session and start a ${needs.toLowerCase()} one to sit it.`,
+    // Hosted, and the ordinary case now: a seat is created for the exam
+    // the candidate chose in the lobby, and the environment was built and
+    // sized for that one. Says what to do rather than only refusing, and
+    // says why the session is worth keeping if they are mid-attempt.
+    otherExamNote:
+      "You started a session for a different exam, and this environment was built for that one. End the session and start this exam to sit it — your finished attempts are kept either way.",
     // The stat strip under each card's title.
     durationLabel: "Duration",
     passingLabel: "To pass",
@@ -429,6 +435,18 @@ export const strings = {
     desktopRestored: "Desktop connection restored.",
   },
 
+  // The sheet's frame only. Everything a candidate reads inside it is the
+  // BANK's tips.md, not copy in this file: what makes a CKAD sitting fast
+  // is not what makes a KCNA one fast, and a string here would have to
+  // claim one of them was the other.
+  tips: {
+    title: "Exam tips",
+    open: "Exam tips",
+    lead: "Technique for this exam, not answers — how to set the terminal up, generate manifests instead of typing them, and find things faster than the documentation can.",
+    done: "Close",
+    failed: (message: string) => `The tips could not be loaded: ${message}`,
+  },
+
   intro: {
     title: "How this exam works",
     open: "How this exam works",
@@ -439,7 +457,11 @@ export const strings = {
       "Layout of the exam screen: a question panel on the left, the exam desktop filling the rest, and a bar across the top holding the countdown and the Submit exam button.",
     diagramQuestions: "Questions",
     diagramDesktop: "Exam desktop",
-    diagramTimer: "1:59:58",
+    // The countdown chip on the schematic. Filled with the loaded exam's
+    // own clock; this is what it says when the drawer is opened with no
+    // exam loaded, because a made-up time on a diagram of the real
+    // screen is the kind of small lie that gets believed.
+    diagramTimerLabel: "Time left",
     diagramEnd: "Submit exam",
     legend: [
       {
@@ -487,11 +509,20 @@ export const strings = {
       ["Documentation", "Firefox limited to allowlisted official sites", "Same"],
       ["Timing", "Fixed countdown, auto-submit at zero", "Same"],
       ["Working directories", "Pre-created /opt/course/<n> paths", "Same"],
-      ["Cluster", "Local kind cluster (one control plane, one worker)", "Managed multi-node environments"],
+      // Not "one control plane, one worker": the size is the bank's
+      // (spec.environment.nodes), so this page — which describes every
+      // exam at once — says how the cluster is made and leaves how big
+      // to the exam card that knows.
+      ["Cluster", "A local kind cluster, sized for the exam you pick", "Managed multi-node environments"],
       ["Proctoring", "None. No webcam, no ID checks, no lockdown browser", "PSI remote proctoring"],
       [
         "Question pool",
-        "One fixed set per exam; you will see the same questions again",
+        // Was "one fixed set per exam; you will see the same questions
+        // again", which stopped being true the moment a bank could
+        // declare spec.examLength — KCNA already draws 65 of 97. Says
+        // what each card then says precisely, rather than a rule that
+        // holds for some banks and not others.
+        "Some exams draw a fresh subset from a larger pool; the rest ask every question they hold",
         "Drawn from a much larger pool",
       ],
       ["Retakes", "Reset and retry as often as you like", "Limited, paid retakes"],
@@ -533,11 +564,24 @@ export const strings = {
   // Choosing an exam that is not the loaded one is not a navigation — it
   // is a 2-4 minute destructive rebuild, and it stays behind a
   // confirmation for that reason alone.
+  //
+  // The FIRST exam is a different sentence, not a softer one. Nothing is
+  // loaded, so nothing is wiped and nothing is replaced; the wait is the
+  // same few minutes and is still worth confirming, but describing it as
+  // a switch would warn a new candidate about losing work they have not
+  // done and an exam they have not chosen.
   lobby: {
     switchConfirmTitle: (title: string) => `Load ${title}?`,
     switchConfirmBody:
       "Only one exam can be loaded at a time. Switching wipes all cluster and instance state and rebuilds from scratch, which usually takes about 2-4 minutes. You can leave the tab open while it runs.",
     switchConfirm: "Load it",
+    buildConfirmTitle: (title: string) => `Set up ${title}?`,
+    buildConfirmBody:
+      "This builds the Kubernetes cluster for this exam and sets up its tasks, which usually takes about 2-4 minutes. You can leave the tab open while it runs, and you can switch to a different exam afterwards.",
+    // "Build it" and not "Start": nothing is timed yet. The clock starts
+    // on the mode screen this lands on, and a candidate must never think
+    // they have begun an attempt by pressing a button in a dialog.
+    buildConfirm: "Build it",
     cancel: "Cancel",
   },
 
@@ -746,7 +790,18 @@ export const strings = {
     // Said plainly because the alternative is a candidate concluding it
     // has hung and killing it partway — which used to be the rational
     // read, since nothing on screen changed for the whole of a first run.
-    hint: "First run builds a two-node Kubernetes cluster and sets up every question, which takes several minutes. Later runs resume in seconds. You can leave this tab open.",
+    // No node count and no task count: both are the bank's to declare
+    // (spec.environment.nodes, and how many questions it holds), and
+    // this screen is shown while an exam is being built rather than
+    // after one is loaded — so it must describe the act, not the shape.
+    //
+    // It must also not claim an exam. This screen covers two windows,
+    // and in the first of them there is no exam at all: k8s-env reports
+    // `booting` for the seconds it spends on the inner Docker daemon and
+    // the chart repository, which run whether or not anything has been
+    // chosen. "This exam's cluster" was a sentence about a bank nobody
+    // had picked yet.
+    hint: "The first run pulls images and builds the environment, which takes several minutes. Later runs resume in seconds. You can leave this tab open.",
     stepOf: (step: number, total: number, label: string) => `Step ${step} of ${total}: ${label}`,
     elapsed: (span: string) => `Elapsed ${span}`,
     progressLabel: "Environment build progress",
@@ -779,6 +834,10 @@ export const strings = {
     // Takes the exam's catalog title ("CKA Mock Exam 01"), never the
     // bank slug — the slug is an implementation detail.
     switchTitle: (exam: string) => `Switching to ${exam}`,
+    // The first exam an environment is given. There is no outgoing bank,
+    // so "Switching to" would name a change that is not happening and
+    // imply work being thrown away that was never done.
+    provisionTitle: (exam: string) => `Building your ${exam} environment`,
     // A pooled bank seeds only the questions the draw picked, so this runs
     // between pressing Start and the clock beginning. It destroys nothing,
     // and the wording has to say what is happening rather than borrow the
@@ -786,10 +845,21 @@ export const strings = {
     // their work be wiped.
     seedTitle: "Setting up your tasks",
     failedTitle: (op: string) =>
-      op === "switch" ? "Switch failed" : op === "seed" ? "Setup failed" : "Reset failed",
+      op === "switch"
+        ? "Switch failed"
+        : op === "provision"
+          ? "Setup failed"
+          : op === "seed"
+            ? "Setup failed"
+            : "Reset failed",
     // The measured cluster rebuild is 90–240s. Promising "1–2 minutes"
     // and then blowing past it turns a normal wait into a perceived hang.
     hint: "Rebuilding the Kubernetes cluster. Usually about 2-4 minutes. You can leave this tab open.",
+    // Same wait, and deliberately not the same sentence: there is nothing
+    // to rebuild the first time, and a candidate who has just chosen an
+    // exam should not be told something is being torn down.
+    hintProvision:
+      "Building the Kubernetes cluster and setting up the tasks. Usually about 2-4 minutes. You can leave this tab open.",
     // For jobs with no recreate-cluster phase (a switch to or reset of a
     // multiple-choice bank): promising minutes for a seconds-long job is
     // the same mistake in the other direction.
@@ -1379,11 +1449,29 @@ export const strings = {
 
     // The lobby: signed in, no session yet.
     startTitle: (login: string) => `Ready when you are, ${login}`,
+    // Says what varies without saying what any one exam's numbers are.
+    // A hands-on session builds a cluster whose SIZE is the bank's to
+    // declare, so naming two nodes here was describing CKAD to everyone
+    // who might be about to sit something else.
     startLead:
-      "Pick what to sit. A hands-on session builds a real two-node cluster and takes a few minutes to come up; multiple choice is ready immediately.",
+      "Pick the exam you want to sit. A hands-on session builds you a real cluster and takes a few minutes to come up; multiple choice is ready immediately.",
+    // Shown on an exam card whose bank writes no description of itself.
+    // Deliberately says nothing about size or length — the card's own
+    // stats carry those, and this is the slot for what kind of thing it
+    // is.
+    examFallbackBody: "A full sitting, graded the way the real exam is.",
+    // No seats configured for either engine, so there is nothing to
+    // start. A deployment can legitimately be in this state (an operator
+    // scaling to zero), and a lobby with an empty space where the cards
+    // go reads as a broken page.
+    noExams: "This deployment has no seats configured, so there is nothing to start here yet.",
+    // The two-card fallback, for a hub with no exam list staged. Both
+    // describe the ENGINE, which is all this path knows: which exam a
+    // flavour starts is the deployment's setting, and the candidate is
+    // not being asked.
     practicalTitle: "Hands-on exam",
     practicalBody:
-      "A two-node cluster, two shells and a desktop with a browser, in your own environment. This is the full simulator.",
+      "A real Kubernetes cluster, two shells and a desktop with a browser, in your own environment. This is the full simulator.",
     mcqTitle: "Multiple choice",
     mcqBody:
       "Answered in this browser. No cluster, no waiting, and it works on a phone.",
@@ -1424,11 +1512,39 @@ export const strings = {
     // it is ready in about twenty seconds — telling that candidate to
     // expect six minutes of cluster building describes someone else's
     // session.
-    bootStartingBody:
-      "A two-node Kubernetes cluster, the exam images and 22 tasks' worth of setup. It usually takes three to six minutes; nothing is lost if you close this tab.",
+    //
+    // The numbers come from the bank being built (spec.environment.nodes
+    // and its question count), because they are per-exam now: this said
+    // "a two-node Kubernetes cluster … 22 tasks" to everyone, which was
+    // only ever CKAD's shape. Both are optional — a bank that declares
+    // neither gets a sentence that claims neither, rather than a
+    // fabricated default.
+    bootStartingBody: (nodes?: number, tasks?: number) => {
+      const cluster =
+        nodes && nodes > 0
+          ? `A ${nodes}-node Kubernetes cluster`
+          : "A real Kubernetes cluster";
+      const setup = tasks && tasks > 0 ? `, the exam images and ${tasks} tasks' worth of setup` : " and the exam images";
+      return `${cluster}${setup}. Nothing is lost if you close this tab.`;
+    },
     bootStartingBodyMcq:
       "No cluster to build for a multiple-choice exam — just the question bank and the marker. This takes a few seconds.",
     bootElapsed: (elapsed: string) => `${elapsed} so far`,
+    // Said as the wait goes on, rather than promising a range up front.
+    //
+    // The old copy promised "three to six minutes", measured on one
+    // exam's cluster on one machine. A bigger cluster, a cold image
+    // cache or a busy node all blow through it, and a promise that has
+    // already expired turns a normal wait into a perceived hang. These
+    // are keyed on the elapsed counter the screen already keeps, so what
+    // is on screen is always something still true.
+    bootReassure: (elapsedMs: number) => {
+      if (elapsedMs < 90_000) return "Pulling images and starting the cluster.";
+      if (elapsedMs < 240_000) return "Still going — the cluster is coming up and its questions are being set up.";
+      if (elapsedMs < 600_000)
+        return "Taking longer than usual. A first build on a cold node pulls several gigabytes; it is still working.";
+      return "This is well past the usual wait. If nothing changes, give up this seat and start again.";
+    },
     bootFailedTitle: "Your environment did not start",
     bootRetry: "Try again",
     bootGiveUp: "Give up this seat",

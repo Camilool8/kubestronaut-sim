@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -16,6 +17,9 @@ type fakePods struct {
 	mu      sync.Mutex
 	pods    map[string]*Pod
 	created []string
+	// specs are the manifests as they were actually submitted, which is
+	// the only place the rendered template can be observed.
+	specs [][]byte
 	// notReady names Pods that never become ready, to exercise the
 	// waiting paths.
 	notReady   map[string]bool
@@ -46,6 +50,7 @@ func (f *fakePods) Create(_ context.Context, spec []byte) error {
 		return ErrPodExists
 	}
 	f.created = append(f.created, name)
+	f.specs = append(f.specs, append([]byte(nil), spec...))
 	f.pods[name] = &Pod{
 		Name: name, IP: "10.42.0.9", Phase: "Running",
 		Ready: !f.notReady[name], CreatedAt: time.Now(), Labels: pod.Metadata.Labels,
@@ -128,11 +133,81 @@ func waitReady(t *testing.T, m *Manager, user string) Session {
 	return Session{}
 }
 
+func (f *fakePods) lastSpec() string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.specs) == 0 {
+		return ""
+	}
+	return string(f.specs[len(f.specs)-1])
+}
+
+// The exam a candidate chooses is what gets stamped into their Pod. It
+// used to be a deployment value they never saw — `sessions.practical.bank`
+// — and the flavour's setting is now the DEFAULT for a request that
+// names none, not the answer.
+func TestTheChosenExamIsWhatTheSessionSits(t *testing.T) {
+	m, pods := newManager(t, 1, nil)
+
+	if _, err := m.Start(context.Background(), "583231", Practical, "cka-mock-01"); err != nil {
+		t.Fatal(err)
+	}
+	live := waitReady(t, m, "583231")
+	if live.Bank != "cka-mock-01" {
+		t.Errorf("bank = %q, want the exam that was chosen", live.Bank)
+	}
+	// Not just recorded on the session: it has to reach the Pod, which is
+	// the only thing the facilitator inside it ever reads.
+	if spec := pods.lastSpec(); !strings.Contains(spec, `"cka-mock-01"`) {
+		t.Errorf("the chosen exam never reached the Pod spec: %s", spec)
+	}
+}
+
+// One seat pool, but not one Pod shape. An exam whose cluster is a
+// different size cannot be sized by what another exam measured, and the
+// chart writes it its own manifest.
+func TestAnExamWithItsOwnPodSpecGetsIt(t *testing.T) {
+	special := `{"kind":"Pod","metadata":{},"spec":{"containers":[` +
+		`{"name":"facilitator","env":[{"name":"BANK","value":"x"}]},` +
+		`{"name":"an-extra-node","env":[]}]}}`
+	m, pods := newManager(t, 1, func(cfg *Config) {
+		fl := cfg.Flavours[Practical]
+		fl.BankTemplates = map[string]Template{"cka-mock-01": Template(special)}
+		cfg.Flavours[Practical] = fl
+	})
+
+	if _, err := m.Start(context.Background(), "583231", Practical, "cka-mock-01"); err != nil {
+		t.Fatal(err)
+	}
+	waitReady(t, m, "583231")
+	if spec := pods.lastSpec(); !strings.Contains(spec, "an-extra-node") {
+		t.Errorf("the exam's own Pod spec was not used: %s", spec)
+	}
+}
+
+// A bank with no manifest of its own gets the flavour's, which is every
+// bank today. The lookup must not be a requirement.
+func TestAnExamWithNoPodSpecOfItsOwnUsesTheFlavours(t *testing.T) {
+	m, pods := newManager(t, 1, func(cfg *Config) {
+		fl := cfg.Flavours[Practical]
+		fl.BankTemplates = map[string]Template{"cka-mock-01": Template(miniTemplate)}
+		cfg.Flavours[Practical] = fl
+	})
+
+	if _, err := m.Start(context.Background(), "583231", Practical, "ckad-mock-01"); err != nil {
+		t.Fatal(err)
+	}
+	waitReady(t, m, "583231")
+	if spec := pods.lastSpec(); !strings.Contains(spec, `"ckad-mock-01"`) {
+		t.Errorf("the default template did not carry the chosen exam: %s", spec)
+	}
+}
+
 func TestStartCreatesAPodAndBecomesReady(t *testing.T) {
 	m, pods := newManager(t, 1, nil)
 	ctx := context.Background()
 
-	s, err := m.Start(ctx, "583231", Practical)
+	s, err := m.Start(ctx, "583231", Practical, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +225,7 @@ func TestStartCreatesAPodAndBecomesReady(t *testing.T) {
 	}
 	// Idempotent: a second start returns the same session, not a second
 	// Pod and not a queue position.
-	if _, err := m.Start(ctx, "583231", Practical); err != nil {
+	if _, err := m.Start(ctx, "583231", Practical, ""); err != nil {
 		t.Fatal(err)
 	}
 	if pods.count() != 1 {
@@ -166,10 +241,10 @@ func TestASeatIsHeldWhileTheSessionIsStillBooting(t *testing.T) {
 	pods.notReady["sim-session-practical-first"] = true
 	ctx := context.Background()
 
-	if _, err := m.Start(ctx, "first", Practical); err != nil {
+	if _, err := m.Start(ctx, "first", Practical, ""); err != nil {
 		t.Fatal(err)
 	}
-	_, err := m.Start(ctx, "second", Practical)
+	_, err := m.Start(ctx, "second", Practical, "")
 	var q *Queued
 	if !errors.As(err, &q) {
 		t.Fatalf("second candidate got %v, want a queue position", err)
@@ -189,14 +264,14 @@ func TestTheQueueHeadGetsAHoldAndOnlyTheyCanClaimIt(t *testing.T) {
 	})
 	ctx := context.Background()
 
-	if _, err := m.Start(ctx, "holder", Practical); err != nil {
+	if _, err := m.Start(ctx, "holder", Practical, ""); err != nil {
 		t.Fatal(err)
 	}
 	waitReady(t, m, "holder")
 
 	// Two candidates queue, in order.
 	for _, u := range []string{"queued-1", "queued-2"} {
-		if _, err := m.Start(ctx, u, Practical); err == nil {
+		if _, err := m.Start(ctx, u, Practical, ""); err == nil {
 			t.Fatalf("%s was admitted with no free seat", u)
 		}
 	}
@@ -208,10 +283,10 @@ func TestTheQueueHeadGetsAHoldAndOnlyTheyCanClaimIt(t *testing.T) {
 	if err := m.End(ctx, "holder"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := m.Start(ctx, "queued-2", Practical); err == nil {
+	if _, err := m.Start(ctx, "queued-2", Practical, ""); err == nil {
 		t.Error("queued-2 jumped the queue")
 	}
-	if _, err := m.Start(ctx, "queued-1", Practical); err != nil {
+	if _, err := m.Start(ctx, "queued-1", Practical, ""); err != nil {
 		t.Fatalf("the head of the queue could not claim its seat: %v", err)
 	}
 	waitReady(t, m, "queued-1")
@@ -231,12 +306,12 @@ func TestAnUnclaimedHoldLapsesAndThePersonBehindGetsTheSeat(t *testing.T) {
 	})
 	ctx := context.Background()
 
-	if _, err := m.Start(ctx, "holder", Practical); err != nil {
+	if _, err := m.Start(ctx, "holder", Practical, ""); err != nil {
 		t.Fatal(err)
 	}
 	waitReady(t, m, "holder")
-	m.Start(ctx, "ghost", Practical)
-	m.Start(ctx, "patient", Practical)
+	m.Start(ctx, "ghost", Practical, "")
+	m.Start(ctx, "patient", Practical, "")
 	if err := m.End(ctx, "holder"); err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +323,7 @@ func TestAnUnclaimedHoldLapsesAndThePersonBehindGetsTheSeat(t *testing.T) {
 	if got := m.Position("ghost"); got != 0 {
 		t.Errorf("ghost is still queued at %d", got)
 	}
-	if _, err := m.Start(ctx, "patient", Practical); err != nil {
+	if _, err := m.Start(ctx, "patient", Practical, ""); err != nil {
 		t.Fatalf("patient still cannot start after the hold lapsed: %v", err)
 	}
 }
@@ -264,7 +339,7 @@ func TestPodCreationIsSerialised(t *testing.T) {
 	}
 
 	for _, u := range []string{"a", "b", "c"} {
-		if _, err := m.Start(ctx, u, Practical); err != nil {
+		if _, err := m.Start(ctx, u, Practical, ""); err != nil {
 			t.Fatalf("%s: %v", u, err)
 		}
 	}
@@ -290,7 +365,7 @@ func TestIdleAndAgedSessionsAreReaped(t *testing.T) {
 	ctx := context.Background()
 
 	for _, u := range []string{"idle", "old", "active"} {
-		if _, err := m.Start(ctx, u, Practical); err != nil {
+		if _, err := m.Start(ctx, u, Practical, ""); err != nil {
 			t.Fatal(err)
 		}
 		waitReady(t, m, u)
@@ -328,7 +403,7 @@ func TestIdleAndAgedSessionsAreReaped(t *testing.T) {
 func TestAVanishedPodFreesItsSeat(t *testing.T) {
 	m, pods := newManager(t, 1, nil)
 	ctx := context.Background()
-	if _, err := m.Start(ctx, "unlucky", Practical); err != nil {
+	if _, err := m.Start(ctx, "unlucky", Practical, ""); err != nil {
 		t.Fatal(err)
 	}
 	waitReady(t, m, "unlucky")
@@ -341,7 +416,7 @@ func TestAVanishedPodFreesItsSeat(t *testing.T) {
 	if _, err := m.Get("unlucky"); !errors.Is(err, ErrNoSession) {
 		t.Error("the session outlived its pod")
 	}
-	if _, err := m.Start(ctx, "next", Practical); err != nil {
+	if _, err := m.Start(ctx, "next", Practical, ""); err != nil {
 		t.Errorf("the seat was never released: %v", err)
 	}
 }
@@ -353,7 +428,7 @@ func TestAVanishedPodFreesItsSeat(t *testing.T) {
 func TestAdoptReattachesToRunningSessions(t *testing.T) {
 	m, pods := newManager(t, 2, nil)
 	ctx := context.Background()
-	if _, err := m.Start(ctx, "583231", Practical); err != nil {
+	if _, err := m.Start(ctx, "583231", Practical, ""); err != nil {
 		t.Fatal(err)
 	}
 	waitReady(t, m, "583231")
@@ -383,7 +458,7 @@ func TestAdoptReattachesToRunningSessions(t *testing.T) {
 func TestRecycleReplacesThePodAndReportsPhases(t *testing.T) {
 	m, pods := newManager(t, 1, nil)
 	ctx := context.Background()
-	if _, err := m.Start(ctx, "583231", Practical); err != nil {
+	if _, err := m.Start(ctx, "583231", Practical, ""); err != nil {
 		t.Fatal(err)
 	}
 	waitReady(t, m, "583231")
@@ -443,7 +518,7 @@ func TestStartWaitsOutAPodStillTerminating(t *testing.T) {
 	if err := pods.Create(ctx, []byte(`{"metadata":{"name":"`+name+`"}}`)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := m.Start(ctx, "583231", Practical); err != nil {
+	if _, err := m.Start(ctx, "583231", Practical, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -460,7 +535,7 @@ func TestStartWaitsOutAPodStillTerminating(t *testing.T) {
 
 func TestUnknownKindIsRefused(t *testing.T) {
 	m, _ := newManager(t, 1, nil)
-	if _, err := m.Start(context.Background(), "u", MCQ); !errors.Is(err, ErrNoSuchKind) {
+	if _, err := m.Start(context.Background(), "u", MCQ, ""); !errors.Is(err, ErrNoSuchKind) {
 		t.Errorf("err = %v, want ErrNoSuchKind for a flavour this deployment does not offer", err)
 	}
 }

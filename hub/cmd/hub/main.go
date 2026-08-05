@@ -28,6 +28,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,6 +37,7 @@ import (
 
 	"kubestronaut-sim/hub/internal/api"
 	"kubestronaut-sim/hub/internal/auth"
+	"kubestronaut-sim/hub/internal/catalog"
 	"kubestronaut-sim/hub/internal/kube"
 	"kubestronaut-sim/hub/internal/session"
 	"kubestronaut-sim/hub/internal/store"
@@ -131,12 +133,27 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	srv := &api.Server{Auth: a, Store: st, BaseURL: baseURL, Ingest: ingest, UI: web.FS()}
+	// The exam list, read once. Banks are an image layer staged by an
+	// init container, so a new bank is a new image and therefore a new
+	// hub Pod — there is nothing to reload.
+	//
+	// A deployment with no index is not a failure: it serves identity,
+	// history and seats exactly as it did before exams were choosable,
+	// and its lobby offers a flavour instead.
+	banks, err := catalog.Load(os.Getenv("BANKS_INDEX_DIR"))
+	if err != nil {
+		return err
+	}
+	if banks.Len() > 0 {
+		log.Printf("hub: %d exam(s) available to choose from", banks.Len())
+	}
+
+	srv := &api.Server{Auth: a, Store: st, BaseURL: baseURL, Ingest: ingest, UI: web.FS(), Banks: banks}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	mgr, err := buildManager(newTicketer(ingest, baseURL, envDuration("SESSION_MAX_AGE", 10*time.Hour)))
+	mgr, err := buildManager(newTicketer(ingest, baseURL, envDuration("SESSION_MAX_AGE", 10*time.Hour)), banks)
 	if err != nil {
 		return err
 	}
@@ -213,7 +230,7 @@ func newTicketer(signer *auth.Signer, baseURL string, maxAge time.Duration) func
 // history only — which is a real configuration, not a degraded one: it
 // is what the auth and store halves can be run and proved with before a
 // cluster exists.
-func buildManager(webhook func(string) (string, string, error)) (*session.Manager, error) {
+func buildManager(webhook func(string) (string, string, error), banks *catalog.Catalog) (*session.Manager, error) {
 	upstream := os.Getenv("SESSION_UPSTREAM")
 	practical := os.Getenv("SESSION_POD_TEMPLATE")
 	mcq := os.Getenv("SESSION_POD_TEMPLATE_MCQ")
@@ -302,6 +319,7 @@ func buildManager(webhook func(string) (string, string, error)) (*session.Manage
 		}
 		cfg.Flavours[kind] = session.Flavour{
 			Seats: seats, Template: tmpl, Bank: os.Getenv(spec.bank),
+			BankTemplates: bankTemplates(spec.path, kind, banks),
 		}
 		log.Printf("hub: %s sessions: %d seat(s)", kind, seats)
 	}
@@ -309,6 +327,50 @@ func buildManager(webhook func(string) (string, string, error)) (*session.Manage
 		return nil, errors.New("hub: sessions are configured but no flavour has seats — set PRACTICAL_SEATS and/or MCQ_SEATS")
 	}
 	return session.New(pods, cfg), nil
+}
+
+// bankTemplates finds the per-exam Pod manifests beside the flavour's
+// base one: <dir>/session-bank-<id>.json, written by the chart for every
+// bank given resource overrides under sessions.<kind>.banks.
+//
+// Discovered rather than configured, because the alternative is a second
+// list of bank ids in the environment that has to agree with the first.
+// A bank with no file simply gets the flavour's base manifest, which is
+// every bank today.
+//
+// The catalog decides which flavour a file belongs to, so a bank is
+// never registered against the wrong one: an exam's engine is declared
+// by the bank itself, in exactly one place, and the same mapping decides
+// which seat pool admits it.
+func bankTemplates(basePath string, kind session.Kind, banks *catalog.Catalog) map[string]session.Template {
+	if basePath == "" || banks == nil {
+		return nil
+	}
+	dir := filepath.Dir(basePath)
+	out := map[string]session.Template{}
+	for _, entry := range banks.List() {
+		if session.KindOf(entry.ExamType) != kind {
+			continue
+		}
+		path := filepath.Join(dir, "session-bank-"+entry.ID+".json")
+		raw, err := os.ReadFile(path)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			// Not fatal: the base manifest still works, and refusing to
+			// start the whole hub over one unreadable override would take
+			// every other exam down with it.
+			log.Printf("hub: read %s: %v (using the default session Pod for %s)", path, err, entry.ID)
+			continue
+		}
+		out[entry.ID] = raw
+		log.Printf("hub: %s uses its own session Pod spec", entry.ID)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func envOr(key, fallback string) string {

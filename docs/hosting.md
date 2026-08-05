@@ -25,7 +25,20 @@ Two things, and the second is created and destroyed on demand:
   own Pod.
 - **A session Pod, per candidate** — the whole `./sim up` stack as a
   single Pod. Two flavours: `practical` (eight containers, a real
-  two-node cluster) and `mcq` (a facilitator and 128Mi, no cluster).
+  cluster) and `mcq` (a facilitator and 128Mi, no cluster).
+
+The candidate chooses the **certification**, not the flavour. The hub
+reads a bank index staged beside it from the banks image, so the lobby
+lists the exams themselves rather than a copy of their names in
+`values.yaml`, and the flavour is derived from the bank's own engine. A
+seat is then that one exam: the Pod is stamped and sized for it and the
+exam selector inside the session offers no other, because changing exam
+means a different environment, not a rebuild of this one.
+
+Seats stay per flavour. What a seat costs the cluster is a session Pod,
+and every hands-on exam is one, so CKAD and CKA draw from the same
+pool — see `sessions.practical.banks` below for sizing one exam's Pod
+differently from another's.
 
 The facilitator inside a session has no authentication of any kind and
 gains none. It is simply never reachable except through the hub, which
@@ -123,8 +136,11 @@ still booting and hand both of them a half-built cluster.
 
 | Value | Default | What it governs |
 |---|---|---|
-| `sessions.practical.seats` | 3 | Concurrent hands-on environments |
+| `sessions.practical.seats` | 3 | Concurrent hands-on environments, across every hands-on exam |
+| `sessions.practical.bank` | `ckad-mock-01` | The exam a hands-on session sits when the request names none. A **default**, not the exam: the lobby offers certifications and sends the chosen one |
+| `sessions.practical.banks.<id>.resources` | `{}` | Per-exam container resources, merged over `sessions.practical.resources`, which is itself merged over the manifest. For an exam whose cluster is a different size |
 | `sessions.mcq.seats` | 30 | Concurrent multiple-choice sessions |
+| `sessions.mcq.bank` | `kcna-mock` | As above, for the multiple-choice pool |
 | `sessions.maxAge` | `10h` | The hard cap. A seat is taken back at it |
 | `sessions.idleTimeout` | `30m` | No request from the browser for this long and the seat goes back |
 | `sessions.queueHold` | `2m` | How long the head of the queue has to claim a seat |
@@ -146,6 +162,13 @@ manifest declares them: **3.9Gi / 540m requested, 11.8Gi / 4400m
 limit**. The per-container numbers are measured and live in
 `deploy/helm/kubestronaut-sim/files/session-pod.yaml`; override them
 through `sessions.practical.resources` rather than editing that file.
+
+Those numbers were measured on a two-node cluster. An exam whose bank
+asks for more nodes needs more, and
+`sessions.practical.banks.<id>.resources` is where it goes: the chart
+renders that exam its own Pod manifest and the hub stamps it out for
+sessions on that bank only. Seats are unaffected — one pool, one queue,
+a differently sized Pod in it.
 
 The limits are deliberately far above the requests, which means seats
 are overcommitted: three sessions request 11.8Gi and could in principle
