@@ -582,23 +582,25 @@ func TestGetReportsTheControlOpWhileARebuildRuns(t *testing.T) {
 }
 
 // The boot screen's elapsed counter is (now - StartedAt), and a rebuild
-// shows that screen. Restamping only once the old Pod has drained meant
+// shows that screen. Restamping only once the old Pod had drained meant
 // the first phase of every rebuild counted from the session's original
 // start — hours, on a long seat.
+//
+// No polling and no Pod fixture, deliberately: the property under test is
+// that the restamp happens before Recycle returns. Left in the goroutine
+// it would be a race against the caller, which is the bug itself, so a
+// test that waited for the goroutine would pass either way.
 func TestRecycleRestampsTheClockWhenItBeginsNotWhenThePodIsRecreated(t *testing.T) {
-	m, pods := newManager(t, 1, nil)
+	m, _ := newManager(t, 1, nil)
 	if _, err := m.Start(context.Background(), "583231", Practical, ""); err != nil {
 		t.Fatal(err)
 	}
 	waitReady(t, m, "583231")
 
-	before, _ := m.Get("583231")
-
-	// Never ready, so the recycle cannot reach its start phase and any
-	// restamping observed below is the one Recycle itself did.
-	pods.mu.Lock()
-	pods.notReady[pods.created[0]] = true
-	pods.mu.Unlock()
+	before, err := m.Get("583231")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := m.Recycle("583231", ""); err != nil {
 		t.Fatal(err)
