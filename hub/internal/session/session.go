@@ -78,6 +78,17 @@ type Session struct {
 	LastSeen  time.Time `json:"lastSeen"`
 	Error     string    `json:"error,omitempty"`
 
+	// Op is the control operation running against this session right now
+	// — "reset" or "switch" — and empty when there is none.
+	//
+	// On the session rather than left to GET /api/control/status because
+	// of who asks and when. The SPA polls /api/me every 2s while a session
+	// is not ready, and this is the field that lets the screen shown
+	// during that wait tell a first boot from a rebuild the candidate
+	// asked for. It is server truth, so it survives a reload mid-rebuild,
+	// which a remembered click would not.
+	Op string `json:"op,omitempty"`
+
 	// addr is where the proxy sends traffic. Unexported: it is the
 	// candidate's own Pod, but publishing an in-cluster address in a JSON
 	// response is telling every user something about the infrastructure
@@ -493,12 +504,22 @@ func (m *Manager) setState(e *entry, st State, errText string) {
 // Get returns a user's session.
 func (m *Manager) Get(user string) (Session, error) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	e, ok := m.sessions[user]
 	if !ok {
+		m.mu.Unlock()
 		return Session{}, ErrNoSession
 	}
-	return e.Session, nil
+	out := e.Session
+	m.mu.Unlock()
+	// Deliberately read outside m.mu. The job store has a lock of its own
+	// and nothing that holds it ever reaches for m.mu, so nesting the two
+	// here would make this the first place in the package that could
+	// deadlock — for no gain, since `out` is already a copy.
+	if snap := e.jobs.snapshot(); snap.Busy && snap.Job != nil {
+		out.Op = snap.Job.Op
+		out.addr = ""
+	}
+	return out, nil
 }
 
 // Touch records that a user is still there. Called on every proxied

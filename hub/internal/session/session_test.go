@@ -539,3 +539,44 @@ func TestUnknownKindIsRefused(t *testing.T) {
 		t.Errorf("err = %v, want ErrNoSuchKind for a flavour this deployment does not offer", err)
 	}
 }
+
+// A rebuild is a Pod replacement, and the screen shown while it runs has
+// to be able to say so. Without this the only signal is "not ready",
+// which is also exactly what a first boot looks like — so the candidate
+// who pressed "New attempt" got a screen welcoming them to a new
+// environment and offering to give their seat up.
+func TestGetReportsTheControlOpWhileARebuildRuns(t *testing.T) {
+	m, pods := newManager(t, 1, nil)
+	if _, err := m.Start(context.Background(), "583231", Practical, ""); err != nil {
+		t.Fatal(err)
+	}
+	waitReady(t, m, "583231")
+
+	if s, _ := m.Get("583231"); s.Op != "" {
+		t.Errorf("op = %q on a settled session, want empty", s.Op)
+	}
+
+	// Hold the replacement un-ready so the recycle stays in flight for the
+	// length of this test rather than racing it.
+	name := pods.created[0]
+	pods.mu.Lock()
+	pods.notReady[name] = true
+	pods.mu.Unlock()
+
+	if _, err := m.Recycle("583231", ""); err != nil {
+		t.Fatal(err)
+	}
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		s, err := m.Get("583231")
+		if err == nil && s.Op == "reset" {
+			if s.Addr() != "" {
+				t.Errorf("addr = %q mid-rebuild, want empty", s.Addr())
+			}
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("Get never reported the reset in flight")
+}
