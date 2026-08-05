@@ -4,6 +4,7 @@ import {
   getControlStatus,
   getExam,
   getSession,
+  isEnvironmentStarting,
   pollSession,
   startControlReset,
   startControlSwitch,
@@ -33,10 +34,10 @@ import { HostedBooting } from "./screens/HostedBooting";
 import { HostedSignIn } from "./screens/HostedSignIn";
 import { HostedStart } from "./screens/HostedStart";
 import { Review } from "./screens/Review";
-import { SessionChip } from "./components/SessionChip";
 import { useHosted } from "./lib/useHosted";
 import type { Me } from "./api";
 import { useRoute } from "./lib/useHashRoute";
+import { useSeatLanding } from "./lib/useSeatLanding";
 import { strings } from "./strings";
 
 // Control-status poll cadence: fast while a job is running (the overlay
@@ -93,6 +94,11 @@ export interface Hosted {
 export default function App() {
   const { state, refresh } = useHosted();
   const route = useRoute();
+
+  // Before the gate below, not inside a branch: hooks may not be
+  // conditional, and this one has to keep watching across every state the
+  // gate switches between.
+  useSeatLanding(state);
 
   if (state.status === "unknown") {
     return (
@@ -166,13 +172,10 @@ function HostedHome({ hosted, route }: { hosted: Hosted; route: ReturnType<typeo
   return (
     <>
       <TopProgress />
-      <AppHeader {...headerProps}>
-        <SessionChip
-          login={me.user?.login ?? ""}
-          session={me.session}
-          onChanged={refresh}
-        />
-      </AppHeader>
+      <AppHeader
+        {...headerProps}
+        session={{ login: me.user?.login ?? "", session: me.session, onChanged: refresh }}
+      />
       <main>
         <ScreenTransition screenKey={reviewId ? `review:${reviewId}` : onProgress ? "progress" : "lobby"}>
           {screen}
@@ -278,6 +281,23 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
   const handlePollError = useCallback((err: unknown) => {
     setPollError(String(err));
     if (!seenSession.current) return;
+    // Two ways to know this is not a fault, and both are wanted.
+    //
+    // The hub answers every proxied request with 503 environment_starting
+    // while it replaces a session Pod, and a hosted "New attempt" IS a Pod
+    // replacement. That is the durable signal: it survives a reload
+    // landing mid-rebuild, where nothing in this tab remembers a click.
+    //
+    // A control job in flight covers the rest — the window between the
+    // 202 and /api/me reporting it, and the LOCAL product, where a reset
+    // restarts the facilitator in place and the poll fails for exactly
+    // the same non-reason. The overlay is already narrating it; a warning
+    // toast over the top says the thing the candidate asked for has gone
+    // wrong.
+    //
+    // pollError is set above either way, so the pre-first-session loading
+    // screen keeps its message.
+    if (isEnvironmentStarting(err) || wasBusy.current) return;
     pollToastId.current = toastStore.push({
       kind: "warning",
       message: strings.app.cannotReach(String(err)),
@@ -650,24 +670,27 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
           button — and neither is the boot screen, which is a takeover with
           nothing to navigate to yet. */}
       {session && !booting && session.state !== "running" && (
-        <AppHeader {...headerProps}>
-          {/* Hosted only. It carries the lease countdown, which is the one
-              thing about a hosted session a candidate cannot be left to
-              guess: the seat is taken back at the cap whatever they are
-              doing. Deliberately NOT rendered over a running exam — that
-              screen has its own topbar with its own clock, and a second
-              countdown beside it would be read as the exam's. One good
-              consequence and one recorded cost: there is no way to
-              destroy an environment mid-attempt by misclick, and a lease
-              that expires mid-attempt gives no warning. See
-              docs/follow-ups.md. */}
-          {hosted && (
-            <SessionChip
-              login={hosted.me.user?.login ?? ""}
-              session={hosted.me.session}
-              onChanged={hosted.refresh}
-            />
-          )}
+        <AppHeader
+          {...headerProps}
+          // Hosted only. It carries the lease countdown, which is the one
+          // thing about a hosted session a candidate cannot be left to
+          // guess: the seat is taken back at the cap whatever they are
+          // doing. Deliberately NOT rendered over a running exam — that
+          // screen has its own topbar with its own clock, and a second
+          // countdown beside it would be read as the exam's. One good
+          // consequence and one recorded cost: there is no way to destroy
+          // an environment mid-attempt by misclick, and a lease that
+          // expires mid-attempt gives no warning. See docs/follow-ups.md.
+          session={
+            hosted
+              ? {
+                  login: hosted.me.user?.login ?? "",
+                  session: hosted.me.session,
+                  onChanged: hosted.refresh,
+                }
+              : undefined
+          }
+        >
           {/* A backgrounded rebuild used to run for 2-4 minutes with no
               indicator anywhere: the lobby behind it looked idle while the
               cluster it describes was being torn down. */}

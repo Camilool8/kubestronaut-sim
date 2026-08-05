@@ -31,6 +31,10 @@ export const strings = {
     // from nowhere.
     navExams: "Exams",
     navProgress: "Progress",
+    // The narrow-viewport menu. The button is icon-only, so this is the
+    // whole of its accessible name.
+    menuLabel: "Menu",
+    menuAccount: "Account",
   },
 
   // 1b, the exam selector. The screen a candidate lands on.
@@ -1548,6 +1552,44 @@ export const strings = {
     bootFailedTitle: "Your environment did not start",
     bootRetry: "Try again",
     bootGiveUp: "Give up this seat",
+
+    // A rebuild, not a first boot. The same wait, a different fact: this
+    // candidate already has a seat and asked for another attempt, so copy
+    // that welcomes them to a new environment and offers to give the seat
+    // up is describing somebody else's situation entirely.
+    rebuildTitle: "Rebuilding your environment",
+    // Named when the exam is known, because a candidate mid-rebuild wants
+    // to be sure it is being rebuilt as the exam they were sitting.
+    rebuildBody: (exam?: string) =>
+      exam
+        ? `Your last attempt is being cleared and a clean ${exam} environment built in its place. This takes a few minutes, and nothing is lost if you close this tab.`
+        : "Your last attempt is being cleared and a clean environment built in its place. This takes a few minutes, and nothing is lost if you close this tab.",
+    // Says what it does. "Give up this seat" during a rebuild reads as
+    // "cancel the rebuild", which is not what the button does — it ends
+    // the session and hands the seat back to the pool.
+    rebuildGiveUp: "End session and free the seat",
+    // bootReassure's own copy, said about a rebuild instead of a first
+    // boot. It shares that copy's thresholds because the wait is the
+    // same wait — but "a first build on a cold node pulls several
+    // gigabytes" is false here, the images are already on this node from
+    // the attempt being replaced, and the long-wait line no longer tells
+    // someone trying to KEEP their seat to give it up; rebuildGiveUp
+    // exists precisely to stop saying that.
+    rebuildReassure: (elapsedMs: number) => {
+      if (elapsedMs < 90_000) return "Tearing down the old cluster and starting a clean one.";
+      if (elapsedMs < 240_000)
+        return "Still going — the new cluster is coming up and its questions are being set up.";
+      if (elapsedMs < 600_000)
+        return "Taking longer than usual, but the images are already on this node — this is not a first build. Still working.";
+      return "This is well past the usual wait, and something may be wrong. Ending the session frees the seat so you can start again.";
+    },
+    // "Your environment did not start" is a first-boot sentence, and it
+    // is wrong here: a moment ago this seat had a running environment,
+    // and what failed was replacing it. Retrying does not resume that
+    // rebuild — it ends the session and starts over, same as any other
+    // failed boot — so this stops short of promising the attempt that
+    // was being rebuilt back.
+    rebuildFailedTitle: "Your environment could not be rebuilt",
 
     // The header chip.
     chipLabel: "Session",

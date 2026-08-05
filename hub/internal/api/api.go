@@ -401,3 +401,19 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
+
+// Error codes on the proxy's own answers.
+//
+// The `error` field is a sentence for a person and stays that way. These
+// are for the SPA, which has to tell an expected wait from a fault and
+// must not do it by matching prose — the copy is a UI string living in a
+// Go file, and it will be reworded by someone with no idea a client is
+// parsing it.
+const (
+	codeEnvironmentStarting    = "environment_starting"
+	codeEnvironmentUnreachable = "environment_unreachable"
+)
+
+func writeErrorCode(w http.ResponseWriter, status int, code, msg string) {
+	writeJSON(w, status, map[string]string{"error": msg, "code": code})
+}

@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../App";
 import type { Me } from "../api";
+import { strings } from "../strings";
 
 // The hosted tier, from the outside: what a browser sees when the SPA is
 // served by the hub instead of by a facilitator.
@@ -24,18 +25,21 @@ function me(overrides: Partial<Me> = {}): Me {
   };
 }
 
+/** A settled idle session, as the facilitator reports one. */
+const readySessionStub = {
+  state: "idle",
+  bank: "ckad-mock-01",
+  startedAt: "",
+  durationSeconds: 7200,
+  remainingSeconds: 0,
+  endReason: "",
+  mode: "exam",
+  untimed: false,
+};
+
 /** A ready local environment, so the ordinary app can mount over a hub. */
 const localStubs: Record<string, unknown> = {
-  "/api/session": {
-    state: "idle",
-    bank: "ckad-mock-01",
-    startedAt: "",
-    durationSeconds: 7200,
-    remainingSeconds: 0,
-    endReason: "",
-    mode: "exam",
-    untimed: false,
-  },
+  "/api/session": readySessionStub,
   "/api/boot": {
     state: "ready",
     phase: "ready",
@@ -162,6 +166,25 @@ function stubFetch() {
         });
       }
       if (url.includes("/api/history/")) return json(attemptResults);
+      // Two failure fixtures for the session poll, opted into by writing
+      // a sentinel into localStubs. `null` is the hub's answer while it
+      // replaces a Pod — an expected wait. "boom" is a facilitator that
+      // has actually fallen over, which must still be reported.
+      if (url.endsWith("/api/session")) {
+        if (localStubs["/api/session"] === null) {
+          return json(
+            {
+              error: "your exam environment is still starting",
+              code: "environment_starting",
+              state: "pending",
+            },
+            503,
+          );
+        }
+        if (localStubs["/api/session"] === "boom") {
+          return json({ error: "the facilitator is not answering" }, 500);
+        }
+      }
       for (const [path, body] of Object.entries(localStubs)) {
         if (url.endsWith(path)) return json(body);
       }
@@ -173,6 +196,7 @@ function stubFetch() {
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true, now });
   identity = me();
+  localStubs["/api/session"] = readySessionStub;
   startAnswer = { status: 202, body: { starting: true, state: "pending" } };
   hubExams = [];
   stubFetch();
@@ -520,4 +544,277 @@ test("the hosted dashboard exports but does not import", async () => {
 
   expect(await screen.findByRole("link", { name: /export/i })).toBeTruthy();
   expect(screen.queryByRole("button", { name: /^import$/i })).toBeNull();
+});
+
+/** A ready hosted seat, so SimApp mounts and its session poller runs. */
+function readySeat() {
+  return {
+    kind: "practical" as const,
+    bank: "ckad-mock-01",
+    pod: "sim-session-practical-583231",
+    state: "ready" as const,
+    startedAt: new Date(now - 600_000).toISOString(),
+    expiresAt: new Date(now + 2 * 3600_000).toISOString(),
+    lastSeen: new Date(now).toISOString(),
+  };
+}
+
+// The reported bug, in the window it actually happens in.
+//
+// SimApp has to be MOUNTED and its session poller running, because that
+// poller is what raises the toast. /api/me flips to "pending" about two
+// seconds after the POST and unmounts SimApp — but a toast pushed before
+// then lives in a module singleton and outlives it. So the fixture holds
+// /api/me at "ready" while the proxy has already started answering 503,
+// which is exactly the race.
+test("a Pod replacement raises no outage toast", async () => {
+  identity = me({ session: readySeat() });
+  render(<App />);
+  await screen.findByRole("heading", { name: /path to kubestronaut/i });
+
+  // The hub begins replacing the Pod. Every proxied request is a 503 from
+  // here on; /api/me has not caught up.
+  localStubs["/api/session"] = null;
+  window.dispatchEvent(new Event("focus")); // pollSession re-fetches on focus
+  await vi.advanceTimersByTimeAsync(0); // let the mocked 503 round-trip settle
+
+  await waitFor(() => {
+    expect(screen.queryByText(/cannot reach facilitator/i)).toBeNull();
+  });
+});
+
+// The other half, and the reason the guard is a code and not a blanket
+// mute: a facilitator that has genuinely fallen over must still say so.
+test("a real failure still raises the toast", async () => {
+  identity = me({ session: readySeat() });
+  render(<App />);
+  await screen.findByRole("heading", { name: /path to kubestronaut/i });
+
+  localStubs["/api/session"] = "boom"; // forces the 500 branch in stubFetch
+  window.dispatchEvent(new Event("focus"));
+
+  expect(await screen.findByText(/cannot reach facilitator/i)).toBeInTheDocument();
+});
+
+// The rebuild screen names the exam and offers the honest way out. A
+// first boot must be untouched by all of this.
+test("a rebuild says so, and a first boot still reads as a first boot", async () => {
+  hubExams = [
+    {
+      id: "ckad-mock-01",
+      title: "CKAD Mock Exam 01",
+      certification: "CKAD",
+      examType: "hands-on",
+      kind: "practical",
+      available: true,
+      nodes: 2,
+      questionCount: 22,
+    },
+  ];
+  const booting = {
+    kind: "practical" as const,
+    bank: "ckad-mock-01",
+    pod: "sim-session-practical-583231",
+    state: "starting" as const,
+    startedAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + 3_600_000).toISOString(),
+    lastSeen: new Date(now).toISOString(),
+  };
+
+  identity = me({ session: { ...booting, op: "reset" } });
+  const rebuild = render(<App />);
+  await screen.findByRole("heading", { name: strings.hosted.rebuildTitle });
+  // The heading needs no exam data and renders on the first pass; the
+  // body names the exam only once GET /hub/exams has round-tripped. That
+  // is an independent, unbounded number of microtask hops behind the
+  // heading, so a positive `waitFor` — which keeps retrying on every DOM
+  // mutation rather than checking once — is what actually waits for it,
+  // where a single timer flush proved to still race it.
+  await waitFor(() => {
+    expect(screen.getByText(/clean CKAD environment/i)).toBeInTheDocument();
+  });
+  expect(
+    screen.getByRole("button", { name: strings.hosted.rebuildGiveUp }),
+  ).toBeInTheDocument();
+  // The reassure line, not just the title: this is the sentence that used
+  // to say "a first build on a cold node pulls several gigabytes" about a
+  // node that already had every image, and past minute ten told a
+  // candidate trying to KEEP their seat to give it up.
+  expect(
+    screen.getByText("Tearing down the old cluster and starting a clean one."),
+  ).toBeInTheDocument();
+  rebuild.unmount();
+
+  identity = me({ session: booting });
+  render(<App />);
+  await screen.findByRole("heading", { name: strings.hosted.bootStartingTitle });
+  expect(
+    screen.getByRole("button", { name: strings.hosted.bootGiveUp }),
+  ).toBeInTheDocument();
+  expect(screen.getByText("Pulling images and starting the cluster.")).toBeInTheDocument();
+});
+
+// op clears the moment a recycle's job finishes, which session.go does
+// just before flipping state to "failed" — so by the time this screen
+// can render the failure, the hub's own answer no longer says it was a
+// rebuild. The screen has to remember what it watched happen across the
+// polls in between, or a failed rebuild reads as "your environment did
+// not start", which is false: a moment ago this seat had one running.
+test("a rebuild that fails still reads as a rebuild, not a first boot", async () => {
+  const rebuilding = {
+    kind: "practical" as const,
+    bank: "ckad-mock-01",
+    pod: "sim-session-practical-583231",
+    state: "starting" as const,
+    op: "reset" as const,
+    startedAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + 3_600_000).toISOString(),
+    lastSeen: new Date(now).toISOString(),
+  };
+  identity = me({ session: rebuilding });
+  render(<App />);
+  await screen.findByRole("heading", { name: strings.hosted.rebuildTitle });
+
+  // The hub's own answer once the recycle has actually failed: op is
+  // gone (the job finished), state is "failed", same as any other boot
+  // that died.
+  identity = me({
+    session: {
+      ...rebuilding,
+      state: "failed",
+      op: undefined,
+      error: "waiting for sim-session-practical-583231 to go away: context deadline exceeded",
+    },
+  });
+  await vi.advanceTimersByTimeAsync(2_000);
+
+  expect(
+    await screen.findByRole("heading", { name: strings.hosted.rebuildFailedTitle }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: strings.hosted.rebuildGiveUp }),
+  ).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: strings.hosted.bootFailedTitle })).toBeNull();
+});
+
+// A hosted seat is scoped to one exam — the Pod is stamped and sized for
+// it — so the picker at the end of a boot has one card on it and asks the
+// candidate to re-confirm what they chose in the lobby. After a rebuild
+// it reads as having been thrown out of the attempt they asked to repeat.
+test("an environment that comes up lands on its exam, not on the picker", async () => {
+  identity = me({
+    session: {
+      kind: "practical",
+      bank: "ckad-mock-01",
+      pod: "sim-session-practical-583231",
+      state: "starting",
+      op: "reset",
+      startedAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + 3_600_000).toISOString(),
+      lastSeen: new Date(now).toISOString(),
+    },
+  });
+  render(<App />);
+  await screen.findByRole("heading", { name: strings.hosted.rebuildTitle });
+
+  identity = me({
+    session: {
+      kind: "practical",
+      bank: "ckad-mock-01",
+      pod: "sim-session-practical-583231",
+      state: "ready",
+      startedAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + 3_600_000).toISOString(),
+      lastSeen: new Date(now).toISOString(),
+    },
+  });
+
+  // useHosted only re-polls /api/me every POLL_ACTIVE_MS (useHosted.ts) —
+  // 2s — while a session is not yet ready, so the ready state above sits
+  // unseen until that timer fires. Advance past it explicitly rather than
+  // trusting shouldAdvanceTime's real-time pace to outrun waitFor's
+  // shorter default timeout.
+  await vi.advanceTimersByTimeAsync(2_000);
+  await waitFor(() => {
+    expect(window.location.hash).toBe("#/exams/ckad-mock-01/mode");
+  });
+});
+
+// A tab that was already on a ready session is not mid-anything, and
+// yanking it to the mode screen would lose whatever the candidate was
+// reading.
+test("a page load into a ready seat is left where it is", async () => {
+  window.location.hash = "#/progress";
+  identity = me({
+    session: {
+      kind: "practical",
+      bank: "ckad-mock-01",
+      pod: "sim-session-practical-583231",
+      state: "ready",
+      startedAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + 3_600_000).toISOString(),
+      lastSeen: new Date(now).toISOString(),
+    },
+  });
+  render(<App />);
+  // A bare waitFor on an assertion that is already true on its first
+  // synchronous check resolves instantly, before the mocked /api/me
+  // round-trip (and the effect it would drive) ever runs — passing
+  // whether or not the hook is wired correctly. Flush that round-trip
+  // first so a wrongly-navigating hook has actually had its turn before
+  // the hash is checked. See Score.test.tsx and the Pod-replacement test
+  // above for the same pattern.
+  await vi.advanceTimersByTimeAsync(0);
+  await waitFor(() => expect(window.location.hash).toBe("#/progress"));
+});
+
+// The other guard the docstring calls "both matter" — and neither test
+// above reaches it. The first arrives on the default route, so the
+// yield list is passed through without being evaluated; the second's
+// session is already ready at mount, so it only exercises the baseline
+// guard, and being on /progress there is incidental. A rebuild finishing
+// behind a candidate who is deliberately reading their progress page
+// must not close it under them. `history` and `exams` are the same
+// branch of the same condition as `progress`, so proving this one yields
+// is enough — three near-copies would not cover anything more.
+test("a rebuild finishing behind a deliberate route does not close it", async () => {
+  window.location.hash = "#/progress";
+  identity = me({
+    session: {
+      kind: "practical",
+      bank: "ckad-mock-01",
+      pod: "sim-session-practical-583231",
+      state: "starting",
+      op: "reset",
+      startedAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + 3_600_000).toISOString(),
+      lastSeen: new Date(now).toISOString(),
+    },
+  });
+  render(<App />);
+  // /progress answers from the hub's own store regardless of session
+  // state — HostedHome renders it ahead of the booting screen for
+  // exactly that reason — so the export link, not a rebuild heading, is
+  // the settled signal to wait for here.
+  await screen.findByRole("link", { name: /export/i });
+
+  identity = me({
+    session: {
+      kind: "practical",
+      bank: "ckad-mock-01",
+      pod: "sim-session-practical-583231",
+      state: "ready",
+      startedAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + 3_600_000).toISOString(),
+      lastSeen: new Date(now).toISOString(),
+    },
+  });
+
+  // Same poll-cadence wait as the sibling starting->ready test above:
+  // advance past useHosted's POLL_ACTIVE_MS before checking, so the
+  // guard has actually run (in either direction) before the assertion
+  // does, rather than a bare waitFor resolving on its already-true first
+  // check.
+  await vi.advanceTimersByTimeAsync(2_000);
+  await waitFor(() => expect(window.location.hash).toBe("#/progress"));
 });

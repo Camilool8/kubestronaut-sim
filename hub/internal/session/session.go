@@ -78,6 +78,17 @@ type Session struct {
 	LastSeen  time.Time `json:"lastSeen"`
 	Error     string    `json:"error,omitempty"`
 
+	// Op is the control operation running against this session right now
+	// — "reset" or "switch" — and empty when there is none.
+	//
+	// On the session rather than left to GET /api/control/status because
+	// of who asks and when. The SPA polls /api/me every 2s while a session
+	// is not ready, and this is the field that lets the screen shown
+	// during that wait tell a first boot from a rebuild the candidate
+	// asked for. It is server truth, so it survives a reload mid-rebuild,
+	// which a remembered click would not.
+	Op string `json:"op,omitempty"`
+
 	// addr is where the proxy sends traffic. Unexported: it is the
 	// candidate's own Pod, but publishing an in-cluster address in a JSON
 	// response is telling every user something about the infrastructure
@@ -493,12 +504,26 @@ func (m *Manager) setState(e *entry, st State, errText string) {
 // Get returns a user's session.
 func (m *Manager) Get(user string) (Session, error) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	e, ok := m.sessions[user]
 	if !ok {
+		m.mu.Unlock()
 		return Session{}, ErrNoSession
 	}
-	return e.Session, nil
+	out := e.Session
+	m.mu.Unlock()
+	// Deliberately read outside m.mu. The job store has a lock of its own
+	// and nothing that holds it ever reaches for m.mu, so nesting the two
+	// here would make this the first place in the package that could
+	// deadlock — for no gain, since `out` is already a copy.
+	//
+	// op(), not snapshot(): this runs on every proxied request by way of
+	// handleProxy, and snapshot deep-copies two Jobs and their []Phase
+	// slices to answer a question that only needs one string.
+	if op := e.jobs.op(); op != "" {
+		out.Op = op
+		out.addr = ""
+	}
+	return out, nil
 }
 
 // Touch records that a user is still there. Called on every proxied
@@ -585,10 +610,27 @@ func (m *Manager) Recycle(user, bank string) (Job, error) {
 		op = "switch"
 		phases[1].Label = "Start a session on the new exam"
 	}
+	// Beginning a job here is what makes Get stop reporting an address
+	// for this session until the job ends — Get clears it the moment
+	// jobs.op() reports one in flight, on the theory that a Pod being
+	// replaced has nowhere for the proxy to send traffic. That rule
+	// lives in Get, not here, so whoever adds a third job type to
+	// jobStore and reads this line rather than Get's needs to know that
+	// starting a job here has that side effect there.
 	j, ok := e.jobs.begin(op, bank, phases)
 	if !ok {
 		return Job{}, ErrBusy
 	}
+
+	// The clock the boot screen counts from. It used to be restamped in
+	// the start phase, i.e. after the old Pod had been deleted and
+	// drained, so the first stretch of every rebuild counted from the
+	// session's original start. ExpiresAt stays where it is: it is the
+	// lease, and extending it a few seconds earlier is a different
+	// decision from fixing a displayed counter.
+	m.mu.Lock()
+	e.StartedAt = m.now()
+	m.mu.Unlock()
 
 	go m.runRecycle(e, fl, bank)
 	return j, nil
@@ -626,8 +668,11 @@ func (m *Manager) runRecycle(e *entry, fl Flavour, bank string) {
 		if bank != "" {
 			e.Bank = bank
 		}
+		// StartedAt is not touched here: Recycle stamped it when the job
+		// was accepted, which is when the wait the candidate is watching
+		// actually began.
 		now := m.now()
-		e.StartedAt, e.LastSeen = now, now
+		e.LastSeen = now
 		e.ExpiresAt = now.Add(m.cfg.MaxAge)
 		e.addr, e.State, e.Error = "", Pending, ""
 		m.mu.Unlock()

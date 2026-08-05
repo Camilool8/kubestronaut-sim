@@ -40,7 +40,8 @@ func (s *Server) newProxy() *httputil.ReverseProxy {
 		FlushInterval: -1,
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 			s.logf("hub: proxy %s: %v", r.URL.Path, err)
-			writeError(w, http.StatusBadGateway, "your exam environment is not reachable right now")
+			writeErrorCode(w, http.StatusBadGateway, codeEnvironmentUnreachable,
+				"your exam environment is not reachable right now")
 		},
 		Transport: &http.Transport{
 			// No idle timeout on the desktop stream, but a bound on how
@@ -102,6 +103,7 @@ func (s *Server) handleProxy(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Retry-After", "5")
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
 			"error": "your exam environment is still starting",
+			"code":  codeEnvironmentStarting,
 			"state": live.State,
 		})
 		return

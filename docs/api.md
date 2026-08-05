@@ -1263,8 +1263,8 @@ in"}` without one.
 |---|---|
 | — | Proxied to the candidate's Pod, unchanged. `X-Forwarded-*` is deliberately NOT set: the facilitator trusts its inputs, and a header the hub uses for auth must not be one a candidate can set. |
 | 404 | The candidate has no session. Not 502 — nothing is wrong, they have not started one. |
-| 503 | Their Pod exists and is not ready. Carries `Retry-After: 5` and `{"state": "..."}`. |
-| 502 | The Pod is unreachable. |
+| 503 | Not proxyable right now, which is not always the same thing as "not ready": either the Pod is genuinely booting, or a control job has just begun and `Manager.Get` has cleared the address while it replaces the Pod. Carries `Retry-After: 5` and `{"error": "...", "code": "environment_starting", "state": "..."}`. `state` can read `ready` here — during a reset or switch's stop phase the session's own `State` has not moved yet, only its address has, so the body's `state` and the fact of the 503 can disagree on purpose. |
+| 502 | The Pod is unreachable. `{"error": "...", "code": "environment_unreachable"}`. |
 
 The upgrade to the desktop's WebSocket is carried by the same proxy
 (`httputil.ReverseProxy` hijacks on a 101), with `FlushInterval: -1` so
@@ -1283,7 +1283,7 @@ Answers 200 whether or not anyone is signed in — a 401 would conflate
   "user": {"id": "583231", "login": "octocat"},
   "session": {
     "kind": "practical", "pod": "sim-session-practical-583231",
-    "state": "starting", "startedAt": "...", "expiresAt": "...",
+    "state": "starting", "op": "reset", "startedAt": "...", "expiresAt": "...",
     "lastSeen": "..."
   },
   "seats": {"practical": {"used": 1, "total": 3}, "mcq": {"used": 0, "total": 30}}
@@ -1299,6 +1299,13 @@ whether there is anywhere to sit.
 `state` is `pending` (a seat is held, someone else is booting first),
 `starting` (their own Pod is building), `ready`, or `failed` — which
 keeps the seat so they can read why before it is reaped.
+
+`op` is `reset` or `switch` while a control job is replacing the Pod —
+which is what a hosted reset or exam switch actually is — and absent
+the rest of the time, including on a first boot. It is server truth,
+set by the hub rather than remembered from a click, so it is still
+correct after a reload lands mid-rebuild; a client's own memory of
+having pressed "New attempt" would not survive that reload.
 
 ### POST /api/session/start
 

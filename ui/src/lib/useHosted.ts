@@ -33,6 +33,13 @@ const POLL_RETRY_MS = 3_000;
 function cadenceFor(me: Me): number {
   if (me.queue) return POLL_ACTIVE_MS;
   if (me.session && me.session.state !== "ready") return POLL_ACTIVE_MS;
+  // A session with a job in flight is exactly a session about to change
+  // state, whatever it currently reports: during a recycle's stop phase
+  // the hub answers "ready" WITH op set, because the address is cleared
+  // before the state catches up. Without this check that combination
+  // fell through to the idle cadence, and the SPA could take up to 20s
+  // to notice a rebuild had begun.
+  if (me.session?.op) return POLL_ACTIVE_MS;
   return POLL_IDLE_MS;
 }
 

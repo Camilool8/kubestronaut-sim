@@ -165,8 +165,13 @@
   gap: var(--space-3);
 }
 
+/* Wider than the lead's gap on purpose: this cluster is four groups —
+   the session, {children} (the backgrounded-job chip, between the
+   session and the nav — see AppHeader.tsx), the nav, the icon buttons —
+   and at the lead's spacing they read as one undifferentiated row of
+   controls. */
 .app-header-tail {
-  gap: var(--space-3);
+  gap: var(--space-4);
   flex-shrink: 0;
 }
 
@@ -233,9 +238,13 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
+  /* 44px, which is the floor for a pointer target. This was
+     `var(--space-1) 0` — about 24px tall and no wider than its word. */
+  min-height: 44px;
+  padding: 0 var(--space-3);
   background: none;
   border: 0;
-  padding: var(--space-1) 0;
+  border-radius: var(--radius-s);
   font: inherit;
   font-size: var(--text-s);
   font-weight: 500;
@@ -249,12 +258,15 @@
 
 .app-header-back:hover {
   color: var(--accent-strong);
+  background: var(--surface-hover);
 }
 
+/* Tight, because the links are now padded: the gap used to be doing the
+   separating that the targets do. */
 .app-header-nav {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-1);
 }
 
 .app-header-link {
@@ -263,26 +275,87 @@
 
 .app-header-link:hover {
   color: var(--text);
+  background: var(--surface-hover);
 }
 
+/* A rule under the word, not a hue change alone. aria-current is the
+   only thing that said "you are here", and a state carried by colour
+   alone is not a state to everyone. */
 .app-header-link-on {
   color: var(--text);
+  box-shadow: inset 0 -2px 0 var(--accent);
   cursor: default;
 }
 
-/* Under ~560px the crumb is the first thing to go: the mark still says
-   where you are, and the nav is the only part that cannot be reached any
-   other way. */
-@media (max-width: 560px) {
+/* One breakpoint for the whole header, and it must stay in step with
+   HEADER_COMPACT_QUERY in lib/useMediaQuery.ts — that is what decides
+   which controls are in the DOM, and this only dresses what is left.
+   Under it the crumb goes first: the mark still says where you are, and
+   the nav has moved into the menu rather than being dropped.
+
+   This replaced two unrelated rules — a 560px block here and a 40rem
+   block for .session-chip-user at the bottom of the file — that between
+   them hid four things and let the other eight overflow. */
+@media (max-width: 48rem) {
   .app-header {
-    padding: 0 var(--space-3);
+    /* Physical, not logical: the inset describes a hardware cutout,
+       which sits on a physical edge of the device and does not move
+       with writing direction. max() keeps the ordinary padding on
+       every device that reports no inset. */
+    padding-left: max(var(--space-3), env(safe-area-inset-left));
+    padding-right: max(var(--space-3), env(safe-area-inset-right));
     gap: var(--space-2);
   }
 
   .app-header-crumb,
   .app-header-rule,
-  .app-header-detail {
+  .app-header-detail,
+  .app-header-wordmark-tail {
     display: none;
+  }
+
+  /* .app-header-home has to give up its flex item's default min-width
+     (its own content size) before the wordmark inside it can shrink at
+     all, and at the 320px reflow width the full word "kubestronaut-sim"
+     no longer fits. */
+  .app-header-home {
+    min-width: 0;
+  }
+
+  /* Ellipsises rather than running into the tail at 320px, the WCAG
+     reflow width. .app-header-detail already does this; the wordmark
+     never needed it until the row itself could get this narrow. */
+  .app-header-wordmark {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  /* .job-chip-label already truncates with its own min-width: 0 and
+     text-overflow: ellipsis — the chip's 11rem floor was the only thing
+     still stopping the whole chip from shrinking, and with
+     .app-header-tail's flex-shrink: 0 that floor was reachable in both
+     products (locally, a `./sim reset` from a terminal while the lobby
+     is backgrounded; hosted, during a recycle's stop phase with SimApp
+     still mounted). A comfortable resting width is not worth a
+     scrollbar on a phone. */
+  .app-header .job-chip {
+    min-width: 0;
+  }
+
+  .app-header-tail {
+    gap: var(--space-1);
+  }
+
+  /* The compact bar's only two survivors: About and the theme toggle
+     stay here rather than move into the menu (see the design spec), so
+     they are the controls a thumb actually has to hit directly. Scoped
+     to the header — .info-button is shared with the exam topbar, which
+     this branch has no business resizing. */
+  .app-header .info-button,
+  .app-header .theme-toggle {
+    min-width: 44px;
+    min-height: 44px;
   }
 }
 
@@ -6359,7 +6432,18 @@
   color: var(--text-muted);
 }
 
-/* The header chip: identity, the lease, and the two ways out. */
+/* Identity, the lease, and the two ways out, as one group. The chip and
+   the actions are separate components — the actions have to survive
+   being raised from inside a popover that unmounts them on Task 10's
+   narrow viewport — but without this wrapper they fall back to being
+   plain siblings in .app-header-tail and inherit its wider gap. */
+.session-cluster {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* The header chip: identity and the lease. */
 .session-chip {
   display: flex;
   align-items: center;
@@ -6430,8 +6514,116 @@
   font-size: var(--text-s);
 }
 
-@media (max-width: 40rem) {
-  .session-chip-user {
-    display: none;
-  }
+/* ---- header menu ----
+   Everything in the header that is not time-critical, on a viewport too
+   narrow to hold it. See HeaderMenu.tsx for why this is a popover and not
+   a sheet. */
+
+.header-menu {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.header-menu-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-s);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.header-menu-button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+/* Sits under the panel and over everything else, so a pointer anywhere
+   outside dismisses. */
+.header-menu-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-panel);
+}
+
+.header-menu-panel {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: var(--z-dialog);
+  min-width: 13rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-2);
+}
+
+/* The nav landmark inside the panel wraps the links in an actual <nav>,
+   which is one level deeper than the buttons and the label the panel's
+   other children render at. Its own flex column and gap match the
+   panel's exactly, so that extra level does not change the rhythm
+   between the nav links or between the nav block and what follows it. */
+.header-menu-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* Every child is a full-width row with a real target, whatever element
+   it happens to be — the panel takes nav links (through the landmark
+   wrapper above), session buttons and a plain label. */
+.header-menu-panel > button,
+.header-menu-panel > .header-menu-nav > button,
+.header-menu-panel > .header-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-s);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-s);
+  text-align: left;
+}
+
+/* Only the buttons: the sole .header-menu-item is the login name, a
+   static <span>, and a pointer cursor over something that does not
+   respond to a click is a false affordance. */
+.header-menu-panel > button,
+.header-menu-panel > .header-menu-nav > button {
+  cursor: pointer;
+}
+
+.header-menu-panel > button:hover,
+.header-menu-panel > .header-menu-nav > button:hover {
+  background: var(--surface-hover);
+}
+
+.header-menu-label {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.header-menu-rule {
+  height: 1px;
+  margin: var(--space-1) 0;
+  background: var(--border);
 }

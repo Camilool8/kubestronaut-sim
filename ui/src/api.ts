@@ -400,6 +400,50 @@ export interface Results {
 
 interface ApiErrorBody {
   error: string;
+  code?: string;
+}
+
+/**
+ * An HTTP error from the API, with the machine-readable parts kept.
+ *
+ * `name` is deliberately left as "Error", so `String(err)` is unchanged
+ * and every call site that renders one reads exactly as it did. What is
+ * added is `code`: the hub answers a proxied request with 503
+ * `environment_starting` for the minutes it spends replacing a session
+ * Pod, and that is an expected wait rather than a fault — a distinction
+ * no amount of reading the sentence can make safely.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code?: string;
+
+  constructor(status: number, message: string, code?: string) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
+/** The hub's answer while a session Pod is being replaced. */
+export const ENVIRONMENT_STARTING = "environment_starting";
+
+export function isEnvironmentStarting(err: unknown): boolean {
+  return err instanceof ApiError && err.code === ENVIRONMENT_STARTING;
+}
+
+/**
+ * The error a failed response should throw.
+ *
+ * readError stays beside it and is still used: the `{ ok: false, error }`
+ * call sites want the sentence and nothing else.
+ */
+async function apiError(res: Response): Promise<ApiError> {
+  try {
+    const body = (await res.json()) as ApiErrorBody;
+    return new ApiError(res.status, body.error || `HTTP ${res.status}`, body.code);
+  } catch {
+    return new ApiError(res.status, `HTTP ${res.status}`);
+  }
 }
 
 async function readError(res: Response): Promise<string> {
@@ -453,7 +497,7 @@ async function request(path: string, opts: RequestOptions = {}): Promise<Respons
 export async function getSession(signal?: AbortSignal): Promise<SessionSnapshot> {
   const res = await request("/api/session", { signal });
   if (!res.ok) {
-    throw new Error(await readError(res));
+    throw await apiError(res);
   }
   return (await res.json()) as SessionSnapshot;
 }
@@ -493,7 +537,7 @@ export interface BootStatus {
 export async function getBoot(signal?: AbortSignal): Promise<BootStatus> {
   const res = await request("/api/boot", { signal });
   if (!res.ok) {
-    throw new Error(await readError(res));
+    throw await apiError(res);
   }
   return (await res.json()) as BootStatus;
 }
@@ -501,7 +545,7 @@ export async function getBoot(signal?: AbortSignal): Promise<BootStatus> {
 export async function getExam(signal?: AbortSignal): Promise<ExamInfo> {
   const res = await request("/api/exam", { signal });
   if (!res.ok) {
-    throw new Error(await readError(res));
+    throw await apiError(res);
   }
   return (await res.json()) as ExamInfo;
 }
@@ -517,7 +561,7 @@ export async function getExam(signal?: AbortSignal): Promise<ExamInfo> {
 export async function getExamTips(signal?: AbortSignal): Promise<string> {
   const res = await request("/api/exam/tips", { signal });
   if (!res.ok) {
-    throw new Error(await readError(res));
+    throw await apiError(res);
   }
   return ((await res.json()) as { markdown: string }).markdown;
 }
@@ -525,7 +569,7 @@ export async function getExamTips(signal?: AbortSignal): Promise<string> {
 export async function getQuestion(id: string, signal?: AbortSignal): Promise<QuestionDetail> {
   const res = await request(`/api/questions/${encodeURIComponent(id)}`, { signal });
   if (!res.ok) {
-    throw new Error(await readError(res));
+    throw await apiError(res);
   }
   return (await res.json()) as QuestionDetail;
 }
@@ -544,7 +588,7 @@ export async function getSolution(id: string, signal?: AbortSignal): Promise<Sol
     return { ok: false, error: await readError(res) };
   }
   if (!res.ok) {
-    throw new Error(await readError(res));
+    throw await apiError(res);
   }
   return { ok: true, solution: (await res.json()) as SolutionDetail };
 }
@@ -610,7 +654,7 @@ export async function startSession(
     return { ok: false, error: await readError(res) };
   }
   if (!res.ok) {
-    throw new Error(await readError(res));
+    throw await apiError(res);
   }
   // Branched on the STATUS, not on the body's shape. 202 also passes
   // `res.ok`, and its body is a preparation rather than a session — read
@@ -675,7 +719,7 @@ export async function putFocus(
     return { ok: false, error: await readError(res) };
   }
   if (!res.ok) {
-    throw new Error(await readError(res));
+    throw await apiError(res);
   }
   return { ok: true };
 }
@@ -688,7 +732,7 @@ export async function endSession(signal?: AbortSignal): Promise<SessionActionRes
     return { ok: false, error: await readError(res) };
   }
   if (!res.ok) {
-    throw new Error(await readError(res));
+    throw await apiError(res);
   }
   return { ok: true, session: (await res.json()) as SessionSnapshot };
 }
@@ -713,7 +757,7 @@ export async function getResults(signal?: AbortSignal): Promise<ResultsResponse>
     return { status: "error", message: await readError(res) };
   }
   if (!res.ok) {
-    throw new Error(await readError(res));
+    throw await apiError(res);
   }
   return { status: "ready", results: (await res.json()) as Results };
 }
@@ -783,7 +827,7 @@ export async function putAnswer(
     return { ok: false, error: await readError(res) };
   }
   if (!res.ok) {
-    throw new Error(await readError(res));
+    throw await apiError(res);
   }
   const body = (await res.json()) as { id: string; selected: number[] };
   return { ok: true, ...body };
@@ -797,7 +841,7 @@ export async function putAnswer(
 export async function getAnswers(signal?: AbortSignal): Promise<Record<string, number[]>> {
   const res = await request("/api/answers", { signal });
   if (!res.ok) {
-    throw new Error(await readError(res));
+    throw await apiError(res);
   }
   const body = (await res.json()) as { answers: Record<string, number[]> };
   return body.answers ?? {};
@@ -852,7 +896,7 @@ export interface ControlStatus {
 export async function getControlStatus(signal?: AbortSignal): Promise<ControlStatus> {
   const res = await request("/api/control/status", { signal });
   if (!res.ok) {
-    throw new Error(await readError(res));
+    throw await apiError(res);
   }
   return (await res.json()) as ControlStatus;
 }
@@ -867,7 +911,7 @@ export interface ControlLog {
 export async function getControlLog(signal?: AbortSignal): Promise<ControlLog> {
   const res = await request("/api/control/log", { signal });
   if (!res.ok) {
-    throw new Error(await readError(res));
+    throw await apiError(res);
   }
   const body = (await res.json()) as Partial<ControlLog>;
   // `lines ?? []`, the same guard getAnswers uses: a 200 whose body is
@@ -989,7 +1033,7 @@ export async function getHint(
     return { ok: false, error: await readError(res) };
   }
   if (!res.ok) {
-    throw new Error(await readError(res));
+    throw await apiError(res);
   }
   return { ok: true, hint: (await res.json()) as HintDetail };
 }
@@ -1159,7 +1203,7 @@ export interface CatalogResponse {
 export async function getCatalog(signal?: AbortSignal): Promise<CatalogResponse> {
   const res = await request("/api/catalog", { signal });
   if (!res.ok) {
-    throw new Error(await readError(res));
+    throw await apiError(res);
   }
   return (await res.json()) as CatalogResponse;
 }
@@ -1173,7 +1217,7 @@ export interface HistoryResponse {
 export async function getHistory(signal?: AbortSignal): Promise<HistoryResponse> {
   const res = await request("/api/history", { signal });
   if (!res.ok) {
-    throw new Error(await readError(res));
+    throw await apiError(res);
   }
   return (await res.json()) as HistoryResponse;
 }
@@ -1258,6 +1302,13 @@ export interface HostedSession {
   expiresAt: string;
   lastSeen: string;
   error?: string;
+  /**
+   * The control operation running against this session right now. Set by
+   * the hub while it replaces the Pod, which is what a hosted reset or
+   * exam switch is. Absent means nothing is running — including on a
+   * first boot, which is the distinction this exists to draw.
+   */
+  op?: "reset" | "switch";
 }
 
 /** How many of one flavour's seats are taken. */
@@ -1305,7 +1356,7 @@ export async function getMe(signal?: AbortSignal): Promise<Me | null> {
   const res = await request("/api/me", { signal });
   if (res.status === 404) return null;
   if (!res.ok) {
-    throw new Error(await readError(res));
+    throw await apiError(res);
   }
   const body = (await res.json()) as Partial<Me>;
   if (typeof body.authMode !== "string") return null;
@@ -1341,7 +1392,7 @@ export interface HostedExam extends BankEntry {
 
 export async function getHostedExams(signal?: AbortSignal): Promise<HostedExam[]> {
   const res = await request("/hub/exams", { signal });
-  if (!res.ok) throw new Error(await readError(res));
+  if (!res.ok) throw await apiError(res);
   const body = (await res.json()) as { exams?: HostedExam[] };
   return body.exams ?? [];
 }
@@ -1453,7 +1504,7 @@ export async function getAttemptResults(
 ): Promise<Results> {
   const res = await request(`/api/history/${encodeURIComponent(attempt)}`, { signal });
   if (!res.ok) {
-    throw new Error(await readError(res));
+    throw await apiError(res);
   }
   return (await res.json()) as Results;
 }
