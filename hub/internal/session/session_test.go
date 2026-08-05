@@ -580,3 +580,35 @@ func TestGetReportsTheControlOpWhileARebuildRuns(t *testing.T) {
 	}
 	t.Fatal("Get never reported the reset in flight")
 }
+
+// The boot screen's elapsed counter is (now - StartedAt), and a rebuild
+// shows that screen. Restamping only once the old Pod has drained meant
+// the first phase of every rebuild counted from the session's original
+// start — hours, on a long seat.
+func TestRecycleRestampsTheClockWhenItBeginsNotWhenThePodIsRecreated(t *testing.T) {
+	m, pods := newManager(t, 1, nil)
+	if _, err := m.Start(context.Background(), "583231", Practical, ""); err != nil {
+		t.Fatal(err)
+	}
+	waitReady(t, m, "583231")
+
+	before, _ := m.Get("583231")
+
+	// Never ready, so the recycle cannot reach its start phase and any
+	// restamping observed below is the one Recycle itself did.
+	pods.mu.Lock()
+	pods.notReady[pods.created[0]] = true
+	pods.mu.Unlock()
+
+	if _, err := m.Recycle("583231", ""); err != nil {
+		t.Fatal(err)
+	}
+
+	after, err := m.Get("583231")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !after.StartedAt.After(before.StartedAt) {
+		t.Errorf("startedAt = %v, want later than the original %v", after.StartedAt, before.StartedAt)
+	}
+}

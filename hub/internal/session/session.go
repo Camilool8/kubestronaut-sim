@@ -611,6 +611,16 @@ func (m *Manager) Recycle(user, bank string) (Job, error) {
 		return Job{}, ErrBusy
 	}
 
+	// The clock the boot screen counts from. It used to be restamped in
+	// the start phase, i.e. after the old Pod had been deleted and
+	// drained, so the first stretch of every rebuild counted from the
+	// session's original start. ExpiresAt stays where it is: it is the
+	// lease, and extending it a few seconds earlier is a different
+	// decision from fixing a displayed counter.
+	m.mu.Lock()
+	e.StartedAt = m.now()
+	m.mu.Unlock()
+
 	go m.runRecycle(e, fl, bank)
 	return j, nil
 }
@@ -647,8 +657,11 @@ func (m *Manager) runRecycle(e *entry, fl Flavour, bank string) {
 		if bank != "" {
 			e.Bank = bank
 		}
+		// StartedAt is not touched here: Recycle stamped it when the job
+		// was accepted, which is when the wait the candidate is watching
+		// actually began.
 		now := m.now()
-		e.StartedAt, e.LastSeen = now, now
+		e.LastSeen = now
 		e.ExpiresAt = now.Add(m.cfg.MaxAge)
 		e.addr, e.State, e.Error = "", Pending, ""
 		m.mu.Unlock()
