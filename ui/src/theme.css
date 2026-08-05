@@ -314,8 +314,48 @@
     display: none;
   }
 
+  /* .app-header-home has to give up its flex item's default min-width
+     (its own content size) before the wordmark inside it can shrink at
+     all, and at the 320px reflow width the full word "kubestronaut-sim"
+     no longer fits. */
+  .app-header-home {
+    min-width: 0;
+  }
+
+  /* Ellipsises rather than running into the tail at 320px, the WCAG
+     reflow width. .app-header-detail already does this; the wordmark
+     never needed it until the row itself could get this narrow. */
+  .app-header-wordmark {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  /* .job-chip-label already truncates with its own min-width: 0 and
+     text-overflow: ellipsis — the chip's 11rem floor was the only thing
+     still stopping the whole chip from shrinking, and with
+     .app-header-tail's flex-shrink: 0 that floor was reachable in both
+     products (locally, a `./sim reset` from a terminal while the lobby
+     is backgrounded; hosted, during a recycle's stop phase with SimApp
+     still mounted). A comfortable resting width is not worth a
+     scrollbar on a phone. */
+  .app-header .job-chip {
+    min-width: 0;
+  }
+
   .app-header-tail {
     gap: var(--space-1);
+  }
+
+  /* The compact bar's only two survivors: About and the theme toggle
+     stay here rather than move into the menu (see the design spec), so
+     they are the controls a thumb actually has to hit directly. Scoped
+     to the header — .info-button is shared with the exam topbar, which
+     this branch has no business resizing. */
+  .app-header .info-button,
+  .app-header .theme-toggle {
+    min-width: 44px;
+    min-height: 44px;
   }
 }
 
