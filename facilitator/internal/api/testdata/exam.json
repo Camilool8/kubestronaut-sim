@@ -10,6 +10,10 @@
     "duration": "10m",
     "passingScore": 50,
     "kubernetesVersion": "1.30",
+    "environment": {
+      "provider": "kind",
+      "nodes": 3
+    },
     "questions": [
       {
         "id": "q01",

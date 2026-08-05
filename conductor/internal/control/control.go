@@ -251,7 +251,29 @@ func (c *Controller) runReset(jobID string, mcq bool) {
 // never touches either, and the rebuild is the whole 2-4 minute wait.
 // The cluster keeps the outgoing bank's state until the next hands-on
 // switch rebuilds it — nothing reads it in between.
-func switchPhases(mcq bool) []job.PhaseSpec {
+//
+// provision drops the two phases that only make sense when there is an
+// outgoing exam. Nothing is switching: there is no session to end, no
+// desktop to lock, and no candidate work to wipe, because no exam has
+// ever been chosen in this environment. Running them anyway would work
+// — both are no-ops against nothing — but the checklist is the only
+// account of what is happening the candidate gets, and "End session and
+// lock desktop" as the first thing they see after picking their first
+// exam describes a product they have not used yet.
+func switchPhases(mcq, provision bool) []job.PhaseSpec {
+	if provision {
+		phases := []job.PhaseSpec{{ID: "write-bank", Label: "Select the exam"}}
+		if !mcq {
+			phases = append(phases,
+				job.PhaseSpec{ID: "recreate-cluster", Label: "Build the Kubernetes cluster"},
+				job.PhaseSpec{ID: "restart-instances", Label: "Start the exam instances"},
+			)
+		}
+		return append(phases,
+			job.PhaseSpec{ID: "restart-facilitator", Label: "Start the exam services"},
+			job.PhaseSpec{ID: "verify", Label: "Verify the exam is live"},
+		)
+	}
 	if mcq {
 		return []job.PhaseSpec{
 			{ID: "end-session", Label: "End session and lock desktop"},
@@ -287,6 +309,18 @@ func (c *Controller) StartSwitch(bank string) (job.Job, error) {
 		return job.Job{}, fmt.Errorf("%w: %v", ErrInvalidBank, err)
 	}
 	mcq := c.bankIsMCQ(bank)
+	// An environment that has never been told which exam to be is not
+	// switching away from anything — it is being built for the first
+	// time. The distinction is the bank file's absence and nothing else:
+	// k8s-env rests without writing it, and the conductor is its only
+	// other writer, so an empty read here means no exam was ever chosen.
+	//
+	// It changes the phase list and the job's op label; the sequence
+	// below is otherwise the same one a switch has always run, which is
+	// the point. Building an environment on demand was never a missing
+	// capability — bootstrapCmd tears the cluster down and rebuilds it
+	// from whatever /shared/bank says — only a missing name for it.
+	provision := c.activeBank() == ""
 	// Every switch restarts the bank-reading services (RestartExtra), and
 	// a hands-on target restarts the instances too. Unlike reset there is
 	// no variant that needs none, so on an engine that cannot restart, a
@@ -308,11 +342,15 @@ func (c *Controller) StartSwitch(bank string) (job.Job, error) {
 		return job.Job{}, ErrSessionRunning
 	}
 
-	j, err := c.Store.Begin("switch", bank, switchPhases(mcq))
+	op := "switch"
+	if provision {
+		op = "provision"
+	}
+	j, err := c.Store.Begin(op, bank, switchPhases(mcq, provision))
 	if err != nil {
 		return job.Job{}, err
 	}
-	go c.runSwitch(j.ID, bank, mcq)
+	go c.runSwitch(j.ID, bank, mcq, provision)
 	return j, nil
 }
 
@@ -321,19 +359,26 @@ func (c *Controller) StartSwitch(bank string) (job.Job, error) {
 // and the bank-reading services restart after the instances, the
 // facilitator last (its entrypoint re-derives EXAM_JSON; its restart
 // also triggers the session manager's cross-bank discard).
-func (c *Controller) runSwitch(jobID, bank string, mcq bool) {
+// When provision is set the first two steps are skipped rather than run
+// against nothing — see switchPhases, whose checklist must agree with
+// this sequence phase for phase. StartPhase silently ignores an id the
+// job never declared, so a phase run without a spec would settle nothing
+// and leave the UI counting a step that is not on screen.
+func (c *Controller) runSwitch(jobID, bank string, mcq, provision bool) {
 	ctx := context.Background()
 
-	c.Store.StartPhase(jobID, "end-session")
-	if err := c.endSession(ctx); err != nil {
-		c.Store.Fail(jobID, err.Error())
-		return
-	}
+	if !provision {
+		c.Store.StartPhase(jobID, "end-session")
+		if err := c.endSession(ctx); err != nil {
+			c.Store.Fail(jobID, err.Error())
+			return
+		}
 
-	c.Store.StartPhase(jobID, "wipe-instances")
-	if err := c.wipeCandidateState(ctx, jobID); err != nil {
-		c.Store.Fail(jobID, err.Error())
-		return
+		c.Store.StartPhase(jobID, "wipe-instances")
+		if err := c.wipeCandidateState(ctx, jobID); err != nil {
+			c.Store.Fail(jobID, err.Error())
+			return
+		}
 	}
 
 	c.Store.StartPhase(jobID, "write-bank")

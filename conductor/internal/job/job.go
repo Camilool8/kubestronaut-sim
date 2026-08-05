@@ -62,10 +62,16 @@ type Phase struct {
 
 // Job is one control operation's progress record. Snapshots returned by
 // Status are deep copies — callers can never mutate store state.
+//
+// Op's fourth value, "provision", is a switch run in an environment that
+// has never had an exam: the same sequence minus the two phases that
+// only mean something when there is an outgoing one. It gets a label of
+// its own because the UI titles the job from it, and "Switching to CKAD"
+// is the wrong thing to tell somebody choosing their first exam.
 type Job struct {
 	ID         string  `json:"id"`
-	Op         string  `json:"op"`   // "reset" | "switch" | "seed"
-	Bank       string  `json:"bank"` // target bank for switch and seed, "" for reset
+	Op         string  `json:"op"`   // "reset" | "switch" | "provision" | "seed"
+	Bank       string  `json:"bank"` // target bank for switch, provision and seed, "" for reset
 	StartedAt  string  `json:"startedAt"`
 	FinishedAt string  `json:"finishedAt,omitempty"`
 	Phase      string  `json:"phase"` // id of the phase currently running ("" before the first)

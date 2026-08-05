@@ -444,10 +444,18 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
     [runControlAction],
   );
 
+  // A provision retries as a switch, because that is what it is on the
+  // wire: POST /api/control/switch with a bank, which the conductor
+  // labels "provision" only while no exam is active. Falling through to
+  // reset here would have offered to rebuild an environment that has
+  // never been built — and rebuilt it as nothing, since a reset carries
+  // no bank.
   const handleRetry = useCallback(
     (op: string, bank: string) =>
       runControlAction(() =>
-        op === "switch" && bank ? startControlSwitch(bank) : startControlReset(),
+        (op === "switch" || op === "provision") && bank
+          ? startControlSwitch(bank)
+          : startControlReset(),
       ),
     [runControlAction],
   );
@@ -487,9 +495,17 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
   // start gate is bypassed for mcq to match. The cluster keeps building
   // silently behind the lobby so switching back to a hands-on bank
   // stays seamless.
+  //
+  // "idle" is exempt for the opposite reason to all of the above. It does
+  // not mean "not ready yet", it means "nobody has said what to build" —
+  // there is no cluster coming, no progress to narrate, and nothing to
+  // wait for. Showing a progress screen there would ask the candidate to
+  // wait for an event that only THEY can cause. The selector renders
+  // instead, which is where the exam gets chosen.
   const booting =
     boot !== null &&
     boot.state !== "ready" &&
+    boot.state !== "idle" &&
     !isMcq &&
     session?.state !== "running" &&
     !showOverlay &&
@@ -584,6 +600,7 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
             onControlStart={runControlAction}
             catalogVersion={catalogVersion}
             seatKind={hosted?.me.session?.kind}
+            seatBank={hosted?.me.session?.bank}
             onBanksLoaded={handleBanksLoaded}
           />
         );

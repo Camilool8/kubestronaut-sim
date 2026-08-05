@@ -120,6 +120,12 @@ func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desk
 	mux.HandleFunc("GET /healthz", handleHealthz)
 	mux.HandleFunc("GET /api/boot", s.handleBoot)
 	mux.HandleFunc("GET /api/exam", s.handleExam)
+	// Ungated, unlike solutions and hints. Technique is not answers: what
+	// this serves is how to drive kubectl and an editor quickly, which is
+	// the same advice before, during and after an attempt, and is most
+	// useful before one. Registering it beside the gated routes rather
+	// than under them is the whole distinction.
+	mux.HandleFunc("GET /api/exam/tips", s.handleExamTips)
 	mux.HandleFunc("GET /api/questions/{id}", s.handleQuestion)
 	mux.HandleFunc("GET /api/questions/{id}/solution", s.handleSolution)
 	mux.HandleFunc("GET /api/questions/{id}/hints/{n}", s.handleHint)
@@ -205,6 +211,12 @@ type examResponse struct {
 	// pooled bank is larger than the exam a candidate will actually get.
 	QuestionCount int                `json:"questionCount"`
 	Questions     []examQuestionInfo `json:"questions"`
+	// Environment is the cluster this bank is sat in, so a screen that
+	// describes the environment can describe the one being built rather
+	// than the one CKAD happens to use. Omitted entirely for a bank that
+	// declares none — an mcq exam has no cluster, and "0 nodes" is a
+	// worse answer than no answer.
+	Environment *environmentInfo `json:"environment,omitempty"`
 	// Modes the lobby renders its picker from, so the three cards are
 	// described by the server rather than hardcoded in the UI.
 	Modes []examMode `json:"modes"`
@@ -214,6 +226,18 @@ type examResponse struct {
 	// Questions is that attempt's drawn subset, and counting it by domain
 	// would present the drawn questions as if they were the curriculum.
 	Domains []domainInfo `json:"domains"`
+	// HasTips says whether GET /api/exam/tips has anything to serve, so a
+	// bank that ships no tips.md draws no control rather than one that
+	// opens empty. Omitted when false: absent and false are the same
+	// answer, and every client already treats a missing field as no.
+	HasTips bool `json:"hasTips,omitempty"`
+}
+
+// environmentInfo is spec.environment as the UI sees it: what builds the
+// cluster and how many nodes it has.
+type environmentInfo struct {
+	Provider string `json:"provider,omitempty"`
+	Nodes    int    `json:"nodes,omitempty"`
 }
 
 // domainInfo is one curriculum domain of the loaded exam.
@@ -282,6 +306,9 @@ type examQuestionInfo struct {
 }
 
 func (s *server) handleExam(w http.ResponseWriter, r *http.Request) {
+	if !s.requireExam(w) {
+		return
+	}
 	pool := s.questionsForExamResponse()
 	resp := examResponse{
 		Name:              s.ex.Name,
@@ -292,9 +319,13 @@ func (s *server) handleExam(w http.ResponseWriter, r *http.Request) {
 		PassingScore:      s.ex.PassingScore,
 		KubernetesVersion: s.ex.KubernetesVersion,
 		QuestionCount:     s.declaredQuestionCount(),
+		HasTips:           s.ex.HasTips,
 		// Pre-sized (not nil) so an exam with zero questions still
 		// marshals Questions as JSON "[]" rather than "null".
 		Questions: make([]examQuestionInfo, 0, len(pool)),
+	}
+	if env := s.ex.Environment; env.Provider != "" || env.Nodes > 0 {
+		resp.Environment = &environmentInfo{Provider: env.Provider, Nodes: env.Nodes}
 	}
 	for _, q := range pool {
 		info := examQuestionInfo{
@@ -333,6 +364,39 @@ func (s *server) handleExam(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// tipsResponse is the GET /api/exam/tips JSON shape. One markdown body,
+// with no id beside it: tips belong to the bank, not to a question.
+type tipsResponse struct {
+	Markdown string `json:"markdown"`
+}
+
+// handleExamTips serves the loaded bank's tips.md.
+//
+// Deliberately ungated. The solution and hint handlers check the
+// attempt's mode before they will answer, because reading an answer
+// during an exam is the thing an exam is for stopping; this is the
+// opposite errand. It is technique — aliases, generators, `explain`,
+// where to look when a Pod will not start — none of which is specific to
+// a question, and all of which is most useful in the minutes BEFORE the
+// clock starts.
+//
+// Read from disk per request rather than cached at load, exactly as
+// question.md and solution.md are, so editing the file needs no restart.
+// A bank with no tips.md answers 404: the client already knows from
+// GET /api/exam's hasTips whether to ask, and this is the honest answer
+// for anything that asks anyway.
+func (s *server) handleExamTips(w http.ResponseWriter, r *http.Request) {
+	if !s.requireExam(w) {
+		return
+	}
+	md, err := os.ReadFile(exam.TipsPath(s.bankDir))
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "this exam ships no tips")
+		return
+	}
+	writeJSON(w, http.StatusOK, tipsResponse{Markdown: string(md)})
 }
 
 // totalPoints sums the Points of every check in q that Load did not
@@ -426,6 +490,14 @@ func (s *server) questionsForExamResponse() []exam.Question {
 // The second return value is false when id names no question at all, or
 // names one outside the current subset.
 func (s *server) findQuestion(id string) (exam.Question, bool) {
+	// With no exam chosen there are no questions to find. Answering here
+	// rather than at each caller keeps the solution and hint endpoints'
+	// deliberate ordering intact — both gate on session state BEFORE any
+	// id lookup so they cannot be used to enumerate ids, and a
+	// requireExam ahead of that gate would have inverted it.
+	if s.ex == nil {
+		return exam.Question{}, false
+	}
 	if ids := s.mgr.QuestionIDs(); len(ids) > 0 {
 		inSubset := false
 		for _, want := range ids {
@@ -461,6 +533,9 @@ type questionResponse struct {
 }
 
 func (s *server) handleQuestion(w http.ResponseWriter, r *http.Request) {
+	if !s.requireExam(w) {
+		return
+	}
 	id := r.PathValue("id")
 	q, ok := s.findQuestion(id)
 	if !ok {
@@ -624,6 +699,9 @@ type answerResponse struct {
 // ordering matches the solution handler: the endpoint must not double as
 // a question-id oracle for whatever state the session is in.
 func (s *server) handleAnswerPut(w http.ResponseWriter, r *http.Request) {
+	if !s.requireExam(w) {
+		return
+	}
 	if s.ex.Type != exam.TypeMCQ {
 		writeJSONError(w, http.StatusBadRequest, "not a multiple-choice exam")
 		return
@@ -785,6 +863,9 @@ type startResponse struct {
 }
 
 func (s *server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
+	if !s.requireExam(w) {
+		return
+	}
 	// The facilitator answers long before the cluster is usable now, so
 	// this is the gate that stops a candidate starting a 120-minute
 	// clock against a half-built environment. Without it, "the UI came
@@ -952,6 +1033,9 @@ type startRequest struct {
 // state check comes first so the endpoint cannot double as a way to
 // enumerate question ids.
 func (s *server) handleSessionFocus(w http.ResponseWriter, r *http.Request) {
+	if !s.requireExam(w) {
+		return
+	}
 	if s.mgr.Snapshot().State != "running" {
 		writeJSONError(w, http.StatusConflict, "no attempt is running")
 		return

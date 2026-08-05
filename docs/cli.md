@@ -27,7 +27,7 @@ it as `MISSING (./sim up needs it)` (`sim:119`).
 
 | Command | What it does | What it destroys |
 |---|---|---|
-| `./sim up [bank]` | `docker compose up -d --build`, then polls `/api/boot` every 3s, printing each phase as it changes, until the environment reports ready. | Nothing. |
+| `./sim up [bank]` | `docker compose up -d --build`, then polls `/api/boot`. With no bank it waits only for the shell to settle — `idle`, meaning up with nothing chosen — and returns in seconds, having built no exam environment. With a bank it waits for that exam's environment to report ready, printing each phase as it changes. | Nothing. |
 | `./sim down` | `docker compose down --remove-orphans`. Volumes survive, so the next `up` resumes the same exam — including a running attempt. | Nothing. |
 | `./sim purge` | `down`, then removes the project's volumes one at a time, skipping the one holding attempt history. | Eight volumes: the kind cluster and its image cache, `/shared` (ready marker, active bank, ssh keys), the session file, both `/opt/course` directories, both podman stores, and the exam registry. **Not** `state`. |
 | `./sim purge --all` | `down -v`. Prints what it is about to destroy first. | All nine volumes, `state` included — every attempt ever graded on this machine, with no backup and no undo. |
@@ -35,13 +35,49 @@ it as `MISSING (./sim up needs it)` (`sim:119`).
 | `./sim reset` | POSTs `/api/control/reset` and polls `/api/control/status` until the job settles. Same code path as the UI's New attempt button. | The session, both instances' work directories and podman stores, the exam registry's contents, and the kind cluster. |
 | `./sim ssh [instance]` | `docker compose exec <instance> su - candidate`, defaulting to `instance-1`. | Nothing. |
 | `./sim status` | `docker compose ps`. | Nothing. |
-| `./sim grade` | Runs the facilitator's session-free scoreboard against the environment as it stands (`docker compose exec facilitator /entrypoint.sh grade`). Hands-on banks only: an mcq bank's answers live in the session, not the cluster, so `grade` refuses with a pointer to the UI/API rather than printing a misleading 0%. | Nothing. It records no result and touches no session state. |
+| `./sim grade` | Runs the facilitator's read-only scoreboard against the environment as it stands (`docker compose exec facilitator /entrypoint.sh grade`). Scores the whole bank, or — on a [pooled](bank-spec.md#pooling-a-bank-specexamlength) one — the open attempt's drawn subset, since the questions it did not draw were never seeded. Hands-on banks only: an mcq bank's answers live in the session, not the cluster, so `grade` refuses with a pointer to the UI/API rather than printing a misleading 0%. | Nothing. It records no result and writes no session state. |
 | `./sim help` | Prints the usage string. It is also the default with no argument (`sim:4`), and what an unknown subcommand prints before exiting 1 (`sim:176`). | Nothing. |
+
+### grade
+
+The scoreboard reads the session file to find out which questions the
+open attempt asks, and scores those. On every unpooled bank that changes
+nothing — the whole bank is seeded at boot, so the attempt and the bank
+are the same set — and with no attempt open it falls back to the whole
+bank, which is what it has always done.
+
+It matters on a pooled bank. `ckad-mock-01` draws 22 of 26 and only the
+drawn questions are ever seeded, so scoring the pool would score four
+questions whose Namespaces do not exist and cannot: a perfect attempt
+printed **191/217 (87%)** before this scoping existed. With no attempt
+open on such a bank it says so on stderr and grades the pool anyway,
+against an environment that holds none of it.
+
+It remains a reader. It never resumes the attempt, never arms a timer and
+never writes the session file, which is what lets it run as a second
+process beside the live server.
 
 ### up
 
-The optional bank argument sets `BANK` for that compose invocation and
-nothing more — see [BANK](#bank) below.
+**Nothing is built until an exam is chosen.** A bare `./sim up` brings
+the stack up, waits for it to settle, and prints where to pick an exam.
+It waits for the boot state to reach `idle` rather than merely for the
+UI to answer: the facilitator answers within a second or two, while
+`k8s-env` still has the two exam-independent phases ahead of it (the
+inner Docker daemon, then the chart repository) and reports `booting`
+throughout. Returning there printed "Choose an exam" over a browser
+still showing a boot screen. It is seconds either way, and it never
+waits for an exam. There is no cluster, no seeded questions and no default bank:
+guessing one costs several minutes and is thrown away the moment the
+candidate picks something else. `k8s-env` rests in a new `idle` boot
+state, the facilitator serves the exam selector with no bank loaded, and
+choosing one runs the conductor's own build.
+
+Naming a bank — `./sim up ckad-mock-01` — additionally builds that
+exam's environment and blocks with the phase printout, which is what the
+smoke suite and anyone who already knows what they want are doing. The
+argument sets `BANK` for that compose invocation and nothing more — see
+[BANK](#bank) below.
 
 `up` exits 1 in two cases: `/api/boot` reported `failed`, in which case
 the error is printed verbatim (`sim:53-59`); or the boot budget elapsed
@@ -82,8 +118,9 @@ a clean machine pulls that image.
 | Variable | Default | Read at |
 |---|---|---|
 | `SIM_BIND` | `0.0.0.0` | `docker-compose.yaml:21-23`, `docker-compose.yaml:208` |
-| `SIM_BOOT_BUDGET` | `3600` | `sim:26` |
-| `BANK` | `ckad-mock-01` | `sim:24`, and every service's compose environment |
+| `SIM_BOOT_BUDGET` | `3600` | `sim` — how long `./sim up <bank>` waits for that exam's environment |
+| `SIM_SHELL_BUDGET` | `300` | `sim` — how long a bare `./sim up` waits for the shell to settle. Far smaller because it waits for a container runtime and a chart repository, never for a cluster |
+| `BANK` | unset | `sim`, and every service's compose environment. No default: nothing is built until an exam is chosen |
 | `PRELOAD` | `full` | `images/k8s-env/Dockerfile:94` (build arg, not runtime) |
 | `SESSION_DURATION_OVERRIDE` | unset | `facilitator/cmd/facilitator/main.go:91` |
 
@@ -103,12 +140,24 @@ SIM_BIND=127.0.0.1 ./sim up     # loopback only
 
 ### SIM_BOOT_BUDGET
 
-Seconds `./sim up` waits for a ready state before giving up. It bounds
-the wait, not the boot: the environment carries on building after the
-command exits 1.
+Seconds `./sim up <bank>` waits for a ready state before giving up. It
+bounds the wait, not the boot: the environment carries on building after
+the command exits 1.
 
 ```bash
-SIM_BOOT_BUDGET=7200 ./sim up
+SIM_BOOT_BUDGET=7200 ./sim up ckad-mock-01
+```
+
+### SIM_SHELL_BUDGET
+
+The same idea for a bare `./sim up`, which waits for the boot state to
+reach `idle` rather than `ready`. Much smaller by default because the
+two phases it covers are a container runtime and a chart repository —
+measured at about eight seconds — and the inner daemon has its own 180s
+deadline underneath it. It never waits for a cluster.
+
+```bash
+SIM_SHELL_BUDGET=600 ./sim up
 ```
 
 ### BANK
@@ -119,6 +168,10 @@ if it does (`images/k8s-env/bootstrap.sh:15-21`); the facilitator, the
 instances and the docs proxy all prefer that file over their `BANK`
 environment. So once the shared volume exists, the conductor owns the
 active bank and `BANK` is ignored.
+
+Unset is the normal case and not a fallback: with neither the file nor
+the variable, `start.sh` stops before the bootstrap and the environment
+waits to be told which exam to be.
 
 ```bash
 ./sim up ckad-mock-01           # same as BANK=ckad-mock-01 ./sim up

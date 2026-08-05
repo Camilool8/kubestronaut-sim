@@ -83,12 +83,14 @@ const renderExams = (
   catalogVersion = 0,
   onControlStart = noop as never,
   seatKind?: "practical" | "mcq",
+  seatBank?: string,
 ) =>
   render(
     <Exams
       catalogVersion={catalogVersion}
       onControlStart={onControlStart}
       seatKind={seatKind}
+      seatBank={seatBank}
       onBanksLoaded={noop}
     />,
   );
@@ -282,6 +284,45 @@ describe("choosing an exam", () => {
     expect(window.location.hash).toBe("");
   });
 
+  // A fresh `./sim up` builds nothing and loads nothing, so this screen
+  // is the first thing a candidate sees and `active` is empty. The
+  // confirmation still appears — it is still minutes of building — but
+  // the switch copy would warn them about wiping cluster state they have
+  // not created and replacing an exam they have not chosen.
+  describe("with no exam loaded yet", () => {
+    beforeEach(() => {
+      banks = catalog("");
+    });
+
+    test("confirms a build rather than a destructive switch", async () => {
+      const user = userEvent.setup();
+      renderExams(0, ((start: () => Promise<unknown>) => void start()) as never);
+      await screen.findByRole("heading", { name: "CKAD" });
+
+      await user.click(within(cardFor("CKAD")).getByRole("button", { name: "Choose a mode" }));
+      const dialog = await screen.findByRole("dialog");
+      expect(dialog).not.toHaveTextContent(/wipes/i);
+      expect(dialog).not.toHaveTextContent(/switching/i);
+      expect(dialog).toHaveTextContent(/builds the Kubernetes cluster/i);
+
+      // Same request either way: the conductor decides it is a provision
+      // by reading the bank file, not by being told.
+      await user.click(screen.getByRole("button", { name: "Build it" }));
+      await waitFor(() => expect(switchCalls).toEqual(["ckad-mock-01"]));
+    });
+
+    test("still gates it behind a confirmation — it is minutes of work", async () => {
+      const user = userEvent.setup();
+      renderExams(0, ((start: () => Promise<unknown>) => void start()) as never);
+      await screen.findByRole("heading", { name: "CKAD" });
+
+      await user.click(within(cardFor("CKAD")).getByRole("button", { name: "Choose a mode" }));
+      expect(await screen.findByRole("dialog")).toBeInTheDocument();
+      expect(switchCalls).toEqual([]);
+      expect(window.location.hash).toBe("");
+    });
+  });
+
   test("cancelling starts nothing", async () => {
     const user = userEvent.setup();
     renderExams(0, ((start: () => Promise<unknown>) => void start()) as never);
@@ -384,6 +425,34 @@ describe("a hosted seat", () => {
     await screen.findByRole("heading", { name: "CKAD" });
 
     expect(within(cardFor("CKAD")).getByRole("button", { name: "Choose a mode" })).toBeTruthy();
+    expect(within(cardFor("KCNA")).getByRole("button", { name: "Choose a mode" })).toBeTruthy();
+  });
+
+  // A hosted seat is ONE exam now: the candidate chose the certification
+  // in the lobby and the Pod was created, stamped and sized for it. The
+  // hub refuses anything else, and this is so nobody is offered it first
+  // and the reason is on screen rather than in a 409.
+  test("a seat offers its own exam and no other, even of the same engine", async () => {
+    banks = catalog("ckad-mock-01", [ckad, { ...kcna, examType: "hands-on" }, cks]);
+    renderExams(0, noop as never, "practical", "ckad-mock-01");
+    await screen.findByRole("heading", { name: "CKAD" });
+
+    expect(within(cardFor("CKAD")).getByRole("button", { name: "Choose a mode" })).toBeTruthy();
+    const other = cardFor("KCNA");
+    expect(within(other).queryByRole("button")).toBeNull();
+    expect(within(other).getByText("Not in this seat")).toBeTruthy();
+    // Says what to do, and that finishing an attempt is not at stake.
+    expect(within(other).getByText(/end the session and start this exam/i)).toBeTruthy();
+  });
+
+  // A Pod adopted from before exams were choosable records no bank. It
+  // falls back to the rule that came first — the seat's flavour — rather
+  // than to no rule at all.
+  test("a seat that records no exam still refuses the wrong engine", async () => {
+    renderExams(0, noop as never, "mcq", undefined);
+    await screen.findByRole("heading", { name: "CKAD" });
+
+    expect(within(cardFor("CKAD")).getByText("Not in this seat")).toBeTruthy();
     expect(within(cardFor("KCNA")).getByRole("button", { name: "Choose a mode" })).toBeTruthy();
   });
 });
