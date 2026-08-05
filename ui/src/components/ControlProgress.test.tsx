@@ -222,4 +222,67 @@ describe("ControlProgress", () => {
       vi.unstubAllGlobals();
     }
   });
+
+  // Nothing is built until an exam is chosen, so the first choice runs a
+  // job that has no outgoing exam behind it. It reaches this dialog
+  // through the same overlay as every other job, and if it borrowed the
+  // switch's wording the first thing a new candidate would read is that
+  // their environment is being wiped and replaced.
+  describe("the first exam an environment is given", () => {
+    const provisionJob: ControlJob = {
+      id: "job-2",
+      op: "provision",
+      bank: "ckad-mock-01",
+      startedAt: "2026-07-24T12:00:00.000Z",
+      phase: "recreate-cluster",
+      phases: [
+        {
+          id: "write-bank",
+          label: "Select the exam",
+          state: "done",
+          startedAt: "2026-07-24T12:00:00.000Z",
+          finishedAt: "2026-07-24T12:00:00.100Z",
+        },
+        {
+          id: "recreate-cluster",
+          label: "Build the Kubernetes cluster",
+          state: "running",
+          startedAt: "2026-07-24T12:00:00.100Z",
+        },
+        { id: "verify", label: "Verify the exam is live", state: "pending" },
+      ],
+    };
+
+    test("is titled as a build, not as a switch", () => {
+      render(<ControlProgress job={provisionJob} bankTitle="CKAD Mock Exam 01" {...props} />);
+      const heading = screen.getByRole("heading", { level: 2 });
+      expect(heading).toHaveTextContent(/building/i);
+      expect(heading).toHaveTextContent("CKAD Mock Exam 01");
+      expect(heading).not.toHaveTextContent(/switch/i);
+    });
+
+    test("promises the same minutes without claiming anything is being rebuilt", () => {
+      render(<ControlProgress job={provisionJob} bankTitle="CKAD Mock Exam 01" {...props} />);
+      const hint = document.querySelector(".control-hint");
+      expect(hint).toHaveTextContent(/2-4 minutes/);
+      expect(hint).not.toHaveTextContent(/rebuild/i);
+    });
+
+    test("retries as itself: the handler is given the op, and it carries a bank", async () => {
+      const onRetry = vi.fn();
+      const user = setupUser();
+      render(
+        <ControlProgress
+          job={{ ...provisionJob, error: "kind: failed to create cluster" }}
+          bankTitle="CKAD Mock Exam 01"
+          {...props}
+          onRetry={onRetry}
+        />,
+      );
+      // A failed provision must offer retry — unlike a seed, whose retry
+      // would tear down an environment the candidate still has.
+      await user.click(screen.getByRole("button", { name: /retry/i }));
+      expect(onRetry).toHaveBeenCalled();
+    });
+  });
 });

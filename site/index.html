@@ -209,9 +209,9 @@
             <p class="section-lede">
               Everything after <code>up</code> happens in the browser: a
               countdown that cannot be paused, a real Linux desktop with
-              terminals, a real two-node Kubernetes cluster to act on, a
-              per-check score with full solutions afterwards, and a record of
-              every graded attempt to measure the next one against.
+              terminals, a real Kubernetes cluster built for the exam you
+              picked, a per-check score with full solutions afterwards, and a
+              record of every graded attempt to measure the next one against.
             </p>
           </div>
 
@@ -229,15 +229,16 @@
                 <span class="term-bar-title">bash — quickstart</span>
               </figcaption>
               <pre class="term-body"><code><span class="term-prompt" aria-hidden="true">$ </span>./sim doctor    <span class="term-note"># optional preflight</span>
-<span class="term-prompt" aria-hidden="true">$ </span>./sim up        <span class="term-note"># first run: several minutes</span>
+<span class="term-prompt" aria-hidden="true">$ </span>./sim up        <span class="term-note"># brings the app up in seconds</span>
 <span class="term-prompt" aria-hidden="true">$ </span>open <span class="term-url">http://localhost:8080</span></code></pre>
             </figure>
 
             <p class="quickstart-note">
               Requires Docker Desktop (or docker + compose v2), python3, and
               about 9GB of free RAM — the XFCE desktop is inside that figure.
-              The UI comes up before the cluster does, so the page shows the
-              same boot progress the terminal does.
+              Nothing is built until you pick an exam: choosing one in the
+              browser is what creates its cluster, and the page shows that
+              build's progress step by step.
             </p>
           </div>
         </div>
@@ -248,10 +249,10 @@
         <h2 id="stats-title" class="sr-only">The numbers behind it</h2>
         <ul class="stat-grid">
           <li class="stat">
-            <p class="stat-figure">119</p>
+            <p class="stat-figure">123</p>
             <h3 class="stat-label">Questions written</h3>
             <p class="stat-note">
-              22 hands-on for CKAD and 97 multiple-choice for KCNA, counted from
+              26 hands-on for CKAD and 97 multiple-choice for KCNA, counted from
               the <code>spec.questions</code> list in each bank's
               <code>exam.yaml</code> file. All original: no third-party exam
               dump may be committed here, because CC BY-SA 4.0 requires the
@@ -319,17 +320,20 @@
                  of line with this one. -->
             <dl class="exam-stats">
               <div><dt>Duration</dt><dd>2h</dd></div>
-              <div><dt>Tasks</dt><dd>22</dd></div>
+              <div>
+                <dt>Drawn / pool</dt>
+                <dd>22 <span class="exam-stat-of">/ 26</span></dd>
+              </div>
               <div><dt>To pass</dt><dd>66%</dd></div>
               <div><dt>Engine</dt><dd class="exam-stat-engine">Practical</dd></div>
             </dl>
 
             <p class="exam-desc">
-              Developer-track exercises across the full CKAD curriculum:
-              workloads and multi-container design, deployments and
-              configuration, security contexts, observability, and services,
-              ingress and network policy. Two instances, kind-backed cluster,
-              Kubernetes 1.35.
+              22 tasks drawn each attempt from a 26-task pool, across the
+              full CKAD curriculum: workloads and multi-container design,
+              deployments and configuration, security contexts,
+              observability, and services, ingress and network policy. Two
+              instances, kind-backed cluster, Kubernetes 1.35.
             </p>
 
             <div class="domains">
@@ -363,9 +367,10 @@
             <dl class="exam-stats">
               <div><dt>Duration</dt><dd>1h 30m</dd></div>
               <!-- The pool pair, and its label, appear only when the two
-                   numbers differ. A card reading "22 / 22" would advertise
-                   a random draw that bank does not do, which is why the
-                   CKAD card says "Tasks, 22" instead. -->
+                   numbers differ. A card reading "65 / 65" would advertise
+                   a random draw that bank does not do. The CKAD card next
+                   to this one drew a flat "Tasks, 22" until its bank
+                   started pooling too. -->
               <div>
                 <dt>Drawn / pool</dt>
                 <dd>65 <span class="exam-stat-of">/ 97</span></dd>

@@ -168,6 +168,10 @@ type examResponse struct {
 		WeightPct     int    `json:"weightPct"`
 		QuestionCount int    `json:"questionCount"`
 	} `json:"domains"`
+	Environment *struct {
+		Provider string `json:"provider"`
+		Nodes    int    `json:"nodes"`
+	} `json:"environment"`
 }
 
 func TestExam(t *testing.T) {
@@ -198,6 +202,17 @@ func TestExam(t *testing.T) {
 	}
 	if got.KubernetesVersion != "1.30" {
 		t.Errorf("KubernetesVersion = %q, want %q", got.KubernetesVersion, "1.30")
+	}
+	// The shape of the cluster this bank is sat in — the same
+	// spec.environment.nodes bootstrap.sh generates the kind config from.
+	// It is here so the screens that describe an environment while it is
+	// being built can describe THIS one instead of asserting CKAD's two
+	// nodes at a candidate sitting something else. The fixture says three
+	// precisely so a hardcoded default cannot pass.
+	if got.Environment == nil {
+		t.Errorf("Environment absent; the bank declares one")
+	} else if got.Environment.Provider != "kind" || got.Environment.Nodes != 3 {
+		t.Errorf("Environment = %+v, want provider=kind nodes=3", *got.Environment)
 	}
 	if len(got.Questions) != 2 {
 		t.Fatalf("len(Questions) = %d, want 2", len(got.Questions))

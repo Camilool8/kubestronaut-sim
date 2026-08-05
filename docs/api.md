@@ -125,11 +125,13 @@ and the three selectable modes. Always 200.
   "durationSeconds": 7200,
   "passingScore": 66,
   "kubernetesVersion": "1.35",
+  "questionCount": 22,
+  "hasTips": true,
   "questions": [
     {"id": "q01", "instance": "instance-1", "domain": "Application Environment, Configuration and Security", "weight": 9, "totalPoints": 9, "hintCount": 2, "targetSeconds": 360, "targetDerived": true}
   ],
   "domains": [
-    {"name": "Application Environment, Configuration and Security", "weightPct": 25, "questionCount": 5}
+    {"name": "Application Environment, Configuration and Security", "weightPct": 25, "questionCount": 6}
   ],
   "modes": [
     {"id": "training", "durationSeconds": 0, "untimed": true, "helpAllowed": true, "gradesPerTask": true, "recorded": false, "recommended": false},
@@ -204,7 +206,39 @@ worth 44% and hold three questions.
 above is narrowed to the drawn subset once an attempt starts
 (`facilitator/internal/api/api.go:313-320`). Counting `questions` by
 domain instead would show a candidate the questions they already drew as
-if they were the whole curriculum.
+if they were the whole curriculum. `questionCount` is the exam's declared
+length — `spec.examLength` for a pooled bank, otherwise the pool size —
+and is what any display of "how many questions" must read, since
+`questions` still lists the whole pool before an attempt has drawn.
+
+`hasTips` says the bank ships a `tips.md`, i.e. that
+[`GET /api/exam/tips`](#get-apiexamtips) has something to serve. Omitted
+when it does not; the client draws no entry point at all in that case,
+because a control that opens an empty sheet is worse than none.
+
+### GET /api/exam/tips
+
+The active bank's `tips.md` — how to sit *this* exam quickly, read from
+disk per request so editing it needs no restart.
+
+```json
+{"markdown": "# Exam tips\n\n..."}
+```
+
+**Ungated, deliberately**, where
+[`/solution`](#get-apiquestionsidsolution) and
+[`/hints/{n}`](#get-apiquestionsidhintsn) are not. Those two carry
+answers, which is what an exam exists to withhold; this carries technique
+— aliases, generators, `kubectl explain`, where to look when a Pod will
+not start — which is the same advice before, during and after an attempt
+and is most useful before one. No mode is consulted and no attempt need
+exist.
+
+| Code | When |
+|---|---|
+| 200 | The bank ships a `tips.md`. |
+| 404 | It does not. Ask `hasTips` on `GET /api/exam` first; this is the honest answer for anything that asks anyway. |
+| 503 | No exam is loaded — the shell is up and nothing has been chosen (`facilitator/internal/api/history.go`, `requireExam`). |
 
 ### GET /api/questions/{id}
 
@@ -960,7 +994,7 @@ history still has a bank list).
       "durationSeconds": 7200,
       "passingScore": 66,
       "questionCount": 22,
-      "poolCount": 22,
+      "poolCount": 26,
       "available": true,
       "progress": {
         "attempts": 3,
@@ -1165,7 +1199,7 @@ The exam catalog the exam selector renders. Always 200.
 {
   "active": "ckad-mock-01",
   "banks": [
-    {"id": "ckad-mock-01", "title": "CKAD Mock Exam 01", "certification": "CKAD", "description": "Developer-track exercises...", "examType": "hands-on", "durationSeconds": 7200, "passingScore": 66, "kubernetesVersion": "1.35", "questionCount": 22, "poolCount": 22, "available": true},
+    {"id": "ckad-mock-01", "title": "CKAD Mock Exam 01", "certification": "CKAD", "description": "Developer-track exercises...", "examType": "hands-on", "durationSeconds": 7200, "passingScore": 66, "kubernetesVersion": "1.35", "questionCount": 22, "poolCount": 26, "available": true},
     {"id": "kcna-mock", "title": "KCNA Mock Exam", "certification": "KCNA", "description": "65 questions drawn each attempt...", "examType": "mcq", "durationSeconds": 5400, "passingScore": 75, "questionCount": 65, "poolCount": 97, "available": true},
     {"id": "cks-mock", "title": "CKS Mock Exam", "certification": "CKS", "examType": "hands-on", "available": false, "comingSoon": true, "note": "Requires security add-ons not in the kind environment yet"}
   ]

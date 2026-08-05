@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 4
 # desc: status-page is a NodePort Service on port 80 with node port 30081
 set -uo pipefail
 . /banks/_lib/checks.sh

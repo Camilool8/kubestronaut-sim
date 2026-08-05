@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { getControlLog, type ControlJob, type ControlPhase } from "../api";
+import { controlJobHint, controlJobTitle } from "../lib/controlJob";
 import { formatElapsed } from "../lib/format";
 import { useFocusTrap } from "../lib/useFocusTrap";
 import { Icon } from "./Icon";
@@ -103,18 +104,12 @@ export function ControlProgress({
     return () => window.clearInterval(id);
   }, [failed]);
 
-  const target = bankTitle || job.bank;
   // A seed prepares the cluster for an attempt that has already been
-  // drawn; it destroys nothing and the clock has not started. Titled as
-  // itself rather than falling through to the reset's wording, which
-  // would tell a candidate waiting to begin that their environment is
-  // being wiped.
-  const title =
-    job.op === "switch"
-      ? strings.control.switchTitle(target)
-      : job.op === "seed"
-        ? strings.control.seedTitle
-        : strings.control.resetTitle;
+  // drawn; it destroys nothing and the clock has not started. A provision
+  // is the first exam this environment has ever had. Neither falls
+  // through to the reset's wording, which would tell a candidate waiting
+  // to begin that their environment is being wiped.
+  const title = controlJobTitle(job, bankTitle);
   const running = job.phases.find((p) => p.state === "running");
   const reconnecting = running?.id === BLACKOUT_PHASE;
 
@@ -170,10 +165,6 @@ export function ControlProgress({
   const jobStarted = parseStamp(job.startedAt);
   const totalElapsed = jobStarted === null ? null : formatElapsed(now - jobStarted);
   const doneCount = job.phases.filter((p) => p.state === "done").length;
-  // An mcq reset/switch never advertises this phase — see resetPhases/
-  // switchPhases in control.go. Its absence is exactly the "no cluster
-  // rebuild" signal the hint needs, with no extra prop to thread through.
-  const hasClusterRebuild = job.phases.some((p) => p.id === "recreate-cluster");
 
   return (
     <div className="control-overlay">
@@ -298,11 +289,7 @@ export function ControlProgress({
                   runs one setup script per drawn question against a live
                   cluster, so "usually a few seconds" would be a promise it
                   cannot keep on a sixteen-task draw. */}
-              {job.op === "seed"
-                ? strings.control.hintSeed
-                : hasClusterRebuild
-                  ? strings.control.hint
-                  : strings.control.hintFast}
+              {controlJobHint(job)}
               {totalElapsed && (
                 <span className="control-elapsed" aria-hidden="true">
                   {strings.control.elapsed(totalElapsed)}

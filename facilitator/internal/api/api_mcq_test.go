@@ -102,6 +102,12 @@ func TestMCQExamResponse(t *testing.T) {
 	if strings.Contains(rec.Body.String(), `"instance"`) {
 		t.Errorf("exam response contains an instance key: %s", rec.Body.String())
 	}
+	// Nor a cluster. Absent entirely rather than zeroed: a client reading
+	// `nodes: 0` has to know to ignore it, and any copy built from it
+	// would describe a cluster that does not exist.
+	if strings.Contains(rec.Body.String(), `"environment"`) {
+		t.Errorf("exam response describes an environment an mcq exam has none of: %s", rec.Body.String())
+	}
 }
 
 func TestMCQQuestionServesOptionsNeverTheKey(t *testing.T) {

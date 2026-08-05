@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 2
 # desc: the Ingress was migrated to the v1 backend schema, host and rule intact
 set -uo pipefail
 . /banks/_lib/checks.sh

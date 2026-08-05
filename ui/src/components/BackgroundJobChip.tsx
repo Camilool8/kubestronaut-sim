@@ -1,4 +1,5 @@
 import type { ControlJob } from "../api";
+import { controlJobTitle } from "../lib/controlJob";
 import { formatElapsed } from "../lib/format";
 import { useTick } from "../lib/useTick";
 import { strings } from "../strings";
@@ -26,11 +27,7 @@ export function BackgroundJobChip({ job, bankTitle, onReopen }: BackgroundJobChi
   const total = job.phases.length;
   const done = job.phases.filter((p) => p.state === "done").length;
   const running = job.phases.find((p) => p.state === "running");
-  const label = bankTitle
-    ? strings.control.switchTitle(bankTitle)
-    : job.op === "switch"
-      ? strings.control.switchTitle(job.bank)
-      : strings.control.resetTitle;
+  const label = controlJobTitle(job, bankTitle);
 
   const startedAt = Date.parse(job.startedAt);
   const elapsed = Number.isNaN(startedAt) ? null : formatElapsed(now - startedAt);

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"kubestronaut-sim/hub/internal/auth"
+	"kubestronaut-sim/hub/internal/catalog"
 	"kubestronaut-sim/hub/internal/session"
 	"kubestronaut-sim/hub/internal/store"
 )
@@ -36,8 +37,18 @@ type Server struct {
 	// catch-all. Every session route checks for it.
 	Sessions *session.Manager
 	// DefaultKind is the flavour /api/session/start admits into when the
-	// request does not say.
+	// request names neither an exam nor a kind.
 	DefaultKind session.Kind
+	// Banks is what exams this deployment offers, read at startup from
+	// the index the banks image ships.
+	//
+	// The hub needs its own copy because of when the question is asked:
+	// a candidate in the lobby is choosing a certification and has no
+	// session Pod yet, so there is nothing running to ask. Nil is a
+	// deployment that staged no index — the lobby then has no exams to
+	// offer and falls back to offering a flavour, which is what it did
+	// before exams were choosable.
+	Banks *catalog.Catalog
 	// BaseURL is where a browser reaches the hub, used to build the
 	// OAuth redirect back to it.
 	BaseURL string
@@ -95,6 +106,17 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/history/import", s.handleHistoryImport)
 	mux.HandleFunc("GET /api/history/summary", s.handleHistorySummary)
 	mux.HandleFunc("GET /api/history/{attempt}", s.handleAttempt)
+
+	// The exam list, for the lobby.
+	//
+	// Under /hub/ and not /api/ for the reason the whole route table is
+	// split that way: /api/ is the candidate's session surface, and
+	// everything under it is either answered on their behalf or proxied
+	// to their Pod. This is a question about the deployment that has to
+	// be answerable when they have no Pod at all — which is precisely
+	// when they are asking it. A local `./sim up` JSON-404s it, exactly
+	// as it does /api/me, so the SPA can tell the two products apart.
+	mux.HandleFunc("GET /hub/exams", s.handleExams)
 
 	mux.HandleFunc("GET /hub/auth/login", s.handleLogin)
 	mux.HandleFunc("GET /hub/auth/callback", s.handleCallback)
@@ -196,6 +218,48 @@ func (s *Server) seats() map[string]seat {
 		out[string(kind)] = seat{Used: counts[0], Total: counts[1]}
 	}
 	return out
+}
+
+// hubExam is one exam as the lobby renders it: the catalog row plus the
+// seat pool its engine draws from.
+//
+// `kind` is derived here rather than in the browser because it is the
+// hub's rule, not a display detail — it decides which seat pool a click
+// on this card competes for, and the same mapping (session.KindOf) is
+// what admission and the seat guard use. Two independent derivations of
+// it would be two places to get it wrong.
+type hubExam struct {
+	catalog.Entry
+	Kind string `json:"kind"`
+}
+
+// handleExams answers the lobby's exam list.
+//
+// Unauthenticated on purpose, like the seat counts beside it on
+// /api/me: what a deployment offers is not a fact about anybody, and
+// somebody deciding whether to sign in is entitled to see whether the
+// certification they came for is here.
+func (s *Server) handleExams(w http.ResponseWriter, r *http.Request) {
+	// Never null: an empty list has to marshal as [] so the lobby renders
+	// "no exams" rather than crashing on it.
+	exams := []hubExam{}
+	if s.Banks != nil {
+		for _, e := range s.Banks.List() {
+			exams = append(exams, hubExam{Entry: e, Kind: string(session.KindOf(e.ExamType))})
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"exams": exams})
+}
+
+// bank looks an exam up, answering false for a deployment that staged no
+// index. Refusing there is deliberate: a hub that cannot tell whether a
+// bank exists must not stamp the name into a Pod and find out over the
+// twenty minutes it takes to boot one.
+func (s *Server) bank(id string) (catalog.Entry, bool) {
+	if s.Banks == nil {
+		return catalog.Entry{}, false
+	}
+	return s.Banks.Get(id)
 }
 
 // handleHistory serves the user's attempts in the exact shape the

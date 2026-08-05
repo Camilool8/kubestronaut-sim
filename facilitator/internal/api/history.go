@@ -64,6 +64,24 @@ func (s *server) requireHistory(w http.ResponseWriter) bool {
 	return true
 }
 
+// requireExam answers 503 and reports false when no exam has been
+// chosen yet.
+//
+// Same shape as requireHistory above, and for a related reason: this is
+// a state the product legitimately has, not an error in it. An
+// environment starts with no exam loaded and stays that way until a
+// candidate picks one, so every route that reads the bank has to be able
+// to say so rather than dereference nil. GET /api/catalog deliberately
+// does NOT use this — the catalog is how an exam gets chosen, so it is
+// the one bank-reading route that must answer without a bank.
+func (s *server) requireExam(w http.ResponseWriter) bool {
+	if s.ex == nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "no exam is loaded yet — choose one to build its environment")
+		return false
+	}
+	return true
+}
+
 func (s *server) handleHistoryGet(w http.ResponseWriter, r *http.Request) {
 	if !s.requireHistory(w) {
 		return
@@ -205,8 +223,15 @@ type catalogResponse struct {
 // you have already sat" is a far better answer than an error page. The
 // degraded rows say so themselves — see degradedBanks.
 func (s *server) handleCatalog(w http.ResponseWriter, r *http.Request) {
+	// Deliberately no requireExam. This route is how an exam is chosen,
+	// so it is the one bank-reading endpoint that has to answer when
+	// there is no bank: with no exam loaded, `active` is empty and every
+	// row comes back unchosen, which is exactly what the selector should
+	// render on a fresh environment. The bank LIST never needed the
+	// active bank anyway — it is the conductor's startup scan of
+	// banks/*/exam.yaml.
 	active := s.mgr.Snapshot().Bank
-	if active == "" {
+	if active == "" && s.ex != nil {
 		active = s.ex.Name
 	}
 
@@ -271,20 +296,29 @@ func (s *server) fetchBanks(ctx context.Context) (banksDoc, error) {
 // destructive action (switch banks, which rebuilds the cluster) the
 // thing that discovers the outage.
 func (s *server) degradedBanks(active string, progress map[string]history.ExamProgress) []bankEntry {
-	out := []bankEntry{{
-		ID:                active,
-		Title:             s.ex.Title,
-		Certification:     s.ex.Certification,
-		ExamType:          s.ex.Type,
-		DurationSeconds:   int(s.ex.Duration.Seconds()),
-		PassingScore:      s.ex.PassingScore,
-		KubernetesVersion: s.ex.KubernetesVersion,
-		QuestionCount:     bankLength(s.ex),
-		PoolCount:         len(s.ex.Questions),
-		Available:         true,
-	}}
+	// The loaded bank is the one row this build can vouch for — when
+	// there is one. With no exam chosen there is nothing to vouch for and
+	// no conductor to ask, so the list is whatever the attempt history
+	// remembers, all of it marked unavailable with its reason. An empty
+	// selector that explains itself beats a fabricated row.
+	var out []bankEntry
+	seen := map[string]bool{}
+	if s.ex != nil {
+		out = append(out, bankEntry{
+			ID:                active,
+			Title:             s.ex.Title,
+			Certification:     s.ex.Certification,
+			ExamType:          s.ex.Type,
+			DurationSeconds:   int(s.ex.Duration.Seconds()),
+			PassingScore:      s.ex.PassingScore,
+			KubernetesVersion: s.ex.KubernetesVersion,
+			QuestionCount:     bankLength(s.ex),
+			PoolCount:         len(s.ex.Questions),
+			Available:         true,
+		})
+		seen[active] = true
+	}
 
-	seen := map[string]bool{active: true}
 	for _, r := range historyRows(s.hist) {
 		if seen[r.Bank] {
 			continue

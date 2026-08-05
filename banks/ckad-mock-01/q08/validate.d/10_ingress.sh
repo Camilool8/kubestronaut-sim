@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 4
+# points: 5
 # desc: Ingress helios-routes uses class nginx, host helios.sim.local, two Prefix paths
 set -uo pipefail
 . /banks/_lib/checks.sh

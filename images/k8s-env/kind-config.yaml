@@ -55,4 +55,14 @@ nodes:
       - containerPort: 30082
         hostPort: 30082
         protocol: TCP
-  - role: worker
+# The workers are NOT here. bootstrap.sh copies this file and appends one
+# `- role: worker` per extra node the active bank's spec.environment.nodes
+# asks for, because the right number is a property of the certification
+# being rehearsed and not of the image: a CKA bank has to be able to
+# cordon one node and see the work move.
+#
+# So this file describes a single-node cluster, and that is exactly what
+# a bank asking for one node gets. Everything above the node list —
+# especially the port mappings and certSANs, which are the whole
+# host -> cluster chain — is shared by every size and lives here so there
+# is one copy of it.

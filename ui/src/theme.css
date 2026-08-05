@@ -1986,22 +1986,43 @@
   overflow-x: auto;
 }
 
-.md code {
-  background: var(--bg);
+/* Inline code carries TWO channels, and it needs both.
+   The fill alone used to be the whole treatment (`background: var(--bg)`),
+   which worked in the hands-on question panel — that sits on --surface, so
+   a --bg chip reads against it — and was invisible on the multiple-choice
+   screen, where .mcq-body IS --bg. Identical fill, no edge, 0.1em of
+   padding: a keyword in an mcq stem was distinguished from the prose
+   around it by nothing but the monospace face, at a stem size where that
+   is a very quiet signal. Candidates found out a value was a value by
+   hovering it.
+   So: --surface-raised is the chip fill everywhere else in the system
+   (DESIGN.md, Colours), and the hairline is what survives a surface whose
+   tone happens to be close. Neither channel is load-bearing alone.
+
+   .mcq-option-text is here because an option is not markdown and never
+   passes through .md — it is a single-line string out of exam.yaml,
+   rendered by InlineCode. Its code spans are the same object and must
+   not be a second definition of one. base.css already gives every `code`
+   element the mono face, so only the chrome is stated here. */
+.md code,
+.mcq-option-text code {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
   padding: 0.1em 0.3em;
   border-radius: var(--radius-xs);
 }
 
-/* Every inline value in a question is a click-to-copy button. It has to
-   read as part of the sentence, not as a form control, so it borrows
-   the inline-code look and only reveals its affordance on hover/focus. */
+/* Every inline value in a hands-on question is a click-to-copy button. It
+   has to read as part of the sentence rather than as a form control — but
+   it does have to read as a control, which is the Two-Tier Hairline rule:
+   --border-strong is for an edge that identifies a hit area (and answers
+   WCAG 1.4.11's 3:1 floor), --border for everything structural. This was
+   `1px solid transparent` until now, which is how the affordance came to
+   be hover-only. */
 .copy-value {
-  /* inline-block, not inline: the icon below is absolutely positioned and
-     needs a positioned box to hang off. Baseline alignment keeps it
-     sitting in the sentence exactly as inline did. */
   display: inline-block;
-  position: relative;
   vertical-align: baseline;
+  max-width: 100%;
   padding: 0;
   border: 0;
   background: none;
@@ -2012,7 +2033,25 @@
 }
 
 .copy-value code {
-  border: 1px solid transparent;
+  border-color: var(--border-strong);
+  /* A bank value can be a 31-character /opt/course path in a panel the
+     candidate has dragged down to 280px. Breaking inside the chip is the
+     better failure than pushing the pane sideways. */
+  overflow-wrap: anywhere;
+}
+
+/* Except in a table, where the column can grow instead.
+   `anywhere` also collapses the cell's intrinsic minimum width, so a
+   two-column table squeezed the first column down and split the token
+   inside it: the exam tips' symptom table rendered "ImagePullBackOf" and
+   a lone "f" on the next line. These are strings a candidate greps for,
+   so a broken one is worse than a wide column. `break-word` keeps the
+   token whole and lets the column size to it, only breaking when the
+   token cannot fit on a line of its own — which is the behaviour the
+   rule above wants and cannot have where there is no column to grow. */
+.md th code,
+.md td code {
+  overflow-wrap: break-word;
 }
 
 .copy-value:hover code,
@@ -2022,37 +2061,23 @@
   color: var(--accent-strong);
 }
 
-/* Out of flow, deliberately.
-   This used to be an inline glyph at opacity: 0, which still occupied its
-   own width plus a margin — so every copyable value in a question left a
-   permanent gap in the sentence, and a paragraph with six of them read as
-   though it had been typeset with holes in it. Hiding it with `width: 0`
-   instead would have been worse: the sentence would reflow under the
-   cursor while being read.
-   Absolute keeps the resting text exactly as if the icon did not exist,
-   and hovering shifts nothing. The value's own hover treatment (accent
-   border, accent-soft fill, accent-strong text) is what actually
-   advertises the control; this is a fourth, redundant channel. */
-.copy-value-icon {
-  position: absolute;
-  left: 100%;
-  top: 50%;
-  transform: translateY(-50%);
-  margin-left: 0.15em;
-  font-size: 0.85em;
-  line-height: 1;
-  color: var(--accent-strong);
-  opacity: 0;
-  pointer-events: none;
-}
-
-.copy-value:hover .copy-value-icon,
-.copy-value:focus-visible .copy-value-icon {
-  opacity: 1;
-}
+/* There is no hover icon, and this comment is the record of why not.
+   Three geometries were tried. An inline glyph at `opacity: 0` reserved
+   its own width plus a margin, so a paragraph with six copyable values
+   read as though it had been typeset with holes in it. `width: 0` would
+   have reflowed the sentence under the cursor while it was being read.
+   Absolute positioning at `left: 100%` reserved nothing and therefore
+   collided with everything: at the mcq stem's 19px it ran ~18px past the
+   chip into a ~4px word gap, and because neither the button nor the icon
+   opened a stacking context, the NEXT chip's opaque fill painted over it.
+   An icon that is drawn behind the following word is worse than no icon.
+   The chip's own resting hairline is the affordance now, its accent
+   treatment is the hover state, and the toast is the confirmation. Three
+   channels, none of them out of flow. */
 
 .md pre code {
   background: none;
+  border: 0;
   padding: 0;
 }
 
@@ -2176,6 +2201,52 @@
   justify-content: flex-end;
   gap: var(--space-3);
   margin-top: var(--space-4);
+}
+
+/* ---- exam tips sheet ---- */
+
+/* A dialog that is READ rather than answered.
+   560px is the right measure for a sentence and two buttons, which is
+   what every other dialog here is. The tips are a document — pipe tables,
+   and command lines like `k create cj nightly --image=... --schedule=...`
+   — and at 560px every one of those wraps or scrolls sideways, which is
+   exactly the retyping the page exists to save. Selected off the body
+   rather than by adding a third size to Dialog, because this is the only
+   reading dialog the product has; `.screen:has(> .score-screen)` above
+   sets the same precedent. */
+.confirm-dialog-wide:has(> .tips-body) {
+  width: min(760px, 94%);
+}
+
+.dialog-lead {
+  margin-top: 0;
+  margin-bottom: var(--space-4);
+}
+
+/* The lobby's two sheet openers, kept together as one flex child of
+   .mode-fine so its space-between still means "tips list, then buttons"
+   rather than spreading three items across the row. */
+.mode-fine-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+/* .score-actions centres inline content and had exactly one button in it
+   until the tips opener arrived; JSX puts no whitespace between adjacent
+   elements, so without this the two would touch. */
+.score-actions .btn + .btn {
+  margin-left: var(--space-3);
+}
+
+/* Ruled off from the lead the way .intro-note is ruled off from its
+   legend: what follows is the bank's own prose rather than this app's
+   copy, and the two should not read as one paragraph. The dialog itself
+   scrolls (max-height + overflow-y), so this deliberately does NOT open a
+   second scroll container inside it. */
+.tips-body {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
 }
 
 /* ---- score screen ---- */
@@ -6277,6 +6348,15 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-4);
+}
+
+/* The line that changes as the wait goes on, under the one that does
+   not. Muted because it is the secondary of the two: the paragraph above
+   says what is being built, this says how it is going. */
+.hosted-boot-reassure {
+  margin: 0;
+  max-width: 64ch;
+  color: var(--text-muted);
 }
 
 /* The header chip: identity, the lease, and the two ways out. */

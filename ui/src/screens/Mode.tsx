@@ -11,6 +11,7 @@ import {
 import { Async } from "../components/Async";
 import { useDesktopGate } from "../components/DesktopRequired";
 import { ExamIntro, markIntroSeen } from "../components/ExamIntro";
+import { ExamTips } from "../components/ExamTips";
 import { Icon } from "../components/Icon";
 import { parseDomainsParam } from "../lib/attemptHistory";
 import { formatDuration } from "../lib/format";
@@ -332,6 +333,7 @@ export function Mode({ bankId, catalogVersion, onSessionChange }: ModeProps) {
   const [starting, setStarting] = useState<SessionMode | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const [introOpen, setIntroOpen] = useState(false);
+  const [tipsOpen, setTipsOpen] = useState(false);
 
   const examState = useAsync((signal) => getExam(signal), [catalogVersion]);
   const exam = examState.data;
@@ -466,30 +468,55 @@ export function Mode({ bankId, catalogVersion, onSessionChange }: ModeProps) {
                   ))}
                   <li>{strings.mode.tipTimer}</li>
                 </ul>
-                {/* Marks the card seen: someone who reads it here should
-                    not have it thrown at them again the moment the exam
-                    opens. Hidden for mcq — the card walks through the
-                    split-screen desktop layout, none of which exists
-                    there. */}
-                {!isMcq && (
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => {
-                      markIntroSeen();
-                      setIntroOpen(true);
-                    }}
-                  >
-                    {strings.intro.open}
-                  </button>
-                )}
+                {/* Grouped, so `.mode-fine`'s space-between keeps holding
+                    the tips list against one edge and the buttons against
+                    the other. Ungrouped, a second button became a third
+                    flex child and the first one drifted into the middle
+                    of the row. */}
+                <div className="mode-fine-actions">
+                  {/* Marks the card seen: someone who reads it here should
+                      not have it thrown at them again the moment the exam
+                      opens. Hidden for mcq — the card walks through the
+                      split-screen desktop layout, none of which exists
+                      there. */}
+                  {!isMcq && (
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => {
+                        markIntroSeen();
+                        setIntroOpen(true);
+                      }}
+                    >
+                      {strings.intro.open}
+                    </button>
+                  )}
+                  {/* Drawn only when the bank ships a tips.md. A control
+                      that opens an empty sheet is worse than no control,
+                      and the server is the only thing that knows — tips
+                      are per bank, so there is no per-question count to
+                      infer it from the way the hint tray does. Shown for
+                      both engines: an mcq bank is free to ship its own. */}
+                  {loaded.hasTips && (
+                    <button type="button" className="btn" onClick={() => setTipsOpen(true)}>
+                      {strings.tips.open}
+                    </button>
+                  )}
+                </div>
               </div>
             </>
           );
         }}
       </Async>
 
-      {introOpen && <ExamIntro onClose={() => setIntroOpen(false)} />}
+      {introOpen && (
+        <ExamIntro
+          onClose={() => setIntroOpen(false)}
+          durationSeconds={exam?.durationSeconds}
+        />
+      )}
+
+      {tipsOpen && <ExamTips onClose={() => setTipsOpen(false)} />}
     </div>
   );
 }

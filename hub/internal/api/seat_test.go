@@ -38,6 +38,20 @@ func catalogHandler() http.Handler {
 // mid-restart looks like from here.
 func seatOfKind(t *testing.T, kind session.Kind) (*Server, *http.Cookie, *httptest.Server) {
 	t.Helper()
+	bank := "ckad-mock-01"
+	if kind == session.MCQ {
+		bank = "kcna-mock"
+	}
+	return seatFor(t, kind, bank)
+}
+
+// seatFor is seatOfKind with the seat's exam named, including as "" —
+// which is a session that records no exam at all. That is not a
+// hypothetical: it is what a Pod adopted from before exams were
+// choosable looks like, and it is the case the flavour check underneath
+// the bank check exists for.
+func seatFor(t *testing.T, kind session.Kind, bank string) (*Server, *http.Cookie, *httptest.Server) {
+	t.Helper()
 	s, _ := newServer(t, auth.ModeGitHub)
 	pod := httptest.NewServer(catalogHandler())
 	t.Cleanup(pod.Close)
@@ -46,10 +60,6 @@ func seatOfKind(t *testing.T, kind session.Kind) (*Server, *http.Cookie, *httpte
 		t.Fatal(err)
 	}
 	host, port := u.Hostname(), atoi(u.Port())
-	bank := "ckad-mock-01"
-	if kind == session.MCQ {
-		bank = "kcna-mock"
-	}
 	s.Sessions = session.New(&session.Static{Host: host}, session.Config{
 		Flavours: map[session.Kind]session.Flavour{
 			kind: {Seats: 1, Template: session.Template(podTemplate), Bank: bank},
@@ -74,11 +84,47 @@ func switchTo(s *Server, c *http.Cookie, bank string) *httptest.ResponseRecorder
 	return do(s, r)
 }
 
-// The bug. An MCQ seat is two containers and no cluster; switching its
-// bank does not switch its template, so a hands-on exam chosen here
-// booted the hands-on bank into a Pod with no instances and no desktop,
-// graded every check 0 with "could not resolve hostname instance-1", and
-// recorded it as a real attempt.
+// A seat is one exam.
+//
+// The candidate chose the certification in the lobby, and the Pod was
+// created and sized for it. Rebuilding it onto a different exam would
+// hand them an environment they were never admitted for — and would do
+// it silently, since the two hands-on exams look identical from inside
+// the session. The answer to "I want a different exam" is a new session.
+func TestASeatRefusesAnyExamButItsOwn(t *testing.T) {
+	s, c, _ := seatFor(t, session.Practical, "ckad-mock-01")
+
+	w := switchTo(s, c, "ckad-mock-02")
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409: %s", w.Code, body(t, w))
+	}
+	if got := body(t, w); !strings.Contains(got, "this seat is for one exam") {
+		t.Errorf("body = %q, want the one-exam refusal", got)
+	}
+}
+
+// The same request naming the seat's own exam is not a refusal: it is
+// the reseed a candidate gets by asking for the exam they are already
+// sitting, and it must go through the ordinary recycle.
+func TestASeatAcceptsItsOwnExam(t *testing.T) {
+	s, c, _ := seatFor(t, session.Practical, "ckad-mock-01")
+
+	w := switchTo(s, c, "ckad-mock-01")
+
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202: %s", w.Code, body(t, w))
+	}
+}
+
+// The bug this gate was built for. An MCQ seat is two containers and no
+// cluster; switching its bank does not switch its template, so a
+// hands-on exam chosen here booted the hands-on bank into a Pod with no
+// instances and no desktop, graded every check 0 with "could not resolve
+// hostname instance-1", and recorded it as a real attempt.
+//
+// Refused by the one-exam rule now rather than by the flavour rule, and
+// the test stays because what must never happen is unchanged.
 func TestAnMcqSeatRefusesAHandsOnExam(t *testing.T) {
 	s, c, _ := seatOfKind(t, session.MCQ)
 
@@ -86,9 +132,6 @@ func TestAnMcqSeatRefusesAHandsOnExam(t *testing.T) {
 
 	if w.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want 409: %s", w.Code, body(t, w))
-	}
-	if got := body(t, w); !strings.Contains(got, "cannot run that exam") {
-		t.Errorf("body = %q, want the seat refusal", got)
 	}
 }
 
@@ -102,6 +145,23 @@ func TestAPracticalSeatRefusesAnMcqExam(t *testing.T) {
 
 	if w.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want 409: %s", w.Code, body(t, w))
+	}
+}
+
+// A session that records no exam — a Pod adopted from before exams were
+// choosable — cannot be checked against its own bank, so it falls
+// through to the flavour check that was the whole rule before. It must
+// not fall through to no check at all.
+func TestASeatWithNoRecordedExamStillChecksTheFlavour(t *testing.T) {
+	s, c, _ := seatFor(t, session.MCQ, "")
+
+	if w := switchTo(s, c, "ckad-mock-01"); w.Code != http.StatusConflict {
+		t.Fatalf("hands-on into an mcq seat: status = %d, want 409: %s", w.Code, body(t, w))
+	}
+	// And the same-flavour move it always allowed still works, so the
+	// fallback is the old rule intact rather than a blanket refusal.
+	if w := switchTo(s, c, "kcna-mock"); w.Code != http.StatusAccepted {
+		t.Fatalf("mcq into an mcq seat: status = %d, want 202: %s", w.Code, body(t, w))
 	}
 }
 
@@ -122,23 +182,11 @@ func TestARefusedSwitchLeavesTheSessionRunning(t *testing.T) {
 	}
 }
 
-// Same kind, different bank: a practical seat may move between hands-on
-// exams, because the Pod that needs is the one it already has. The gate
-// is on the flavour, not on the bank the seat happened to start with.
-func TestAPracticalSeatMayMoveBetweenHandsOnExams(t *testing.T) {
-	s, c, _ := seatOfKind(t, session.Practical)
-
-	w := switchTo(s, c, "ckad-mock-02")
-
-	if w.Code != http.StatusAccepted {
-		t.Fatalf("status = %d, want 202: %s", w.Code, body(t, w))
-	}
-}
-
 // An exam no catalog knows is a 404, not a rebuild onto a bank that does
-// not exist.
+// not exist. Reached through a seat with no recorded exam, since a seat
+// that has one never gets as far as the catalog.
 func TestAnUnknownExamIsRefused(t *testing.T) {
-	s, c, _ := seatOfKind(t, session.MCQ)
+	s, c, _ := seatFor(t, session.MCQ, "")
 
 	w := switchTo(s, c, "cks-mock-01")
 
@@ -150,7 +198,7 @@ func TestAnUnknownExamIsRefused(t *testing.T) {
 // Fail closed. Not knowing whether a hands-on bank is about to be booted
 // into a Pod with no cluster is not a reason to try it and find out.
 func TestAnUnreadableCatalogRefusesTheSwitch(t *testing.T) {
-	s, c, pod := seatOfKind(t, session.MCQ)
+	s, c, pod := seatFor(t, session.MCQ, "")
 	pod.Close()
 
 	w := switchTo(s, c, "ckad-mock-01")

@@ -494,7 +494,12 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
           </div>
         </Dialog>
       )}
-      {introOpen && <ExamIntro onClose={() => setIntroOpen(false)} />}
+      {introOpen && (
+        <ExamIntro
+          onClose={() => setIntroOpen(false)}
+          durationSeconds={exam?.durationSeconds}
+        />
+      )}
     </div>
   );
 }

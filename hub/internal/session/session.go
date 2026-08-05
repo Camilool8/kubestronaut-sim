@@ -118,9 +118,31 @@ type Pod struct {
 type Flavour struct {
 	Seats    int
 	Template Template
-	// Bank is the exam this flavour starts on. Empty leaves whatever the
-	// template declares.
+	// Bank is the exam this flavour starts on when the candidate names
+	// none. Empty leaves whatever the template declares.
+	//
+	// It used to be the exam, full stop — a deployment value the person
+	// sitting the exam never saw. It is a DEFAULT now: the lobby offers
+	// certifications, and Start takes the one that was chosen.
 	Bank string
+	// BankTemplates are per-exam manifests, keyed by bank id, for exams
+	// that need a differently sized Pod. A bank with no entry gets
+	// Template.
+	//
+	// One seat pool either way: the queue, the seat count and admission
+	// are all per-kind, and an exam does not get its own capacity by
+	// needing more memory. This only changes what is stamped out once a
+	// seat has been granted — a CKA Pod running three kind nodes cannot
+	// be sized by what CKAD measured.
+	BankTemplates map[string]Template
+}
+
+// templateFor returns the manifest this flavour stamps out for a bank.
+func (f Flavour) templateFor(bank string) Template {
+	if t, ok := f.BankTemplates[bank]; ok && len(t) > 0 {
+		return t
+	}
+	return f.Template
 }
 
 // Config is everything the manager needs to be built.
@@ -301,7 +323,10 @@ func (m *Manager) logf(format string, args ...any) {
 // Idempotent: a user who already has a session gets it back rather than a
 // second one. The UI polls this while queued, and each poll is also how a
 // held seat is claimed.
-func (m *Manager) Start(ctx context.Context, user string, kind Kind) (Session, error) {
+// bank names the exam to stamp into the Pod. Empty falls back to the
+// flavour's default, which is what an older client — or a deployment
+// whose lobby has no exam list to offer — sends.
+func (m *Manager) Start(ctx context.Context, user string, kind Kind, bank string) (Session, error) {
 	m.mu.Lock()
 
 	if e, ok := m.sessions[user]; ok {
@@ -315,6 +340,9 @@ func (m *Manager) Start(ctx context.Context, user string, kind Kind) (Session, e
 	if !ok || fl.Seats <= 0 {
 		m.mu.Unlock()
 		return Session{}, fmt.Errorf("%w: %s", ErrNoSuchKind, kind)
+	}
+	if bank == "" {
+		bank = fl.Bank
 	}
 
 	// A seat this user is already holding through the queue counts as
@@ -331,7 +359,7 @@ func (m *Manager) Start(ctx context.Context, user string, kind Kind) (Session, e
 		Session: Session{
 			User:      user,
 			Kind:      kind,
-			Bank:      fl.Bank,
+			Bank:      bank,
 			Pod:       m.podName(user, kind),
 			State:     Pending,
 			StartedAt: now,
@@ -345,7 +373,7 @@ func (m *Manager) Start(ctx context.Context, user string, kind Kind) (Session, e
 	s := e.Session
 	m.mu.Unlock()
 
-	m.logf("hub: admitted %s to a %s seat as %s", user, kind, e.Pod)
+	m.logf("hub: admitted %s to a %s seat as %s, sitting %s", user, kind, e.Pod, bank)
 	// Detached from the request: booting takes minutes and the browser
 	// polls. ctx here would cancel the boot when the admitting request
 	// returned.
@@ -405,7 +433,7 @@ func (m *Manager) createAndWait(ctx context.Context, e *entry, fl Flavour) error
 		}
 		p.WebhookURL, p.WebhookToken = url, token
 	}
-	spec, err := fl.Template.render(p)
+	spec, err := fl.templateFor(e.Bank).render(p)
 	if err != nil {
 		return err
 	}

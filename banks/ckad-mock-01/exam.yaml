@@ -14,6 +14,25 @@ spec:
   duration: 120m
   passingScore: 66
   kubernetesVersion: "1.35"
+  # One attempt asks 22 of the 26 questions below, drawn fresh and
+  # domain-stratified every time it starts. The number is the sitting, not
+  # the bank: the real CKAD is around twenty tasks in two hours, and
+  # putting four more into the same 120 minutes would have made this a
+  # harder exam rather than a fuller one.
+  #
+  # The variety is a bonus and a modest one — with a pool this close to
+  # the draw, three of the five domains are asked in full every time and
+  # only Design and Build (4 of 7) and Observability (3 of 4) rotate.
+  # Deepening a domain widens its rotation; nothing else has to change.
+  #
+  # The cost is real and worth knowing before copying this line into
+  # another bank: a pooled hands-on bank is NOT seeded at boot. The draw
+  # has not happened yet at boot time, so images/k8s-env/bootstrap.sh
+  # pre-pulls the images and stops, and the drawn questions' setup.sh
+  # scripts run when the attempt starts — POST /api/session/start answers
+  # 202 and the clock waits on the conductor's seed job. See
+  # docs/bank-spec.md.
+  examLength: 22
   # The published CKAD curriculum weights. These are not documentation:
   # a domain's share of this exam's points IS its weight here, and
   # tests/bank-weights.sh fails the build if any domain drifts more than
@@ -58,7 +77,7 @@ spec:
       title: NetworkPolicy lockdown
       instance: instance-2
       domain: Services and Networking
-      weight: 9
+      weight: 11
       docs:
         - label: Network policies
           url: https://kubernetes.io/docs/concepts/services-networking/network-policies/
@@ -104,7 +123,7 @@ spec:
       title: Route two Services with one Ingress
       instance: instance-2
       domain: Services and Networking
-      weight: 9
+      weight: 11
       docs:
         - label: Ingress
           url: https://kubernetes.io/docs/concepts/services-networking/ingress/
@@ -167,7 +186,7 @@ spec:
       title: Health checks
       instance: instance-2
       domain: Application Observability and Maintenance
-      weight: 9
+      weight: 8
       docs:
         - label: Liveness, readiness and startup probes
           url: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
@@ -175,12 +194,12 @@ spec:
       title: Find out why two workloads are broken
       instance: instance-1
       domain: Application Observability and Maintenance
-      weight: 9
+      weight: 8
     - id: q18
       title: Bring a manifest up to date
       instance: instance-2
       domain: Application Observability and Maintenance
-      weight: 9
+      weight: 8
       docs:
         - label: Deprecated API migration guide
           url: https://kubernetes.io/docs/reference/using-api/deprecation-guide/
@@ -188,7 +207,7 @@ spec:
       title: A Service that reaches nothing
       instance: instance-1
       domain: Services and Networking
-      weight: 9
+      weight: 11
       docs:
         - label: Services
           url: https://kubernetes.io/docs/concepts/services-networking/service/
@@ -196,7 +215,7 @@ spec:
       title: Expose a Deployment on a node port
       instance: instance-2
       domain: Services and Networking
-      weight: 9
+      weight: 11
       docs:
         - label: Service types
           url: https://kubernetes.io/docs/concepts/services-networking/service/
@@ -210,3 +229,43 @@ spec:
       instance: instance-2
       domain: Application Design and Build
       weight: 6
+    - id: q23
+      title: Blue/green cutover
+      instance: instance-1
+      domain: Application Deployment
+      weight: 9
+      docs:
+        - label: Services
+          url: https://kubernetes.io/docs/concepts/services-networking/service/
+        - label: Labels and selectors
+          url: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+    - id: q24
+      title: Replace a bare Pod with a hardened Deployment
+      instance: instance-2
+      domain: Application Environment, Configuration and Security
+      weight: 9
+      docs:
+        - label: Security contexts
+          url: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+        - label: Deployments
+          url: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
+    - id: q25
+      title: Debug a Pod you cannot get into
+      instance: instance-1
+      domain: Application Observability and Maintenance
+      weight: 8
+      docs:
+        - label: Ephemeral containers
+          url: https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/
+        - label: Debug running Pods
+          url: https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/
+    - id: q26
+      title: Pull policy and shutdown budget
+      instance: instance-2
+      domain: Application Design and Build
+      weight: 6
+      docs:
+        - label: Images and pull policy
+          url: https://kubernetes.io/docs/concepts/containers/images/
+        - label: Pod lifecycle
+          url: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/

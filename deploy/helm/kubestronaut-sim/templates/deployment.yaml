@@ -67,6 +67,42 @@ spec:
         fsGroup: 65532
         seccompProfile:
           type: RuntimeDefault
+      {{- if $sessions }}
+      initContainers:
+        # The exam list, staged out of the banks image.
+        #
+        # The hub needs it because of WHEN the question is asked: a
+        # candidate in the lobby is choosing which certification to sit,
+        # and until they have chosen there is no session Pod, so there is
+        # nothing running that could be asked what exams exist.
+        #
+        # It copies /index — JSON generated at image build time from each
+        # bank's exam.yaml — and not /src. The hub is a FROM scratch
+        # image with no shell, and no Go binary in this repo parses YAML,
+        # so the conversion happens where the content lives. Same reason
+        # the session Pod stages banks from this image rather than baking
+        # them into six others.
+        - name: banks
+          image: {{ include "kubestronaut-sim.image" (dict "ctx" . "name" "banks") | quote }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          # -r and not -a, unlike the session Pod's identical-looking
+          # init container. That one runs as root; this Pod runs as
+          # 65532, and -a asks to preserve root ownership, which a
+          # non-root process cannot do and busybox reports as a failure.
+          # Nothing here needs the original ownership: the hub reads
+          # these files and no one else ever opens them.
+          command: ["sh", "-c", "cp -r /index/. /banks/"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - {name: banks, mountPath: /banks}
+          resources:
+            requests: {memory: "16Mi", cpu: "10m"}
+            limits: {memory: "64Mi", cpu: "200m"}
+      {{- end }}
       containers:
         - name: hub
           image: {{ include "kubestronaut-sim.image" (dict "ctx" . "name" "hub") | quote }}
@@ -109,6 +145,7 @@ spec:
                 secretKeyRef: {name: {{ $secret | quote }}, key: GITHUB_CLIENT_SECRET, optional: true}
 
             {{- if $sessions }}
+            - {name: BANKS_INDEX_DIR, value: "/banks"}
             - {name: SESSION_NAMESPACE, value: {{ include "kubestronaut-sim.sessionNamespace" . | quote }}}
             - {name: DEFAULT_KIND, value: {{ .Values.sessions.defaultKind | quote }}}
             - {name: POD_PREFIX, value: {{ .Values.sessions.podPrefix | quote }}}
@@ -135,6 +172,7 @@ spec:
             - {name: state, mountPath: /state}
             {{- if $sessions }}
             - {name: session-pods, mountPath: /etc/hub, readOnly: true}
+            - {name: banks, mountPath: /banks, readOnly: true}
             {{- end }}
           # /healthz answers before any of the interesting wiring, which
           # is what makes it a liveness probe and not a readiness one: a
@@ -158,6 +196,11 @@ spec:
         - name: session-pods
           configMap:
             name: {{ include "kubestronaut-sim.fullname" . }}-session-pods
+        # Read once at startup and never again: banks are an image layer,
+        # so a new bank is a new image and therefore a new hub Pod.
+        - name: banks
+          emptyDir:
+            sizeLimit: 16Mi
         {{- end }}
       {{- with .Values.hub.nodeSelector }}
       nodeSelector:

@@ -7,6 +7,20 @@ set -euo pipefail
 # cold cluster bootstrap, but it is finite: a wait that has gone wrong
 # should end as a message in the log, not as a container that looks alive
 # and does nothing.
+# First, wait — without a deadline — for an exam to exist at all.
+#
+# The budget below exists to turn "a cold bootstrap has gone wrong" into a
+# message instead of a container that looks alive and does nothing. That
+# is a different situation from "nobody has chosen an exam yet", which is
+# a perfectly good state to sit in for an hour, and which no longer has a
+# compose health gate holding this container back from reaching it. Timing
+# out on it would kill an instance for being correctly idle, and nothing
+# would restart it.
+if [ ! -s /shared/bank ]; then
+  echo "no exam selected yet; waiting for one to be chosen..."
+  until [ -s /shared/bank ]; do sleep 2; done
+fi
+
 echo "waiting for cluster kubeconfig..."
 wait_deadline=$((SECONDS + ${INSTANCE_WAIT_BUDGET:-2400}))
 # -s, not -f: a zero-byte file is a file, and the whole failure this

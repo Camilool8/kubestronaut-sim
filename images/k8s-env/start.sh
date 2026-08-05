@@ -115,6 +115,34 @@ start_control_sshd() {
     && echo "control sshd on ${SSHD_LISTEN}:22"
 }
 
+# Nothing above this line is about any particular exam — an inner Docker
+# daemon and a chart repository are the same whichever bank is chosen, and
+# both are once-per-container anyway. Everything below builds ONE exam's
+# environment, so it does not run until there is one to build.
+#
+# The runtime bank file wins over the compose-time env var, exactly as it
+# does inside bootstrap.sh. `./sim up` no longer passes a default, so a
+# bare `up` lands here with neither and the container rests: no cluster,
+# no CNI, no seeded questions, nothing that would have to be torn down
+# when the candidate picks something other than what we guessed. Picking
+# an exam writes /shared/bank and the conductor execs bootstrap.sh in
+# here, which is the same path a bank switch has always taken.
+#
+# A hosted session Pod is always stamped with BANK at creation, so it
+# never takes this branch.
+selected=""
+if [ -s /shared/bank ]; then
+  selected=$(cat /shared/bank)
+elif [ -n "${BANK:-}" ]; then
+  selected="$BANK"
+fi
+
+if [ -z "$selected" ]; then
+  boot_idle
+  start_control_sshd
+  tail -f /dev/null
+fi
+
 if ! /opt/sim/bootstrap.sh; then
   start_control_sshd
   echo "bootstrap failed; holding the container open so the failure is visible and retryable" >&2

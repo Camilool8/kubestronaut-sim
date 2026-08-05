@@ -1,3 +1,4 @@
+import { formatClock } from "../lib/format";
 import { Dialog } from "./Dialog";
 import { strings } from "../strings";
 
@@ -31,15 +32,31 @@ export function resetIntroSeen(): void {
 // 900px, and it is renderable (and therefore testable) without a live
 // exam behind it, which is also why the lobby can show it before the
 // clock starts.
-export function ExamIntro({ onClose }: { onClose: () => void }) {
+export function ExamIntro({
+  onClose,
+  durationSeconds,
+}: {
+  onClose: () => void;
+  durationSeconds?: number;
+}) {
   const s = strings.intro;
+  // The schematic's countdown chip showed a hardcoded "1:59:58", i.e.
+  // CKAD's two hours, on a diagram explaining every exam's screen. It
+  // reads two seconds off the loaded exam's own clock — enough to look
+  // like a countdown that is running rather than one at its start —
+  // and falls back to the label when no exam is loaded, which is where
+  // the About drawer can open it.
+  const timer =
+    durationSeconds && durationSeconds > 2
+      ? formatClock(durationSeconds - 2)
+      : s.diagramTimerLabel;
 
   return (
     <Dialog title={s.title} onClose={onClose} wide>
       <div className="intro-schematic" role="img" aria-label={s.schematicAlt}>
         <div className="intro-topbar">
           <span className="intro-region-label">3</span>
-          <span className="intro-chip intro-chip-timer">{s.diagramTimer}</span>
+          <span className="intro-chip intro-chip-timer">{timer}</span>
           <span className="intro-region-label">4</span>
           <span className="intro-chip intro-chip-end">{s.diagramEnd}</span>
         </div>

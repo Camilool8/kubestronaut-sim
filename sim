@@ -21,11 +21,70 @@ case "$cmd" in
     # The facilitator no longer waits for the cluster, so it answers
     # within seconds and /api/boot can narrate the rest. The browser shows
     # the same phases from the same source at the same time.
-    BANK=${2:-ckad-mock-01} docker compose up -d --build
+    # No default bank. `./sim up` brings the shell up and stops there;
+    # naming one — `./sim up ckad-mock-01` — additionally builds that
+    # exam's environment and waits for it, which is what the smoke suite
+    # and anyone who already knows what they want are doing.
+    #
+    # A warm stack keeps whatever is already active: /shared/bank
+    # survives `down`, and every entrypoint prefers the file over this
+    # variable, so this only decides what a FRESH environment builds.
+    BANK=${2:-} docker compose up -d --build
 
     budget=${SIM_BOOT_BUDGET:-3600}
     deadline=$((SECONDS + budget))
     last=""
+    if [ -z "${2:-}" ]; then
+      # Nothing to BUILD, which is not the same as nothing to wait for.
+      #
+      # This used to return the moment /api/boot answered, which the
+      # facilitator does within a second or two of starting. k8s-env is
+      # not done at that point: it still has the two phases that are not
+      # about any particular exam — the inner Docker daemon, then the
+      # chart repository — and it reports `booting` throughout. So the
+      # line below printed "Choose an exam" while the browser was still
+      # showing a boot screen. Measured at ~8s on a warm laptop; the
+      # smoke suite caught it by sampling the state at ~2s.
+      #
+      # Waiting for the state to SETTLE fixes it and costs those same
+      # seconds. It never waits for an exam: `idle` is the expected
+      # answer, and it means the shell is up with nothing chosen.
+      shell_deadline=$((SECONDS + ${SIM_SHELL_BUDGET:-300}))
+      while :; do
+        if [ "$SECONDS" -ge "$shell_deadline" ]; then
+          echo
+          echo "The environment did not finish starting up. Check with:"
+          echo "  docker compose logs k8s-env"
+          exit 1
+        fi
+        boot=$(curl -fsS --max-time 5 "${UI}/api/boot" 2>/dev/null) || { sleep 2; continue; }
+        state=$(printf '%s' "$boot" | json_field state)
+        label=$(printf '%s' "$boot" | json_field label)
+        if [ -n "$label" ] && [ "$label" != "$last" ]; then
+          echo "  $label"
+          last="$label"
+        fi
+        case "$state" in
+          idle)
+            echo "Ready. Choose an exam at ${UI} — its environment is built when you pick one."
+            exit 0 ;;
+          ready)
+            # A warm stack whose exam survived a `down`. Nothing was
+            # chosen just now, so say what is actually there rather than
+            # inviting a choice that has already been made.
+            echo "Exam environment ready. Exam UI: ${UI} — or ./sim ssh instance-1"
+            exit 0 ;;
+          failed)
+            echo
+            echo "The environment failed to start:"
+            printf '  %s\n' "$(printf '%s' "$boot" | json_field error)"
+            echo
+            echo "Full output:  docker compose logs k8s-env"
+            exit 1 ;;
+        esac
+        sleep 2
+      done
+    fi
     echo "Building the exam environment (first run pulls and seeds; later runs resume)..."
     while :; do
       if [ "$SECONDS" -ge "$deadline" ]; then

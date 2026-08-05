@@ -25,6 +25,12 @@ const (
 	StateBooting = "booting"
 	StateReady   = "ready"
 	StateFailed  = "failed"
+	// StateIdle is "up, and nothing to build yet": the container is
+	// running and no exam has been chosen, so no cluster exists. It is
+	// deliberately not a kind of booting. A boot screen narrates progress
+	// and asks the candidate to wait; this state wants the opposite, which
+	// is to get out of the way so they can pick an exam.
+	StateIdle = "idle"
 )
 
 // State is one snapshot of the environment's start-up, and is the
@@ -43,6 +49,10 @@ type State struct {
 // Ready reports whether the environment is usable — the one question
 // callers outside this package actually branch on.
 func (s State) Ready() bool { return s.State == StateReady }
+
+// Idle reports whether the environment is waiting to be told what to
+// build. Callers use it to tell "not yet" apart from "not asked".
+func (s State) Idle() bool { return s.State == StateIdle }
 
 // Reader reads the phase file written by k8s-env's bootstrap.
 //
@@ -125,6 +135,11 @@ func (r *Reader) read() State {
 		// Stale, per the reasoning above.
 		s.State = StateBooting
 	}
+	// StateIdle needs no case of its own and must not get one: it is not
+	// ready, so the first arm does not fire, and it is not a stale
+	// "ready", so the second does not either. It passes through as
+	// written, which is correct — the marker's absence is exactly what
+	// idle already claims.
 	return s
 }
 

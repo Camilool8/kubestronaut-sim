@@ -145,6 +145,34 @@ preload_bank_images() {
   done < /opt/sim/preload.txt
 }
 
+# How many nodes this exam's cluster has, from the bank that asked for
+# it. CKAD needs somewhere to schedule and nothing more; CKA has to be
+# able to drain one node and watch the work land on another, and CKS
+# wants a node it can leave broken. One cluster shape for all of them
+# would be wrong for at least two.
+#
+# /opt/sim/kind-config.yaml holds the control-plane node only — its
+# extraPortMappings and certSANs are the host -> cluster port chain and
+# have to be reproduced exactly — and the workers are appended here. The
+# shipped file is therefore a valid single-node config on its own, which
+# is what it produces when a bank asks for one node.
+#
+# A malformed count fails the boot rather than quietly falling back to
+# two. `nodes: two` in a bank is an authoring mistake, and a cluster
+# silently the wrong size is the kind of thing that is discovered by a
+# CKA drain question grading zero.
+nodes=$(yq -r '.spec.environment.nodes // 2' "${BANK_DIR}/exam.yaml")
+case "$nodes" in
+  ''|*[!0-9]*|0) echo "spec.environment.nodes must be a positive integer, got '${nodes}'"; exit 1 ;;
+esac
+kind_config=/tmp/kind-config.yaml
+cp /opt/sim/kind-config.yaml "${kind_config}"
+worker=1
+while [ "$worker" -lt "$nodes" ]; do
+  printf '  - role: worker\n' >> "${kind_config}"
+  worker=$((worker + 1))
+done
+
 phase create-cluster "Creating the Kubernetes cluster" 3
 created=0
 if ! kind get clusters 2>/dev/null | grep -qx sim; then
@@ -157,7 +185,8 @@ if ! kind get clusters 2>/dev/null | grep -qx sim; then
   # is both correct and the safer pull.
   node_ref="${NODE_IMAGE}"
   [ -f /opt/sim/images/_node.tar ] && node_ref="${NODE_IMAGE%%@*}"
-  kind create cluster --config /opt/sim/kind-config.yaml --image "${node_ref}"
+  echo "creating a ${nodes}-node cluster"
+  kind create cluster --config "${kind_config}" --image "${node_ref}"
   created=1
 fi
 kind get kubeconfig --name sim | sed 's#https://0\.0\.0\.0:6443#https://k8s-env:6443#' | write_shared /shared/kubeconfig

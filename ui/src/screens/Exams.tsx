@@ -219,25 +219,43 @@ function SoonCard({ bank, badge }: { bank: BankEntry; badge?: string }) {
  * The seat a hosted candidate is sitting in, or undefined when this is
  * the local product and every exam is theirs to choose.
  *
- * A seat is a Pod template. The multiple-choice one is a facilitator and
- * 128Mi with no cluster in it, so a hands-on exam started there boots the
- * bank into an environment with no instances and no desktop: every task
- * grades zero against "could not resolve hostname instance-1", and the
- * attempt is recorded as if it counted.
+ * A hosted seat is ONE EXAM. The candidate chose the certification in
+ * the lobby and their Pod was created, stamped and sized for it, so
+ * every other exam is greyed out here and the hub refuses it too. That
+ * refusal is the one that matters; this is so nobody is offered it
+ * first, and so the reason is on screen rather than in a 409.
  *
  * The catalog cannot make this distinction itself — the banks image
  * stages every bank into every session, so all of them are `available`
- * from inside any Pod. The hub refuses the switch too, and that refusal
- * is the one that matters; this is so nobody is offered it first.
+ * from inside any Pod.
+ *
+ * `seatBank` is empty for a session adopted from a Pod created before
+ * exams were choosable. Those fall back to the rule that came first: the
+ * seat's FLAVOUR. A multiple-choice Pod is a facilitator and 128Mi with
+ * no cluster in it, so a hands-on exam started there boots the bank into
+ * an environment with no instances and no desktop — every task grades
+ * zero against "could not resolve hostname instance-1", and the attempt
+ * is recorded as if it counted.
  */
 function seatFor(
   exams: CatalogExam[],
   seat: SessionKind | undefined,
+  seatBank: string | undefined,
 ): { offered: CatalogExam[]; wrongSeat: Set<string> } {
   const wrongSeat = new Set<string>();
   if (!seat) return { offered: exams, wrongSeat };
   const offered = exams.map((bank) => {
     if (!bank.available) return bank;
+    if (seatBank) {
+      if (bank.id === seatBank) return bank;
+      wrongSeat.add(bank.id);
+      return {
+        ...bank,
+        available: false,
+        comingSoon: false,
+        note: strings.exams.otherExamNote,
+      };
+    }
     const needs = bank.examType === "mcq" ? "mcq" : "practical";
     if (needs === seat) return bank;
     wrongSeat.add(bank.id);
@@ -261,6 +279,9 @@ interface ExamsProps {
   catalogVersion: number;
   // The hosted seat, if this is a hosted session. Undefined locally.
   seatKind?: SessionKind;
+  // The one exam that seat was created for. Undefined locally, and
+  // undefined for a session adopted from before exams were choosable.
+  seatBank?: string;
   // Takes the *starter*, not its result, so the switch runs inside App's
   // runControlAction — the wrapper that turns both a refused job
   // ({ok:false}) and a rejected fetch into a toast.
@@ -286,8 +307,20 @@ interface ExamsProps {
  * this screen must not smooth over, and it is why every card carries the
  * same "Choose a mode" verb but a card that is not the active bank goes
  * through a confirmation first.
+ *
+ * A fresh environment has no active bank at all: nothing is built until
+ * an exam is chosen, and this screen is where that happens. The
+ * confirmation still appears — it is still minutes of building — but it
+ * describes a build rather than a switch, because there is no outgoing
+ * exam and no candidate work for it to destroy.
  */
-export function Exams({ catalogVersion, seatKind, onControlStart, onBanksLoaded }: ExamsProps) {
+export function Exams({
+  catalogVersion,
+  seatKind,
+  seatBank,
+  onControlStart,
+  onBanksLoaded,
+}: ExamsProps) {
   const [confirm, setConfirm] = useState<CatalogExam | null>(null);
   const [switching, setSwitching] = useState(false);
   // The bank a switch was started FOR, so the mode screen it was meant
@@ -368,7 +401,7 @@ export function Exams({ catalogVersion, seatKind, onControlStart, onBanksLoaded 
           // Only the two lists below are seat-aware. The coverage figure
           // above counts certifications passed on the path, which is a
           // fact about the candidate and not about the Pod they are in.
-          const { offered, wrongSeat } = seatFor(loaded.exams, seatKind);
+          const { offered, wrongSeat } = seatFor(loaded.exams, seatKind, seatBank);
           const live = offered.filter((b) => b.available);
           const soon = offered.filter((b) => !b.available);
           return (
@@ -434,10 +467,19 @@ export function Exams({ catalogVersion, seatKind, onControlStart, onBanksLoaded 
 
       {confirm && (
         <Dialog
-          title={strings.lobby.switchConfirmTitle(examHeading(confirm))}
+          title={
+            active
+              ? strings.lobby.switchConfirmTitle(examHeading(confirm))
+              : strings.lobby.buildConfirmTitle(examHeading(confirm))
+          }
           onClose={() => setConfirm(null)}
         >
-          <p>{strings.lobby.switchConfirmBody}</p>
+          {/* `active` is empty exactly when no exam has ever been chosen
+              in this environment — nothing is built, so there is nothing
+              to wipe and nothing being replaced. The switch copy is a
+              warning about losing state; printing it here would warn a
+              candidate about work they have not done. */}
+          <p>{active ? strings.lobby.switchConfirmBody : strings.lobby.buildConfirmBody}</p>
           <div className="confirm-actions">
             <button className="btn" onClick={() => setConfirm(null)} disabled={switching}>
               {strings.lobby.cancel}
@@ -445,7 +487,11 @@ export function Exams({ catalogVersion, seatKind, onControlStart, onBanksLoaded 
             <button className="btn btn-primary" onClick={handleConfirm} disabled={switching}>
               {/* Both buttons going grey with nothing else changing reads
                   as a stuck dialog rather than a request in flight. */}
-              {switching ? strings.control.starting : strings.lobby.switchConfirm}
+              {switching
+                ? strings.control.starting
+                : active
+                  ? strings.lobby.switchConfirm
+                  : strings.lobby.buildConfirm}
             </button>
           </div>
         </Dialog>

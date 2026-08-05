@@ -90,6 +90,24 @@ func newTestController(t *testing.T, eng Engine, facilitator string) *Controller
 	}
 }
 
+// bankFileHolding returns a bank-file path that already names an active
+// exam — i.e. an environment somebody is already sitting in.
+//
+// This is what makes a switch a switch. StartSwitch reads the same file
+// to tell "replace the exam that is loaded" from "there has never been
+// one", and a test that only pointed BankFile at an empty temp dir was
+// silently exercising the second: no session to end and no candidate
+// work to wipe, so both of those phases were correctly skipped and the
+// assertions about them failed.
+func bankFileHolding(t *testing.T, bank string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "bank")
+	if err := os.WriteFile(path, []byte(bank), 0o644); err != nil {
+		t.Fatalf("seed bank file: %v", err)
+	}
+	return path
+}
+
 // waitIdle blocks until the store has no in-flight job.
 func waitIdle(t *testing.T, s *job.Store) job.Snapshot {
 	t.Helper()
@@ -306,7 +324,7 @@ func TestSwitchRunsFullSequenceAndWritesBankFile(t *testing.T) {
 	eng := &fakeEngine{}
 	c := newTestController(t, eng, facilitator.URL)
 	c.Catalog = testCatalogForSwitch(t)
-	c.BankFile = filepath.Join(t.TempDir(), "bank")
+	c.BankFile = bankFileHolding(t, "ckad-mock-01")
 	c.RestartExtra = []string{"docs-proxy", "facilitator"}
 
 	if _, err := c.StartSwitch("cka-mock-01"); err != nil {
@@ -369,7 +387,7 @@ func TestSwitchToMCQBankSkipsClusterRebuild(t *testing.T) {
 	eng := &fakeEngine{}
 	c := newTestController(t, eng, facilitator.URL)
 	c.Catalog = testCatalogWithMCQ(t)
-	c.BankFile = filepath.Join(t.TempDir(), "bank")
+	c.BankFile = bankFileHolding(t, "ckad-mock-01")
 	c.RestartExtra = []string{"docs-proxy", "facilitator"}
 
 	j, err := c.StartSwitch("kcna-mock")
@@ -400,6 +418,99 @@ func TestSwitchToMCQBankSkipsClusterRebuild(t *testing.T) {
 		t.Errorf("mcq switch restarted instances:\n%s", calls)
 	}
 	for _, needle := range []string{wipeShell, "restart:docs-proxy", "restart:facilitator"} {
+		if !strings.Contains(calls, needle) {
+			t.Errorf("engine calls missing %q:\n%s", needle, calls)
+		}
+	}
+}
+
+// The first exam an environment is ever given.
+//
+// `./sim up` with no bank builds nothing: k8s-env rests after the two
+// phases that are not about any particular exam, and the bank file is
+// never written. Choosing an exam then runs this — the same sequence a
+// switch runs, minus the two phases that only mean something when there
+// is an outgoing exam to end and candidate work to wipe.
+//
+// The op label is load-bearing, not cosmetic: it is what the overlay and
+// the background chip title themselves from, and "Switching to CKA Mock
+// Exam 01" is a lie told to somebody who has chosen exactly one exam in
+// their life. The empty bank file is the whole trigger, so this test
+// deliberately does not create one.
+func TestFirstExamProvisionsRatherThanSwitches(t *testing.T) {
+	var deletes int
+	var mu sync.Mutex
+	facilitator := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/session":
+			fmt.Fprint(w, `{"state":"idle"}`)
+		case r.Method == http.MethodDelete && r.URL.Path == "/api/session":
+			mu.Lock()
+			deletes++
+			mu.Unlock()
+			w.WriteHeader(http.StatusNoContent)
+		case r.URL.Path == "/healthz":
+			fmt.Fprint(w, "ok")
+		case r.URL.Path == "/api/exam":
+			fmt.Fprint(w, `{"name":"cka-mock-01"}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer facilitator.Close()
+
+	eng := &fakeEngine{}
+	c := newTestController(t, eng, facilitator.URL)
+	c.Catalog = testCatalogForSwitch(t)
+	// Points at a path inside an empty dir: no exam has ever been chosen.
+	c.BankFile = filepath.Join(t.TempDir(), "bank")
+	c.RestartExtra = []string{"docs-proxy", "facilitator"}
+
+	j, err := c.StartSwitch("cka-mock-01")
+	if err != nil {
+		t.Fatalf("StartSwitch: %v", err)
+	}
+	if j.Op != "provision" {
+		t.Errorf("op = %q, want provision", j.Op)
+	}
+	for _, p := range j.Phases {
+		if p.ID == "end-session" || p.ID == "wipe-instances" {
+			t.Errorf("provision job advertises phase %q, want it absent", p.ID)
+		}
+	}
+
+	snap := waitIdle(t, c.Store)
+	if snap.LastJob == nil || snap.LastJob.Error != "" {
+		t.Fatalf("provision job = %+v, want clean completion", snap.LastJob)
+	}
+	// Every declared phase must have run. A phase left pending in a
+	// COMPLETED job is what happens when the checklist and the sequence
+	// disagree — StartPhase ignores an id the job never declared, and the
+	// reverse leaves a row on screen that never ticks.
+	for _, p := range snap.LastJob.Phases {
+		if p.State != job.PhaseDone {
+			t.Errorf("phase %q ended in state %q, want done", p.ID, p.State)
+		}
+	}
+
+	mu.Lock()
+	if deletes != 0 {
+		t.Errorf("DELETE /api/session calls = %d, want 0: there is no session to end", deletes)
+	}
+	mu.Unlock()
+
+	wrote, err := os.ReadFile(c.BankFile)
+	if err != nil || string(wrote) != "cka-mock-01" {
+		t.Fatalf("bank file = %q, %v; want cka-mock-01", wrote, err)
+	}
+
+	calls := strings.Join(eng.recorded(), "\n")
+	if strings.Contains(calls, wipeShell) || strings.Contains(calls, registryShell) {
+		t.Errorf("provision wiped state that cannot exist yet:\n%s", calls)
+	}
+	// It is still a full build: the cluster and everything that reads the
+	// bank. Only the teardown half is gone.
+	for _, needle := range []string{"exec:k8s-env:", "restart:instance-1", "restart:facilitator"} {
 		if !strings.Contains(calls, needle) {
 			t.Errorf("engine calls missing %q:\n%s", needle, calls)
 		}
@@ -493,7 +604,7 @@ func TestSwitchSeparatesTheFacilitatorRestartIntoItsOwnPhase(t *testing.T) {
 	eng := &fakeEngine{}
 	c := newTestController(t, eng, facilitator.URL)
 	c.Catalog = testCatalogForSwitch(t)
-	c.BankFile = filepath.Join(t.TempDir(), "bank")
+	c.BankFile = bankFileHolding(t, "ckad-mock-01")
 	c.RestartExtra = []string{"docs-proxy", "facilitator"}
 
 	if _, err := c.StartSwitch("cka-mock-01"); err != nil {
@@ -577,7 +688,7 @@ func TestSwitchRefusedWhileSessionRunning(t *testing.T) {
 
 	c := newTestController(t, &fakeEngine{}, facilitator.URL)
 	c.Catalog = testCatalogForSwitch(t)
-	c.BankFile = filepath.Join(t.TempDir(), "bank")
+	c.BankFile = bankFileHolding(t, "ckad-mock-01")
 
 	_, err := c.StartSwitch("cka-mock-01")
 	if !errors.Is(err, ErrSessionRunning) {
@@ -612,7 +723,7 @@ func TestSwitchVerifyFailsOnExamNameMismatch(t *testing.T) {
 
 	c := newTestController(t, &fakeEngine{}, facilitator.URL)
 	c.Catalog = testCatalogForSwitch(t)
-	c.BankFile = filepath.Join(t.TempDir(), "bank")
+	c.BankFile = bankFileHolding(t, "ckad-mock-01")
 
 	if _, err := c.StartSwitch("cka-mock-01"); err != nil {
 		t.Fatalf("StartSwitch: %v", err)

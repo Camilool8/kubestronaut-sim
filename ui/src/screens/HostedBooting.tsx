@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { endHostedSession, startHostedSession, type HostedSession } from "../api";
+import { endHostedSession, getHostedExams, startHostedSession, type HostedSession } from "../api";
 import { PendingBar } from "../components/Pending";
 import { formatElapsed } from "../lib/format";
+import { useAsync } from "../lib/useAsync";
 import { useTick } from "../lib/useTick";
 import { strings } from "../strings";
 
@@ -17,7 +18,7 @@ interface HostedBootingProps {
  * different things to the person waiting. `pending` is "nothing is wrong,
  * someone else is booting first" — the hub builds Pods one at a time
  * because boot is CPU-bound and two at once makes both slow. `starting`
- * is their own Pod, building a real two-node cluster.
+ * is their own Pod, building the cluster their chosen exam asked for.
  *
  * The elapsed counter is the signal that works without motion: it ticks
  * identically whether or not the candidate accepts animation, and the bar
@@ -30,13 +31,27 @@ export function HostedBooting({ session, onChanged }: HostedBootingProps) {
   const started = Date.parse(session.startedAt);
   const elapsed = Number.isNaN(started) ? 0 : now - started;
 
+  // What is actually being built. The session names its exam; the exam
+  // list is what knows that exam's shape. Fetched rather than assumed,
+  // because the alternative is asserting one bank's node and task counts
+  // at whoever is waiting — which is what this screen used to do.
+  //
+  // A failure here costs nothing: the copy below falls back to sentences
+  // that claim no numbers at all.
+  const examsState = useAsync((signal) => getHostedExams(signal), []);
+  const exam = examsState.data?.find((e) => e.id === session.bank);
+
   const retry = async () => {
     setBusy(true);
     // End first, then ask again: a failed session still holds its seat so
     // the candidate can read why, and starting without giving that up
     // would simply hand back the same failed session.
+    //
+    // Retried onto the SAME exam. Without the bank this fell back to the
+    // deployment's default, so a candidate whose CKA environment failed
+    // would press "Try again" and be handed CKAD.
     await endHostedSession().catch(() => undefined);
-    await startHostedSession(session.kind).catch(() => undefined);
+    await startHostedSession(session.kind, session.bank).catch(() => undefined);
     setBusy(false);
     onChanged();
   };
@@ -79,12 +94,23 @@ export function HostedBooting({ session, onChanged }: HostedBootingProps) {
     ? strings.hosted.bootPendingBody
     : session.kind === "mcq"
       ? strings.hosted.bootStartingBodyMcq
-      : strings.hosted.bootStartingBody;
+      : strings.hosted.bootStartingBody(exam?.nodes, exam?.questionCount);
 
   return (
     <div className="page hosted-screen hosted-booting">
       <h1>{title}</h1>
       <p>{body}</p>
+      {/* Keyed on the elapsed counter rather than a range promised up
+          front: a wait that has already blown through the number it was
+          given reads as a hang, and the honest thing to say at four
+          minutes is not the thing to say at ten. Only for the build —
+          a queue's wait is somebody else's boot and this screen cannot
+          narrate it. */}
+      {!pending && session.kind !== "mcq" && (
+        <p className="hosted-boot-reassure" role="status">
+          {strings.hosted.bootReassure(elapsed)}
+        </p>
+      )}
       <div className="score-loading-progress">
         <PendingBar label={title} />
         {/* aria-hidden and tabular, matching the control overlay: a clock

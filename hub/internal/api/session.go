@@ -45,6 +45,7 @@ func (s *Server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 
 	var wanted struct {
 		Kind string `json:"kind"`
+		Bank string `json:"bank"`
 	}
 	// A body is optional here, exactly as it is for the facilitator.
 	_ = json.Unmarshal(body, &wanted)
@@ -58,7 +59,33 @@ func (s *Server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 		kind = k
 	}
 
-	live, err := s.Sessions.Start(r.Context(), user.UserID, kind)
+	// A named exam decides the seat, rather than being checked against
+	// one the caller also sent. The seat is a Pod template and the exam
+	// is what has to run in it, so the exam is the fact and the flavour
+	// is derived from it — the same direction seatCanRun enforces for a
+	// switch. A client that sends both and disagrees gets the exam it
+	// asked for, not a refusal about a field it should not have needed
+	// to send.
+	//
+	// Validated against the hub's own catalog BEFORE a seat is granted:
+	// an unknown bank stamped into a Pod is twenty minutes of boot
+	// ending in a facilitator with no exam loaded, and the candidate
+	// would have spent a seat and a place in the queue to find out.
+	bank := wanted.Bank
+	if bank != "" {
+		entry, ok := s.bank(bank)
+		if !ok {
+			writeError(w, http.StatusBadRequest, "no such exam")
+			return
+		}
+		if !entry.Available {
+			writeError(w, http.StatusBadRequest, "that exam cannot be sat yet")
+			return
+		}
+		kind = session.KindOf(entry.ExamType)
+	}
+
+	live, err := s.Sessions.Start(r.Context(), user.UserID, kind, bank)
 	var queued *session.Queued
 	switch {
 	case errors.As(err, &queued):
@@ -150,15 +177,25 @@ func (s *Server) handleSwitch(w http.ResponseWriter, r *http.Request) {
 	s.recycle(w, r, body.Bank)
 }
 
-// seatCanRun reports whether this candidate's seat is the flavour their
-// chosen exam needs, writing the refusal itself when it is not.
+// seatCanRun reports whether this candidate's seat may run the exam they
+// are asking for, writing the refusal itself when it may not.
 //
-// The authority on what an exam needs is the bank, and the bank is in
-// the session Pod — the hub has no /banks of its own — so this asks the
-// candidate's own facilitator. That is one request against a Pod the
-// proxy is already talking to, and it happens BEFORE anything is
-// destroyed: a switch that wipes the session and then discovers it
-// cannot finish is precisely the failure canRestart() exists to prevent.
+// A seat is now a certification, not a flavour. It is created for one
+// exam — the candidate chose it in the lobby, and the Pod was stamped
+// and sized for it — so the only bank it can run is its own, and the
+// answer to "I want a different exam" is a new session rather than a
+// rebuild of this one.
+//
+// That is stricter than it was, and the strictness is the point. The
+// previous rule allowed any same-flavour bank, which was correct while
+// the exam was a deployment value nobody chose; it is wrong now, because
+// a seat sized for CKAD's two-node cluster is not a seat for CKA's
+// three, and the seat pool a candidate was admitted through was the one
+// their chosen exam draws from.
+//
+// The kind check below stays underneath it as the second line: an empty
+// seat bank is possible for a session adopted from a Pod that predates
+// this, and that session must not fall through to no check at all.
 //
 // Every uncertain answer refuses. Not knowing whether a hands-on bank is
 // about to be booted into a Pod with no cluster is not a reason to try
@@ -176,6 +213,14 @@ func (s *Server) seatCanRun(w http.ResponseWriter, user, bank string) bool {
 	}
 	if live.Addr() == "" {
 		writeError(w, http.StatusConflict, "wait until your environment is ready before changing exams")
+		return false
+	}
+	if live.Bank != "" {
+		if bank == live.Bank {
+			return true
+		}
+		writeError(w, http.StatusConflict,
+			"this seat is for one exam — end this session and start the exam you want")
 		return false
 	}
 
@@ -256,16 +301,28 @@ func (s *Server) recycle(w http.ResponseWriter, r *http.Request, bank string) {
 	writeJSON(w, http.StatusAccepted, map[string]any{"job": job})
 }
 
-// handleControlStatus and handleControlLog answer for the hub's own
-// jobs, never the conductor's.
+// handleControlStatus and handleControlLog answer for the hub's own jobs
+// first, and for the session Pod's conductor when the hub has none
+// running.
 //
-// In a session Pod the conductor produces no jobs of its own: reset and
-// switch are the hub's, and reseed answers synchronously. The one
-// exception is seeding a pooled bank, which the facilitator triggers
-// server-to-server and whose progress would therefore be invisible here.
-// No bank in the product is pooled on the hands-on side, so nothing is
-// currently affected; it is recorded in docs/follow-ups.md rather than
-// guessed at.
+// The hub owns reset and switch here — they are Pod replacement, and the
+// Pod they describe does not exist for most of the time they run — so
+// while one of those is in flight it is the only truthful answer, and
+// the Pod cannot be asked anyway. The conductor inside a session still
+// has one job type of its own: `seed`, which prepares the cluster for
+// the questions a pooled bank's draw picked, triggered by the
+// facilitator server-to-server between the candidate pressing Start and
+// their clock beginning.
+//
+// Without the fall-through below that seed job was invisible: the
+// browser polled the hub, the hub answered from a job store the seed was
+// never in, and the candidate watched a blank hold with no explanation
+// for however long the setup took. docs/follow-ups.md recorded this as
+// waiting for the first pooled hands-on bank.
+//
+// The priority is in-flight over settled. The hub's own settled job
+// still wins over an idle Pod, so a FAILED reset the candidate has not
+// dismissed does not vanish from under them.
 func (s *Server) handleControlStatus(w http.ResponseWriter, r *http.Request) {
 	user, ok := s.requireUser(w, r)
 	if !ok {
@@ -278,6 +335,17 @@ func (s *Server) handleControlStatus(w http.ResponseWriter, r *http.Request) {
 		// and useful answer to that question.
 		writeJSON(w, http.StatusOK, session.Snapshot{})
 		return
+	}
+	if !snap.Busy {
+		if raw, ok := s.podControl(user.UserID, "/api/control/status"); ok {
+			var pod struct {
+				Busy bool `json:"busy"`
+			}
+			if json.Unmarshal(raw, &pod) == nil && pod.Busy {
+				writeRaw(w, raw)
+				return
+			}
+		}
 	}
 	writeJSON(w, http.StatusOK, snap)
 }
@@ -292,8 +360,68 @@ func (s *Server) handleControlLog(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"jobId": "", "lines": []string{}})
 		return
 	}
+	// Same rule as the status above, and it has to be the same rule: the
+	// log pane is opened from the overlay the status put on screen, so a
+	// pane reading from the other job store would be empty for exactly
+	// the job somebody opened it to watch.
+	if snap, statusErr := s.Sessions.Status(user.UserID); statusErr == nil && !snap.Busy {
+		if raw, ok := s.podControl(user.UserID, "/api/control/log"); ok {
+			var pod struct {
+				JobID string `json:"jobId"`
+			}
+			if json.Unmarshal(raw, &pod) == nil && pod.JobID != "" {
+				writeRaw(w, raw)
+				return
+			}
+		}
+	}
 	if lines == nil {
 		lines = []string{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"jobId": id, "lines": lines})
+}
+
+// podControl asks the candidate's own session for one of the conductor's
+// control routes, returning false for anything that is not a clean 200.
+//
+// Deliberately quiet about failures. This is a fall-through on a polling
+// route: the caller's own answer is always available and always
+// truthful, so a Pod that is restarting, gone, or slow should cost a
+// poll rather than an error the browser has to interpret.
+func (s *Server) podControl(user, path string) ([]byte, bool) {
+	live, err := s.Sessions.Get(user)
+	if err != nil || live.Addr() == "" {
+		return nil, false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+live.Addr()+path, nil)
+	if err != nil {
+		return nil, false
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, false
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return nil, false
+	}
+	raw, err := io.ReadAll(io.LimitReader(res.Body, maxBody))
+	if err != nil {
+		return nil, false
+	}
+	return raw, true
+}
+
+// writeRaw passes a session Pod's JSON answer through untouched.
+//
+// Re-encoding it would mean modelling the conductor's job shape in the
+// hub, which is precisely the coupling that lets the two drift: the
+// overlay renders whatever the conductor sends, and the hub's only
+// interest here is which of the two answers to forward.
+func writeRaw(w http.ResponseWriter, raw []byte) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(raw)
 }

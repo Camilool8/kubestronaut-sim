@@ -67,4 +67,32 @@ describe("BackgroundJobChip", () => {
     await userEvent.click(screen.getByRole("button"));
     expect(reopened).toHaveBeenCalledTimes(1);
   });
+
+  // The chip used to title ANY job carrying a bank as a switch, because a
+  // resolved bankTitle was checked before the op was. Both jobs below
+  // carry one, and neither is a switch: the overlay named them correctly
+  // while the chip for the very same job did not.
+  test("titles a first-time build as a build", () => {
+    render(
+      <BackgroundJobChip
+        job={{ ...job, op: "provision", bank: "ckad-mock-01" }}
+        bankTitle="CKAD Mock Exam 01"
+        onReopen={() => {}}
+      />,
+    );
+    const chip = screen.getByRole("button");
+    expect(chip).toHaveAccessibleName(/building/i);
+    expect(chip).not.toHaveAccessibleName(/switching/i);
+  });
+
+  test("titles a pooled bank's seeding as setup, not as a switch", () => {
+    render(
+      <BackgroundJobChip
+        job={{ ...job, op: "seed", bank: "ckad-mock-01" }}
+        bankTitle="CKAD Mock Exam 01"
+        onReopen={() => {}}
+      />,
+    );
+    expect(screen.getByRole("button")).not.toHaveAccessibleName(/switching/i);
+  });
 });

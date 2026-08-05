@@ -55,7 +55,20 @@ type Exam struct {
 	SpeedDuration     time.Duration
 	PassingScore      int
 	KubernetesVersion string
-	Questions         []Question // in exam.yaml order
+	// Environment is spec.environment.provider and .nodes: the shape of
+	// the cluster this bank asks for. It stopped being decorative when
+	// images/k8s-env/bootstrap.sh started generating the kind config from
+	// Nodes, and it is surfaced on GET /api/exam so the screens that
+	// describe the environment while it is being built can describe THIS
+	// one — a candidate waiting on a CKA cluster should not be told it
+	// has two nodes because CKAD did.
+	//
+	// Nodes is 0 when the bank declares none, which is what an mcq bank
+	// does: it has no cluster, and a default here would invent one. The
+	// bootstrap's own default lives in the bootstrap, where the cluster
+	// actually gets made.
+	Environment Environment
+	Questions   []Question // in exam.yaml order
 
 	// DomainWeights is spec.domainWeights: each curriculum domain's
 	// published percentage share. Historically read by no Go code (only
@@ -82,6 +95,16 @@ type Exam struct {
 	// of that loop instead and has the drawn subset seeded at the start of
 	// the attempt. See Draw and images/k8s-env/bootstrap.sh.
 	ExamLength int
+	// HasTips reports whether the bank ships a tips.md beside its
+	// exam.yaml. Only the existence is loaded, exactly as HintCount is —
+	// the text is read per request, so editing it needs no restart.
+	//
+	// It exists so the UI can decide whether to draw the control at all. A
+	// bank with no tips must show no entry point rather than one that
+	// opens an empty sheet, and the client cannot know that without being
+	// told: unlike hints, tips are not per-question, so there is no count
+	// on a question to infer it from.
+	HasTips bool
 }
 
 // Pooled reports whether ex draws a strict subset of its questions —
@@ -94,6 +117,17 @@ type Exam struct {
 // before the clock runs rather than trusting boot to have done it.
 func Pooled(ex *Exam) bool {
 	return ex.ExamLength > 0 && ex.ExamLength < len(ex.Questions)
+}
+
+// Environment is the cluster a bank asks to be sat in.
+//
+// Provider names how it is built ("kind" is the only one the simulator
+// has) and Nodes how big it is. Both are the bank's declaration and
+// neither is defaulted here: the code that builds the cluster owns the
+// fallback, and a zero here is the honest "this bank did not say".
+type Environment struct {
+	Provider string
+	Nodes    int
 }
 
 // Domain is one curriculum domain of a bank: its name and the percentage
@@ -179,15 +213,19 @@ type examDoc struct {
 		KubernetesVersion string         `json:"kubernetesVersion"`
 		DomainWeights     map[string]int `json:"domainWeights"`
 		ExamLength        int            `json:"examLength"`
-		Questions         []struct {
-			ID            string   `json:"id"`
-			Title         string   `json:"title"`
-			Instance      string   `json:"instance"`
-			Domain        string   `json:"domain"`
-			Weight        int      `json:"weight"`
-			TargetSeconds int      `json:"targetSeconds"`
-			Options       []string `json:"options"`
-			Correct       []int    `json:"correct"`
+		Environment       struct {
+			Provider string `json:"provider"`
+			Nodes    int    `json:"nodes"`
+		} `json:"environment"`
+		Questions []struct {
+			ID            string        `json:"id"`
+			Title         string        `json:"title"`
+			Instance      string        `json:"instance"`
+			Domain        string        `json:"domain"`
+			Weight        int           `json:"weight"`
+			TargetSeconds int           `json:"targetSeconds"`
+			Options       []string      `json:"options"`
+			Correct       []int         `json:"correct"`
 			Multi         bool          `json:"multi"`
 			Docs          []examDocLink `json:"docs"`
 		} `json:"questions"`
@@ -248,6 +286,11 @@ func Load(examJSONPath, bankDir string) (*Exam, error) {
 		KubernetesVersion: doc.Spec.KubernetesVersion,
 		DomainWeights:     doc.Spec.DomainWeights,
 		ExamLength:        doc.Spec.ExamLength,
+		Environment: Environment{
+			Provider: doc.Spec.Environment.Provider,
+			Nodes:    doc.Spec.Environment.Nodes,
+		},
+		HasTips: hasTips(bankDir),
 	}
 
 	for _, q := range doc.Spec.Questions {
@@ -562,6 +605,25 @@ func countHints(bankDir, qid string) int {
 		return 0
 	}
 	return len(hintHeading.FindAllIndex(raw, -1))
+}
+
+// TipsPath is where a bank's exam technique notes live: one optional
+// file beside exam.yaml, for the whole bank rather than per question.
+//
+// Bank data rather than UI copy, on the same reasoning that drives
+// spec.environment.nodes: what makes a CKAD sitting fast is not what
+// makes a KCNA one fast, and a string in the client would have to claim
+// one of them was the other.
+func TipsPath(bankDir string) string {
+	return filepath.Join(bankDir, "tips.md")
+}
+
+// hasTips reports whether the bank ships a non-empty tips.md. Non-empty
+// rather than merely present: an empty file would open a sheet with
+// nothing in it, which is worse than no control at all.
+func hasTips(bankDir string) bool {
+	info, err := os.Stat(TipsPath(bankDir))
+	return err == nil && !info.IsDir() && info.Size() > 0
 }
 
 // DrawOptions configures one draw. The zero value draws the whole

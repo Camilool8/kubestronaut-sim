@@ -160,6 +160,52 @@ jobs:
             --set hub.baseURL=https://sim.invalid --set hub.existingSecret=hub \
             --show-only templates/configmap-session-pods.yaml > /tmp/cm.yaml
 
+      # The per-exam manifest, which the default values render none of.
+      #
+      # `sessions.practical.banks.<id>.resources` is how an exam whose
+      # cluster is a different size gets a Pod sized for it, and the
+      # FILENAME is a contract: hub/cmd/hub/main.go's bankTemplates
+      # discovers these by looking for session-bank-<id>.json beside the
+      # flavour's own manifest. A rename on either side would leave every
+      # session silently taking the default Pod, which still boots — so
+      # nothing else would notice.
+      - name: A per-exam Pod spec renders, merged over the flavour's
+        run: |
+          helm template sim deploy/helm/kubestronaut-sim -n kubestronaut-sim \
+            --set hub.baseURL=https://sim.invalid --set hub.existingSecret=hub \
+            --set sessions.practical.resources.k8s-env.requests.cpu=1500m \
+            --set sessions.practical.banks.cka-mock-01.resources.k8s-env.limits.memory=10Gi \
+            --show-only templates/configmap-session-pods.yaml > /tmp/cm-bank.yaml
+          python3 - <<'PY'
+          import json, re, sys
+          docs, key = {}, None
+          for line in open('/tmp/cm-bank.yaml'):
+              line = line.rstrip('\n')
+              m = re.match(r'^  ([A-Za-z0-9._-]+\.json): \|\s*$', line)
+              if m:
+                  key = m.group(1); docs[key] = []; continue
+              if key is None:
+                  continue
+              if line.startswith('    '):
+                  docs[key].append(line[4:])
+              elif line.strip():
+                  key = None
+          name = 'session-bank-cka-mock-01.json'
+          if name not in docs:
+              sys.exit(f'no per-exam manifest was rendered: {sorted(docs)}')
+          pod = json.loads('\n'.join(docs[name]))
+          env = next(c for c in pod['spec']['containers'] if c['name'] == 'k8s-env')
+          # Three layers, most specific last: the manifest's measured
+          # numbers, then the flavour's, then the exam's.
+          if env['resources']['limits']['memory'] != '10Gi':
+              sys.exit(f"the exam's own limit was lost: {env['resources']}")
+          if env['resources']['requests']['cpu'] != '1500m':
+              sys.exit(f"the flavour's request was lost: {env['resources']}")
+          if env['resources']['requests']['memory'] != '2Gi':
+              sys.exit(f"the manifest's own request was lost: {env['resources']}")
+          print(f'{name}: {env["resources"]}')
+          PY
+
       # What the chart is responsible for, as opposed to what the
       # manifests are: that every first-party image was rewritten to the
       # configured registry and tag, that no container was lost on the

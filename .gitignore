@@ -42,6 +42,17 @@ shared/
 # committed here — not even "temporarily".
 killer-sh-*.txt
 *-dump.txt
+dump*.txt
+# The two patterns above name the files someone thought to name that way,
+# which is the weakness: a dump dropped in as `dump1.txt` inside a
+# plausible-looking bank directory matched neither, and sat in the tree
+# one `git add banks/` from being committed.
+#
+# A bank is YAML, Markdown and shell — nothing under banks/ has ever been
+# a .txt and nothing should be. So the rule stops guessing at filenames
+# and states that instead: a .txt under banks/ is foreign material by
+# definition. `git status` will not show it, which is the point.
+banks/**/*.txt
 
 # Local agent/tool state.
 #

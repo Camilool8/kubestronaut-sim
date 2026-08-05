@@ -520,3 +520,65 @@ describe("Score routing to the deep dive", () => {
     expect(await screen.findByText(strings.score.verdictsTitle)).toBeInTheDocument();
   });
 });
+
+// The screen where a candidate finds out they ran out of time is the
+// right place to offer the technique notes — but only when the bank
+// actually ships some. Score has no exam in its props, so it asks.
+describe("the exam tips opener", () => {
+  function stubWithExam(exam: unknown) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/api/results"))
+          return new Response(JSON.stringify(results), { status: 200 });
+        if (url.endsWith("/api/exam/tips"))
+          return new Response(JSON.stringify({ markdown: "## Pacing\n\nMove on." }), {
+            status: 200,
+          });
+        if (url.endsWith("/api/exam")) return new Response(JSON.stringify(exam), { status: 200 });
+        return new Response(JSON.stringify({}), { status: 200 });
+      }),
+    );
+  }
+
+  test("is absent when the bank ships no tips", async () => {
+    stubWithExam({ name: "ckad-mock-01" });
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+
+    await screen.findByRole("button", { name: strings.control.newAttempt });
+    expect(screen.queryByRole("button", { name: strings.tips.open })).not.toBeInTheDocument();
+  });
+
+  test("opens the bank's tips when it does", async () => {
+    stubWithExam({ name: "ckad-mock-01", hasTips: true });
+    const user = userEvent.setup();
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+
+    await user.click(await screen.findByRole("button", { name: strings.tips.open }));
+
+    expect(screen.getByRole("dialog", { name: strings.tips.title })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Pacing" })).toBeInTheDocument();
+  });
+
+  // A failed exam fetch must not grow an error onto a screen that has
+  // just finished grading: the button is an offer, not a result.
+  test("a failed exam fetch costs the offer and nothing else", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/api/results"))
+          return new Response(JSON.stringify(results), { status: 200 });
+        if (url.endsWith("/api/exam"))
+          return new Response(JSON.stringify({ error: "no exam" }), { status: 503 });
+        return new Response(JSON.stringify({}), { status: 200 });
+      }),
+    );
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+
+    await screen.findByRole("button", { name: strings.control.newAttempt });
+    expect(screen.queryByRole("button", { name: strings.tips.open })).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+});

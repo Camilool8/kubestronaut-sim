@@ -95,3 +95,23 @@ boot_failed() {
   echo "[boot] FAILED: $1" >&2
   _boot_write failed "" "$1"
 }
+
+# boot_idle
+#
+# Resting, not working: the container is up and no exam has been chosen,
+# so there is nothing to build yet. Distinct from `booting` because the
+# two want opposite things from the UI — a boot screen narrates progress
+# and asks the candidate to wait, while this one should get out of the
+# way and let them pick an exam.
+#
+# Reached only under compose with no BANK. A hosted session Pod is
+# always stamped with the exam it was created for, so it never idles.
+boot_idle() {
+  _boot_phase=awaiting-exam
+  _boot_label="Waiting for an exam to be chosen"
+  # The two phases that have run are the ones that are not about any
+  # particular exam: the container runtime and the chart repository.
+  _boot_step=2
+  echo "[boot] no exam selected; nothing to build until one is chosen"
+  _boot_write idle "" ""
+}

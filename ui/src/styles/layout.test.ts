@@ -235,3 +235,53 @@ describe("the task pane's domain chip", () => {
     expect(domain).toContain("min-width: 0");
   });
 });
+
+// The tips sheet is a document, not a question. Both claims below were
+// measured in a browser; jsdom can only see the declarations.
+describe("the exam tips sheet", () => {
+  test("is wider than a confirm dialog, because it is read rather than answered", async () => {
+    const css = await readThemeCss();
+
+    // 560px is the right measure for a sentence and two buttons. The tips
+    // are pipe tables and command lines like
+    // `k create cj nightly --image=... --schedule='0 2 * * *'`, and every
+    // one of those wraps or scrolls sideways at that width — which is
+    // exactly the retyping the page exists to save.
+    expect(ruleBody(css, ".confirm-dialog-wide"), "the base wide dialog was renamed").toContain(
+      "min(560px",
+    );
+    expect(ruleBody(css, ".confirm-dialog-wide:has(> .tips-body)")).toContain("min(760px");
+  });
+
+  test("does not open a second scroll container inside the dialog", async () => {
+    const css = await readThemeCss();
+
+    // `.confirm-dialog` already scrolls (max-height + overflow-y). A body
+    // that scrolled too would give a long document two nested scrollbars,
+    // and the browser's Find, Home and End would all apply to the wrong
+    // one — the bug `.screen:has(> .score-screen)` exists to have fixed
+    // on the score screen.
+    expect(ruleBody(css, ".confirm-dialog")).toContain("overflow-y: auto");
+    expect(ruleBody(css, ".tips-body")).not.toContain("overflow");
+    expect(ruleBody(css, ".tips-body")).not.toContain("max-height");
+  });
+});
+
+// A value chip breaks differently depending on whether anything around
+// it can grow. Both rules are load-bearing and jsdom can see neither.
+describe("value chips that are too long for their column", () => {
+  test("break anywhere in a panel, but keep the token whole in a table", async () => {
+    const css = await readThemeCss();
+
+    // The narrow-panel case: a 31-character /opt/course path in a task
+    // pane dragged to its 280px floor has nowhere to grow, so breaking
+    // inside the chip beats pushing the pane sideways.
+    expect(ruleBody(css, ".copy-value code")).toContain("overflow-wrap: anywhere");
+
+    // The table case is the opposite: `anywhere` also collapses the
+    // cell's intrinsic minimum, which squeezed the exam tips' symptom
+    // column until it rendered "ImagePullBackOf" and a lone "f".
+    // `break-word` lets the column size to the token instead.
+    expect(ruleBody(css, ".md th code, .md td code")).toContain("overflow-wrap: break-word");
+  });
+});

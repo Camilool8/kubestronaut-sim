@@ -159,13 +159,16 @@ testing what it claims to the day one does.
 | The docs-proxy allowlist: `kubernetes.io` and `code.jquery.com` allowed, `example.com`, analytics and open web search blocked, no direct egress from the desktop | tests/smoke.sh:210-231 |
 | The conductor unreachable from the host and the desktop, reachable only through `/api/control/*` | tests/smoke.sh:240-248 |
 | Session lifecycle: start, a countdown that decreases, desktop unlock, submit, results polling, and the solution and desktop gates re-locking | tests/smoke.sh:347-508 |
-| Solving all 22 questions of ckad-mock-01, each on the instance its `exam.yaml` entry names | tests/smoke.sh:428-453 |
+| Solving every question the attempt DREW (22 of ckad-mock-01's 26), each on the instance its `exam.yaml` entry names, plus a check that no pool question lacks a solution script | tests/smoke.sh, `solve_bank` |
 | Warm restart keeping the score, and `./sim reset` returning it to 0 with `/opt/course` re-created empty | tests/smoke.sh:510-531 |
 | A bank round trip, CKAD to the hidden `smoke-01` fixture and back, including its one question and the fixture staying out of the exam selector's list | tests/smoke.sh:539-635 |
 | Switching to a coming-soon certification refused with 400 | tests/smoke.sh:563-571 |
 | A bank id or question id that is not a slug refused with 400, so neither reaches a filesystem path | tests/smoke.sh:572-576, tests/smoke.sh:926-928 |
 | The mcq engine on kcna-mock: a blank attempt grading 0, a partial one, full marks against the attempt's own drawn subset, and the answer gates | tests/smoke.sh:637-883 |
 | Training mode: hint tiers served one at a time, solutions readable mid-attempt, a practice grade that never becomes a result — and every one of those endpoints 403 in an exam attempt | tests/smoke.sh:885-956 |
+| The pooled hands-on path, which no unit test can reach: a boot that seeds nothing, `POST /api/session/start` answering 202, the conductor's seed job, a clock that starts only once it succeeds, and `/api/exam` narrowing from the 26-question pool to the drawn 22 | tests/smoke.sh, `start_session` |
+| Re-seeding an IDENTICAL draw is allowed without a rebuild — the exam-gate attempt replays the training attempt's seed, which is the documented retry path and the only way a second attempt is permitted on a pooled bank | tests/smoke.sh, exam-gate block |
+| `GET /api/exam/tips` answering with no attempt running AND mid-exam, beside the hint and solution routes refusing — the one place the ungated/gated distinction is exercised against a real facilitator | tests/smoke.sh |
 | A session expiring unattended and re-locking the desktop | tests/smoke.sh:958-986 |
 
 CKA is covered only as an assertion that switching to it is refused.

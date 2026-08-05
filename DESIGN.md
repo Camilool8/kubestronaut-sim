@@ -343,7 +343,7 @@ The rules that govern them:
 | Rare Accent | blue arrives for four things only — focus, currency (the selected question, the active exam, the running phase), the one filled primary button per screen, and links. Progress is cyan, not blue, which is what lets the two coexist. A screen that reads as blue before it is touched has used it as decoration |
 | Two Tiers For One Hue | wherever a hue serves both a bar and a label, the base token is the graphic (3:1) and `-strong` is the text (4.5:1) — `--success`, `--warn`, `--progress`. Using the base for text is the single easiest way to fail AA here, and the contrast test is what catches it |
 | The Machine Is Not The App | `--machine-*` is a dark palette that appears in BOTH themes, reserved for things that are literally a computer. Never reach for it to make an app surface look technical. In dark mode the distinction is carried by hue and chrome rather than by lightness (`tokens.css`, header) |
-| Hover is not an accent channel | hover is one step of tone and nothing more, so the tile under a cursor never draws the outline that means "the question I am on". Two exceptions, both elements with no resting box to tone: the click-to-copy value and the 6px panel resizer |
+| Hover is not an accent channel | hover is one step of tone and nothing more, so the tile under a cursor never draws the outline that means "the question I am on". Two exceptions: the click-to-copy value, which goes accent on hover because its resting state is a hairline rather than a fill, and the 6px panel resizer, which has no resting box at all |
 | Two-Tier Hairline | `--border-strong` if the edge identifies a control's hit area or carries a state, which answers WCAG 1.4.11's 3:1 floor; `--border` for everything structural. This is the one place the design brief was overruled: it draws every border at a value measuring ~1.2:1 (`tokens.css`, borders) |
 | Three Mirrors | these values also live in the Go locked page (`facilitator/internal/desktop/proxy.go`), the favicon (`ui/public/favicon.svg`) and the terminal palette (`images/desktop/assets/terminalrc` plus its xfconf twin), so a colour change is never a one-file change. Enforced by `ui/src/styles/mirrors.test.ts`, which was written after the xfconf twin was found to have silently lost its palette |
 
@@ -416,6 +416,7 @@ the rest owning their whole viewport.
 | About drawer | `min(480px, 92vw)` |
 | Confirm dialog | `min(440px, 90%)` |
 | Wide confirm dialog | `min(560px, 92%)` |
+| Exam tips sheet | `min(760px, 94%)` — a dialog that is READ rather than answered. 560px is the measure for a sentence and two buttons; the tips are pipe tables and long command lines, and at that width every one of them wraps |
 | Control dialog | `min(92vw, 520px)` |
 | Boot panel | `min(94vw, 560px)` |
 | Desktop-required card | `min(34rem, 100%)` |

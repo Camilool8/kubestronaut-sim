@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Markdown } from "./Markdown";
+import { InlineCode, Markdown } from "./Markdown";
 import { desktopClipboard } from "../lib/desktopClipboard";
-import { readThemeCss } from "../test/readCss";
+import { readThemeCss, ruleBody } from "../test/readCss";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -80,6 +80,101 @@ describe("Markdown", () => {
     const table = container.querySelector("table");
     expect(table?.parentElement).toHaveClass("md-table-scroll");
   });
+
+  // An mcq attempt has no desktop and no terminal — it starts before the
+  // cluster is up and works on a phone — so a copy button there promises a
+  // paste target that does not exist.
+  test("copyable={false} renders inline code as a value, not a control", () => {
+    const { container } = render(
+      <Markdown copyable={false}>{"Set `runAsNonRoot: true` on the container."}</Markdown>,
+    );
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(container.querySelector("code")?.textContent).toBe("runAsNonRoot: true");
+  });
+
+  test("copyable={false} leaves fenced blocks alone", () => {
+    render(<Markdown copyable={false}>{"```yaml\nkind: Pod\n```"}</Markdown>);
+    // The block's own copy control is a separate affordance with a real
+    // slot for itself, and it survives.
+    expect(screen.getByRole("button", { name: /copy yaml code block/i })).toBeInTheDocument();
+  });
+});
+
+describe("InlineCode", () => {
+  // bank-spec.md has always promised that "inline markdown such as
+  // backticks is fine" in an mcq option. It was not: both option
+  // renderers interpolated the raw string, so the 44 backticked spans in
+  // the KCNA bank reached the candidate with their backticks showing.
+  test("backticked spans become code, and the backticks do not survive", () => {
+    const { container } = render(<InlineCode text="Setting `hostNetwork: true` in the pod spec" />);
+    const code = container.querySelector("code");
+    expect(code?.textContent).toBe("hostNetwork: true");
+    expect(container.textContent).toBe("Setting hostNetwork: true in the pod spec");
+    expect(container.textContent).not.toContain("`");
+  });
+
+  test("an option with no backticks is unchanged", () => {
+    const { container } = render(<InlineCode text="The kube-scheduler" />);
+    expect(container.querySelector("code")).toBeNull();
+    expect(container.textContent).toBe("The kube-scheduler");
+  });
+
+  // A stray backtick is an authoring typo in a bank, not a reason to eat
+  // the rest of the option.
+  test("an unpaired backtick renders as the literal it is", () => {
+    const { container } = render(<InlineCode text="90% of `nodes" />);
+    expect(container.textContent).toBe("90% of `nodes");
+    expect(container.querySelector("code")).toBeNull();
+  });
+
+  // An option is the label of a checkbox. Rendering it through Markdown
+  // would nest a <button> inside that <label> — invalid HTML, and it
+  // takes the click away from the option itself.
+  test("renders no interactive element", () => {
+    render(<InlineCode text="Use `kubectl debug` to attach a container" />);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+});
+
+describe("the copyable value announces itself at rest", () => {
+  // jsdom has no CSS engine, so these read the stylesheet. They exist
+  // because nothing pinned this component's geometry before, and three
+  // separate hover-icon geometries were tried and reverted without a
+  // single test noticing.
+
+  test("inline code carries a fill AND an edge, so it survives any surface", async () => {
+    const body = ruleBody(await readThemeCss(), ".md code, .mcq-option-text code");
+    expect(body).not.toBeNull();
+    // The fill used to be --bg, which is exactly what .mcq-body is: on the
+    // multiple-choice screen the chip was invisible until hovered.
+    expect(body).not.toMatch(/background:\s*var\(--bg\)/);
+    expect(body).toMatch(/background:\s*var\(--surface-raised\)/);
+    expect(body).toMatch(/border:\s*1px solid var\(--border\)/);
+  });
+
+  test("a copyable value's resting edge marks it as a control", async () => {
+    const body = ruleBody(await readThemeCss(), ".copy-value code");
+    expect(body).not.toBeNull();
+    // DESIGN.md's Two-Tier Hairline rule: --border-strong is for an edge
+    // that identifies a hit area. This was `1px solid transparent`, which
+    // is how the affordance came to be discoverable only by hovering.
+    expect(body).toMatch(/border-color:\s*var\(--border-strong\)/);
+    expect(body).not.toMatch(/transparent/);
+  });
+
+  test("there is no out-of-flow hover icon to collide with the next word", async () => {
+    const css = await readThemeCss();
+    // At the mcq stem's 19px the absolutely-positioned icon ran ~18px past
+    // its chip into a ~4px word gap, and the next chip's opaque fill
+    // painted over it. The chip itself is the whole control now.
+    expect(ruleBody(css, ".copy-value-icon")).toBeNull();
+    expect(css).not.toContain("copy-value-icon");
+  });
+
+  test("a long value wraps inside its chip rather than pushing the pane sideways", async () => {
+    const body = ruleBody(await readThemeCss(), ".copy-value code");
+    expect(body).toMatch(/overflow-wrap:\s*anywhere/);
+  });
 });
 
 describe("Markdown wrapper: pane layout and prose styling do not share a class", () => {
@@ -127,9 +222,12 @@ describe("Markdown wrapper: pane layout and prose styling do not share a class",
       expect(bareMdRule[1]).not.toMatch(/overflow-y:/);
     }
 
-    // Prose selectors stay scoped under `.md`.
+    // Prose selectors stay scoped under `.md`. The inline-code rule now
+    // shares its block with `.mcq-option-text code` — an option is not
+    // markdown but its code spans are the same object — so the selector
+    // may be followed by a comma as well as by its brace.
     expect(css).toMatch(/(?:^|\n)\.md pre\s*\{/);
-    expect(css).toMatch(/(?:^|\n)\.md code\s*\{/);
+    expect(css).toMatch(/(?:^|\n)\.md code\s*[,{]/);
     expect(css).toMatch(/(?:^|\n)\.md pre code\s*\{/);
 
     // Pane layout lives on its own selector, used only by QuestionPanel,
