@@ -7122,6 +7122,140 @@
   }
 }
 
+/* The header's brand lockup and theme toggle, on a phone.
+ *
+ * At 390px the row carries a mark, the wordmark, the hosted lease
+ * countdown, About, the theme toggle and the menu — and the wordmark is
+ * the item that gives way, ellipsing to "kube…". Three characters of a
+ * brand is worse than none: the mark beside it already IS the brand, and
+ * it is the same mark as the favicon.
+ *
+ * Clipped rather than `display: none`, and that is load-bearing.
+ * BrandMark is aria-hidden, so this span is the home link's ONLY
+ * accessible name — removing it from the tree leaves an unnamed link.
+ * The .sr-only idiom keeps the name and takes the pixels.
+ *
+ * The theme toggle drops its word for the same reason and by a different
+ * rule: it has an explicit aria-label, which replaces its contents for a
+ * screen reader, so hiding the visible text costs nothing and cannot
+ * produce the double-name the Move-Don't-Hide rule warns about. */
+@media (max-width: 640px) {
+  .app-header-wordmark {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .theme-toggle-label {
+    display: none;
+  }
+
+  .app-header .theme-toggle {
+    width: var(--tap-min);
+    padding: 0;
+    justify-content: center;
+    border-radius: var(--radius-pill);
+  }
+}
+
+/* The About drawer, on a phone.
+ *
+ * It is a side drawer at min(480px, 92vw), which on a 390px screen is
+ * 359px — a panel that covers all but a 31px sliver of scrim. That is
+ * neither a drawer (there is nothing left beside it to see) nor a
+ * screen, and the sliver is too narrow to be the dismiss target it looks
+ * like. Full width, and the 32px side padding closes a step: it was
+ * chosen against a 480px panel and costs a phone a fifth of its
+ * measure.
+ *
+ * The comparison table inside it is the real defect. Three columns —
+ * Aspect, This simulator, Real exam — want 307px in a 279px content box,
+ * so the third one was CLIPPED at the drawer's edge: "REAL EXAI", with
+ * every value under it cut in half. It scrolled sideways inside its own
+ * wrapper, which is the Scroll-Inside rule working exactly as written
+ * and still the wrong answer here, because nothing about a clipped
+ * heading says "this scrolls".
+ *
+ * So it stacks, the same treatment .tv-row already takes at 640px: one
+ * block per row, the aspect as its heading, and each value carrying the
+ * column label it lost. `display: block` on table elements would take
+ * the table semantics with it, so the cells become grid rows and the
+ * labels come from data attributes on a wrapper — see the Table-Cell
+ * rule. */
+@media (max-width: 640px) {
+  .info-drawer {
+    width: 100%;
+    border-left: 0;
+    padding: var(--space-5) var(--space-4);
+    padding-bottom: calc(var(--space-6) + var(--safe-b));
+  }
+
+  /* Nothing left to scroll: the table below is no longer wider than its
+     box, and a scroll container that never scrolls is a scrollbar
+     gutter for nothing. */
+  .compare-table-scroll {
+    overflow-x: visible;
+  }
+
+  .compare-table thead {
+    /* Not display:none — the column labels are still what each value
+       means, and they are re-announced per cell below. This hides them
+       visually while keeping them for a screen reader reading the table
+       the ordinary way. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .compare-table tbody tr {
+    display: block;
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .compare-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .compare-table tbody th,
+  .compare-table tbody td {
+    display: block;
+    border-bottom: 0;
+    padding: 0;
+  }
+
+  .compare-table tbody th {
+    margin-bottom: var(--space-2);
+  }
+
+  /* The label each value lost when its column heading was hidden.
+     Content from a data attribute the markup sets, so the words live in
+     strings.ts with every other piece of copy. */
+  .compare-table tbody td::before {
+    content: attr(data-label);
+    display: block;
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .compare-table tbody td + td {
+    margin-top: var(--space-2);
+  }
+}
+
 /* ---- the hub and its chrome, on a phone ----
 
    Last in the file with the touch layer, and for the same reason: these

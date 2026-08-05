@@ -55,10 +55,14 @@ export function InfoDrawer({ onClose, onShowIntro }: InfoDrawerProps) {
             </thead>
             <tbody>
               {s.compareRows.map((row) => (
+                // data-label is what the stacked mobile layout prints
+                // above each value once the column headings are visually
+                // hidden. Same words, from the same place — a CSS
+                // ::before cannot invent copy, and it must not.
                 <tr key={row[0]}>
                   <th scope="row">{row[0]}</th>
-                  <td>{row[1]}</td>
-                  <td>{row[2]}</td>
+                  <td data-label={s.compareHere}>{row[1]}</td>
+                  <td data-label={s.compareReal}>{row[2]}</td>
                 </tr>
               ))}
             </tbody>

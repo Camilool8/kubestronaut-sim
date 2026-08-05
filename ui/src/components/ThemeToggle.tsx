@@ -24,7 +24,12 @@ export function ThemeToggle() {
       aria-label={strings.theme.ariaLabel(strings.theme.labels[pref])}
     >
       <span aria-hidden="true"><Icon name={THEME_ICONS[pref]} /></span>{" "}
-      {strings.theme.labels[pref]}
+      {/* Wrapped so the compact header can hide the WORD and keep the
+          glyph. Safe to hide with CSS, unlike most labels: the button
+          carries an explicit aria-label, which replaces its contents
+          entirely for a screen reader — so there is no second name to
+          collide with, and nothing is lost when the text goes. */}
+      <span className="theme-toggle-label">{strings.theme.labels[pref]}</span>
     </button>
   );
 }
