@@ -206,8 +206,9 @@ do with this change.
 **The menu** is a popover under its trigger with `aria-expanded` and
 `aria-controls`, Escape to close, focus returned to the trigger,
 click-outside to dismiss, and `useFocusTrap` while open — the pattern
-`InfoDrawer` already establishes. Three sections: navigation, account,
-then About and theme.
+`InfoDrawer` already establishes. Two sections: navigation, then
+account. About and the theme toggle are not among them — they stay in
+the bar, for the reason above.
 
 One hazard to design around: `SessionChip` renders its own End-session
 confirmation `Dialog`. Inside a popover that unmounts on close, that
