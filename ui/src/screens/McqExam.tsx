@@ -27,7 +27,7 @@ import { TimerBar } from "../components/TimerBar";
 import { Dialog } from "../components/Dialog";
 import { InfoButton } from "../components/InfoButton";
 import { Icon } from "../components/Icon";
-import { Markdown } from "../components/Markdown";
+import { InlineCode, Markdown } from "../components/Markdown";
 import { CheckList } from "../components/CheckList";
 import { HintTray } from "../components/HintTray";
 import { Navigator, type NavigatorQuestion } from "../components/Navigator";
@@ -519,7 +519,9 @@ function McqQuestion({
         >
           {(data) => (
             <>
-              <Markdown>{data.markdown}</Markdown>
+              {/* copyable={false}: there is no desktop in an mcq session
+                  and therefore nothing to paste into. */}
+              <Markdown copyable={false}>{data.markdown}</Markdown>
               <fieldset className="mcq-options">
                 <legend>
                   {info.multi ? strings.mcq.selectAll : strings.mcq.selectOne}
@@ -542,7 +544,7 @@ function McqQuestion({
                       </span>
                       <span className="mcq-option-text">
                         <span className="sr-only">{LETTERS[i]}. </span>
-                        {text}
+                        <InlineCode text={text} />
                       </span>
                     </label>
                   );
@@ -709,7 +711,7 @@ function McqCheckAnswer({ questionId }: { questionId: string }) {
       </summary>
       {loading && <p>{strings.mcq.loadingAnswer}</p>}
       {error && <p className="error-text">{error}</p>}
-      {solution && <Markdown>{solution.markdown}</Markdown>}
+      {solution && <Markdown copyable={false}>{solution.markdown}</Markdown>}
     </details>
   );
 }

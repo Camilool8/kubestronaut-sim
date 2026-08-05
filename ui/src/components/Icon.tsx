@@ -7,10 +7,14 @@ import type { ReactNode } from "react";
 // `unicode-range` on each @font-face, which is a hard gate: a codepoint
 // outside every declared range never reaches the woff2 at all. ◆ ◇ ✓ ✗ ⧉
 // ◐ ☀ ☾ are all outside both families' subsets, so they fell through to
-// whatever the operating system had. ⧉ — the copy affordance, and the
-// visual payload of what DESIGN.md calls the system's signature component
-// — renders as a tofu box on many Linux font sets, and ☀/☾ can resolve to
-// Apple Color Emoji on macOS, which DESIGN.md explicitly bans.
+// whatever the operating system had. ⧉ — the copy affordance — renders as
+// a tofu box on many Linux font sets, and ☀/☾ can resolve to Apple Color
+// Emoji on macOS, which DESIGN.md explicitly bans.
+//
+// ⧉ no longer appears on the click-to-copy value itself. It sits on the
+// two copy controls that have a real slot for it: the clipboard panel and
+// the question pane's ssh hint. See `.copy-value` in theme.css for why
+// the inline one has no icon at all.
 //
 // These are hand-authored on a 24 grid with round caps and joins, no
 // fill, and a stroke proportional to the grid. Everything is drawn here

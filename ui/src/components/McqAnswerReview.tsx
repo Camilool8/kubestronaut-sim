@@ -1,5 +1,6 @@
 import type { QuestionResult } from "../api";
 import { Icon } from "./Icon";
+import { InlineCode } from "./Markdown";
 import { strings } from "../strings";
 
 const LETTERS = "ABCDEF";
@@ -50,7 +51,7 @@ export function McqAnswerReview({ question }: { question: QuestionResult }) {
               </span>
               <span className="mcq-option-text">
                 <span className="sr-only">{LETTERS[i]}. </span>
-                {text}
+                <InlineCode text={text} />
               </span>
               {icon && (
                 <span className="mcq-review-state">
