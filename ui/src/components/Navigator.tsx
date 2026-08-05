@@ -1,5 +1,6 @@
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useFocusTrap } from "../lib/useFocusTrap";
 import { Icon } from "./Icon";
 import { marksStore } from "./marksStore";
 import { strings } from "../strings";
@@ -61,6 +62,21 @@ interface NavigatorProps {
   progress: NavigatorProgress;
   onSelect: (id: string) => void;
   onDismiss: () => void;
+  /**
+   * Present it as a modal bottom sheet rather than a panel inside its
+   * host: scrim, `role="dialog"`, focus trap, tap-outside to dismiss.
+   *
+   * Set by the mcq screen on a phone, and by nothing else. The comment
+   * above explains why this component is normally a disclosure — a
+   * scrim over a live remote desktop reads as something going wrong —
+   * and that reasoning is about the remote desktop. There is none behind
+   * an mcq question. What IS behind it on a phone is the whole viewport,
+   * because sixty-five tiles at a coarse-pointer size do not fit in a
+   * box inside the column; and an overlay that covers the screen while
+   * leaving what it covers reachable is the definition of the thing a
+   * focus trap exists for.
+   */
+  asSheet?: boolean;
 }
 
 type NavigatorFilter = "all" | "flagged" | "todo";
@@ -96,6 +112,7 @@ export function Navigator({
   progress,
   onSelect,
   onDismiss,
+  asSheet = false,
 }: NavigatorProps) {
   const ref = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLUListElement>(null);
@@ -112,9 +129,19 @@ export function Navigator({
   // notifications, and a mutable Set is not that.
   useSyncExternalStore(marksStore.subscribe, marksStore.getVersion);
 
-  // A non-modal disclosure, so useFocusTrap is the wrong tool despite
-  // being right next door: it cycles Tab inside the container, which would
-  // strand a keyboard user who wanted to reach the timer or Submit exam.
+  // As a panel this is a non-modal disclosure, and useFocusTrap is the
+  // wrong tool despite being right next door: it cycles Tab inside the
+  // container, which would strand a keyboard user who wanted to reach the
+  // timer or Submit exam. As a sheet it covers the viewport, and the
+  // same cycling is the only thing keeping Tab out of the question
+  // behind it.
+  //
+  // Declared BEFORE the effect below, so that when both run the tile
+  // wins: effects fire in declaration order, and the trap's own opening
+  // focus lands on the first filter chip. The grid should arrive
+  // pointing at your place either way.
+  useFocusTrap(ref, onDismiss, asSheet);
+
   // Focus opens on the question you are on, so the grid arrives already
   // pointing at your place.
   useEffect(() => {
@@ -258,8 +285,16 @@ export function Navigator({
         ? strings.navigator.emptyUnanswered
         : strings.navigator.emptyUnseen;
 
-  return (
-    <div className="navigator" id={id} ref={ref}>
+  const panel = (
+    <div
+      className={`navigator${asSheet ? " navigator-sheet" : ""}`}
+      id={id}
+      ref={ref}
+      role={asSheet ? "dialog" : undefined}
+      aria-modal={asSheet ? true : undefined}
+      aria-label={asSheet ? strings.navigator.regionLabel : undefined}
+    >
+      {asSheet && <span className="sheet-grip" aria-hidden="true" />}
       <header className="navigator-head">
         <div
           className="navigator-filters"
@@ -386,6 +421,19 @@ export function Navigator({
         </p>
       </footer>
     </div>
+  );
+
+  if (!asSheet) return panel;
+  return (
+    <>
+      {/* Tapping away is how a sheet is dismissed on a phone, and it has
+          to be a real target rather than a click handler on the scrim
+          colour alone. aria-hidden with no role: the dialog above it is
+          the thing, and an announced "button" here would be a second way
+          to say close that the sheet's own controls already cover. */}
+      <div className="navigator-scrim" aria-hidden="true" onClick={onDismiss} />
+      {panel}
+    </>
   );
 }
 

@@ -47,6 +47,23 @@ export const NARROW_QUERY = "(max-width: 767px)";
 export const SPLIT_QUERY = "not (max-width: 900px)";
 
 /**
+ * A phone-sized column: the exam's chrome has to collapse rather than
+ * wrap.
+ *
+ * At its fullest the exam topbar is a title, a three-number tally, a
+ * training score button, an About button, a theme toggle, a mode chip, a
+ * clock and a submit button. It wraps rather than compressing, which on
+ * a 390px screen is three or four rows of chrome — well over a fifth of
+ * the viewport — sitting above the question the candidate is trying to
+ * read.
+ *
+ * Mirrored in theme.css's `max-width: 640px` blocks, which is also where
+ * the reading type steps up. The two must agree: the JS decides which
+ * controls exist, and the CSS sizes what is left.
+ */
+export const MCQ_COMPACT_QUERY = "(max-width: 640px)";
+
+/**
  * Too narrow for the header's full row.
  *
  * At its fullest that row is a wordmark, a rule, a crumb, a detail line,

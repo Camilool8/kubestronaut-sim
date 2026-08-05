@@ -235,6 +235,15 @@ export const strings = {
     // the same lie in the other direction (#22).
     endAttempt: (mode: string) => (mode === "training" ? "Submit session" : "Submit exam"),
     ending: "Ending…",
+    // The compact topbar's one control, and the accessible name for a
+    // glyph. "More" rather than "Menu": what it opens is a panel of this
+    // exam's own controls, not a navigation — there is nowhere to go
+    // from inside a running attempt, which is the point of the screen.
+    moreLabel: "Exam controls",
+    // The compact navigator button's face. Its accessible name is still
+    // the full "Question 7 of 65" — this is the glyph beside it, not a
+    // second voice for the same fact.
+    positionShort: (n: number, total: number) => `${n}/${total}`,
     // Submitting is the one control that must never fail silently: the
     // server-side clock keeps running whatever the button looks like.
     endFailed: (detail: string) =>

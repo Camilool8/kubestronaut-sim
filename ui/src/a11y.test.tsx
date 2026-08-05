@@ -29,7 +29,7 @@ import { HostedSignIn } from "./screens/HostedSignIn";
 import { HostedStart } from "./screens/HostedStart";
 import { EndSessionDialog, SessionActions, SessionChip } from "./components/SessionChip";
 import { HeaderMenu } from "./components/HeaderMenu";
-import { HEADER_COMPACT_QUERY, SPLIT_QUERY } from "./lib/useMediaQuery";
+import { HEADER_COMPACT_QUERY, MCQ_COMPACT_QUERY, SPLIT_QUERY } from "./lib/useMediaQuery";
 import { matchMediaMock } from "./test/setup";
 import { marksStore } from "./components/marksStore";
 import { toastStore } from "./components/toastStore";
@@ -789,6 +789,38 @@ describe("axe: no WCAG violations", () => {
     await screen.findByText("Which component persists cluster state?");
     await user.click(screen.getByRole("button", { name: /show all questions/i }));
     expect(container.querySelector("#mcq-jump")).not.toBeNull();
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  // The two surfaces a phone gets instead of the wide bar and the inline
+  // panel. Both are modal, both are new, and an unscanned state is
+  // exactly how the violations above survived as long as they did.
+  test("mcq compact topbar sheet", async () => {
+    matchMediaMock([MCQ_COMPACT_QUERY]);
+    stubMcqFetch();
+    const user = userEvent.setup();
+    const { container } = render(
+      <McqExam session={mcqSession} fetchedAt={Date.now()} onSessionChange={() => {}} />,
+    );
+    await screen.findByText("Which component persists cluster state?");
+    await user.click(screen.getByRole("button", { name: /exam controls/i }));
+    expect(screen.getByRole("dialog", { name: "KCNA Mock Exam" })).toBeInTheDocument();
+    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+  });
+
+  test("mcq navigator as a bottom sheet", async () => {
+    matchMediaMock([MCQ_COMPACT_QUERY]);
+    stubMcqFetch({ q01: [1] });
+    const user = userEvent.setup();
+    const { container } = render(
+      <McqExam session={mcqSession} fetchedAt={Date.now()} onSessionChange={() => {}} />,
+    );
+    await screen.findByText("Which component persists cluster state?");
+    await user.click(screen.getByRole("button", { name: /question 1 of 2/i }));
+    expect(screen.getByRole("dialog", { name: /questions/i })).toHaveAttribute(
+      "aria-modal",
+      "true",
+    );
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 

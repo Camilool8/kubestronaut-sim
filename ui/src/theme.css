@@ -2261,6 +2261,78 @@
   width: min(560px, 92%);
 }
 
+/* The sheet variant: the same dialog, anchored to the bottom edge.
+ *
+ * On a wide screen it stays a centred dialog — a panel pinned to the
+ * bottom of a 27" display is further from the pointer than the middle
+ * is, and the thumb-zone argument that justifies it on a phone is an
+ * argument about a hand holding the device. So everything below is
+ * inside the mobile query; on a desktop `.confirm-dialog-sheet` adds
+ * nothing but the grip, which is hidden there for the same reason. */
+.sheet-grip {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .confirm-overlay-sheet {
+    align-items: flex-end;
+  }
+
+  /* Scoped through the overlay for SPECIFICITY, not for clarity. The
+     600px block further down makes every .confirm-dialog full-bleed —
+     width 100%, max-height 100dvh, radius 0 — and it appears later in
+     this file, so at equal specificity it would win and the sheet would
+     become an ordinary full-screen dialog on exactly the widths it
+     exists for. Two classes beat one wherever they are written. */
+  .confirm-overlay-sheet .confirm-dialog-sheet {
+    width: 100%;
+    max-width: 100%;
+    /* Not 100dvh, unlike the full-bleed dialogs above. A sheet that
+       covers everything is a screen and should have been one; leaving
+       the top of the page visible is what says "this is a layer over
+       what you were doing, and dismissing it puts you back". */
+    max-height: 85dvh;
+    /* Corners at the top only: the bottom edge reaches the physical
+       edge of the display and rounding it would float the sheet on a
+       sliver of scrim no thumb can hit. */
+    border-radius: var(--radius-l) var(--radius-l) 0 0;
+    border-bottom: 0;
+    /* The home indicator lives in the last ~20px. Without this the final
+       control in the sheet sits under it. */
+    padding-bottom: calc(var(--space-5) + var(--safe-b));
+  }
+
+  .sheet-grip {
+    display: block;
+    width: 36px;
+    height: 4px;
+    margin: 0 auto var(--space-3);
+    border-radius: var(--radius-pill);
+    background: var(--border-strong);
+  }
+}
+
+/* Rises from the edge it is anchored to rather than fading in place.
+   transform only, so it composites, and inside the no-preference guard
+   like every other animation in this file — a reduced-motion reader gets
+   the sheet already in position, which is the same layout. */
+@media (prefers-reduced-motion: no-preference) {
+  .confirm-overlay-sheet .confirm-dialog-sheet {
+    animation: sheet-in var(--dur-modal-in) var(--ease-out);
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 .confirm-dialog h2 {
   margin-top: 0;
 }
@@ -4833,6 +4905,12 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* The flick at the end of a question stops here instead of scrolling
+     the page behind it — which on a phone means the address bar sliding
+     back into view and the whole layout resizing, mid-read, because the
+     candidate reached the bottom of a stem. Same declaration, same
+     reason, as .navigator-body and .confirm-dialog. */
+  overscroll-behavior: contain;
   padding: var(--space-4) 0;
 }
 
@@ -5089,27 +5167,92 @@
 
 @media (max-width: 640px) {
   .mcq-body {
-    padding: var(--space-4) var(--space-2) var(--space-3);
+    padding: var(--space-4) var(--space-2) 0;
   }
 
-  /* A phone gets the controls on one row and the reassurance line under
-     them, rather than three items squeezed into a third of the width
-     each. `order` is safe here because the line is not focusable, so the
-     visual order and the tab order cannot disagree (WCAG 1.3.2 / 2.4.3).
-     This is a real media query and not a container one: the column is the
-     viewport here, and nothing drags its width the way .panel-resizer
-     drags the task pane's. */
+  /* The action bar.
+   *
+   * The footer used to be three controls and a sentence sharing a
+   * wrapped flex row, and it sat on the literal bottom edge of the
+   * viewport — under the home indicator on any recent iPhone, and under
+   * the URL bar whenever it was showing. Both are fixed here: the safe
+   * inset is real now that index.html opts into it, and the height chain
+   * tracks dvh.
+   *
+   * Full width, 48px tall, and the three targets in the order the thumb
+   * expects: back, where-am-I, forward. 48 rather than the 44 the rest of
+   * this system uses because these are the controls a candidate reaches
+   * for WITHOUT looking — their eyes are on the question — and a target
+   * found by feel wants Material's floor rather than the minimum.
+   *
+   * A surface of its own, not the page: it stays put while the question
+   * scrolls behind it, and a bar that shares the reading surface's fill
+   * looks like it scrolled off. */
+  .mcq-footer {
+    margin-inline: calc(-1 * var(--space-2));
+    padding: var(--space-2) var(--space-3);
+    padding-bottom: calc(var(--space-2) + var(--safe-b));
+    gap: var(--space-2);
+    flex-wrap: nowrap;
+    background: var(--surface);
+  }
+
+  /* The reassurance line moves ABOVE the bar. It used to take a row of
+     its own beneath the controls, which put a permanent sentence in the
+     one band of the screen a thumb can reach without moving — paid for
+     every question, to say something that is only news once.
+     `order` is safe here because the line is not focusable, so the
+     visual order and the tab order cannot disagree (WCAG 1.3.2 /
+     2.4.3). */
   .mcq-save-note {
-    order: 1;
+    order: -1;
     flex-basis: 100%;
     text-align: center;
+    font-size: var(--text-2xs);
   }
 
-  /* The stem steps back down: --text-2xl in a 340px measure is four words
-     to a line. */
-  .mcq-question .mcq-pane > .md > p {
-    font-size: var(--text-xl);
+  .mcq-footer .btn {
+    min-height: var(--tap-comfortable);
+    justify-content: center;
   }
+
+  /* Previous and the navigator hold their size; the forward action takes
+     the rest. It is the one pressed on nearly every question, and on the
+     last one it becomes Submit — the only button on the screen that ends
+     the attempt, and the only one worth making unmissable. */
+  .mcq-footer-end {
+    flex: 1;
+    gap: var(--space-2);
+  }
+
+  .mcq-footer-end .btn-primary {
+    flex: 1;
+  }
+
+  /* Icon-only Previous: the label is on the button as an accessible
+     name already, and three labelled controls do not fit a 320px row
+     without every one of them ellipsing. */
+  .mcq-footer > .btn:first-child {
+    flex-shrink: 0;
+    padding-inline: var(--space-3);
+  }
+
+  .mcq-footer > .btn:first-child .btn-label {
+    display: none;
+  }
+
+  /* The keyboard hints go with the keyboard. */
+  .mcq-footer .key-hint {
+    display: none;
+  }
+
+  /* The stem stays at its full reading size. It used to step DOWN here
+     — --text-2xl to --text-xl — which is backwards: the token ramp now
+     raises the body text underneath it, and a stem that shrank while its
+     own body grew would invert the hierarchy on the one screen where the
+     question is the whole point. What made 19px feel wrong at this width
+     was the four-words-to-a-line measure, and `text-wrap: pretty` on the
+     rule this overrides already handles that. */
 
   .mcq-review-option {
     flex-wrap: wrap;
@@ -5118,6 +5261,131 @@
   .mcq-review-state {
     width: 100%;
     justify-content: flex-end;
+  }
+
+  /* The navigator as a sheet.
+   *
+   * As a panel it is `position: absolute; inset: 0` inside
+   * .mcq-question, which on a desktop is a 720px column with room for a
+   * ten-wide grid. On a phone that box is the width of the screen and
+   * the height of one question, and sixty-five tiles at a coarse-pointer
+   * size are thirteen rows plus filter chips plus a legend — so the
+   * panel became a scrolling box inside a scrolling column, opened by a
+   * control at the bottom, drawing its grid at the top.
+   *
+   * As a sheet it rises from the edge the thumb pressed, keeps its
+   * filters and legend pinned, and scrolls only the grid. Fixed rather
+   * than absolute, so it escapes the column entirely — which is also why
+   * it needs the scrim and the focus trap the panel deliberately does
+   * without. */
+  .navigator-sheet {
+    position: fixed;
+    inset: auto 0 0 0;
+    max-height: 85dvh;
+    z-index: var(--z-dialog);
+    border-radius: var(--radius-l) var(--radius-l) 0 0;
+    border-top: 1px solid var(--border);
+    box-shadow: var(--shadow-3);
+    padding-top: var(--space-3);
+    /* The home indicator, again. The legend is the last thing in the
+       sheet and it is the thing that would sit under it. */
+    padding-bottom: var(--safe-b);
+  }
+
+  .navigator-scrim {
+    position: fixed;
+    inset: 0;
+    background: var(--overlay);
+    z-index: var(--z-dialog);
+  }
+
+  /* Bigger than the 44px the coarse-pointer block gives them. This is a
+     grid of sixty-five adjacent targets with no gaps to miss into, and
+     hitting Q34 instead of Q35 costs a candidate the same gesture
+     again. */
+  .navigator-sheet .navigator-tile {
+    min-height: var(--tap-comfortable);
+  }
+
+  /* The answer rows. 44px is the floor for a control you aim at; these
+     are the screen's whole purpose, they are read before they are
+     pressed, and the option text is often two lines anyway — so the
+     height comes from real padding rather than from a min-height
+     propping up a cramped row.
+
+     The letter circle grows with it. At 24px on a phone it was a detail
+     beside the text; at 28px it is the thing you press, which is what it
+     already is on a touchscreen. */
+  .mcq-options {
+    gap: var(--space-3);
+  }
+
+  .mcq-option {
+    min-height: var(--tap-comfortable);
+    padding: var(--space-4) var(--space-3);
+    gap: var(--space-3);
+  }
+
+  .mcq-question .mcq-option-letter {
+    width: 28px;
+    height: 28px;
+    font-size: var(--text-s);
+  }
+
+  /* The head row: position, domain, flag. The flag keeps its label on a
+     phone — it is the one control here whose glyph is genuinely
+     ambiguous, and "Mark for review" is four words. */
+  .mcq-head {
+    gap: var(--space-2);
+  }
+
+  /* The compact topbar: one row, one height, and the clock reading as
+     the fixed point it is. */
+  .topbar-compact {
+    flex-wrap: nowrap;
+    height: 56px;
+    padding: 0 var(--space-3);
+    padding-top: var(--safe-t);
+    box-sizing: content-box;
+    gap: var(--space-2);
+  }
+
+  .topbar-compact .timer {
+    font-size: var(--text-xl);
+  }
+
+  .topbar-more {
+    margin-left: auto;
+    min-width: var(--tap-min);
+    min-height: var(--tap-min);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    flex-shrink: 0;
+  }
+
+  /* The overflow sheet's contents. Stacked and full width: these are
+     unrelated controls sharing a panel, not a row of peers, and side by
+     side they would read as a toolbar with an order that means
+     something. */
+  .topbar-sheet-extras {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+
+  .topbar-sheet-extras > .btn,
+  .topbar-sheet-end {
+    width: 100%;
+    min-height: var(--tap-comfortable);
+  }
+
+  .topbar-sheet .mcq-tally {
+    margin-left: 0;
+    font-size: var(--text-s);
   }
 }
 

@@ -10,8 +10,22 @@ const FOCUSABLE =
 export function useFocusTrap(
   ref: RefObject<HTMLElement | null>,
   onClose: () => void,
+  /**
+   * Off makes the whole thing a no-op, for a component that is modal on
+   * one viewport and a plain disclosure on another.
+   *
+   * A parameter rather than a conditional call at the call site, because
+   * hooks may not be conditional — and rather than two components,
+   * because the navigator is genuinely one thing whose surroundings
+   * differ. On a desktop it opens over a live remote desktop, where
+   * dimming the screen to pick question 12 reads as a fault; on a phone
+   * it is a sheet covering everything, and a sheet you can Tab out of
+   * behind is not a sheet.
+   */
+  enabled = true,
 ): void {
   useEffect(() => {
+    if (!enabled) return;
     const container = ref.current;
     if (!container) return;
     const opener = document.activeElement as HTMLElement | null;
@@ -51,5 +65,5 @@ export function useFocusTrap(
       container.removeEventListener("keydown", onKeyDown);
       opener?.focus();
     };
-  }, [ref, onClose]);
+  }, [ref, onClose, enabled]);
 }

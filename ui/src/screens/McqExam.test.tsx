@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { McqExam } from "./McqExam";
 import { marksStore } from "../components/marksStore";
 import { toastStore } from "../components/toastStore";
+import { MCQ_COMPACT_QUERY } from "../lib/useMediaQuery";
+import { matchMediaMock } from "../test/setup";
 import type { SessionSnapshot } from "../api";
 
 const session: SessionSnapshot = {
@@ -433,5 +435,116 @@ describe("McqExam footer navigation", () => {
     expect(
       await screen.findByText(/answers save as you go · nothing is graded until submit/i),
     ).toBeInTheDocument();
+  });
+});
+
+// The one exam a phone can sit, so the phone layout is not a fallback
+// here — it is the product. jsdom cannot see any of the CSS that makes
+// it work, but it can see the half that matters most: which controls
+// exist, where, and what they are called. Every branch below is a JS
+// branch precisely so that it IS testable, and so that no button ends up
+// with two accessible names.
+describe("McqExam on a phone", () => {
+  afterEach(() => {
+    matchMediaMock([]);
+  });
+
+  const renderCompact = () => {
+    matchMediaMock([MCQ_COMPACT_QUERY]);
+    return render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+  };
+
+  // The topbar was a title, a three-number tally, an About button, a
+  // theme toggle, a clock and a red Submit, wrapping onto three or four
+  // rows above the question. What survives is the one thing a candidate
+  // must never go looking for while a countdown runs.
+  test("the topbar keeps the clock and moves everything else behind one control", async () => {
+    stubFetch();
+    renderCompact();
+    await screen.findByText(/persists cluster state/);
+
+    expect(screen.getByRole("timer")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /exam controls/i })).toBeInTheDocument();
+    // Submit is not on the bar. It ends the attempt, it cannot be undone,
+    // and the topbar is where a thumb reaching for the notch lands.
+    expect(screen.queryByRole("button", { name: "Submit exam" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "KCNA Mock Exam" })).toBeNull();
+  });
+
+  test("the overflow sheet holds the title, the tally and Submit", async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    renderCompact();
+    await screen.findByText(/persists cluster state/);
+
+    await user.click(screen.getByRole("button", { name: /exam controls/i }));
+
+    const sheet = screen.getByRole("dialog", { name: "KCNA Mock Exam" });
+    expect(within(sheet).getByText(/Answered 0/)).toBeInTheDocument();
+    expect(within(sheet).getByRole("button", { name: "Submit exam" })).toBeInTheDocument();
+  });
+
+  test("submitting from the sheet opens the same confirmation the wide bar does", async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    renderCompact();
+    await screen.findByText(/persists cluster state/);
+
+    await user.click(screen.getByRole("button", { name: /exam controls/i }));
+    await user.click(screen.getByRole("button", { name: "Submit exam" }));
+
+    // The sheet closes behind it: two stacked dialogs over one decision
+    // is one dialog too many, and the confirmation is the one that
+    // matters.
+    expect(await screen.findByRole("dialog", { name: /submit/i })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "KCNA Mock Exam" })).toBeNull();
+  });
+
+  // Three labelled controls do not fit a 320px row without every one of
+  // them ellipsing. The labels give way to the glyphs they already sit
+  // beside — and the navigator trades the word "Navigator" for the
+  // position it is the way to change.
+  test("the action bar drops its labels but keeps every accessible name", async () => {
+    stubFetch();
+    renderCompact();
+    await screen.findByText(/persists cluster state/);
+
+    const previous = screen.getByRole("button", { name: /previous/i });
+    expect(previous).toBeInTheDocument();
+    expect(previous.textContent).not.toMatch(/prev/i);
+
+    // "1/2" is drawn; the accessible name is still the full sentence.
+    expect(screen.getByText("1/2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /question 1 of 2/i })).toBeInTheDocument();
+  });
+
+  // The reasoning that makes the desktop navigator a plain disclosure —
+  // a scrim over a live remote desktop reads as a fault — is about the
+  // remote desktop, and there is none behind an mcq question. What is
+  // behind it on a phone is the whole viewport.
+  test("the navigator opens as a modal sheet, not an inline panel", async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    renderCompact();
+    await screen.findByText(/persists cluster state/);
+
+    await user.click(screen.getByRole("button", { name: /question 1 of 2/i }));
+
+    const sheet = screen.getByRole("dialog", { name: /questions/i });
+    expect(sheet).toHaveAttribute("aria-modal", "true");
+    expect(within(sheet).getByRole("button", { name: /^Q1/ })).toBeInTheDocument();
+  });
+
+  test("and stays a plain disclosure on a desktop", async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    matchMediaMock([]);
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+    await screen.findByText(/persists cluster state/);
+
+    await user.click(screen.getByRole("button", { name: /navigator/i }));
+
+    expect(screen.queryByRole("dialog", { name: /questions/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /^Q1/ })).toBeInTheDocument();
   });
 });
