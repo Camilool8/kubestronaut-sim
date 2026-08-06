@@ -5,14 +5,8 @@ cd "$(dirname "$0")/.."
 python3 - "$@" <<'PY'
 import os, re, sys, glob
 
-TOLERANCE = 2.0  # percentage points
+TOLERANCE = 2.0
 
-# exam.yaml is machine-shaped and simple, so it is parsed with regexes
-# rather than dragging in a YAML library the rest of the tests do not
-# need. That is only safe because of the cross-check below: if the
-# regexes ever stop matching the file's real shape, the question count
-# disagrees with the directory listing and this exits non-zero. It can
-# fail; it cannot silently pass by finding nothing.
 Q_RE = re.compile(
     r"-\s+id:\s*(?P<id>\S+)\s*\n"
     r"(?:\s+title:\s*.+\n)?"
@@ -21,11 +15,6 @@ Q_RE = re.compile(
     r"\s+weight:\s*(?P<weight>\d+)\s*$",
     re.M,
 )
-# Exactly the Go loader's contract (facilitator/internal/exam/exam.go
-# parsePoints): one space after the colon, no leading zeros. Looser is
-# worse than none — "# points: 08" was counted as 8 here and skipped as 0
-# by the grader, so the two silently disagreed about what a question was
-# worth. tests/check-lint.sh enforces the same pattern on the headers.
 POINTS_RE = re.compile(r"^# points: (0|[1-9][0-9]*)$", re.M)
 
 failures = []
@@ -91,9 +80,6 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
     bank = os.path.basename(bank_dir)
     text = open(exam_path, encoding="utf-8").read()
 
-    # MCQ banks have a different question shape (no instance, no
-    # validate.d) and their own gate: tests/bank-mcq.sh. Skip them here
-    # BEFORE the directory cross-check, or (3) fails on every mcq bank.
     if re.search(r"^\s*examType:\s*mcq\s*$", text, re.M):
         print(f"{bank}: mcq — covered by tests/bank-mcq.sh")
         continue
@@ -104,7 +90,6 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
         if os.path.isdir(p)
     )
 
-    # (4) — and the guard that keeps the regex parsing honest.
     declared = sorted(q["id"] for q in questions)
     if declared != on_disk:
         only_yaml = sorted(set(declared) - set(on_disk))
@@ -119,7 +104,6 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
         fail(bank, "; ".join(detail))
         continue
 
-    # (3)
     points = {}
     for q in questions:
         total = 0
@@ -136,7 +120,6 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
         if total != int(q["weight"]):
             fail(bank, f"{q['id']} weight is {q['weight']} but its checks total {total}")
 
-    # (5) — checked before anything reads the value.
     length = exam_length(text)
     if length is not None and length < 0:
         fail(bank, f"spec.examLength is {length}; a length is positive or absent")
@@ -146,7 +129,6 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
         length = None
     pooled = length is not None and 0 < length < len(questions)
 
-    # (1) and (2)
     weights = domain_weights(text)
     grand = sum(points.values())
     if weights is None:
@@ -169,12 +151,6 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
     for d in sorted(missing):
         fail(bank, f"spec.domainWeights lists {d!r} but no question uses it")
 
-    # (2), pooled form. A pooled bank's attempt is stratified by COUNT,
-    # so the pool's own point distribution says nothing about what a
-    # candidate gets; what would break an attempt is a domain too shallow
-    # to fill its target, and Draw refuses outright when that happens.
-    # Finding that out here costs a second; finding it out at Start costs
-    # a candidate their attempt.
     if pooled:
         order = domain_order(questions)
         targets = domain_targets(weights, order, length)
@@ -210,4 +186,5 @@ if failures:
     sys.exit(1)
 
 print("\nbank weights OK")
+
 PY

@@ -1,8 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- One locked top panel: applications menu, task list, then Terminal
-     and Firefox launchers (the reliable path to both apps — xfdesktop's
-     first-run "untrusted launcher" prompt makes desktop icons second-
-     class) and a clock. -->
 <channel name="xfce4-panel" version="1.0">
   <property name="configver" type="int" value="2"/>
   <property name="panels" type="array">

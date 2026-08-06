@@ -1,23 +1,9 @@
 [Configuration]
 FontName=JetBrains Mono 11
 MiscMenubarDefault=FALSE
-# Candidates paste exam values (resource names, paths, image tags) from
-# the question panel constantly, and anything containing a newline
-# otherwise raises "Warning: Potentially Unsafe Paste". The warning
-# guards against pasting an unread command from the web; here the only
-# source is the exam's own question text, so it is pure friction.
-# (xfce4-terminal reads this file up to 1.0.x; 1.1+ migrates it into the
-# xfconf channel seeded alongside it.)
 MiscShowUnsafePasteDialog=FALSE
 MiscBordersDefault=TRUE
 ScrollingUnlimited=TRUE
-# This palette is the --machine-* family from ui/src/styles/tokens.css,
-# not the app's dark theme. The terminal IS the machine, and the machine
-# does not follow the app's theme — see the note at the top of that file.
-# Green and amber here are --machine-green and --machine-amber, which are
-# also the dark --syntax-string and --syntax-number, so a YAML block in
-# the question panel and the same YAML in the candidate's vim are the
-# same two colours. Keep the xfconf twin next door in step.
 ColorForeground=#c3ccd9
 ColorBackground=#0b0f16
 ColorCursor=#6f9cf8

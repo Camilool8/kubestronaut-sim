@@ -5,16 +5,10 @@ cd "$(dirname "$0")/.."
 python3 - "$@" <<'PY'
 import os, re, sys, glob
 
-TOLERANCE = 2.0     # percentage points
-MIN_SOLUTION = 200  # characters — "the answer is B" is not an explanation
+TOLERANCE = 2.0
+MIN_SOLUTION = 200
 MIN_OPTIONS, MAX_OPTIONS = 3, 6
 
-# exam.yaml is machine-shaped and simple, so it is parsed with regexes
-# rather than dragging in a YAML library the rest of the tests do not
-# need. That is only safe because of the cross-check below: if the
-# regexes ever stop matching the file's real shape, the question count
-# disagrees with the directory listing and this exits non-zero. It can
-# fail; it cannot silently pass by finding nothing.
 Q_RE = re.compile(
     r"-\s+id:\s*(?P<id>\S+)\s*\n"
     r"(?:\s+title:\s*.+\n)?"
@@ -83,8 +77,6 @@ def parse_options(block):
         if len(val) >= 2 and val[0] == val[-1] and val[0] in "\"'":
             val = val[1:-1]
         elif re.search(r":(\s|$)", val):
-            # Unquoted with `key: value` shape — YAML reads that as a
-            # map, not the string this regex would have pretended it is.
             return None
         if not val.strip():
             return None
@@ -105,8 +97,6 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
     bank = os.path.basename(bank_dir)
     text = open(exam_path, encoding="utf-8").read()
 
-    # The mirror of bank-weights.sh's skip: hands-on banks have their
-    # own gate, and their question shape would fail every regex here.
     if not re.search(r"^\s*examType:\s*mcq\s*$", text, re.M):
         print(f"{bank}: hands-on — covered by tests/bank-weights.sh")
         continue
@@ -117,7 +107,6 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
         if os.path.isdir(p)
     )
 
-    # (1) — and the guard that keeps the regex parsing honest.
     declared = sorted(q["id"] for q in questions)
     if declared != on_disk:
         only_yaml = sorted(set(declared) - set(on_disk))
@@ -132,9 +121,6 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
         fail(bank, "; ".join(detail))
         continue
 
-    # (3) — anywhere in the bank, not just the expected places: a
-    # misplaced validate.d/ is exactly the kind of thing "expected
-    # places" would miss.
     for root, dirs, files in os.walk(bank_dir):
         for d in sorted(dirs):
             if d in ("validate.d", "files"):
@@ -144,7 +130,6 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
             rel = os.path.relpath(os.path.join(root, "setup.sh"), bank_dir)
             fail(bank, f"{rel} exists — mcq questions have no setup")
 
-    # (2) — per question, plus the points map (4) and (5) read from.
     points = {}
     for q in questions:
         qid = q["id"]
@@ -184,14 +169,10 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
             fail(bank, f"{qid} correct list {correct} must be unique and sorted ascending")
         if q["multi"] == "false" and len(correct) != 1:
             fail(bank, f"{qid} is single-answer but lists {len(correct)} correct indices")
-        # All correct is as degenerate as one: "select all that apply"
-        # where all apply grades right on a straight select-everything.
         if q["multi"] == "true" and not (2 <= len(correct) <= n - 1):
             fail(bank, f"{qid} is multi but lists {len(correct)} correct indices, "
                        f"want 2..{n - 1}")
 
-    # (6) — a key where one letter is right most of the time grades a
-    # candidate's test-taking reflexes, not their knowledge.
     singles = [q for q in questions if q["multi"] == "false"]
     counts = {}
     for q in singles:
@@ -203,7 +184,6 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
             fail(bank, f"option index {idx} is the answer to {counts[idx]} of "
                        f"{len(singles)} single-answer questions — degenerate key")
 
-    # (4)
     weights = domain_weights(text)
     grand = sum(points.values())
     if weights is None:
@@ -227,16 +207,12 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
     for d in sorted(missing):
         fail(bank, f"spec.domainWeights lists {d!r} but no question uses it")
 
-    # (5)
     n = exam_length(text)
     pooled = n is not None and n < len(questions)
     print(f"{bank}: {len(questions)} questions, {grand} points"
           + (f", examLength {n}" if pooled else ""))
 
     if pooled:
-        # A stratified draw hits its target count regardless of the
-        # pool's own ratio, so what has to hold is pool depth, not
-        # points-share — see the header comment above invariant 5.
         domain_order = []
         pool_count = {}
         for q in questions:
@@ -272,4 +248,5 @@ if failures:
     sys.exit(1)
 
 print("\nbank mcq OK")
+
 PY

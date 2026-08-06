@@ -82,7 +82,6 @@ kubectl -n netpol-smoke run target --image=nginx:1.29-alpine --labels=app=target
   --port=80 >/dev/null 2>&1 || true
 kubectl -n netpol-smoke expose pod target --port=80 >/dev/null 2>&1 || true
 kubectl -n netpol-smoke wait --for=condition=Ready pod/target --timeout=120s >/dev/null
-# Reachable before any policy exists.
 kubectl -n netpol-smoke run probe-before --rm -i --restart=Never --image=busybox:1.37 \
   --command -- wget -q -T 5 -O- http://target >/dev/null 2>&1 \
   || { echo "PROBE: target unreachable before any policy"; exit 1; }

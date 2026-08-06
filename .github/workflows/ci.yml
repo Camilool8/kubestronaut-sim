@@ -141,8 +141,6 @@ jobs:
               sys.exit(f'no per-exam manifest was rendered: {sorted(docs)}')
           pod = json.loads('\n'.join(docs[name]))
           env = next(c for c in pod['spec']['containers'] if c['name'] == 'k8s-env')
-          # Three layers, most specific last: the manifest's measured
-          # numbers, then the flavour's, then the exam's.
           if env['resources']['limits']['memory'] != '10Gi':
               sys.exit(f"the exam's own limit was lost: {env['resources']}")
           if env['resources']['requests']['cpu'] != '1500m':
@@ -150,6 +148,7 @@ jobs:
           if env['resources']['requests']['memory'] != '2Gi':
               sys.exit(f"the manifest's own request was lost: {env['resources']}")
           print(f'{name}: {env["resources"]}')
+
           PY
 
       - name: The rendered Pods are the manifests, with the images moved
@@ -157,8 +156,6 @@ jobs:
           mkdir -p /tmp/rendered
           python3 - <<'PY'
           import json, re, sys
-          # No PyYAML on the runner, and none is needed: toJson emits one
-          # line per key, so the ConfigMap is read by indentation.
           docs, key = {}, None
           for line in open('/tmp/cm.yaml'):
               line = line.rstrip('\n')
@@ -171,7 +168,6 @@ jobs:
                   docs[key].append(line[4:])
               elif line.strip():
                   key = None
-          # From Chart.yaml, so a version bump is one edit and not two.
           tag = re.search(r'^appVersion:\s*"?([^"\s]+)"?',
                           open('deploy/helm/kubestronaut-sim/Chart.yaml').read(),
                           re.M).group(1)
@@ -183,9 +179,6 @@ jobs:
               open('/tmp/rendered/' + name, 'w').write(json.dumps(pod))
               if pod['kind'] != 'Pod':
                   sys.exit(f'{name}: rendered a {pod["kind"]}')
-              # The API server rejects a create whose body names a
-              # different namespace from the URL, and defaults an empty
-              # one silently — which is worse.
               if not pod['metadata'].get('namespace'):
                   sys.exit(f'{name}: no namespace')
               got = (len(pod['spec'].get('initContainers', [])), len(pod['spec']['containers']))
@@ -201,12 +194,12 @@ jobs:
                   first_party = c['image'].startswith('docker.io/cjoga/kubestronaut-sim-')
                   if first_party and not c['image'].endswith(':' + tag):
                       sys.exit(f'{name}: {c["name"]} is on {c["image"]}, not the chart appVersion')
-                  # An upstream pinned tag is not the chart's to move.
                   if c['image'] == 'registry:2':
                       continue
                   if not first_party:
                       sys.exit(f'{name}: {c["name"]} image {c["image"]} was not rewritten')
               print(f'{name}: {inits} init + {containers} containers, images rewritten')
+
           PY
 
       - name: The hub can stamp out what the chart renders
@@ -255,8 +248,6 @@ jobs:
           python3 - <<'PY'
           import sys, re
           src = open('deploy/helm/kubestronaut-sim/files/session-pod.yaml').read()
-          # Stdlib only: no PyYAML on the runner by default, and the
-          # checks worth having here are structural, not schema-deep.
           for probe in ('hostAliases:', 'initContainers:', 'containers:', 'volumes:'):
               if probe not in src:
                   sys.exit(f'session-pod.yaml: missing {probe}')
@@ -264,34 +255,17 @@ jobs:
           expected = {'banks', 'k8s-env', 'instance', 'desktop', 'facilitator', 'conductor', 'docs-proxy'}
           if names != expected:
               sys.exit(f'session-pod.yaml images {sorted(names)} != {sorted(expected)}')
-          # A mutable tag with the default pull policy silently serves a
-          # stale image; every first-party image must opt out.
           if src.count('imagePullPolicy: Always') - src.count('# imagePullPolicy: Always') != len(re.findall(r'image: cjoga/', src)):
               sys.exit('session-pod.yaml: every cjoga/ image needs imagePullPolicy: Always')
-          # Pod containers share a UTS namespace, so an instance that does
-          # not name itself shows the candidate the same prompt they typed
-          # `ssh instance-1` at, with no way to tell it worked.
           for want in ('instance-1', 'instance-2'):
               if 'SIM_HOSTNAME, value: "%s"' % want not in src:
                   sys.exit('session-pod.yaml: %s has no SIM_HOSTNAME' % want)
-          # A practical session is a privileged container holding a root
-          # shell for a stranger. Its egress boundary is not optional, and
-          # it is not part of the Pod spec, so assert it exists and still
-          # denies every private range rather than trusting it shipped.
           np = open('deploy/helm/kubestronaut-sim/templates/networkpolicy.yaml').read()
           for cidr in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16',
                        '100.64.0.0/10', '169.254.0.0/16'):
               if cidr not in np:
                   sys.exit('networkpolicy.yaml: %s is not denied' % cidr)
 
-          # The MCQ flavour. Its whole reason to exist is being small and
-          # unprivileged, so those are what is asserted: no cluster, no
-          # shells, no privilege.
-          #
-          # Comments are stripped first. Every one of these manifests
-          # explains itself at length, and a check that reads the prose
-          # fails on a file that says "no desktop container exists here"
-          # — which is the file being correct, described correctly.
           raw = open('deploy/helm/kubestronaut-sim/files/session-pod-mcq.yaml').read()
           mcq = '\n'.join(re.sub(r'(^|\s)#.*$', '', line) for line in raw.splitlines())
           if 'privileged: true' in mcq:
@@ -299,19 +273,9 @@ jobs:
           for forbidden in ('name: k8s-env', 'name: instance-1', 'name: desktop', 'image: registry:2'):
               if forbidden in mcq:
                   sys.exit('session-pod-mcq.yaml: %s does not belong in an MCQ session' % forbidden)
-          # /shared/ready is the authority on readiness for every service
-          # in the stack. Nothing boots here, so if the init container
-          # stops writing it the facilitator serves a permanent boot
-          # screen over a session that was ready before it started.
           if '/shared/ready' not in mcq:
               sys.exit('session-pod-mcq.yaml: nothing writes /shared/ready')
 
-          # The conductor's control API resets clusters and switches
-          # banks. Compose keeps it off the exam network entirely; a Pod
-          # is one network namespace, so a TCP port would sit on the
-          # candidate's own loopback and a shell on an instance could
-          # drive it. The socket is the replacement boundary, and the
-          # boundary is the MOUNT — exactly two containers may hold it.
           plain = '\n'.join(re.sub(r'(^|\s)#.*$', '', line) for line in src.splitlines())
           sock = 'unix:/run/control/conductor.sock'
           for name, text in (('session-pod.yaml', plain), ('session-pod-mcq.yaml', mcq)):
@@ -322,19 +286,14 @@ jobs:
                   sys.exit('%s: the conductor must not listen on TCP in a Pod' % name)
               if text.count('mountPath: /run/control') != 2:
                   sys.exit('%s: exactly two containers may mount the control socket' % name)
-              # The hub fills these per session, and can only fill an env
-              # var the manifest already declares. Without them a hosted
-              # attempt is graded, shown, and then lost with the Pod —
-              # which the candidate discovers the next day.
               for var in ('HISTORY_WEBHOOK_URL', 'HISTORY_WEBHOOK_TOKEN'):
                   if '%s, value: ""' % var not in text:
                       sys.exit('%s: the facilitator must declare an empty %s' % (name, var))
 
-          # A still VNC screen sends nothing, and an idle WebSocket
-          # through a CDN is closed out from under the candidate.
           if '--heartbeat' not in open('images/desktop/entrypoint.sh').read():
               sys.exit('images/desktop/entrypoint.sh: websockify needs --heartbeat or a hosted desktop drops when idle')
           print('session-pod.yaml + session-pod-mcq.yaml + networkpolicy.yaml ok')
+
           PY
 
   shell:

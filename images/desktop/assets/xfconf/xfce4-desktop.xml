@@ -1,8 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Seeded before first XFCE start: wallpaper on both the plain and the
-     TigerVNC-named monitor (Xvnc exposes the output as VNC-0), desktop
-     icons limited to real launchers (no Thunar on this image, so home/
-     trash/volume icons would be dead ends). -->
 <channel name="xfce4-desktop" version="1.0">
   <property name="backdrop" type="empty">
     <property name="screen0" type="empty">

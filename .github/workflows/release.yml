@@ -58,8 +58,6 @@ jobs:
           INPUT_TAG: ${{ inputs.tag }}
         run: |
           version="${INPUT_TAG:-$GITHUB_REF_NAME}"
-          # A tag typo would otherwise publish `:main` or `:v` to the
-          # world and move `:latest` onto it.
           case "$version" in
             v[0-9]*.[0-9]*.[0-9]*) ;;
             *) echo "refusing to publish '$version': expected vMAJOR.MINOR.PATCH" >&2; exit 1 ;;
@@ -85,10 +83,6 @@ jobs:
           CONTEXT: ${{ matrix.context }}
           FILE: ${{ matrix.file }}
         run: |
-          # An `if`, not `[ -n ... ] && extra=(...)`: the latter works only
-          # because a failing non-final command in an AND-list is exempt
-          # from `set -e`, which stops being true the moment anyone moves
-          # this to the end of the step.
           extra=()
           if [ -n "${BUILD_ARGS:-}" ]; then
             extra=(--build-arg "$BUILD_ARGS")
@@ -131,8 +125,6 @@ jobs:
         run: |
           docker push "$REPO:$VERSION"
           docker push "$REPO:latest"
-          # The digest is the only thing that identifies what shipped once
-          # `:latest` has moved on. Printed so a deployment can pin it.
           docker image inspect "$REPO:$VERSION" \
             --format 'published {{index .RepoDigests 0}} ({{.Architecture}}/{{.Os}}, {{.Size}} bytes)'
 
@@ -153,10 +145,6 @@ jobs:
           missing = need - have
           if missing:
               sys.exit(f'release.yml does not publish: {sorted(missing)}')
-          # The hub is not in either manifest — it runs in front of them —
-          # so it would never be caught by the check above, and a release
-          # that publishes every session image and not the thing that
-          # starts them is a release that cannot be deployed.
           if 'hub' not in have:
               sys.exit('release.yml does not publish the hub')
           print(f'publishes all {len(need)} Pod images plus the hub: {sorted(need)}')

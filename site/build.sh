@@ -67,9 +67,6 @@ fail = []
 if not banks:
     fail.append("found no listable bank under banks/ -- the parse is wrong")
 
-# The headline total, matched through its label rather than its position:
-# there are three .stat-figure elements and only one of them counts
-# questions.
 total = sum(pool for _, pool, _ in banks)
 block = next(
     (b for b in re.findall(r'<li class="stat">.*?</li>', page, re.S)
@@ -84,16 +81,10 @@ else:
         fail.append("the questions stat has no figure")
     elif int(shown.group(1)) != total:
         fail.append(f"questions stat says {shown.group(1)}, banks hold {total}")
-    # The note breaks the total down per bank, so every part must be real
-    # too -- a right total made of two wrong halves is still a wrong page.
     for name, pool, _ in banks:
         if str(pool) not in block:
             fail.append(f"{name} has {pool} questions, absent from the stat note")
 
-# A pooled bank advertises "drawn / pool". Page-wide containment rather
-# than a pinned selector: this pair is drawn on the exam card and the
-# prose beneath it, and pinning one spelling of the markup would make
-# every re-layout a false failure.
 for name, pool, drawn in banks:
     if drawn is None:
         continue
@@ -138,8 +129,6 @@ for prop, value in (("og:image:width", want[0]), ("og:image:height", want[1])):
     elif int(m.group(1)) != value:
         fail.append(f"index.html says {prop} is {m.group(1)}, the file is {value}")
 
-# Relative og:image and og:url are ignored by every scraper, which is a
-# silent failure: the page looks fine and the preview is simply blank.
 for prop in ("og:image", "og:url"):
     m = re.search(rf'property="{prop}"\s+content="([^"]+)"', page)
     if m is None:
@@ -170,7 +159,6 @@ def shapes(fragment):
         out.append((tag, pairs))
     return out
 
-# The component's MARKS record: KEY: ( ...jsx... ),
 body = re.search(r"const MARKS[^{]*\{(.*?)\n\};", tsx, re.S)
 if body is None:
     fail.append("could not find the MARKS record in CertMark.tsx")

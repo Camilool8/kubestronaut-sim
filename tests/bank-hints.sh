@@ -8,11 +8,7 @@ import re
 import sys
 
 HEADING = re.compile(r"(?m)^##\s+Hint\s+(\d+)\s*$")
-# Matches the Go parser in facilitator/internal/exam/exam.go. If these
-# two ever disagree, the UI offers a tier the API will not serve.
 WANT_TIERS = 2
-# A hint sharing this many consecutive characters with solution.md is
-# the solution wearing a hint's name.
 OVERLAP = 120
 
 failures = []
@@ -41,8 +37,6 @@ for exam in sorted(pathlib.Path("banks").glob("*/exam.yaml")):
         if headings != [str(i + 1) for i in range(WANT_TIERS)]:
             failures.append(f"{hf}: tiers numbered {headings}, want 1..{WANT_TIERS}")
 
-        # Bodies must not be empty — an empty tier renders as a reveal
-        # that reveals nothing, which is worse than no tier.
         locs = [m.span() for m in HEADING.finditer(text)]
         for i, (_, end) in enumerate(locs):
             stop = locs[i + 1][0] if i + 1 < len(locs) else len(text)
@@ -68,4 +62,5 @@ for f in failures:
 print()
 print(f"bank-hints: {checked} hint files, {len(failures)} failures")
 sys.exit(1 if failures else 0)
+
 PY
