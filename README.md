@@ -1,164 +1,157 @@
 # kubestronaut-sim
 
 An open-source exam simulator for the Kubestronaut certifications, run
-locally on your own machine. Sit a full exam under a real countdown, on
-a real cluster, as many times as you need. Deliberately harder than the
-real exams.
+locally on your own machine.
 
-It is built to stay with you across the whole path rather than one
-sitting: every graded attempt is kept, so you can see which domains are
-still weak and how far along the five certifications you are.
-
-Two banks ship today. **CKAD Mock Exam 01** is hands-on: 26 original
-questions across all five curriculum domains, 22 drawn per attempt and
-stratified to the curriculum weights every time, 120 minutes, 66% to
-pass, against a two-node Kubernetes 1.35 cluster. **KCNA Mock Exam** is multiple-choice
-in the real exam's shape: 97 original questions, 65 drawn per attempt
-and weighted to the post-November-2025 curriculum on every draw, 90
-minutes, 75% to pass, every question with a full explanation for
-review. CKA, KCSA and CKS appear in the catalog as coming soon.
-
-Hands-on questions are graded on behaviour wherever behaviour is the
-point — a policy that actually denies, an Ingress the controller really
-routes — not on the shape of your YAML.
-
-## What it does not replace
-
-This is one part of preparing, not the whole of it. It does not replace
-working a problem out for yourself, the lab you build at home, or the
-Linux Foundation's own training. What it adds is a timed rehearsal on a
-real cluster and a score you can trust.
-
-## Where it differs from the real exam, on purpose
-
-These are calibration choices, not gaps.
-
-| Divergence | Why |
-|---|---|
-| Harder than the real exam | The whole point. A candidate comfortable here should be comfortable there. |
-| 22 questions against a real CKAD's 15–20 | More coverage per sitting. Point budgets still track the published curriculum weights within 2 points. |
-| A two-node cluster | The real exam has more. Two is enough for scheduling, affinity and DaemonSet questions, and it is what fits in 9GB. |
-| Ingress and NodePorts published to your host | The real exam does not do this. Opening your own Ingress in a browser is a fast way to learn why it is not matching. No grading check depends on it. |
-| The documentation allowlist has no deny-override | Permitting `kubernetes.io` necessarily permits `discuss.kubernetes.io`, which the real exam disallows. Subdomain matching is what the proxy does. |
-| Solutions readable during a Training attempt | Reading the solution is the point of that mode. Exam and Mastery keep the gate. |
+- Sit a full exam under a real countdown, on a real cluster.
+- Retake it as many times as you need.
+- Every graded attempt is kept, so you can see which domains are weak.
+- Deliberately harder than the real exams.
 
 ## Quickstart
 
-Requires Docker Desktop (or docker + compose v2), python3, and about
-9GB of free RAM. The XFCE desktop is included in that figure.
+**Requirements:** Docker Desktop (or docker + compose v2), python3, and
+~9GB of free RAM.
 
 ```bash
-./sim doctor                 # optional preflight: RAM, disk, cgroups, tools
-./sim up                     # up in seconds; pick an exam in the browser
-open http://localhost:8080   # then never touch the CLI again
+./sim doctor    # preflight: RAM, disk, cgroups, tools
+./sim up        # up in seconds
 ```
 
-Nothing is built until you choose an exam: the app is up in seconds and
-picking a certification in the browser is what creates its cluster,
-narrating each phase as it goes. `./sim doctor` catches the
-environmental problems that are cheaper to find before a build than
-during one.
+Then open <http://localhost:8080> and pick an exam. Everything after
+`up` happens in the browser.
 
-Everything after `up` happens in the browser. See [docs/cli.md](docs/cli.md)
-for the full command and configuration reference.
-
-> **There is no authentication anywhere in this stack.** Ports bind to
-> all interfaces by default, so anyone who can reach port 8080 can start
-> and end your exam, and the exam desktop is a real shell with
-> cluster-admin. On a network you do not control:
+> **There is no authentication in this stack.** Ports bind to all
+> interfaces by default. On a network you do not control:
 >
 > ```bash
 > SIM_BIND=127.0.0.1 ./sim up
 > ```
->
-> See [SECURITY.md](SECURITY.md) for what is and is not defended.
 
-## Running it for other people
+Nothing is built until you choose an exam. Picking a certification is
+what creates its cluster, and the browser narrates each phase.
 
-`./sim up` is the reference and it is uncapped. If you want to put it in
-front of a group — or in front of the internet — there is a Helm chart
-in [`deploy/helm/`](deploy/helm/kubestronaut-sim) that deploys a front
-door: sign-in, a capped pool of concurrent sessions with a queue, and
-attempt history kept per user that outlives the environment it was made
-in. Each candidate gets the whole eight-container stack as one Pod.
+## The exams
 
-The simulator itself does not change to make that work — the front door
-is a separate process in front of it — so nothing above is affected.
-Read [docs/hosting.md](docs/hosting.md) before you deploy one: a
-hands-on session runs a privileged container, and the nodes it runs on
-should be ones you are willing to rebuild.
+| Bank | Engine | Questions | Per attempt | Time | Pass |
+|---|---|---|---|---|---|
+| CKAD Mock Exam 01 | Hands-on | 26 | 22 drawn | 120 min | 66% |
+| KCNA Mock Exam | Multiple choice | 97 | 65 drawn | 90 min | 75% |
 
-## What the exam feels like
+- Every draw is stratified to the published curriculum weights.
+- CKAD runs against a two-node Kubernetes 1.35 cluster.
+- KCNA ships a full explanation for every question.
+- CKA, KCSA and CKS appear in the catalog as coming soon.
 
-1. **Exams** — every certification on the Kubestronaut path, with each
-   live bank's duration, draw size, passing score and engine. Choosing
-   one that is not loaded rebuilds the environment, so it asks first.
-2. **Mode** — Training (untimed, two-tier hints, solutions on demand),
-   Mastery (half the clock, no help) or Exam (the bank's duration, no
-   help). Each card lists what the server will actually allow.
-3. **Exam view** — a timer bar with warnings at a quarter, an eighth
-   and a twenty-fourth of the attempt, the question panel, and the exam
-   desktop rendered by a built-in VNC client. The terminal is already
-   open; Firefox is restricted to a documentation allowlist.
-4. **End** — submit early or let the timer expire. The desktop locks
-   immediately and grading runs in the background.
-5. **Score** — percent, pass/fail, expandable per-question checks, full
-   solutions, and a New attempt button.
+Hands-on questions are graded on **behaviour**, not on the shape of your
+YAML — a policy that actually denies, an Ingress the controller really
+routes.
 
-Anything you copy reaches the exam desktop automatically — highlight text
-in a question and press ⌘C, or copy from any other app and come back to
-the tab. The in-page copy needs no clipboard permission anywhere,
-Firefox included, since it reads the live selection rather than the
-clipboard API. Paste in the exam terminal with Ctrl+V, ⌘V, the
-terminal's own Ctrl+Shift+V, or right-click → Paste. Copying in the
-terminal works the same way in reverse, but only in Chrome: reading the
-host clipboard automatically and writing the terminal's copy back to it
-both need a gesture Firefox won't grant — the Clipboard panel is a real
-click and covers both. Press `?` for the full shortcut list.
+## Sitting an exam
 
-What reaches the desktop is reduced to ASCII, so an em dash arrives as a
-hyphen and curly quotes arrive straight. The clipboard channel drops any
-non-ASCII character outright, and a hyphen beats losing the paste.
+1. **Exams** — pick a certification. Each card shows duration, draw
+   size, passing score and engine. Choosing one that is not loaded
+   rebuilds the environment, and asks first.
+2. **Mode** — pick one:
+   - *Training* — untimed, two-tier hints, solutions on demand.
+   - *Mastery* — half the clock, no help.
+   - *Exam* — the bank's duration, no help.
+3. **Exam view** — timer bar, question panel, and the exam desktop in a
+   built-in VNC client. The terminal is already open. Firefox is
+   restricted to a documentation allowlist.
+4. **End** — submit early, or let the timer expire. The desktop locks
+   and grading runs in the background.
+5. **Score** — percent, pass/fail, per-question checks, full solutions,
+   and a New attempt button.
 
-`down` then `up` resumes your exam state, including an in-progress
-session. Light and dark themes follow your system. The exam needs a
-desktop-sized screen; phones get an explanation rather than a broken
-layout.
+Press `?` in the app for the full shortcut list.
+
+### Clipboard
+
+| Direction | How |
+|---|---|
+| Question → desktop | Highlight text, press ⌘C. No permission needed, any browser. |
+| Any app → desktop | Copy, then return to the tab. |
+| Paste in the terminal | Ctrl+V, ⌘V, Ctrl+Shift+V, or right-click → Paste. |
+| Desktop → host | Chrome only. In Firefox, use the Clipboard panel. |
+
+Text reaching the desktop is reduced to ASCII: an em dash arrives as a
+hyphen, curly quotes arrive straight.
+
+### Session behaviour
+
+- `./sim down` then `./sim up` resumes your exam state, including an
+  in-progress attempt.
+- Light and dark themes follow your system.
+- The exam needs a desktop-sized screen. Phones get an explanation
+  rather than a broken layout.
 
 ## The cluster you get
 
-A kind cluster sized by the exam you picked — `spec.environment.nodes`
-in its bank decides how many nodes get built, so a bank that needs
-somewhere to drain to gets one — with **Calico** rather than kindnet, so
-NetworkPolicies are genuinely enforced and a policy question can be
-graded on behaviour. It also carries
-ingress-nginx, a local Helm repository, and a plain-HTTP registry for
-the image-building questions.
+A kind cluster sized by the exam you picked
+(`spec.environment.nodes` in its bank), carrying:
 
-Test in-cluster first — that is what the real exam expects, and what the
-graders use:
+- **Calico** rather than kindnet, so NetworkPolicies are genuinely
+  enforced and policy questions can be graded on behaviour.
+- ingress-nginx.
+- A local Helm repository.
+- A plain-HTTP registry for the image-building questions.
+
+Test in-cluster, which is what the graders do:
 
 ```bash
 kubectl -n <ns> run tmp --rm -it --restart=Never --image=nginx:alpine -- curl -m 5 <svc>
 ```
 
+## Running it for other people
+
+`./sim up` is uncapped and single-user. To put it in front of a group,
+deploy the Helm chart in
+[`deploy/helm/`](deploy/helm/kubestronaut-sim). It adds a front door:
+
+- Sign-in.
+- A capped pool of concurrent sessions, with a queue.
+- Attempt history per user, outliving the environment it was made in.
+
+Each candidate gets the whole eight-container stack as one Pod. The
+simulator itself is unchanged.
+
+Read [docs/hosting.md](docs/hosting.md) first: a hands-on session runs a
+privileged container, so run it on nodes you are willing to rebuild.
+
+## Where it differs from the real exam
+
+Calibration choices, not gaps.
+
+| Divergence | Reason |
+|---|---|
+| Harder than the real exam | Pass here, be comfortable there. |
+| 22 questions vs a real CKAD's 15–20 | More coverage per sitting. Point budgets still track curriculum weights within 2 points. |
+| Two-node cluster | Enough for scheduling, affinity and DaemonSet questions, and it fits in 9GB. |
+| Ingress and NodePorts published to your host | Convenience for debugging. No grading check depends on it. |
+| Documentation allowlist has no deny-override | Allowing `kubernetes.io` also allows `discuss.kubernetes.io`. |
+| Solutions readable in Training | That is the point of the mode. Exam and Mastery keep the gate. |
+
+This is one part of preparing, not the whole of it. It does not replace
+working problems out yourself, your own lab, or the Linux Foundation's
+training.
+
 ## Documentation
 
-| Document | What it covers |
+| Document | Covers |
 |---|---|
 | [docs/cli.md](docs/cli.md) | `./sim` subcommands, environment variables, host ports |
-| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Symptoms and fixes, from preflight to grading |
-| [docs/hosting.md](docs/hosting.md) | The chart, its values, and what hosted mode does differently |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Symptoms and fixes |
+| [docs/hosting.md](docs/hosting.md) | The Helm chart and its values |
 | [docs/api.md](docs/api.md) | HTTP API for the facilitator, conductor and hub |
-| [docs/bank-spec.md](docs/bank-spec.md) | Question bank format and the validator contract |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Building, testing, and submitting changes |
-| [SECURITY.md](SECURITY.md) | Threat model and the boundaries that exist |
+| [docs/bank-spec.md](docs/bank-spec.md) | Question bank format and validator contract |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Building, testing, submitting changes |
+| [SECURITY.md](SECURITY.md) | Threat model and boundaries |
 
 ## License
 
-Code: Apache-2.0. Question banks: CC BY-SA 4.0 (see
-[banks/LICENSE](banks/LICENSE)).
+- **Code:** Apache-2.0.
+- **Question banks:** CC BY-SA 4.0 — see [banks/LICENSE](banks/LICENSE).
 
 Not affiliated with CNCF, The Linux Foundation, or PSI. Kubernetes and
-the certification names are trademarks of The Linux Foundation. The same notice, plus a real-exam comparison table, lives in
-the app's About panel.
+the certification names are trademarks of The Linux Foundation.

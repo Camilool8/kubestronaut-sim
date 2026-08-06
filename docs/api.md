@@ -1,22 +1,33 @@
 # HTTP API
 
-There is no authentication on any endpoint of the simulator: anyone who
-can reach the port has every capability the exam UI has. See
-[SECURITY.md](../SECURITY.md). That property survives a hosted
-deployment rather than being weakened by it — the hub documented at the
-end of this page is a separate process in front, and the facilitator is
-never reachable except through it.
+**There is no authentication on any endpoint of the simulator.** Anyone
+who can reach the port has every capability the exam UI has — see
+[SECURITY.md](../SECURITY.md).
 
-Two services in the simulator, and a third only in a hosted deployment
-([hosting.md](hosting.md)). The facilitator serves the whole browser-facing surface
-on port 8080 — the API, the embedded UI, the desktop proxy, and a
-reverse proxy to the conductor. The conductor is reachable only through
-that proxy: under compose it listens on `:9000` on an `internal: true`
-network with no host port, and in a hosted Pod — one network namespace,
-so an internal network is not available — it listens on a unix socket
-in a volume mounted into the facilitator and nothing else. One value
-per side describes either shape (`LISTEN` and `CONDUCTOR_ADDR`, a
-`host:port` or a `unix:/path`; `facilitator/cmd/facilitator/conductor.go`).
+That property survives a hosted deployment rather than being weakened by
+it. The hub, documented at the end of this page, is a separate process
+in front, and the facilitator is never reachable except through it.
+
+Two services in the simulator, plus a third only in a hosted deployment
+([hosting.md](hosting.md)).
+
+| Service | Reachable on |
+|---|---|
+| Facilitator | Port 8080. Serves the API, the embedded UI, the desktop proxy, and a reverse proxy to the conductor |
+| Conductor | Only through that proxy |
+| Hub | Hosted deployments only |
+
+How the conductor listens:
+
+| Shape | Address |
+|---|---|
+| Compose | `:9000` on an `internal: true` network, no host port |
+| Hosted Pod | A unix socket in a volume mounted into the facilitator and nothing else |
+
+A Pod is one network namespace, so an internal network is not available
+there. One value per side describes either shape — `LISTEN` and
+`CONDUCTOR_ADDR`, each a `host:port` or a `unix:/path`.
+
 Host ports are in [cli.md](cli.md).
 
 Errors are `{"error":"..."}` as `application/json`
@@ -88,12 +99,15 @@ facilitator before a clock starts.
 |---|---|---|
 | `X-Sim-Pointer` | `coarse` (no precise pointer anywhere) or `fine` | every SPA request, from `ui/src/lib/deviceCapability.ts` |
 
-The client measures and declares; the server decides. That is the
-inverse of the mode-capability pattern, where the server owns a predicate
-and the client only renders it, and it has one cause: no server can
-observe a pointer type, and a `User-Agent` is a string the browser
-chooses — desktop mode on a phone walks straight through one, and some
-laptops are turned away by it.
+**The client measures and declares; the server decides.**
+
+This inverts the mode-capability pattern, where the server owns the
+predicate and the client only renders it. The cause:
+
+- No server can observe a pointer type.
+- A `User-Agent` is a string the browser chooses. Desktop mode on a
+  phone walks straight through one, and some laptops are turned away by
+  it.
 
 | Request | Refused when | Response |
 |---|---|---|
@@ -178,14 +192,19 @@ and the three selectable modes. Always 200.
 }
 ```
 
-`modes` is ordered gentlest-first, which is the order the mode screen
-offers the cards in. Every flag is read from the same
-`facilitator/internal/session` predicate the enforcing handler reads, so
-a described mode and an enforced one cannot disagree: `helpAllowed` is
-`session.HelpAllowed`, `gradesPerTask` is `session.GradesPerTask`, and
-`recorded` is `session.Recorded`. `durationSeconds` comes from the same
-`durationFor` that `POST /api/session/start` resolves the real clock
-with, including under `SESSION_DURATION_OVERRIDE`.
+`modes` is ordered gentlest-first — the order the mode screen offers the
+cards in.
+
+Every flag reads the same `facilitator/internal/session` predicate the
+enforcing handler reads, so a described mode and an enforced one cannot
+disagree:
+
+| Field | Source |
+|---|---|
+| `helpAllowed` | `session.HelpAllowed` |
+| `gradesPerTask` | `session.GradesPerTask` |
+| `recorded` | `session.Recorded` |
+| `durationSeconds` | The same `durationFor` that `POST /api/session/start` resolves the real clock with, including under `SESSION_DURATION_OVERRIDE` |
 
 `recorded` says whether a finished attempt in that mode belongs in the
 durable attempt history, and the recorder honours exactly this predicate
@@ -214,30 +233,39 @@ entry is `{"id", "domain", "weight", "totalPoints", "hintCount",
 marks a select-all-that-apply question. `questions` marshals as `[]`,
 never `null`.
 
-`targetSeconds` is how long the question is meant to take, and
-`targetDerived` says that figure was **computed**, not authored: the
+`targetSeconds` is how long the question is meant to take.
+
+`targetDerived` says that figure was **computed**, not authored — the
 question's weight's share of the bank's clock, which is what a bank
-that sets no `spec.questions[].targetSeconds` gets
-(`facilitator/internal/exam/exam.go`, `TargetSeconds`). Neither shipped
-bank sets one, so both are derived today. The flag exists because the
-two are different claims — an author's judgement of the work versus
-arithmetic about weights — and a display that cannot tell them apart
-states the second with the first's confidence. It is a budget, never a
-limit: nothing enforces it and running over costs no points.
+setting no `spec.questions[].targetSeconds` gets.
 
-The divisor is the weight **one attempt** carries, not the pool's:
-kcna-mock's 90 minutes are spread across the 65 questions a candidate
-gets, not the 97 the bank authors, so a question is 83 seconds and not
-56. And the clock is the bank's declared `spec.duration` whatever the
-attempt's mode is — an untimed Training attempt has no clock to divide,
-and its pacing budget is the exam it is practice for.
+- Neither shipped bank sets one, so both are derived today.
+- The flag exists because the two are different claims: an author's
+  judgement of the work, versus arithmetic about weights. A display that
+  cannot tell them apart states the second with the first's confidence.
+- **It is a budget, never a limit.** Nothing enforces it, and running
+  over costs no points.
 
-`domains` is the bank's curriculum in the order it declares it: the list
-a draw configurator builds its chips from. `weightPct` is the domain's
-`spec.domainWeights` entry (what it is worth in the real certification,
-0 for a bank that publishes none) and `questionCount` is how many
-questions this bank has in it. The two are independent — a domain can be
-worth 44% and hold three questions.
+Two things to know about the arithmetic:
+
+- **The divisor is the weight one attempt carries, not the pool's.**
+  kcna-mock's 90 minutes spread across the 65 questions a candidate
+  gets, not the 97 the bank authors — so a question is 83 seconds, not
+  56.
+- **The clock is the bank's declared `spec.duration`, whatever the
+  attempt's mode is.** An untimed Training attempt has no clock to
+  divide, and its pacing budget is the exam it is practice for.
+
+`domains` is the bank's curriculum in declaration order — the list a
+draw configurator builds its chips from.
+
+| Field | Means |
+|---|---|
+| `weightPct` | The domain's `spec.domainWeights` entry: what it is worth in the real certification. `0` for a bank that publishes none |
+| `questionCount` | How many questions this bank has in it |
+
+The two are independent. A domain can be worth 44% and hold three
+questions.
 
 **`domains` is always counted over the full pool**, while `questions`
 above is narrowed to the drawn subset once an attempt starts
@@ -316,13 +344,15 @@ The question's `solution.md`. Gated — see
 ```
 
 `docs` is `spec.questions[].docs` from the bank, omitted entirely when
-the question declares none — which most do. It is rendered as the
-explanation screen's footer, opening in the candidate's own browser.
-These links never reach the exam desktop, which browses through the
-documentation allowlist proxy and never sees this endpoint. An entry
-whose URL is not `https` or does not parse is dropped at bank load with
-a log line rather than failing the boot: a mistyped study link must not
-stop someone sitting an exam.
+the question declares none — which most do.
+
+- Rendered as the explanation screen's footer, opening in the
+  candidate's own browser.
+- These links never reach the exam desktop, which browses through the
+  allowlist proxy and never sees this endpoint.
+- An entry whose URL is not `https`, or does not parse, is dropped at
+  bank load with a log line rather than failing the boot. A mistyped
+  study link must not stop someone sitting an exam.
 
 | Code | When |
 |---|---|
@@ -504,39 +534,47 @@ because `setup.sh` is an idempotent apply.
 Every attempt draws, on both engines
 (`facilitator/internal/exam/exam.go`, `Draw`).
 
-`seed` replays a previous draw: six lowercase hex digits. Omitted, the
-server mints one, so **every attempt is replayable after the fact**
-rather than only if the candidate thought to ask in advance — the seed
-comes back on the response and on every `GET /api/session`. A malformed
-seed is a 400, never a silent reseed: someone who mistypes the seed they
-meant to replay must be told, not handed a different exam that looks
-like the one they asked for.
+`seed` replays a previous draw: six lowercase hex digits.
+
+- Omitted, the server mints one. **Every attempt is replayable after the
+  fact**, not only if the candidate thought to ask in advance.
+- The seed comes back on the response and on every `GET /api/session`.
+- A malformed seed is a `400`, never a silent reseed. Someone who
+  mistypes the seed they meant to replay must be told, not handed a
+  different exam that looks like the one they asked for.
 
 The randomness is a keyed SHA-256 counter stream driving a Fisher-Yates
-shuffle, deliberately neither `math/rand` (how much of its stream a
-shuffle consumes is not a stability guarantee across Go releases, so a
-toolchain upgrade could renumber every saved draw) nor `crypto/rand`
-(unseedable). The stratification is unchanged: each domain still
-contributes exactly its `domainWeights` share of the draw length by
-largest-remainder rounding, so a candidate's set matches the published
-curriculum every time and not merely on average.
+shuffle. Deliberately neither:
+
+- `math/rand` — how much of its stream a shuffle consumes is not a
+  stability guarantee across Go releases, so a toolchain upgrade could
+  renumber every saved draw.
+- `crypto/rand` — unseedable.
+
+Stratification is unchanged: each domain contributes exactly its
+`domainWeights` share of the draw length by largest-remainder rounding,
+so a candidate's set matches the published curriculum every time, not
+merely on average.
 
 `domains` narrows the draw to part of the curriculum, and applies to
-**both engines**. Narrowing a hands-on attempt is free and correct
-today: `bootstrap.sh` seeds every question in the bank into the cluster
-at boot whatever the draw is, so a filtered attempt sees an identical
-cluster. Length pooling stays mcq-only. Within a filtered draw the
-remaining domains' weights are renormalized, so two domains of 44 and 28
-divide a 10-question draw 6/4. Naming *every* domain is recorded as no
-filter at all — a full-coverage attempt, the only kind a "passed" claim
-rests on, must not look narrowed for the rest of its life.
+**both engines**.
 
-`poolDigest` is the fingerprint of the pool a seed came from
-(`facilitator/internal/exam/exam.go`, `PoolDigest`): every question's id
-and domain, in bank order, hashed to twelve hex characters. It changes
-when a question is added, removed, renamed or re-domained — anything
-that changes what a draw would produce — and deliberately does not
-change when a `question.md` is reworded or an option's typo is fixed.
+- Narrowing a hands-on attempt is free and correct: `bootstrap.sh` seeds
+  every question in the bank into the cluster at boot whatever the draw
+  is, so a filtered attempt sees an identical cluster.
+- Length pooling stays mcq-only.
+- Within a filtered draw the remaining domains' weights are
+  renormalized. Two domains of 44 and 28 divide a 10-question draw 6/4.
+- **Naming every domain is recorded as no filter at all.** A
+  full-coverage attempt — the only kind a "passed" claim rests on — must
+  not look narrowed for the rest of its life.
+
+`poolDigest` fingerprints the pool a seed came from: every question's id
+and domain, in bank order, hashed to twelve hex characters.
+
+| Changes when | Does not change when |
+|---|---|
+| A question is added, removed, renamed or re-domained — anything that changes what a draw would produce | A `question.md` is reworded, or an option's typo is fixed |
 
 **A mismatched `poolDigest` does not refuse the start.** The draw is
 still perfectly deterministic; it is simply no longer the same set. The
@@ -726,15 +764,16 @@ questions happened to be worth in points. `pointsPercent` is the raw
 integer `earned * 100 / total` — what `percent` alone meant before
 weighting existed. Both floor rather than round.
 
-The weighting happens at scoring time rather than being baked into a
-bank's point budget because a bank's points are fixed and a draw is not:
-`tests/bank-weights.sh` can promise that ckad-mock-01's 180 points sit
-in the curriculum's ratios, but not that a filtered or partial draw out
-of it does. On a full-bank hands-on attempt the two numbers are
-identical, because that gate holds the points to the same ratios the
-weights declare. On a pooled bank they differ by about a point:
-kcna-mock's 65-question draw is 29 Fundamentals questions, which is
-44.6% of the points against a published weight of 44%.
+Weighting happens at scoring time rather than being baked into a bank's
+point budget, because **a bank's points are fixed and a draw is not**.
+`tests/bank-weights.sh` can promise ckad-mock-01's 180 points sit in the
+curriculum's ratios, but not that a filtered or partial draw out of it
+does.
+
+| Attempt | The two numbers |
+|---|---|
+| Full-bank hands-on | Identical — the gate holds the points to the ratios the weights declare |
+| Pooled | Differ by about a point. kcna-mock's 65-question draw is 29 Fundamentals questions: 44.6% of the points against a published weight of 44% |
 
 Two rules keep the weighted number honest:
 
@@ -747,11 +786,15 @@ Two rules keep the weighted number honest:
   a weight of zero.
 
 `domains` is the per-domain rollup over the graded questions, in bank
-order, and is omitted when nothing was graded. `weightPct`, on a domain
-and on a question, is that item's share of `percent` in percentage
-points — a question's is its domain's share split across that domain's
-questions in proportion to their points. Question shares sum to 100.
-Neither is rounded.
+order. Omitted when nothing was graded.
+
+`weightPct`, on both a domain and a question, is that item's share of
+`percent` in percentage points:
+
+- A question's share is its domain's share, split across that domain's
+  questions in proportion to their points.
+- Question shares sum to 100.
+- Neither is rounded.
 
 `verdict` is exactly `correct`, `partial` or `failed`. A question with
 no scorable points at all (every check's `# points:` header malformed)
@@ -776,11 +819,14 @@ time, and one who walked away accrues a capped amount of it too. Every
 label built from it has to say "open", never "spent" or "worked".
 
 `pointsPercent`, `weightPct`, `verdict`, `domains` and everything in
-this section are all additive. A result graded before they existed is
-persisted verbatim in the session file and served back unchanged after
-an upgrade, so a client must tolerate their absence. Note this survives
-a session-format bump, which discards an in-flight *session*: a stored
-result is opaque bytes and outlives every one of them.
+this section are **additive**.
+
+- A result graded before they existed is persisted verbatim in the
+  session file and served back unchanged after an upgrade. **A client
+  must tolerate their absence.**
+- This survives a session-format bump, which discards an in-flight
+  *session*. A stored result is opaque bytes and outlives every one of
+  them.
 
 ### Grading refuses on a changed bank
 
@@ -789,12 +835,15 @@ persisted `poolDigest` no longer fingerprints the loaded bank
 (`facilitator/internal/exam/exam.go`, `CheckPool`).
 
 `exam.Subset` silently skips ids the exam does not declare, which is
-what lets "no subset drawn" mean "the whole bank". The cost is that a
-session whose drawn ids outlived the bank they came from would otherwise
-be graded on the intersection and reported with a plausible, confident,
-wrong `total` — a candidate would read a real-looking score for an exam
-they did not sit. A wrong score that looks right is worse than an error
-message, so the digest is checked before either engine runs.
+what lets "no subset drawn" mean "the whole bank".
+
+The cost: a session whose drawn ids outlived the bank they came from
+would otherwise be graded on the intersection and reported with a
+plausible, confident, wrong `total` — a real-looking score for an exam
+the candidate did not sit.
+
+**A wrong score that looks right is worse than an error message**, so
+the digest is checked before either engine runs.
 
 This is not the same situation as `poolChanged` on
 [POST /api/session/start](#post-apisessionstart), which is about a *new*
@@ -844,13 +893,12 @@ and switch (`conductor/internal/control/control.go`).
 ### Attempt history
 
 Every endpoint below reads or writes `/state/history.json` on the
-`state` volume — the first thing this product keeps across attempts, and
-the one thing `./sim purge` does not destroy. The five `/api/history`
-routes answer 503 when a build has no history store wired: the route
-exists, it has nowhere to write, and that is a different fact from a 404
-(`facilitator/internal/api/history.go`). `GET /api/catalog` is the
-exception — it still has a bank list to serve, so it degrades to empty
-progress rather than refusing.
+`state` volume — the one thing `./sim purge` does not destroy.
+
+| Route | With no history store wired |
+|---|---|
+| The five `/api/history` routes | `503`. The route exists but has nowhere to write, which is a different fact from a `404` |
+| `GET /api/catalog` | Degrades to empty progress. It still has a bank list to serve |
 
 A record is written by the grader, once `SetResults` has succeeded, and
 only for a **recorded** mode (`session.Recorded` — everything but
@@ -877,13 +925,20 @@ otherwise lie (`facilitator/internal/history/record.go`):
 | `questionCount >= the bank's declared length` | A short draw. Fewer questions is an easier exam, and a bank's passing score was set against its declared length. |
 
 The flag is written once and then trusted — except that an *imported*
-record came from a document this build did not write and can claim
-anything. So every rollup re-checks the two clauses a record can verify
-about **itself**, its mode and its domain filter, and ignores a `counted`
-that contradicts them. The length clause cannot be re-checked at read
-time and is not attempted: a record's bank may not be the loaded one,
-which is the whole point of a self-contained record
-(`facilitator/internal/history/record.go`).
+record came from a document this build did not write, and can claim
+anything.
+
+So every rollup re-checks the two clauses a record can verify about
+**itself**:
+
+1. Its mode.
+2. Its domain filter.
+
+A `counted` that contradicts either is ignored.
+
+The length clause cannot be re-checked at read time and is not
+attempted: a record's bank may not be the loaded one, which is the whole
+point of a self-contained record.
 
 An uncounted attempt is still **kept and shown** — it just does not move
 the certification path. It also still contributes to `weakDomains`,
@@ -891,13 +946,14 @@ deliberately: a drill is the most informative thing a candidate can do
 about a weak domain, and a rollup that ignored drills would keep
 reporting the weakness they spent all week fixing.
 
-`trackCount` is 5 and is a constant of the CNCF **program** (KCNA, KCSA,
-CKA, CKAD, CKS), not a count of the banks this build ships. Deriving it
-from the catalog would shrink the denominator to 1 whenever the
-conductor is unreachable, and tell a candidate who passed CKAD that they
-were a Kubestronaut. `passedCount` counts distinct *track*
-certifications with a counted, passing attempt, so it can never exceed
-`trackCount`.
+`trackCount` is `5`: a constant of the CNCF **program** — KCNA, KCSA,
+CKA, CKAD, CKS — not a count of the banks this build ships.
+
+- Deriving it from the catalog would shrink the denominator to 1
+  whenever the conductor is unreachable, and tell a candidate who passed
+  CKAD that they were a Kubestronaut.
+- `passedCount` counts distinct *track* certifications with a counted,
+  passing attempt, so it can never exceed `trackCount`.
 
 ### GET /api/history
 
@@ -943,13 +999,14 @@ Every attempt, most recent first, plus the cross-exam summary. Always
 }
 ```
 
-`attempts` marshals as `[]`, never `null`. `id` is the session's own
-attempt token, which is what makes recording idempotent — a recovery
-re-grade of the same attempt updates nothing rather than showing the
-candidate the same sitting twice. `weakDomains` is weakest first, ranked
-on **raw** points earned over points available: this ranks a candidate's
-own domains against each other, and how much the exam board weights a
-domain is not part of that question.
+| Field | Behaviour |
+|---|---|
+| `attempts` | Marshals as `[]`, never `null` |
+| `id` | The session's own attempt token. This is what makes recording idempotent — a recovery re-grade of the same attempt updates nothing rather than showing the candidate the same sitting twice |
+| `weakDomains` | Weakest first, ranked on **raw** points earned over points available |
+
+`weakDomains` ranks a candidate's own domains against each other. How
+much the exam board weights a domain is not part of that question.
 
 ### DELETE /api/history
 
@@ -1005,13 +1062,16 @@ its unknown fields dropped, because the candidate is keeping that file
 as their backup.
 
 The same asymmetry governs loading. An unparseable or wrong-version
-`history.json` is **renamed aside** — `history.json.corrupt.N`, picking
-a suffix that is free so an earlier rescue is never clobbered — and a
-fresh record started. It is never removed and never truncated. This is
-deliberately *not* the session file's discard-on-version-mismatch
-policy: discarding a session costs one attempt, discarding history costs
-everything the candidate has ever done
-(`facilitator/internal/history/history.go`).
+`history.json` is **renamed aside**, and a fresh record started:
+
+- The new name is `history.json.corrupt.N`, picking a suffix that is
+  free, so an earlier rescue is never clobbered.
+- It is never removed and never truncated.
+
+This is deliberately *not* the session file's
+discard-on-version-mismatch policy. Discarding a session costs one
+attempt; discarding history costs everything the candidate has ever
+done.
 
 ### GET /api/catalog
 
@@ -1213,12 +1273,14 @@ drawn and its cluster has to be prepared for that draw. See
 {"questions": ["q03", "q07", "q11"]}
 ```
 
-Unlike `reseed`, it takes the hard single-job lock: this is minutes of
-work against the cluster a reset would rebuild, and it *should* raise the
-full-screen overlay. One phase, `seed-questions`, whose `detail` counts
-`question N of M`. One exec per question, so a failure names the question
-and the loop stops there — a cluster prepared for two questions of sixteen
-must not become an exam.
+Unlike `reseed`, it takes the **hard single-job lock**. This is minutes
+of work against the cluster a reset would rebuild, and it *should* raise
+the full-screen overlay.
+
+- One phase, `seed-questions`, whose `detail` counts `question N of M`.
+- One exec per question, so a failure names the question and the loop
+  stops there. A cluster prepared for two questions of sixteen must not
+  become an exam.
 
 | Code | When |
 |---|---|
@@ -1243,14 +1305,17 @@ The exam catalog the exam selector renders. Always 200.
 }
 ```
 
-`questionCount` is how many questions ONE ATTEMPT draws; `poolCount` is
-how many the bank authors. They differ only for a pooled bank, and the
-exam card prints them as a pair ("65 / 97") only when they do — a card
-reading "22 / 22" would advertise a pool that is not one. The
-facilitator knows both for the *active* bank (`GET /api/exam` serves
-the whole question list), but the catalog is the only place that knows
-them for the others, and the exam selector draws every bank side by
-side.
+| Field | Means |
+|---|---|
+| `questionCount` | How many questions **one attempt** draws |
+| `poolCount` | How many the bank authors |
+
+- They differ only for a pooled bank, and the exam card prints them as a
+  pair (`65 / 97`) only when they do. A card reading `22 / 22` would
+  advertise a pool that is not one.
+- The facilitator knows both for the *active* bank, but the catalog is
+  the only place that knows them for the others — and the exam selector
+  draws every bank side by side.
 
 `active` is read from `/shared/bank` at call time, so it is correct the
 instant a switch rewrites it. `available` is false for a coming-soon
@@ -1337,12 +1402,13 @@ whether there is anywhere to sit.
 `starting` (their own Pod is building), `ready`, or `failed` — which
 keeps the seat so they can read why before it is reaped.
 
-`op` is `reset` or `switch` while a control job is replacing the Pod —
-which is what a hosted reset or exam switch actually is — and absent
-the rest of the time, including on a first boot. It is server truth,
-set by the hub rather than remembered from a click, so it is still
-correct after a reload lands mid-rebuild; a client's own memory of
-having pressed "New attempt" would not survive that reload.
+`op` is `reset` or `switch` while a control job is replacing the Pod,
+and absent the rest of the time, including on a first boot.
+
+It is **server truth**, set by the hub rather than remembered from a
+click, so it is still correct after a reload lands mid-rebuild. A
+client's own memory of having pressed "New attempt" would not survive
+that reload.
 
 ### POST /api/session/start
 
@@ -1376,13 +1442,16 @@ their results to a misclick.
 
 ### POST /api/control/reset, POST /api/control/switch
 
-A hosted reset or switch replaces the Pod rather than rebuilding in
-place: the conductor cannot restart a container it reaches over ssh, and
-a Pod has no per-container restart under `restartPolicy: Never`. Both
-answer in the conductor's own 202-plus-job shape, and
+A hosted reset or switch **replaces the Pod** rather than rebuilding in
+place:
+
+- The conductor cannot restart a container it reaches over ssh.
+- A Pod has no per-container restart under `restartPolicy: Never`.
+
+Both answer in the conductor's own `202`-plus-job shape.
 `GET /api/control/status` and `/api/control/log` answer from the hub's
-job store rather than the conductor's — the Pod they describe may not
-exist while they run.
+job store rather than the conductor's, because the Pod they describe may
+not exist while they run.
 
 ### Attempt history
 

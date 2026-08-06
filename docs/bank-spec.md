@@ -79,14 +79,20 @@ question per domain is the floor; a real bank splits each budget over several
 — see [banks/ckad-mock-01/exam.yaml](../banks/ckad-mock-01/exam.yaml).
 
 Keep the `questions:` keys in that order, one per line, with no inline
-comments. [bank-weights.sh](../tests/bank-weights.sh) parses the block with a
-regex, not a YAML library, so a reordered key or a trailing comment hides a
-question from the gate — which then fails the bank for disagreeing with the
-directory listing. `title:` is the one optional key that goes *inside* that
-run — directly after `id:`, where both gate regexes tolerate it and nowhere
-else. The other two, `targetSeconds:` and `docs:`, go *after* it, below
-`weight:` (hands-on) or `correct:` (mcq), where the regexes have already
-stopped looking.
+comments.
+
+[bank-weights.sh](../tests/bank-weights.sh) parses the block with a
+regex, not a YAML library. A reordered key or a trailing comment hides a
+question from the gate, which then fails the bank for disagreeing with
+the directory listing.
+
+Where the optional keys go:
+
+| Key | Position |
+|---|---|
+| `title:` | *Inside* the run, directly after `id:`. Nowhere else |
+| `targetSeconds:` | *After* the run, below `weight:` (hands-on) or `correct:` (mcq) |
+| `docs:` | Same as `targetSeconds:` |
 
 | Field | Meaning and status |
 |---|---|
@@ -126,13 +132,13 @@ A question may name the upstream pages that explain its subject:
           url: https://kubernetes.io/docs/concepts/services-networking/ingress/
 ```
 
-They reach the client on `GET /api/questions/{id}/solution` and nowhere
-else, so they appear in exactly one place: the footer of the **post-attempt
-deep dive**, read in the candidate's own browser once the attempt is over.
-They are deliberately not attached to the question. During the attempt the
-candidate is on the exam desktop, which browses through the documentation
-allowlist proxy (`spec.environment.allowedDomains`) and never sees this
-field — a link out of an exam is not something an exam offers.
+- They reach the client on `GET /api/questions/{id}/solution` and nowhere
+  else.
+- They appear in exactly one place: the footer of the **post-attempt
+  deep dive**, in the candidate's own browser, once the attempt is over.
+- They are deliberately not attached to the question. During the attempt
+  the candidate is on the exam desktop, browsing through the allowlist
+  proxy (`spec.environment.allowedDomains`), and never sees this field.
 
 Rules, all enforced by [exam.go](../facilitator/internal/exam/exam.go):
 
@@ -151,16 +157,18 @@ Rules, all enforced by [exam.go](../facilitator/internal/exam/exam.go):
 
 ## Pooling a bank: `spec.examLength`
 
-Set it and one attempt asks a subset instead of the whole bank, drawn
-fresh each start and stratified so each domain contributes exactly its
-`domainWeights` share (largest-remainder rounding) rather than whatever
-chance produced. The subset is persisted with the session — it survives a
-resume and a facilitator restart — and grading, `GET /api/exam` and every
-single-question endpoint are scoped to it, so a pool question outside the
-draw is a 404 rather than merely ungraded. The same seed against the same
-pool reproduces the same draw; `poolDigest` travels beside it so "same
-seed, different questions" reports as a changed bank rather than a
-mystery.
+Set it and one attempt asks a subset instead of the whole bank:
+
+- **Drawn fresh each start**, stratified so each domain contributes
+  exactly its `domainWeights` share (largest-remainder rounding).
+- **Persisted with the session.** It survives a resume and a facilitator
+  restart.
+- **Scoped everywhere.** Grading, `GET /api/exam` and every
+  single-question endpoint use the draw, so a pool question outside it
+  is a 404 rather than merely ungraded.
+- **Reproducible.** The same seed against the same pool gives the same
+  draw. `poolDigest` travels beside it, so "same seed, different
+  questions" reports as a changed bank rather than a mystery.
 
 **For a hands-on bank, pooling also moves when the cluster is seeded, and
 that is the part to understand before opting in.** An unpooled hands-on
@@ -175,22 +183,27 @@ the drawn questions are seeded when the attempt starts instead:
 and the candidate's clock does not begin until that job succeeds. See
 [api.md](api.md) for the contract.
 
-The consequence for an author: pooling for VARIETY is a good trade when
-the pool is much larger than an attempt, and a bad one when it is not. A
-bank that pools 22 down to 20 has moved four minutes of seeding out of
-the boot screen and into the moment the candidate presses Start, and
-gained almost no variety for it.
+For an author:
 
-`ckad-mock-01` pools 26 down to 22, and its reason is the other one:
-**holding the sitting to the right length.** The real CKAD is around
-twenty tasks in two hours, so the four questions added in this bank's
-last expansion went into the pool rather than into the exam — putting
-them in the sitting would have made it a harder exam rather than a fuller
-one. The variety that comes with it is modest and worth stating honestly:
-with a pool that close to the draw, three of its five domains are asked
-in full every time, and only Application Design and Build (4 of 7) and
-Application Observability and Maintenance (3 of 4) rotate. Deepening a
-domain widens its rotation.
+- Pooling for **variety** is a good trade when the pool is much larger
+  than an attempt.
+- It is a bad trade when it is not. A bank pooling 22 down to 20 has
+  moved four minutes of seeding from the boot screen to the moment the
+  candidate presses Start, and gained almost no variety for it.
+
+`ckad-mock-01` pools 26 down to 22 for the other reason: **holding the
+sitting to the right length.** The real CKAD is around twenty tasks in
+two hours.
+
+The variety that comes with it is modest, and worth stating plainly:
+
+| Domain | Rotation |
+|---|---|
+| Three of the five | Asked in full every time |
+| Application Design and Build | 4 of 7 |
+| Application Observability and Maintenance | 3 of 4 |
+
+Deepening a domain widens its rotation.
 
 ### Points in a pooled bank
 
@@ -272,22 +285,27 @@ to edit, a manifest on a removed apiVersion, a kustomize base. It cannot come
 from `setup.sh`, which runs on `k8s-env` and has no access to the per-instance
 `/opt/course` volumes.
 
-The copy creates only files that are absent, never overwriting, because the
-seeded file *is* the answer sheet and re-copying would discard the candidate's
-edits across a `./sim down && ./sim up`. A reset clears `/opt/course` first and
-seeds fresh copies; a restart does not. Do not ship anything under `files/`
-that a check reads without the candidate having modified it — that scores
-whether the copy worked, not whether they did anything.
+- The copy creates only files that are **absent**, never overwriting.
+  The seeded file *is* the answer sheet, and re-copying would discard
+  the candidate's edits across a `./sim down && ./sim up`.
+- A reset clears `/opt/course` first and seeds fresh copies. A restart
+  does not.
+
+> **Do not ship anything under `files/` that a check reads without the
+> candidate having modified it.** That scores whether the copy worked,
+> not whether they did anything.
 
 ## Multiple-choice banks (examType: mcq)
 
-An mcq bank is exam.yaml plus, per question, a stem and an explanation.
-No cluster is involved anywhere: nothing to seed, nothing to ssh into,
-grading is a set comparison inside the facilitator
-([mcqgrade](../facilitator/internal/mcqgrade/mcqgrade.go)) against the
-selections the session stored. That is also why an mcq attempt starts
-before the environment finishes booting, and why the exam screen works
-on a phone.
+An mcq bank is `exam.yaml` plus, per question, a stem and an
+explanation. No cluster is involved anywhere:
+
+- Nothing to seed, nothing to ssh into.
+- Grading is a set comparison inside the facilitator
+  ([mcqgrade](../facilitator/internal/mcqgrade/mcqgrade.go)) against the
+  selections the session stored.
+- An mcq attempt therefore starts before the environment finishes
+  booting, and the exam screen works on a phone.
 
 ```yaml
 spec:
@@ -344,22 +362,26 @@ Differences from the hands-on shape:
 - **`./sim grade` refuses mcq banks** — the answers live in the
   session, not the cluster. Grade through the UI or the API.
 
-[bank-mcq.sh](../tests/bank-mcq.sh) asserts, per mcq bank: the id set
-matches the directories on disk; every stem and explanation exists (the
-explanation with a length floor); option and correct-index arity as
-above; mcq purity; `domainWeights` sums to 100 with bidirectional
-domain coverage; and that no single option position is correct on more
-than half of the single-answer questions — a degenerate key reads like a
-pattern. The weight-versus-content check has two modes: without
-`examLength` (or one that does not shrink the pool), each domain's share
-of the pool's own points must sit within 2 percentage points of its
-target — the pool IS the exam. With a smaller `examLength`, that
-check instead requires each domain's POOL to be at least as deep as the
-per-domain count a stratified draw of that size would need (the same
-largest-remainder rounding `exam.Draw` uses) — the pool's own ratio
-is free to differ, since every draw is stratified to the target
-regardless. [bank-weights.sh](../tests/bank-weights.sh) applies the same
-two modes to a hands-on bank.
+[bank-mcq.sh](../tests/bank-mcq.sh) asserts, per mcq bank:
+
+1. The id set matches the directories on disk.
+2. Every stem and explanation exists, the explanation above a length
+   floor.
+3. Option and correct-index arity, as above.
+4. MCQ purity — no `setup.sh`, no `validate.d/`, no `files/`.
+5. `domainWeights` sums to 100, with bidirectional domain coverage.
+6. No single option position is correct on more than half the
+   single-answer questions. A degenerate key reads like a pattern.
+
+The weight-versus-content check has **two modes**:
+
+| Condition | Rule |
+|---|---|
+| No `examLength`, or one that does not shrink the pool | Each domain's share of the pool's own points must sit within 2 percentage points of its target. The pool **is** the exam |
+| A smaller `examLength` | Each domain's *pool* must be at least as deep as the per-domain count a stratified draw of that size needs. The pool's own ratio is free to differ, since every draw is stratified to the target regardless |
+
+[bank-weights.sh](../tests/bank-weights.sh) applies the same two modes
+to a hands-on bank.
 
 One trade-off to know when editing a shipped bank: answers are stored
 by option index, so reordering or editing `options` mid-attempt
@@ -368,14 +390,21 @@ editing an mcq bank's options.
 
 ## Code blocks in question.md and solution.md
 
-Use fenced blocks, never 4-space indentation. The UI's highlighter reads a
-fence's language tag and nothing else, so an indented block always renders as
-plain text. Tag each fence with what the content is: `bash` for shell commands,
-`yaml` for manifests, `json` for JSON payloads; `sh` and `shell` alias to
-`bash`. Anything else, including an unrecognised tag, renders plain, so leaving
-a block untagged costs nothing while guessing a tag shows the wrong colour on a
-study tool. A heredoc wrapping a manifest (`k apply -f - <<'EOF'` … `EOF`) is a
-`bash` block: it is one command the candidate copies and runs whole.
+**Use fenced blocks, never 4-space indentation.** The UI's highlighter
+reads a fence's language tag and nothing else, so an indented block
+always renders as plain text.
+
+| Tag | For |
+|---|---|
+| `bash` (aliases `sh`, `shell`) | Shell commands |
+| `yaml` | Manifests |
+| `json` | JSON payloads |
+| Anything else, or untagged | Renders plain |
+
+- Leaving a block untagged costs nothing. Guessing a tag shows the wrong
+  colour on a study tool.
+- A heredoc wrapping a manifest (`k apply -f - <<'EOF'` … `EOF`) is a
+  `bash` block — it is one command the candidate copies and runs whole.
 
 ## Validate script contract
 
@@ -462,12 +491,16 @@ one-space indent is the answer.
 
 #### Expected documents
 
-`show_expected` reads a file and nothing else, on purpose. Expected documents
-live at `banks/<bank-id>/<qid>/expected/<name>` and are **generated from the
-reference solution, never hand-written** — a hand-written "expected" drifts
-from what `tests/solutions/<bank>/<qid>.sh` actually produces and then teaches
-the candidate something false, which is the same failure as a check that grades
-spelling. Regenerate one by solving the question and re-running the check's own
+`show_expected` reads a file and nothing else, on purpose.
+
+- Expected documents live at
+  `banks/<bank-id>/<qid>/expected/<name>`.
+- They are **generated from the reference solution, never
+  hand-written.** A hand-written "expected" drifts from what
+  `tests/solutions/<bank>/<qid>.sh` actually produces, and then teaches
+  the candidate something false.
+
+To regenerate one, solve the question and re-run the check's own
 `show_actual` pipeline against the result:
 
 ```bash
@@ -478,20 +511,25 @@ docker compose exec -T instance-1 bash -c '. /banks/_lib/checks.sh
   > banks/ckad-mock-01/q19/expected/service.yaml
 ```
 
-Filter both panes identically, and filter out whatever the API server assigns
-rather than the candidate: a `clusterIP` in the EXPECTED pane is an address
-they never had, and showing it teaches them it was part of the answer.
-`k8s_clean` removes the noise every object carries (`managedFields`, `status`,
-`resourceVersion`, `uid`, `generation`, `creationTimestamp`, the
-`last-applied-configuration` annotation); anything else the question is not
-about is the check's own `yq`/`jq` filter to remove.
+**Filter both panes identically**, and filter out whatever the API
+server assigns rather than the candidate. A `clusterIP` in the EXPECTED
+pane is an address they never had, and showing it teaches them it was
+part of the answer.
 
-A question with no `expected/` document is fine — `show_expected` emits
-nothing and the candidate gets the message they always had. Prefer that to
-inventing one. `q19/20_reachable.sh` deliberately has none: an EndpointSlice is
-written by a controller, with a random name suffix and Pod IPs for addresses,
-so an authored "expected" one would only teach a candidate to look for numbers
-that were never going to be theirs.
+- `k8s_clean` removes the noise every object carries: `managedFields`,
+  `status`, `resourceVersion`, `uid`, `generation`, `creationTimestamp`,
+  and the `last-applied-configuration` annotation.
+- Anything else the question is not about is the check's own `yq`/`jq`
+  filter to remove.
+
+A question with no `expected/` document is fine: `show_expected` emits
+nothing and the candidate gets the message they always had. **Prefer
+that to inventing one.**
+
+`q19/20_reachable.sh` deliberately has none. An EndpointSlice is written
+by a controller, with a random name suffix and Pod IPs for addresses, so
+an authored "expected" one would only teach a candidate to look for
+numbers that were never going to be theirs.
 
 ### Grade behaviour, not spelling
 
@@ -543,19 +581,26 @@ Offline is the only place it can be noticed.
 
 `get-yaml` has one structural exemption rather than an escape hatch: a
 `-o yaml` piped straight into `k8s_clean` and handed to
-`show_actual`/`show_expected` **on the same line**. Scoring on a serialisation
-grades spelling; showing one is the opposite errand, and there is no other way
-to produce a whole document for the pane. Capture the same pipeline into a
-variable and the rule fires again, because there is then something to compare
-it to.
+`show_actual`/`show_expected` **on the same line**.
 
-`diff` gets no such exemption, and the artifact protocol is not a loophole in
-it. **A grader emits what it found and what it wanted; it never emits a
-diff.** The explanation screen's side-by-side is *rendered* client-side from
-the `actual` and `expected` documents, after grading, where being wrong costs
-nothing. The ban is on `diff` deciding a *score*, and that reason is untouched:
-line order and whitespace are not the candidate's answer, and a check that
-scores them fails correct work.
+- Scoring on a serialisation grades spelling. Showing one is the
+  opposite errand, and there is no other way to produce a whole document
+  for the pane.
+- Capture the same pipeline into a variable and the rule fires again,
+  because there is then something to compare it to.
+
+`diff` gets no such exemption, and the artifact protocol is not a
+loophole in it.
+
+**A grader emits what it found and what it wanted. It never emits a
+diff.**
+
+- The explanation screen's side-by-side is *rendered* client-side from
+  the `actual` and `expected` documents, after grading, where being
+  wrong costs nothing.
+- The ban is on `diff` deciding a *score*. Line order and whitespace are
+  not the candidate's answer, and a check scoring them fails correct
+  work.
 
 ## What the cluster provides
 
@@ -566,13 +611,15 @@ scores them fails correct work.
 | A Helm repo named `sim`, serving [banks/\_charts/](../banks/_charts) from `k8s-env:8879` | Packaged and served by [images/k8s-env/start.sh](../images/k8s-env/start.sh) before bootstrap runs; each instance adds it in [images/instance/entrypoint.sh](../images/instance/entrypoint.sh) |
 | A registry at `registry:5000` — plain HTTP, no auth | A compose service ([docker-compose.yaml](../docker-compose.yaml)) |
 
-Calico is the difference between a policy question that can only check the
-shape of a candidate's YAML and one that can check what the policy does, so
-prefer behavioural checks. `helm` is available to `setup.sh` too, so a question
-can seed releases, including one deliberately left in a bad state. The registry
-sits on `examnet` alongside `k8s-env`, the desktop, the facilitator, the docs
-proxy and both instances; podman is installed only on the instances, so in
-practice only they build, tag and push to it.
+- **Calico** is the difference between a policy question that can only
+  check the shape of a candidate's YAML and one that can check what the
+  policy does. Prefer behavioural checks.
+- **`helm`** is available to `setup.sh` too, so a question can seed
+  releases — including one deliberately left in a bad state.
+- **The registry** sits on `examnet` alongside `k8s-env`, the desktop,
+  the facilitator, the docs proxy and both instances. Podman is
+  installed only on the instances, so in practice only they build, tag
+  and push to it.
 
 ### Testing: in-cluster first
 
@@ -586,11 +633,14 @@ rule splits in two, and the halves are opposites:
 | The candidate at a shell, and `solution.md` | The idiom: `kubectl -n <ns> run tmp --rm -it --restart=Never --image=nginx:alpine -- curl -m 5 <svc>` |
 | `validate.d/*.sh` | **Forbidden.** [check-lint.sh](../tests/check-lint.sh) fails the build on it as a hard `kubectl-run` error |
 
-A check has 30 seconds, and scheduling a Pod, pulling its image, running the
-command and tearing it down uses most of that. The check then passes on an idle
-cluster and times out on a busy one, and a timed-out check is scored failed —
-points off a correct answer. Make the request from a workload the question
-already runs:
+A check has 30 seconds. Scheduling a Pod, pulling its image, running the
+command and tearing it down uses most of that.
+
+The check then passes on an idle cluster and times out on a busy one —
+and a timed-out check is scored failed, taking points off a correct
+answer.
+
+Make the request from a workload the question already runs:
 
 ```bash
 # the allowed path must work, and the denied one must time out
@@ -657,10 +707,14 @@ gated on the attempt being in Training mode.
 ## Exam tips: `banks/<bank-id>/tips.md`
 
 One optional file beside `exam.yaml`, for the whole bank rather than per
-question: how to sit THIS exam quickly. Aliases and completion, the
-generators that write a manifest so nobody types one, `explain` and `-h`
-before the documentation, editor settings for YAML, what to look at when
-a Pod will not start, and when to give up on a question and move on.
+question: how to sit **this** exam quickly. Typical contents:
+
+- Aliases and shell completion.
+- The generators that write a manifest so nobody types one.
+- `explain` and `-h` before the documentation.
+- Editor settings for YAML.
+- What to look at when a Pod will not start.
+- When to give up on a question and move on.
 
 It is bank data, not UI copy, on the same reasoning that governs
 `spec.environment.nodes`: what makes a CKAD sitting fast is not what
