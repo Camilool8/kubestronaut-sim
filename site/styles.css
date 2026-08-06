@@ -195,15 +195,32 @@ img {
 
 /* --------------------------------------------------------------- header */
 
-/* Deliberately no z-index. Sticky already paints above the page's static
-   content, and claiming --z-panel here put the header level with the
-   focused skip link, which is on that layer by design — same layer, later
-   in the DOM, so the header covered the one control a keyboard user needs
-   before anything else. Nothing on this page is positioned, so the header
-   has nothing to outrank. */
+/* z-index: 1, and the exact value is the point.
+   ----------------------------------------------------------------------
+   This rule carried NO z-index for most of its life, and the reasoning
+   was sound at the time: sticky already paints above static content, and
+   claiming --z-panel here put the header level with the focused skip
+   link, which is on that layer by design — same layer, later in the DOM,
+   so the header covered the one control a keyboard user needs before
+   anything else.
+
+   The scroll-driven reveals broke the first half of that. An element
+   animating opacity or transform is promoted to its own compositor
+   layer, and a promoted layer paints above a positioned element that has
+   only z-index: auto — so the sections below began painting over the
+   header, and hit-testing a point inside the header band returned the
+   page content behind it.
+
+   1 is therefore the whole fix: above every section that the animations
+   promote, and still an order of magnitude below --z-panel, so the skip
+   link keeps winning exactly as the original note required. It is a bare
+   number rather than a token because the four --z-* tokens all sit at 10
+   or above, and the header's whole requirement is to be underneath the
+   lowest of them. */
 .site-header {
   position: sticky;
   top: 0;
+  z-index: 1;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
@@ -844,17 +861,19 @@ img {
    comparing them is the whole job, and three prose blocks make the reader
    hold six answers in their head to do it. */
 
-/* Scroll-Inside again: four columns of prose do not fit a phone, and the
-   house answer is a box that scrolls rather than a page that does. The
-   region is focusable in the markup so it can be scrolled from the
-   keyboard, which is what makes the pattern legitimate. */
-.mode-table-scroll {
-  overflow-x: auto;
-}
+/* This used to be Scroll-Inside: a 44rem min-width in a box that scrolled
+   sideways, with a focusable region so the box could be reached from the
+   keyboard. That is a legitimate pattern and it was the wrong one here.
+   Four columns of prose on a phone is not a wide FIGURE that wants
+   panning, like a terminal line or a diagram; it is a comparison whose
+   axes can be re-drawn. So below 780px it is re-drawn (see the stacked
+   block in the responsive section), and above it the columns fit without
+   a minimum at all.
 
+   Two things went with the wrapper: the sideways scroll, and a tab stop
+   that would have led to a region with nothing left to scroll. */
 .mode-table {
   width: 100%;
-  min-width: 44rem;
   border-collapse: collapse;
   text-align: left;
 }
@@ -921,6 +940,205 @@ img {
   max-width: 56ch;
   font-size: var(--text-m);
   color: var(--text-muted);
+}
+
+/* --------------------------------------------------------- run it */
+/* Two shapes of the same simulator. Peers, not tiers: the two cards are
+   identical in weight, neither carries a price, a badge or a call to
+   action, and the local one is first because it is the reference the
+   other is described against.
+
+   Deliberately NOT the .exam-card treatment. Those advertise something
+   you can sit and carry a Live/Soon badge; these describe how the whole
+   product is deployed, and reusing the exam card would file them as two
+   more exams. */
+
+.run-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
+  gap: var(--space-4);
+}
+
+.run-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-1);
+}
+
+.run-card-head h3 {
+  font-size: var(--text-2xl);
+}
+
+.run-card-sub {
+  margin-top: var(--space-1);
+  font-size: var(--text-s);
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+/* The label/value pairs. A hairline between rows and nothing above the
+   first or below the last: the block is already inside a card, so ruling
+   its outer edges would draw a box inside a box. */
+.run-facts > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  padding-block: var(--space-3);
+}
+
+.run-facts > div + div {
+  border-top: 1px solid var(--border);
+}
+
+.run-facts dt {
+  font-size: var(--text-s);
+  color: var(--text-muted);
+}
+
+/* Mono-For-Truth: these are the deployment's own settings, read off the
+   chart's defaults, so they are set as values rather than as prose. */
+.run-facts dd {
+  font-family: var(--font-mono);
+  font-size: var(--text-s);
+  font-weight: 600;
+  color: var(--text);
+  text-align: right;
+}
+
+/* No margin-top: auto here. Pinning the note to the card's bottom edge
+   aligned the two cards' last lines, and paid for it with a hole in the
+   middle of the shorter one — between a value and the sentence explaining
+   it, which is the worst place on the card to put a gap. The two cards
+   still match in height because they are grid items; the slack now
+   collects under the last line, where it reads as margin. */
+.run-note {
+  font-size: var(--text-m);
+  color: var(--text-secondary);
+}
+
+/* A terminal that lives inside a card. It keeps the machine palette and
+   the mono type, because it is still literally a computer, and drops the
+   titlebar and the lifted shadow, because a window chrome nested inside
+   a card reads as a second window rather than as a command. */
+.term-inline {
+  border-radius: var(--radius-m);
+  box-shadow: none;
+}
+
+.term-inline .term-body {
+  padding: var(--space-3) var(--space-4);
+  line-height: 1.7;
+}
+
+/* The shell's line-continuation backslash. Not --machine-muted: this is
+   syntax the reader must retype, not a comment they only read. */
+.term-cont {
+  color: var(--machine-text);
+}
+
+/* --------------------------------------------------- what a seat costs */
+/* Operating figures, and quieter than .stat on purpose. Those are the
+   product's headline numbers; these are what the hardware is asked for,
+   which is a thing you check rather than a thing you are told. */
+
+.run-sizing {
+  margin-top: var(--space-7);
+}
+
+.run-sizing-title {
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-s);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.run-spec-row {
+  display: grid;
+  gap: var(--space-1) var(--space-6);
+  padding-block: var(--space-4);
+}
+
+.run-spec-row + .run-spec-row {
+  border-top: 1px solid var(--border);
+}
+
+.run-spec dt {
+  font-size: var(--text-l);
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: var(--tracking-tight);
+}
+
+.run-spec dd {
+  max-width: 64ch;
+  font-size: var(--text-m);
+  color: var(--text-secondary);
+}
+
+/* The measurement inside the sentence. Mono and tabular, the same as
+   every other figure on the page that came off an instrument. */
+.run-spec dd b {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.run-spec-note {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+}
+
+/* ------------------------------------------------------- the warning */
+/* --warn, because this is a real consequence of deploying the thing and
+   not an aside. --warn-strong is the text tier of the family; --warn on
+   its own is measured for graphics, not for labels.
+
+   Geometry is the app's, not this page's invention: a tinted fill, an
+   even 1px --warn-border and --radius-m are exactly `.hosted-queue-note`
+   in ui/src/theme.css, which is the same component doing the same job in
+   the same hosted flow. This first carried a 3px left edge as well. That
+   is a side-tab, it appeared nowhere else in this repository, and the
+   product had already answered the question — an even border and the
+   tint carry it, and the heading in --warn-strong is the third channel.
+   The one --ink band on the page stays the only place it raises its
+   voice; two shouting blocks would cancel each other out. */
+
+.run-warning {
+  margin-top: var(--space-6);
+  padding: var(--space-5);
+  border: 1px solid var(--warn-border);
+  border-radius: var(--radius-m);
+  background: var(--warn-soft);
+}
+
+.run-warning-title {
+  font-size: var(--text-l);
+  color: var(--warn-strong);
+}
+
+.run-warning p {
+  margin-top: var(--space-2);
+  max-width: 78ch;
+  font-size: var(--text-m);
+  color: var(--text-body);
+}
+
+.run-warning-more a {
+  color: var(--warn-strong);
 }
 
 /* ----------------------------------------------------------- ink band */
@@ -1123,6 +1341,13 @@ img {
     grid-template-columns: 18rem 1fr;
     align-items: baseline;
   }
+
+  /* The same shape, one column narrower: these labels are two words where
+     the evidence rows' are a component name. */
+  .run-spec-row {
+    grid-template-columns: 16rem 1fr;
+    align-items: baseline;
+  }
 }
 
 @media (min-width: 900px) {
@@ -1143,10 +1368,191 @@ img {
   }
 }
 
+/* The mode matrix, re-drawn as three stacked groups.
+   ----------------------------------------------------------------------
+   780px is where the four columns stop fitting the shell without a
+   minimum width. Below it the table is laid out as a GRID and the cells
+   are placed explicitly, which transposes it: the reading order on a
+   phone becomes one mode at a time, all four of its properties together,
+   which is the order someone choosing a mode actually wants. Reading it
+   the other way — one property, three answers — is a comparison, and a
+   comparison is what the desktop table already is.
+
+   The placement is arithmetic, not magic. Three groups of five rows: a
+   heading, then its four values. A cell in tbody column C (2, 3, 4) and
+   row R (1 to 4) goes to grid row (C - 2) * 5 + 1 + R. Fifteen rows, and
+   they are spelled out because grid line numbers cannot be computed with
+   calc().
+
+   One thing is genuinely given up here: a grid container is no longer
+   exposed as a table, so the row/column semantics do not survive this
+   breakpoint. What replaces them is a linear reading order that matches
+   the screen exactly — the mode name, then each property named by its
+   own data-label beside its value — plus the caption, which still says
+   what the whole block is. That trade is worth it. A table nobody can
+   read without dragging it sideways has already lost the reader it was
+   built for. */
+@media (max-width: 779px) {
+  .mode-table {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mode-table thead,
+  .mode-table tbody,
+  .mode-table tr {
+    display: contents;
+  }
+
+  /* The empty corner, and the row headers. Both are structure the stacked
+     form re-expresses: the corner never had anything to say, and each
+     property name now travels beside its own value instead of standing at
+     the head of a row that no longer exists. */
+  .mode-table thead td,
+  .mode-table tbody th {
+    display: none;
+  }
+
+  .mode-table thead th {
+    width: auto;
+    padding: var(--space-6) 0 var(--space-2);
+    border-top: 1px solid var(--border);
+    font-size: var(--text-xl);
+  }
+
+  /* The section head already supplies the gap above the first group. */
+  .mode-table thead th:nth-child(2) {
+    grid-row: 1;
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .mode-table thead th:nth-child(3) {
+    grid-row: 6;
+  }
+
+  .mode-table thead th:nth-child(4) {
+    grid-row: 11;
+  }
+
+  .mode-table tbody td {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
+  }
+
+  .mode-table tbody td::before {
+    content: attr(data-label);
+    font-size: var(--text-s);
+    line-height: 1.5;
+    color: var(--text-muted);
+  }
+
+  /* The value is an anonymous grid item and lands in column two by
+     auto-placement. The minutes underneath are a real element, so they
+     have to be told, or they wrap back under the label. */
+  .mode-table tbody td .mode-sub {
+    grid-column: 2;
+    margin-top: 0;
+  }
+
+  .mode-table tbody tr:nth-child(1) td:nth-child(2) {
+    grid-row: 2;
+  }
+  .mode-table tbody tr:nth-child(2) td:nth-child(2) {
+    grid-row: 3;
+  }
+  .mode-table tbody tr:nth-child(3) td:nth-child(2) {
+    grid-row: 4;
+  }
+  .mode-table tbody tr:nth-child(4) td:nth-child(2) {
+    grid-row: 5;
+  }
+  .mode-table tbody tr:nth-child(1) td:nth-child(3) {
+    grid-row: 7;
+  }
+  .mode-table tbody tr:nth-child(2) td:nth-child(3) {
+    grid-row: 8;
+  }
+  .mode-table tbody tr:nth-child(3) td:nth-child(3) {
+    grid-row: 9;
+  }
+  .mode-table tbody tr:nth-child(4) td:nth-child(3) {
+    grid-row: 10;
+  }
+  .mode-table tbody tr:nth-child(1) td:nth-child(4) {
+    grid-row: 12;
+  }
+  .mode-table tbody tr:nth-child(2) td:nth-child(4) {
+    grid-row: 13;
+  }
+  .mode-table tbody tr:nth-child(3) td:nth-child(4) {
+    grid-row: 14;
+  }
+  .mode-table tbody tr:nth-child(4) td:nth-child(4) {
+    grid-row: 15;
+  }
+}
+
+/* The wordmark gives way to the mark, exactly as it does in the app.
+   ----------------------------------------------------------------------
+   640px and the clip idiom are both taken from `.navbar-wordmark` in
+   ui/src/theme.css rather than chosen again here: this page's header and
+   the product's header solve the same problem, and two different answers
+   to it would be the drift the rest of this directory works to prevent.
+
+   It is hidden rather than dropped, so the accessible name of the header
+   is unchanged and a screen reader still hears the product's name. The
+   mark stays, and it is what the app leaves as well.
+
+   Nav went from four items to five when "Run it" was added, and at 390px
+   the wordmark and the nav were drawn on top of each other. Nothing
+   overflowed, which is why the sideways-scroll sweep did not catch it and
+   a screenshot did: both boxes stayed inside the header, and the text
+   inside them did not. */
+@media (max-width: 640px) {
+  .brand-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* With the wordmark gone the row is the nav, so it takes the width it
+     needs and the gap closes to match the tighter gutters below. */
+  .site-nav {
+    gap: var(--space-4);
+  }
+}
+
 @media (max-width: 600px) {
   /* Page gutters close a step. */
   .shell {
     padding-inline: var(--space-4);
+  }
+
+  /* A label and its value stop sharing a line: at this width the pair was
+     wrapping anyway, and a right-aligned value under a left-aligned label
+     reads as two unrelated things. */
+  .run-facts > div {
+    flex-direction: column;
+    gap: var(--space-1);
+    padding-block: var(--space-2);
+  }
+
+  .run-facts dd {
+    text-align: left;
+  }
+
+  .run-card,
+  .run-warning {
+    padding: var(--space-4);
   }
 
   .term-body {
@@ -1183,6 +1589,13 @@ img {
    composed diagram rather than five dots stacked at twelve o'clock. */
 
 @media (prefers-reduced-motion: no-preference) {
+  /* The header is sticky and every nav item is an in-page anchor, so a
+     jump gives no sense of where the page went. scroll-padding-top at the
+     top of this file already keeps the target clear of the header. */
+  html {
+    scroll-behavior: smooth;
+  }
+
   .btn,
   .site-nav a,
   a {
@@ -1237,11 +1650,204 @@ img {
   .orbit-svg[data-idle] .orbit-track {
     animation-play-state: paused;
   }
+
+  /* ---------------------------------------------- scroll-driven layer */
+  /* Everything below is tied to the SCROLLER rather than to a clock, and
+     none of it needs a line of JavaScript. That is the whole reason it is
+     written this way: this directory holds exactly one script, its job is
+     to pause the orbit, and a second one would have made the page's
+     appearance depend on JS having run.
+
+     Nested inside @supports so the fallback is the finished page rather
+     than a blank one. Where view() is unsupported — Firefox today, any
+     older engine — not one of these rules applies, no keyframe holds an
+     element at opacity 0, and the reader gets the same page without the
+     entrances. That is also why every keyframe animates FROM a hidden
+     state TO the element's own real style, and why no rule here sets
+     opacity or translate outside a keyframe.
+
+     Each of these earns its place or it would not be here:
+       scroll-depth   how far through a long page you are
+       reveal         a section arriving rather than being already there
+       term typing    three commands that run in sequence, in sequence
+       orbit drift    parallax, which gives the hero figure depth */
+  @supports (animation-timeline: view()) {
+    /* Scroll depth, painted along the header's bottom edge. --progress is
+       the token family for exactly this — bars, tracks and dots — and it
+       is deliberately NOT --accent: blue on this page means focus,
+       currency, links and the one primary button, and a hairline that
+       tracks the scrollbar is none of those. */
+    .scroll-depth {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      height: 2px;
+      background: var(--progress);
+      transform-origin: 0 50%;
+      animation: scroll-depth-draw linear;
+      animation-timeline: scroll(root);
+    }
+
+    /* The entrance. 8px and a fade, which is the app's own screen
+       transition (DESIGN.md: "screens fade up 4px") one step larger,
+       because a landing page section is a bigger object than a screen.
+
+       The range ends inside `cover`, so a section has finished arriving
+       well before it reaches the middle of the viewport. A reveal still
+       animating under the reader's eyes is the thing that makes scroll
+       animation feel cheap. */
+    .section-head,
+    .stat,
+    .exam-card,
+    .run-card,
+    .run-spec-row,
+    .run-warning,
+    .mode-table,
+    .mode-notes,
+    .limit,
+    .evidence-row,
+    .docs-group,
+    .quickstart-run {
+      animation: reveal-rise linear both;
+      animation-timeline: view();
+      animation-range: entry 10% cover 30%;
+    }
+
+    /* Siblings that enter on the same line share a timeline and would
+       otherwise arrive as one block. A small offset per column is enough
+       to read as a sequence; it is done with the RANGE rather than a
+       delay, because a delay on a scroll timeline is measured in scroll
+       distance and reads as a stall. */
+    .stat:nth-child(2),
+    .exam-card:nth-child(2),
+    .run-card:nth-child(2),
+    .docs-group:nth-child(2) {
+      animation-range: entry 16% cover 34%;
+    }
+
+    .stat:nth-child(3),
+    .exam-card:nth-child(3),
+    .docs-group:nth-child(3) {
+      animation-range: entry 22% cover 38%;
+    }
+
+    /* The quickstart's three commands arrive one after another, which is
+       the order they are run in. Scrubbed rather than played once: the
+       reader controls it, it cannot run while they are looking somewhere
+       else, and scrolling back is the only honest way to replay it.
+
+       This was a character-by-character type at first, in steps() of each
+       line's own length. It came out well and it is not here, because a
+       half-typed line is a half-true line. Caught mid-reveal, line three
+       read `http://localhost:80` — not obviously unfinished, the way
+       `./sim doct` is, but a different and completely plausible port. A
+       page that will not round a question count up must not animate
+       through a command nobody can run. Opacity says the same thing about
+       sequence and is never wrong in between. */
+    .quickstart .term-line {
+      display: inline-block;
+      animation: term-line-in linear both;
+      animation-timeline: view();
+    }
+
+    .quickstart .term-line:nth-child(1) {
+      animation-range: entry 30% entry 90%;
+    }
+
+    .quickstart .term-line:nth-child(2) {
+      animation-range: entry 90% cover 20%;
+    }
+
+    .quickstart .term-line:nth-child(3) {
+      animation-range: cover 20% cover 32%;
+    }
+
+    /* Parallax on the hero figure. It drifts against the page rather than
+       with it, which is what gives the orbit the sense of sitting behind
+       the headline instead of beside it. 24px total over the whole pass:
+       small enough that it never separates the figure from its caption. */
+    .orbit {
+      animation: orbit-drift linear both;
+      animation-timeline: view();
+      animation-range: cover 0% cover 100%;
+    }
+  }
 }
 
 @keyframes orbit-turn {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes scroll-depth-draw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Both keyframes end at the element's REAL style, so the finished state is
+   exactly the page as it is authored. Nothing here is a "final" class that
+   something has to add. */
+@keyframes reveal-rise {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+/* Opacity only. A line inside a <pre> sits on a fixed baseline grid, and
+   sliding one would drag the block's line spacing with it. */
+@keyframes term-line-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes orbit-drift {
+  from {
+    translate: 0 12px;
+  }
+  to {
+    translate: 0 -12px;
+  }
+}
+
+/* Print gets the page, not a snapshot of an animation that never ran. A
+   scroll timeline has no progress on paper, so every scroll-driven rule
+   above is switched off and each element falls back to its own style —
+   which is the finished one, by the construction described above. */
+@media print {
+  .section-head,
+  .stat,
+  .exam-card,
+  .run-card,
+  .run-spec-row,
+  .run-warning,
+  .mode-table,
+  .mode-notes,
+  .limit,
+  .evidence-row,
+  .docs-group,
+  .quickstart-run,
+  .quickstart .term-line,
+  .orbit {
+    animation: none;
+  }
+
+  .scroll-depth {
+    display: none;
   }
 }
 

@@ -13,6 +13,19 @@ as the stylesheet drew it. Keep it that way — if a second script is ever
 needed, that is the moment to ask whether this directory still wants to
 be static.
 
+Everything that moves on scroll is therefore written as a **CSS
+scroll-driven animation** (`animation-timeline: view()` and
+`scroll(root)`), not as an observer. That was the deciding constraint
+rather than a preference: reveals, the header's scroll-depth hairline and
+the hero's parallax would each have wanted the second script this
+directory will not take. The whole layer sits inside
+`@supports (animation-timeline: view())`, nested inside
+`prefers-reduced-motion: no-preference`, so an engine without it — Firefox
+today — gets the finished page rather than a blank one, and a reader who
+asked for less motion never depends on an animation being cancelled
+correctly. Verify that claim the same way it was verified here: with
+motion reduced the page must report **zero** animations, not stopped ones.
+
 ## Preview
 
 ```bash
@@ -189,6 +202,36 @@ resolve only once Pages is serving this directory.
   from `spec`, and the coming-soon reasons verbatim from
   `banks/catalog.yaml`. If a bank changes, these numbers change. Nothing
   here may be rounded up or projected.
+- **The hosting figures in "Two ways to run it" are NOT gated, and that
+  is the sharp edge in this directory.** Seats, the per-session resource
+  pair, the 32.9GiB of `emptyDir` ceilings and the 3090m boot measurement
+  all come from [../docs/hosting.md](../docs/hosting.md) and the chart's
+  own defaults in `deploy/helm/kubestronaut-sim/values.yaml`. `--check`
+  re-derives the *bank* figures and would catch those drifting; it knows
+  nothing about these. Change a default in the chart and this page is
+  silently wrong, with a green gate — the exact failure `check_figures`
+  was written for, in the one place it does not reach. Grep this page
+  when you touch the chart's defaults, or teach `--check` to read them.
+- **The mode matrix stops being a table below 780px.** It is laid out as
+  a grid and its cells are placed explicitly, which transposes it into
+  one group per mode. Each `<td>` carries a `data-label` that must stay
+  equal to the `<th scope="row">` in its own row, because below the
+  breakpoint the label is what the reader sees and the row header is
+  hidden. Row and column semantics do not survive that breakpoint; the
+  linear reading order and the `<caption>` are what replace them.
+- **The header carries `z-index: 1`, and the value matters.** An element
+  animating opacity or transform is promoted to its own compositor layer
+  and will paint over a sticky header that has only `z-index: auto`,
+  which is what the reveals did to it. 1 clears every promoted section
+  and stays below `--z-panel`, so the focused skip link still covers the
+  header rather than the other way round. Both halves are worth
+  re-checking together if either changes.
+- **The wordmark hides below 640px, and both the breakpoint and the clip
+  idiom are the app's.** They are copied from `.navbar-wordmark` in
+  `ui/src/theme.css`. This is a fourth thing held equal to the app by
+  convention rather than by a check, like the cert marks were before
+  `--check` learned to compare them. It is hidden rather than removed, so
+  the header's accessible name is unchanged.
 - **The non-affiliation notice is binding** on every surface that names a
   certification, and this page names all five. The wording in the footer
   is the app's own, from `ui/src/strings.ts` (`info.disclaimerBody`).

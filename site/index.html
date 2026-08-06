@@ -72,15 +72,24 @@
         </span>
         <nav aria-label="Project">
           <ul class="site-nav">
+            <li><a href="#run">Run it</a></li>
             <li><a href="#track">Exams</a></li>
             <li><a href="#limits">Limits</a></li>
             <li><a href="#docs">Docs</a></li>
-            <li>
+            <li class="site-nav-repo">
               <a href="https://github.com/Camilool8/kubestronaut-sim">GitHub</a>
             </li>
           </ul>
         </nav>
       </div>
+
+      <!-- Scroll depth, drawn on the header's own bottom edge. It is
+           decoration in the strict sense — nothing here is a control and
+           nothing waits on it — so it is aria-hidden, it carries no ARIA
+           progressbar role, and it exists only inside the motion block at
+           the foot of styles.css. Where scroll-driven animations are
+           unsupported the element is simply a 0-width span nobody sees. -->
+      <span class="scroll-depth" aria-hidden="true"></span>
     </header>
 
     <main id="main">
@@ -228,9 +237,15 @@
                 <span class="term-bar-dot" aria-hidden="true"></span>
                 <span class="term-bar-title">bash — quickstart</span>
               </figcaption>
-              <pre class="term-body"><code><span class="term-prompt" aria-hidden="true">$ </span>./sim doctor    <span class="term-note"># optional preflight</span>
-<span class="term-prompt" aria-hidden="true">$ </span>./sim up        <span class="term-note"># brings the app up in seconds</span>
-<span class="term-prompt" aria-hidden="true">$ </span>open <span class="term-url">http://localhost:8080</span></code></pre>
+              <!-- Each command is wrapped in its own .term-line so the
+                   three can arrive in sequence, which is the order they
+                   are run in. The newlines BETWEEN the spans are still
+                   literal text inside the <pre>, so selecting the block
+                   and copying it yields three runnable lines exactly as it
+                   did before the spans existed. -->
+              <pre class="term-body"><code><span class="term-line"><span class="term-prompt" aria-hidden="true">$ </span>./sim doctor    <span class="term-note"># optional preflight</span></span>
+<span class="term-line"><span class="term-prompt" aria-hidden="true">$ </span>./sim up        <span class="term-note"># brings the app up in seconds</span></span>
+<span class="term-line"><span class="term-prompt" aria-hidden="true">$ </span>open <span class="term-url">http://localhost:8080</span></span></code></pre>
             </figure>
 
             <p class="quickstart-note">
@@ -242,6 +257,203 @@
             </p>
           </div>
         </div>
+      </section>
+
+      <!-- ------------------------------------------------------- run it -->
+      <!-- Two shapes of the same simulator, side by side. Deliberately NOT
+           a pricing table: neither column is a tier, neither is bought, and
+           both are things the reader runs themselves. The local product is
+           the reference and is named first for that reason.
+
+           Every figure here is from docs/hosting.md, which is measured
+           rather than projected. If the chart's defaults change, they
+           change here too — unlike the bank figures, build.sh cannot yet
+           re-derive these, so they are cited with the file that owns
+           them. -->
+      <section class="shell section" id="run" aria-labelledby="run-title">
+        <div class="section-head">
+          <h2 id="run-title">Two ways to run it</h2>
+          <p class="section-lede">
+            Both of them are things you run. There is no service here to sign
+            up for and no account to make: the local product is the reference,
+            and the hosted shape is the same simulator with a door in front of
+            it. If you want the uncapped one, clone this and run it.
+          </p>
+        </div>
+
+        <div class="run-grid">
+          <!-- The reference. Named first, and the one the rest of this page
+               is about. -->
+          <article class="run-card" aria-labelledby="run-local">
+            <div class="run-card-head">
+              <h3 id="run-local">On your machine</h3>
+              <p class="run-card-sub">One candidate, no configuration</p>
+            </div>
+
+            <figure class="term term-inline">
+              <pre class="term-body"><code><span class="term-prompt" aria-hidden="true">$ </span>./sim up</code></pre>
+            </figure>
+
+            <dl class="run-facts">
+              <div>
+                <dt>Identity</dt>
+                <dd>None, permanently</dd>
+              </div>
+              <div>
+                <dt>At once</dt>
+                <dd>Uncapped</dd>
+              </div>
+              <div>
+                <dt>History</dt>
+                <dd>A local volume</dd>
+              </div>
+              <div>
+                <dt>Asks for</dt>
+                <dd>Docker, python3, 9GB of RAM</dd>
+              </div>
+            </dl>
+
+            <p class="run-note">
+              A password field on a single-user tool you cloned yourself would
+              be theatre. The only real control is which interface it binds
+              to, so <code>SIM_BIND=127.0.0.1 ./sim up</code> is the answer on
+              a network you do not control.
+            </p>
+          </article>
+
+          <!-- The hosted shape. The chart is real and in the repository;
+               what it is NOT is a service this project operates. -->
+          <!-- No data-engine: --exam-tint is keyed on an EXAM's engine, and
+               neither of these two cards is an exam. Borrowing the alias
+               here would tint the hosted column as though it were the
+               multiple-choice bank. -->
+          <article class="run-card" aria-labelledby="run-hosted">
+            <div class="run-card-head">
+              <h3 id="run-hosted">For a group</h3>
+              <p class="run-card-sub">Sign-in, a capped pool, durable history</p>
+            </div>
+
+            <figure class="term term-inline">
+              <!-- Broken across three lines so the block fits its card
+                   without panning at any width the two columns are drawn
+                   at. The continuations are real backslashes, so the
+                   block still pastes into a shell as one command. -->
+              <pre class="term-body"><code><span class="term-prompt" aria-hidden="true">$ </span>helm install kubestronaut-sim <span class="term-cont">\</span>
+    deploy/helm/kubestronaut-sim <span class="term-cont">\</span>
+    --values my-values.yaml</code></pre>
+            </figure>
+
+            <dl class="run-facts">
+              <div>
+                <dt>Identity</dt>
+                <dd>GitHub, a trusted header, or none</dd>
+              </div>
+              <div>
+                <dt>At once</dt>
+                <dd>3 hands-on, 30 multiple-choice</dd>
+              </div>
+              <div>
+                <dt>History</dt>
+                <dd>Per user, outlives the Pod</dd>
+              </div>
+              <div>
+                <dt>Asks for</dt>
+                <dd>Nodes you are willing to rebuild</dd>
+              </div>
+            </dl>
+
+            <p class="run-note">
+              One hub is reachable from the internet and does identity, seats,
+              the queue and history. Each candidate gets the whole
+              <code>./sim up</code> stack as a single Pod, and the facilitator
+              inside it has no authentication and gains none: it is simply
+              never reachable except through the hub. That is what lets the
+              local product stay untouched.
+            </p>
+          </article>
+        </div>
+
+        <!-- Not a .stat grid: those are the product's headline figures and
+             these are operating costs, which is a quieter job. Label left,
+             measurement right, the same shape as .evidence one section
+             down but in mono, because every value here is a measurement. -->
+        <div class="run-sizing">
+          <h3 class="run-sizing-title">What a seat costs</h3>
+          <dl class="run-spec">
+            <div class="run-spec-row">
+              <dt>Hands-on session</dt>
+              <dd>
+                <b>3.9Gi / 540m</b> requested, <b>11.8Gi / 4400m</b> limit
+                <span class="run-spec-note"
+                  >Summed across its eight containers, measured on a two-node
+                  cluster.</span
+                >
+              </dd>
+            </div>
+            <div class="run-spec-row">
+              <dt>Multiple-choice session</dt>
+              <dd>
+                <b>128Mi</b>, and it schedules anywhere
+                <span class="run-spec-note"
+                  >No cluster is involved, so this pool costs almost
+                  nothing. Setting the hands-on seats to zero hosts only
+                  these.</span
+                >
+              </dd>
+            </div>
+            <div class="run-spec-row">
+              <dt>Node disk</dt>
+              <dd>
+                <b>32.9GiB</b> of ceilings per session
+                <span class="run-spec-note"
+                  >20GiB of that is the inner Docker daemon. A ceiling rather
+                  than a reservation, but three seats on one node can
+                  legitimately ask for 99GiB.</span
+                >
+              </dd>
+            </div>
+            <div class="run-spec-row">
+              <dt>Boot</dt>
+              <dd>
+                <b>1</b> Pod creation in flight at a time
+                <span class="run-spec-note"
+                  >Boot is CPU-bound: one measured session took a four-core
+                  node to 3090m. Two boots on one node do not take turns, they
+                  both crawl.</span
+                >
+              </dd>
+            </div>
+          </dl>
+        </div>
+
+        <!-- Stated at full strength. This is the decision that makes hosting
+             this a hardware question rather than a values question, and a
+             reader who skims everything else has to hit this. -->
+        <aside class="run-warning" aria-labelledby="run-warning-title">
+          <h3 class="run-warning-title" id="run-warning-title">
+            A hands-on session runs a privileged container
+          </h3>
+          <p>
+            It builds a real Kubernetes cluster inside itself with a container
+            runtime and hands a stranger a root shell next to it, and there is
+            no way to do that unprivileged. Treat those nodes as disposable:
+            deploy on hardware you are willing to rebuild and keep them out of
+            any pool running something you care about. The chart ships a
+            NetworkPolicy that stops a session reaching the cluster hosting it,
+            on by default, and turning it off is not a supported configuration
+            — it is the boundary that makes this an accepted risk rather than
+            an open one. Multiple-choice sessions are unprivileged and tiny,
+            and none of this applies to them.
+          </p>
+          <p class="run-warning-more">
+            <a
+              href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/hosting.md"
+              >The full hosting guide</a
+            >
+            covers seats, sizing, credentials, and the four things hosted mode
+            does differently.
+          </p>
+        </aside>
       </section>
 
       <!-- ------------------------------------------------------ stats -->
@@ -463,61 +675,62 @@
           </p>
         </div>
 
-        <!-- Scroll-Inside: four columns of prose do not fit a phone, and
-             the house answer to that is a box that scrolls rather than a
-             page that does. -->
-        <div
-          class="mode-table-scroll"
-          role="region"
-          aria-labelledby="modes-title"
-          tabindex="0"
-        >
-          <table class="mode-table">
-            <caption class="sr-only">
-              What each mode permits, compared across Training, Mastery and Exam
-            </caption>
-            <thead>
-              <tr>
-                <td></td>
-                <th scope="col">Training</th>
-                <th scope="col">Mastery</th>
-                <th scope="col">Exam</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <th scope="row">Clock</th>
-                <td>None. Untimed.</td>
-                <td>
-                  Half the bank's duration
-                  <span class="mode-sub">60 min CKAD, 45 min KCNA</span>
-                </td>
-                <td>
-                  The bank's full duration
-                  <span class="mode-sub">120 min CKAD, 90 min KCNA</span>
-                </td>
-              </tr>
-              <tr>
-                <th scope="row">Help</th>
-                <td>Two-tier hints, and solutions on demand</td>
-                <td>None</td>
-                <td>None</td>
-              </tr>
-              <tr>
-                <th scope="row">Scoring</th>
-                <td>Does not end the attempt</td>
-                <td>Ends the attempt</td>
-                <td>Ends the attempt</td>
-              </tr>
-              <tr>
-                <th scope="row">Kept as an attempt</th>
-                <td>No</td>
-                <td>Yes</td>
-                <td>Yes</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <!-- Below 780px this stops being drawn as a grid of columns and
+             becomes three stacked groups, one per mode, each carrying its
+             own four properties. That is done entirely in the stylesheet:
+             the markup stays one table, with the modes as column headers
+             and the properties as row headers, because that is what it is.
+
+             Every cell therefore needs to name its own property once the
+             row header is no longer beside it, which is what data-label
+             carries. It must stay equal to the <th scope="row"> in its own
+             row — the phone reads the attribute, everything else reads the
+             header. -->
+        <table class="mode-table">
+          <caption class="sr-only">
+            What each mode permits, compared across Training, Mastery and Exam
+          </caption>
+          <thead>
+            <tr>
+              <td></td>
+              <th scope="col">Training</th>
+              <th scope="col">Mastery</th>
+              <th scope="col">Exam</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Clock</th>
+              <td data-label="Clock">None. Untimed.</td>
+              <td data-label="Clock">
+                Half the bank's duration
+                <span class="mode-sub">60 min CKAD, 45 min KCNA</span>
+              </td>
+              <td data-label="Clock">
+                The bank's full duration
+                <span class="mode-sub">120 min CKAD, 90 min KCNA</span>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row">Help</th>
+              <td data-label="Help">Two-tier hints, and solutions on demand</td>
+              <td data-label="Help">None</td>
+              <td data-label="Help">None</td>
+            </tr>
+            <tr>
+              <th scope="row">Scoring</th>
+              <td data-label="Scoring">Does not end the attempt</td>
+              <td data-label="Scoring">Ends the attempt</td>
+              <td data-label="Scoring">Ends the attempt</td>
+            </tr>
+            <tr>
+              <th scope="row">Kept as an attempt</th>
+              <td data-label="Kept as an attempt">No</td>
+              <td data-label="Kept as an attempt">Yes</td>
+              <td data-label="Kept as an attempt">Yes</td>
+            </tr>
+          </tbody>
+        </table>
 
         <div class="mode-notes">
           <p>
@@ -572,12 +785,13 @@
             <div class="limit">
               <dt>Hosting it is your job, not ours.</dt>
               <dd>
-                There is no service here to sign up for, and running this needs
-                nothing but Docker on your own machine. If you want to put it in
-                front of a group there is a Helm chart in the repository that
-                deploys sign-in, a capped pool of sessions and per-user history
-                — but a hands-on session is a privileged container, so that is a
-                decision about hardware you are willing to rebuild.
+                There is no service here to sign up for. Running this needs
+                nothing but Docker on your own machine, and the Helm chart that
+                puts it in front of a group is something you deploy, on your
+                hardware, under your own identity provider. Nobody operates a
+                shared instance of this for you.
+                <a href="#run">Both shapes are set out above</a>, including the
+                part where a hands-on session is a privileged container.
               </dd>
             </div>
             <div class="limit">
@@ -708,6 +922,18 @@
                 <dd>
                   Every <code>./sim</code> subcommand, environment variable, and
                   published port.
+                </dd>
+              </div>
+              <div class="docs-entry">
+                <dt>
+                  <a
+                    href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/hosting.md"
+                    >Hosting</a
+                  >
+                </dt>
+                <dd>
+                  The Helm chart, seats, sizing and credentials, for running it
+                  for other people.
                 </dd>
               </div>
               <div class="docs-entry">
