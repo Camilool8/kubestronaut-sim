@@ -230,8 +230,7 @@ and shares one history. It is for trying the chart, not for people.
 ## What hosted mode does differently
 
 Not a shorter list than it looks. Each of these is a consequence of a
-Pod being one network namespace and one disposable unit, and each is
-recorded with its reasoning in [follow-ups.md](follow-ups.md):
+Pod being one network namespace and one disposable unit:
 
 - The documentation allowlist governs the browser, not the network. A
   Pod is one network namespace, so the desktop and the candidate's

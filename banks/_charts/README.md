@@ -1,7 +1,7 @@
 # Local Helm charts
 
 Charts here are packaged into `/shared/helm-repo` and served over plain
-HTTP on `k8s-env:8879`, both by `images/k8s-env/start.sh:56-68` and
+HTTP on `k8s-env:8879`, both by `images/k8s-env/start.sh` and
 before `bootstrap.sh` runs. Every instance pre-adds the repository as
 `sim`, so a
 candidate starts a Helm question the way the real exam starts one — with

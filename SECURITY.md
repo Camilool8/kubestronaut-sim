@@ -64,7 +64,7 @@ Use loopback there.
 The instances hold `SYS_ADMIN`, `SYS_CHROOT`, `MKNOD`, `SETFCAP` and
 `SYS_RESOURCE`. `SYS_ADMIN` in particular is broad, and the set should
 be read as "meaningfully less than root on the host, but not a strong
-boundary". `docker-compose.yaml:60-98` records what each grant buys and
+boundary". `docker-compose.yaml` records what each grant buys and
 what was tried instead.
 
 ## The conductor is the one real boundary
@@ -88,11 +88,21 @@ the boundary being defended is privilege, not candidate access.
 The desktop returns `403` until a session is running. The solutions
 endpoint returns `403` unless the session has ended **or** the attempt
 is in Training mode, where reading the solution is the point
-(`facilitator/internal/api/api.go:239`).
+(`facilitator/internal/api/api.go`).
 
-Neither gate is a security control. They exist for fidelity with the
+A third gate refuses to start a hands-on exam for a caller that says it
+has no precise pointer, so a phone gets an explanation instead of an
+exam it cannot sit. The client measures this and sends `X-Sim-Pointer`,
+because no server can: a pointer type is not on the wire, and a
+User-Agent is a string the browser chooses. An absent or unrecognised
+header is deliberately **not** treated as touch-only — `./sim`,
+`tests/smoke.sh` and every `curl` POST send no header and must keep
+working.
+
+None of these is a security control. They exist for fidelity with the
 real exam, and every `solution.md` sits unencrypted in `banks/` on your
-own disk the whole time.
+own disk the whole time. The claim the pointer gate supports is "a
+mobile browser will not start one", not "nothing can".
 
 ## The attempt history is unencrypted local data
 
@@ -113,23 +123,23 @@ merges a document in rather than replacing, so an import cannot be used to
 silently drop what is already there, but it can add attempts that never
 happened. On a network you do not control, `SIM_BIND=127.0.0.1`.
 
-`./sim purge` now keeps this volume, so a purge no longer erases it and
-`./sim purge --all` is the deliberate way to. Both are destructive
-operations with no undo and no backup: export first if the record matters
-to you.
+`./sim purge` keeps this volume; `./sim purge --all` is the deliberate
+way to erase it. Both are destructive operations with no undo and no
+backup: export first if the record matters to you.
 
 ## The documentation proxy
 
 The exam desktop has no direct internet access: it is on `examnet`,
-which disables IP masquerade (`docker-compose.yaml:250`). Its Firefox
+which disables IP masquerade (`docker-compose.yaml`). Its Firefox
 reaches an allowlist of documentation sites through `docs-proxy`, which
 mirrors the real exam's restriction and is not a security control — it
 stops you accidentally cheating, not a determined attacker.
 
 The allowlist matches a host or any of its subdomains with no
 deny-override, so permitting `kubernetes.io` necessarily permits
-`discuss.kubernetes.io`, which the real exam disallows. Tracked in
-[docs/follow-ups.md](docs/follow-ups.md).
+`discuss.kubernetes.io`, which the real exam disallows. Subdomain
+matching is what the proxy does; this is a deliberate divergence, not an
+oversight.
 
 The instances, unlike the desktop, do have direct internet access.
 `podman build` needs it to resolve short image names against Docker Hub.
@@ -170,6 +180,29 @@ What that changes, in full:
   be spent as that candidate's login.
 
 The MCQ flavour has none of this: no cluster, no shell, no privilege.
+
+## Brand and affiliation
+
+Every surface that names a certification carries the non-affiliation
+notice: not affiliated with CNCF, The Linux Foundation, or PSI;
+Kubernetes and the certification names are trademarks of The Linux
+Foundation. It lives in the README, on the landing page, and in the
+app's About panel beside a real-exam comparison table.
+
+**Every mark in this product is original. No Kubernetes, CNCF or Linux
+Foundation artwork is used or implied** — not in the app, not on the
+landing page, not in the favicon. The Linux Foundation's trademark
+policy requires written permission before a logo appears on a site
+promoting a product, and the certification badges are issued to
+individuals who pass an exam, for personal display; they are not a third
+party's to use. Doing so would also claim exactly the affiliation the
+notice denies, and a disclaimer under a wall of official badges is not a
+defence. The acronyms as **text** are a different matter: naming an exam
+you prepare someone for is factual reference and needs no permission.
+The marks the app draws live in `ui/src/components/CertMark.tsx`.
+
+Licensing is stated rather than implied: Apache-2.0 for code,
+CC BY-SA 4.0 for question banks ([banks/LICENSE](banks/LICENSE)).
 
 ## Reporting
 

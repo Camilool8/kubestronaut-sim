@@ -97,9 +97,9 @@ deliberately waits for nothing — see
 | `conductor` | no | no | yes |
 
 `examnet` sets `enable_ip_masquerade: "false"`
-(docker-compose.yaml:250), so a container attached to it and nothing else
+(docker-compose.yaml), so a container attached to it and nothing else
 has no route off the host. That is the entire mechanism behind the
-desktop having no direct internet access; `tests/smoke.sh:228` asserts it
+desktop having no direct internet access; `tests/smoke.sh` asserts it
 by curling `https://example.com` from the desktop and requiring the curl
 to fail. The desktop's Firefox reaches documentation through
 `docs-proxy`, which is also on `default` and therefore does have egress.
@@ -114,18 +114,18 @@ conductor and the facilitator are alone on it.
 k8s-env pins its network priorities (`default` 100, `examnet` 10) because
 the default gateway is elected across the two, and an election landing on
 the masquerade-free `examnet` would blackhole every image pull rather
-than failing fast (docker-compose.yaml:48-58).
+than failing fast (docker-compose.yaml).
 
 ## The conductor boundary
 
 Resetting the environment and switching banks means destroying and
 rebuilding the kind cluster, which needs the Docker socket. That power is
 confined to one container: `conductor` is the only service mounting
-`/var/run/docker.sock` (docker-compose.yaml:191), it sits alone with the
+`/var/run/docker.sock` (docker-compose.yaml), it sits alone with the
 facilitator on `controlnet` with no host port and no exam network, and
 every operation reaches it through the facilitator's `/api/control/*`
-reverse proxy (facilitator/internal/api/api.go:85,
-facilitator/cmd/facilitator/main.go:170). The boundary being defended is
+reverse proxy (facilitator/internal/api/api.go,
+facilitator/cmd/facilitator/main.go). The boundary being defended is
 **privilege, not candidate access** — on a single-user local tool the
 candidate can legitimately drive the control API, and a candidate
 resetting their own exam is a feature. [SECURITY.md](../SECURITY.md) owns
@@ -142,7 +142,7 @@ This is defence in depth rather than a hole being closed. Every
 state-changing endpoint is already refused there on its own merits: a
 Pod cannot restart a container under `restartPolicy: Never`, so reset
 and switch return 501 before touching anything
-(`conductor/internal/control/control.go:192,299`); re-seeding is Training
+(`conductor/internal/control/control.go`); re-seeding is Training
 mode only and the conductor asks the facilitator, not the caller
 (`reseed.go`); and `seed` fires only for a pooled bank, which
 `ckad-mock-01` now is. The socket is what keeps that list from having to
@@ -152,7 +152,7 @@ reachable in the first place.
 The conductor speaks the Docker Engine API directly over the socket
 through a hand-written stdlib client with three calls: find a compose
 service's container, exec inside it, restart it
-(conductor/internal/docker/docker.go:1-5). Keep it at three, and keep the
+(conductor/internal/docker/docker.go). Keep it at three, and keep the
 docker CLI out of the image: the narrower the client, the less a
 socket-holding container can be talked into doing.
 
@@ -176,25 +176,24 @@ three.
 
 The four communicate over HTTP and never by import. No module's code
 appears in another module's build — which is also why the hub
-re-implements the facilitator's attempt rollup instead of sharing it
-(docs/follow-ups.md records the reasoning and the risk).
+re-implements the facilitator's attempt rollup instead of sharing it.
 
 None of them parses YAML either. Each image's entrypoint shells out to
 `yq` to pre-convert the bank files to JSON and hands the Go binary a path
-(facilitator/entrypoint.sh:13, conductor/entrypoint.sh:8-13).
+(facilitator/entrypoint.sh, conductor/entrypoint.sh).
 
 The build asymmetry is deliberate. conductor and proxy build from their
 own directory, so their Dockerfiles can `COPY go.mod ./` and see only
 themselves. The facilitator sets `context: .` with an explicit
-`dockerfile: facilitator/Dockerfile` (docker-compose.yaml:203-205)
+`dockerfile: facilitator/Dockerfile` (docker-compose.yaml)
 because its first stage runs Vite over `ui/` and needs that directory in
-the build context (facilitator/Dockerfile:1-6). The compiled `ui/dist` is
+the build context (facilitator/Dockerfile). The compiled `ui/dist` is
 copied into `internal/web/dist` and embedded into the binary, so the
 facilitator image serves the React UI with no web server beside it.
 
 ## The boot sequence
 
-k8s-env reports eight phases (images/k8s-env/phase.sh:23).
+k8s-env reports eight phases (images/k8s-env/phase.sh).
 
 | Step | Phase | What it does | Script |
 |---|---|---|---|
@@ -210,20 +209,20 @@ k8s-env reports eight phases (images/k8s-env/phase.sh:23).
 `phase.sh` renders the current phase to `/shared/boot.json` with jq and
 moves it into place from a temp file. Write it atomically or not at all:
 the facilitator reads that file on an unsynchronised 2s poll and must
-never catch it half-written (images/k8s-env/phase.sh:17-20).
+never catch it half-written (images/k8s-env/phase.sh).
 
 One phase file, two consumers, no second opinion. `./sim up` polls
-`GET /api/boot` and prints each label as it changes (sim:39-49); the
+`GET /api/boot` and prints each label as it changes (sim); the
 browser's boot screen polls the same endpoint. Neither computes progress
 of its own.
 
 `/shared/ready` remains the authority on readiness. The compose
 healthcheck tests for that file and nothing else, and the final phase
 only makes the JSON agree with it
-(images/k8s-env/bootstrap.sh:202-206).
+(images/k8s-env/bootstrap.sh).
 
 The facilitator declares no `depends_on` at all
-(docker-compose.yaml:217-228). It must answer within seconds of `up` so
+(docker-compose.yaml). It must answer within seconds of `up` so
 the browser can render boot progress through a cold first boot, which is
 the stretch a candidate most needs narrated; `POST /api/session/start`
 returns 409 until the environment is genuinely ready, which is the
@@ -236,41 +235,41 @@ parse is renamed to `history.json.corrupt.N` and a fresh record started,
 never removed or truncated. If even the rename fails, the store goes
 read-only for the rest of the process rather than writing over bytes
 nobody has rescued: the exam still runs, it just records nothing, and
-says so on stderr (facilitator/internal/history/history.go:1-25).
+says so on stderr (facilitator/internal/history/history.go).
 
 Failures surface as state, not as silence. bootstrap.sh traps `ERR` and
 writes the failing command into the phase file
-(images/k8s-env/bootstrap.sh:10), and start.sh keeps the container alive
+(images/k8s-env/bootstrap.sh), and start.sh keeps the container alive
 after a failed bootstrap so the UI can render the message and the
-conductor can still exec a retry into it (images/k8s-env/start.sh:75-84).
+conductor can still exec a retry into it (images/k8s-env/start.sh).
 
 ## The cluster
 
 Two nodes, one control plane and one worker
-(images/k8s-env/kind-config.yaml:20-58).
+(images/k8s-env/kind-config.yaml).
 
 **Calico, not kindnet.** kind's default CNI does routing and does not
 implement NetworkPolicy, which would leave policy questions gradeable
 only on the shape of the YAML and leave the candidate unable to test
-their own answer (kind-config.yaml:7-13). The pod subnet stays at kind's
+their own answer (kind-config.yaml). The pod subnet stays at kind's
 `10.244.0.0/16` rather than Calico's `192.168.0.0/16` default: the
 simulator publishes ports on the host's LAN address, and a 192.168/16 pod
 network overlaps the range most home and office networks use
-(kind-config.yaml:14-19).
+(kind-config.yaml).
 
 **ingress-nginx pinned to the control-plane node.** Only that node
 carries the `extraPortMappings` for 80 and 443, and the controller binds
 them by hostPort; bootstrap.sh labels the node `ingress-ready=true`
-before applying the manifest (images/k8s-env/bootstrap.sh:145). NodePorts
+before applying the manifest (images/k8s-env/bootstrap.sh). NodePorts
 need no pinning — kube-proxy answers them on every node.
 
 **The local Helm repository is packaged and served by
-`images/k8s-env/start.sh:56-68`, not by bootstrap.sh.** It has to exist
+`images/k8s-env/start.sh`, not by bootstrap.sh.** It has to exist
 before seeding starts, because a Helm question's `setup.sh` installs
 releases from it, and start.sh runs once per container while bootstrap.sh
 re-runs on every reset and bank switch — a second httpd would fail to
 bind. bootstrap.sh says as much in place of the code
-(images/k8s-env/bootstrap.sh:151-152). Charts come from `banks/_charts`
+(images/k8s-env/bootstrap.sh). Charts come from `banks/_charts`
 and are indexed against `http://k8s-env:8879`.
 
 **The registry is a compose service, not something bootstrap creates.**
@@ -312,26 +311,33 @@ The mode is chosen once at start and is immutable for the life of the
 attempt: `exam` is the bank's duration with no help, `training` is
 untimed with hints and solutions live, `speed` is half the duration with
 no help. Every gate that depends on the mode reads server-side state and
-never a request field (facilitator/internal/session/session.go:38-51).
+never a request field (facilitator/internal/session/session.go).
 
 Grading runs inside the facilitator. `evaluate.Grade` walks each
 question's `validate.d` checks and runs each one as
 `ssh root@<instance> ...` under a 30s per-check deadline, awarding the
 check's points on exit 0. This is the only code in any of the three
 modules that uses `os/exec`
-(facilitator/internal/evaluate/evaluate.go:16); the facilitator shells
+(facilitator/internal/evaluate/evaluate.go); the facilitator shells
 out to the `ssh` binary rather than importing an SSH client so the module
 stays stdlib-only. Its `Scoreboard` method renders the same plain text
 `./sim grade` prints, from the same values the API returns.
 
 Submit and auto-end at 0:00 converge on one CAS-guarded grader, so the
 session-end handler and the expiry callback cannot both start a run for
-the same attempt (facilitator/cmd/facilitator/grader.go:15-29).
+the same attempt (facilitator/cmd/facilitator/grader.go).
 
 `/desktop` returns 403 while no session is running, and while locked the
 backend is never dialed at all — not even for a health check
-(facilitator/internal/desktop/proxy.go:11-12). That gate exists for
-fidelity with the real exam, not for security.
+(facilitator/internal/desktop/proxy.go). That gate exists for fidelity
+with the real exam, not for security.
+
+Grading survives a restart. At boot the facilitator kicks the grader
+exactly once for any session that is `ended` but reached no terminal
+grading outcome — no results recorded and no error set. That covers a
+process that crashed mid-grade, after the session was persisted as ended
+but before results landed, and a session found already past its expiry
+at load, whose clock nothing observed running out.
 
 ## State and volumes
 
@@ -351,8 +357,7 @@ Nine named volumes and four bind mounts.
 durability requirements are opposite: `/session` is one attempt's
 scratch, which a reset clears and a bank switch invalidates, while
 `/state` is the attempt record and outlives all of it. Sharing a volume
-would mean one `docker compose down -v` erased both — which is what
-`./sim purge` used to do.
+would mean one `docker compose down -v` erased both.
 
 Bind mounts: `./banks` read-only into k8s-env, both instances,
 docs-proxy, conductor and facilitator; `./tests` read-only into both
@@ -367,7 +372,7 @@ it — a single writer per file is what makes the unsynchronised polling of
 
 `/shared/bank` is the active-bank pointer. k8s-env creates it on first
 boot from the `BANK` environment default
-(images/k8s-env/bootstrap.sh:21); the conductor owns it from then on, and
+(images/k8s-env/bootstrap.sh); the conductor owns it from then on, and
 a bank switch rewrites the file and re-runs bootstrap. Every bank-aware
 entrypoint prefers the file over the compose-time environment variable,
 so `./sim up <other-bank>` against a warm stack keeps the bank that is
@@ -386,12 +391,12 @@ have ever graded would hurt most. It removes the project's volumes one
 at a time, skipping the one compose labelled `state`
 (`com.docker.compose.volume`, so nothing has to guess at the
 `<project>_<name>` convention). `--all` is the deliberate escape hatch
-and says what it is about to destroy before it does (sim:65-105).
+and says what it is about to destroy before it does (sim).
 
 A resumed cluster is never re-seeded. bootstrap.sh runs the bank's
 `setup.sh` scripts only for a cluster it created in this run, because
 re-seeding would overwrite candidate work
-(images/k8s-env/bootstrap.sh:157-175).
+(images/k8s-env/bootstrap.sh).
 
 ### Where seeding happens, and why it can move
 

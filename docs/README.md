@@ -33,18 +33,5 @@ pages are for changing the thing.
 - [bank-spec.md](bank-spec.md) — the question bank format and the
   validator contract.
 
-## Project state
-
-- [follow-ups.md](follow-ups.md) — deliberate divergences from the real
-  exam, accepted trade-offs, and constraints that read like gaps. The
-  open backlog is in GitHub issues.
-- [../PRODUCT.md](../PRODUCT.md) — scope, durable constraints, and what
-  is deliberately not built.
-- [../DESIGN.md](../DESIGN.md) — the UI design system.
-
-## history/
-
-Frozen milestone plans and specs from the tooling that built this
-project. They record why several non-obvious constraints exist, and they
-are not maintained. Where they disagree with the code, the code is
-right. See [history/README.md](history/README.md).
+Open work lives in
+[GitHub issues](https://github.com/Camilool8/kubestronaut-sim/issues).

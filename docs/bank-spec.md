@@ -90,12 +90,12 @@ stopped looking.
 
 | Field | Meaning and status |
 |---|---|
-| `metadata.name` | Bank id. Convention: the conductor rejects a mismatch with the directory name only when the field is non-empty ([catalog.go:159](../conductor/internal/catalog/catalog.go)) |
+| `metadata.name` | Bank id. Convention: the conductor rejects a mismatch with the directory name only when the field is non-empty ([catalog.go](../conductor/internal/catalog/catalog.go)) |
 | `metadata.title`, `.certification`, `.description` | The exam card's fallback title, its heading and tinted avatar (`CKAD`/`CKA`/`CKS`), and its one-line blurb. `certification` also reaches `GET /api/exam`, where the mode screen's header reads it |
 | `metadata.hidden` | Keeps the bank out of the exam selector while leaving it a legal `switch` target. Exists for `smoke-01`; a bank worth shipping is worth listing |
-| `spec.examType` | `hands-on` (the default when absent, [catalog.go:164-166](../conductor/internal/catalog/catalog.go)) or `mcq`; any other value lists the bank disabled with a "no engine yet" note |
+| `spec.examType` | `hands-on` (the default when absent, [catalog.go](../conductor/internal/catalog/catalog.go)) or `mcq`; any other value lists the bank disabled with a "no engine yet" note |
 | `spec.duration` | The Exam clock. Enforced: the facilitator ends the session at 0:00 |
-| `spec.speedDuration` | The clock for the `speed` mode — shown to candidates as Mastery — defaulting to half `spec.duration` ([exam.go:105-110](../facilitator/internal/exam/exam.go)). A malformed value fails the load |
+| `spec.speedDuration` | The clock for the `speed` mode — shown to candidates as Mastery — defaulting to half `spec.duration` ([exam.go](../facilitator/internal/exam/exam.go)). A malformed value fails the load |
 | `spec.passingScore` | Percent. Enforced by the facilitator's `Results.Passed` |
 | `spec.kubernetesVersion` | Informational; shown on the catalog card |
 | `spec.domainWeights` | The certification's published weights, and a runtime value in three places: `exam.Load` builds `Exam.Domains` from it, `exam.Draw` stratifies a pooled or filtered draw by it, and both graders weight the final score by it. [bank-weights.sh](../tests/bank-weights.sh) still gates it too. Getting it wrong now moves real scores, not just a build check |
@@ -103,7 +103,7 @@ stopped looking.
 | `spec.environment.nodes` | **The size of this exam's cluster.** [bootstrap.sh](../images/k8s-env/bootstrap.sh) copies `kind-config.yaml` — which holds the control-plane node and nothing else — and appends one `- role: worker` per extra node before `kind create cluster`. Absent means 2; anything that is not a positive integer fails the boot rather than falling back, because a cluster silently the wrong size is discovered by a drain question grading zero. Also served on `GET /api/exam` so the screens that describe the environment while it builds describe the one being built |
 | `spec.environment.provider` | Informational; `kind` is the only one that exists. Served on `GET /api/exam` beside `nodes` |
 | `spec.environment.allowedDomains` | Domain suffixes the desktop browser may reach through the docs proxy, subdomains included ([proxy/entrypoint.sh](../proxy/entrypoint.sh)). Omit it to inherit `allow.DefaultDomains` ([allow.go](../proxy/internal/allow/allow.go)), the smallest set that leaves the documentation sites usable |
-| `spec.instances` | 1 or 2 entries. Convention: names outside `instance-1`/`instance-2` only mark the bank unavailable in the exam selector ([catalog.go:218-230](../conductor/internal/catalog/catalog.go)), and the facilitator's exam loader never parses the block at all |
+| `spec.instances` | 1 or 2 entries. Convention: names outside `instance-1`/`instance-2` only mark the bank unavailable in the exam selector ([catalog.go](../conductor/internal/catalog/catalog.go)), and the facilitator's exam loader never parses the block at all |
 | `spec.questions[].id`, `.instance` | Question directory name, and the ssh host the grader runs its checks on |
 | `spec.questions[].title` | Optional short label shown in the question navigator, the jump grid and the score review. Absent, the UI falls back to the id (hands-on) or the attempt position (mcq) |
 | `spec.questions[].domain` | Must match a `domainWeights` key |
@@ -701,14 +701,13 @@ that every test passes.
   pane renders both from structured data — the title from
   `spec.questions[].title`, the instance from `spec.questions[].instance`
   as a chip and as the WORK FROM block — so a bank that also writes them
-  draws the title twice and the ssh host three times. This used to be the
-  opposite rule, back when the markdown was the only channel for either.
-  Naming the instance in prose was also an un-gated way to disagree with
+  draws the title twice and the ssh host three times. Naming the instance
+  in prose is also an un-gated way to disagree with
   `spec.questions[].instance`, which is the field that actually decides
-  where a check runs; there is now nothing to disagree with.
+  where a check runs.
 - Checks must be side-effect free. `check-lint` catches the known brittle
   idioms, not mutation.
-- `# desc:` is parsed ([exam.go:169,192](../facilitator/internal/exam/exam.go))
+- `# desc:` is parsed ([exam.go](../facilitator/internal/exam/exam.go))
   and never validated, so a missing one ships an empty description to the score
   screen in silence.
 - `spec.instances` feeds only the exam selector's availability flag;

@@ -29,6 +29,19 @@ working a problem out for yourself, the lab you build at home, or the
 Linux Foundation's own training. What it adds is a timed rehearsal on a
 real cluster and a score you can trust.
 
+## Where it differs from the real exam, on purpose
+
+These are calibration choices, not gaps.
+
+| Divergence | Why |
+|---|---|
+| Harder than the real exam | The whole point. A candidate comfortable here should be comfortable there. |
+| 22 questions against a real CKAD's 15–20 | More coverage per sitting. Point budgets still track the published curriculum weights within 2 points. |
+| A two-node cluster | The real exam has more. Two is enough for scheduling, affinity and DaemonSet questions, and it is what fits in 9GB. |
+| Ingress and NodePorts published to your host | The real exam does not do this. Opening your own Ingress in a browser is a fast way to learn why it is not matching. No grading check depends on it. |
+| The documentation allowlist has no deny-override | Permitting `kubernetes.io` necessarily permits `discuss.kubernetes.io`, which the real exam disallows. Subdomain matching is what the proxy does. |
+| Solutions readable during a Training attempt | Reading the solution is the point of that mode. Exam and Mastery keep the gate. |
+
 ## Quickstart
 
 Requires Docker Desktop (or docker + compose v2), python3, and about

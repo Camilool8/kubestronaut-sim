@@ -32,11 +32,11 @@ bash tests/bank-weights.sh && bash tests/check-lint.sh \
 
 | Script | What it proves |
 |---|---|
-| `tests/bank-weights.sh` | Each question's `weight:` equals the sum of its `# points:` headers, and `exam.yaml` and the `q*/` directories list the same questions (header at tests/bank-weights.sh:7-17). The balance check has two modes, matching `tests/bank-mcq.sh`: for an unpooled bank, each domain's share of the points must sit within 2 percentage points of its `spec.domainWeights` entry — the bank IS the exam. For a pooled one (`spec.examLength` smaller than the pool), it instead requires each domain's pool to be deep enough for the per-domain count a stratified draw of that size needs; the pool's own ratio is free to differ, because every draw is stratified to the target regardless. |
+| `tests/bank-weights.sh` | Each question's `weight:` equals the sum of its `# points:` headers, and `exam.yaml` and the `q*/` directories list the same questions (header at tests/bank-weights.sh). The balance check has two modes, matching `tests/bank-mcq.sh`: for an unpooled bank, each domain's share of the points must sit within 2 percentage points of its `spec.domainWeights` entry — the bank IS the exam. For a pooled one (`spec.examLength` smaller than the pool), it instead requires each domain's pool to be deep enough for the per-domain count a stratified draw of that size needs; the pool's own ratio is free to differ, because every draw is stratified to the target regardless. |
 | `tests/check-lint.sh` | No validator grades spelling instead of behaviour: no `diff`, no `grep` over YAML, no `kubectl get -o yaml`, no `kubectl run`, no `grep -qx`. It also requires an exact `# points: N` header on every check and refuses a call into `banks/_lib/checks.sh` that never sourced it. |
 | `tests/check-lib.sh` | The `banks/_lib/checks.sh` helpers still treat `0.1` and `100m` as the same CPU request, `1Gi` and `1024Mi` as the same memory, and a trailing space as the same answer. It also covers `k8s_clean`, which decides what a captured object looks like on the explanation screen: server-side noise goes, and so does a cluster-assigned `clusterIP` — allocated per cluster, so an authored `expected/` document would disagree with the live object on every attempt, and a disagreeing line is drawn as the one that is *wrong*. `clusterIP: None` stays, because a human types that one. |
 | `tests/bank-hints.sh` | Every question in a bank that has hints has both tiers, and no hint shares 120 consecutive characters with its `solution.md` — a hint you can paste is the solution wearing a hint's name. |
-| `tests/bank-mcq.sh` | Six invariants over every `examType: mcq` bank (header at tests/bank-mcq.sh:7-28). The ones with no hands-on equivalent: every question is well-formed (3-6 options, a `correct` list that is unique, sorted, in range and sized to match `multi`, and a `solution.md` over 200 characters, since "the answer is B" is not an explanation); mcq purity, meaning no `setup.sh`, no `validate.d/` and no `files/` anywhere in the bank, because a stray one means a question was ported without changing shape; and a non-degenerate answer key, since no option index may be the answer to more than half the single-answer questions. |
+| `tests/bank-mcq.sh` | Six invariants over every `examType: mcq` bank (header at tests/bank-mcq.sh). The ones with no hands-on equivalent: every question is well-formed (3-6 options, a `correct` list that is unique, sorted, in range and sized to match `multi`, and a `solution.md` over 200 characters, since "the answer is B" is not an explanation); mcq purity, meaning no `setup.sh`, no `validate.d/` and no `files/` anywhere in the bank, because a stray one means a question was ported without changing shape; and a non-degenerate answer key, since no option index may be the answer to more than half the single-answer questions. |
 
 The bank format these enforce is specified in
 [docs/bank-spec.md](bank-spec.md).
@@ -44,7 +44,7 @@ The bank format these enforce is specified in
 ### Suppressing a check-lint rule
 
 Add `# lint: allow-<rule>` to the offending line, using the rule name
-the report prints in brackets (tests/check-lint.sh:15). This works for
+the report prints in brackets (tests/check-lint.sh). This works for
 the pattern rules only — `diff`, `grep-yaml`, `get-yaml`,
 `kubectl-run`, `grep-qx` and `index`. The `points` and
 `unsourced-helper` rules have no opt-out, because both mean the grader
@@ -82,19 +82,19 @@ docker run --rm -v "$PWD/facilitator":/w -w /w \
 Set `GOFLAGS=-buildvcs=false` whenever a module is built over a bind
 mount: the `.git` directory's owner does not match the build user, git
 refuses the repository, and the VCS stamp fails the build. CI sets the
-same flag for the same reason (.github/workflows/ci.yml:58-64).
+same flag for the same reason (.github/workflows/ci.yml).
 
 `facilitator` needs `facilitator/internal/web/dist/index.html` to
 exist before it will compile, because `//go:embed all:dist` fails on an
 empty directory. That stub is tracked on purpose and the real Vite
 output overwrites it at image build time, so check it back out if a
-local build has replaced it (.gitignore:13-21).
+local build has replaced it (.gitignore).
 
 ## UI tests
 
 Run every npm and vitest command from `ui/`, never the repo root. From
 the root vitest misses `ui/vite.config.ts` and every DOM test fails
-with `document is not defined` (.github/workflows/ci.yml:77-79).
+with `document is not defined` (.github/workflows/ci.yml).
 
 ```bash
 cd ui
@@ -106,10 +106,16 @@ npm test
 
 | Rule | Reason |
 |---|---|
-| Regenerate `ui/package-lock.json` inside `node:22-alpine`, never with host npm | Host npm resolves differently and the image's `npm ci` then breaks (facilitator/Dockerfile:1) |
-| Do not upgrade vitest past v2 | It is pinned for vite 5 compatibility (ui/package.json:38-39) |
-| Keep `npm run lint` at zero errors **and zero warnings** | It is clean as of this wave — `npx eslint src --max-warnings 0` passes. The one long-standing warning went out with the code that carried it, so there is no longer a baseline to hide a new one in. Keep it that way |
-| `npm run dev` needs a facilitator already on :8080 | `ui/vite.config.ts:17-25` proxies `/api` and the `/desktop` websocket there, so run `./sim up` first |
+| Regenerate `ui/package-lock.json` inside `node:22-alpine`, never with host npm | Host npm resolves differently and the image's `npm ci` then breaks (facilitator/Dockerfile) |
+| Do not upgrade vitest past v2 | It is pinned for vite 5 compatibility (ui/package.json) |
+| Do not "fix" `await import("node:" + "fs")` in `ui/src/test/readCss.ts` | The concatenation is deliberate. This project has no `@types/node`, and `tsc` resolves a dynamic `import()` against installed types only when its argument is a string *literal*. Building the specifier by concatenation keeps its static type `string`, so tsc skips resolution and types the result `any` instead of erroring. Rewriting it as a static import breaks `tsc --noEmit` |
+| Keep `npm run lint` at zero errors **and zero warnings** | `npx eslint src --max-warnings 0` passes, so there is no baseline for a new warning to hide in. Keep it that way |
+| `npm run dev` needs a facilitator already on :8080 | `ui/vite.config.ts` proxies `/api` and the `/desktop` websocket there, so run `./sim up` first |
+
+The stylesheet tests read CSS off disk rather than through
+`getComputedStyle`, because jsdom has no CSS engine: a rule that only
+exists in a `.css` file is invisible to a render test. They strip
+comments before parsing, so stylesheet comments never affect them.
 
 Regenerate the lockfile like this:
 
@@ -120,7 +126,7 @@ docker run --rm -v "$PWD/ui":/w -w /w node:22-alpine npm install
 ## The smoke suite
 
 `tests/smoke.sh` is destructive. It runs `./sim purge` before anything
-else (tests/smoke.sh:39), so every volume and the whole cluster are
+else (tests/smoke.sh), so every volume and the whole cluster are
 deleted — never run it against an environment holding an attempt you
 want. It needs Docker, ~9GB of free RAM, and about 35 minutes.
 
@@ -128,17 +134,17 @@ want. It needs Docker, ~9GB of free RAM, and about 35 minutes.
 bash tests/smoke.sh
 ```
 
-It starts with the five offline gates (tests/smoke.sh:28-37), so a
+It starts with the five offline gates (tests/smoke.sh), so a
 mis-weighted bank fails in two seconds rather than forty minutes in. Two budgets bound the waits,
 both overridable from the environment:
 
 | Variable | Default | Bounds |
 |---|---|---|
-| `SMOKE_BOOT_BUDGET` | 3600s | The cold boot (tests/smoke.sh:46) |
-| `SMOKE_PREPARE_BUDGET` | 900s | Seeding a drawn attempt's cluster after a `202` start (tests/smoke.sh:263) |
+| `SMOKE_BOOT_BUDGET` | 3600s | The cold boot (tests/smoke.sh) |
+| `SMOKE_PREPARE_BUDGET` | 900s | Seeding a drawn attempt's cluster after a `202` start (tests/smoke.sh) |
 
 Every start goes through one helper, `start_session`
-(tests/smoke.sh:265-345). It prints the HTTP status, and on a `202`
+(tests/smoke.sh). It prints the HTTP status, and on a `202`
 polls `GET /api/session` until `preparing` clears before reporting
 `200` — so a caller reads one status whichever path the bank takes. The
 terminal condition is `preparing` disappearing, deliberately **not** the
@@ -149,27 +155,27 @@ testing what it claims to the day one does.
 
 | What it covers | Where |
 |---|---|
-| Cold boot reaching `/api/boot` state `ready`, with two Ready nodes | tests/smoke.sh:44-60 |
-| Calico installed and kindnet gone, plus a behavioural check that a default-deny NetworkPolicy really blocks traffic | tests/smoke.sh:62-102 |
-| ingress-nginx ready on the control-plane node, the `sim` helm repo, the exam registry | tests/smoke.sh:104-120 |
-| The podman build, push and run loop against `registry:5000` on instance-1 | tests/smoke.sh:125-138 |
-| An Ingress answering on the published host port 8081 | tests/smoke.sh:140-172 |
-| Published ports binding 0.0.0.0 by default, the `SIM_BIND` contract | tests/smoke.sh:175-181 |
-| Facilitator healthz, exam metadata, built UI assets, the desktop 403 while idle, and noVNC not published to the host | tests/smoke.sh:183-208 |
-| The docs-proxy allowlist: `kubernetes.io` and `code.jquery.com` allowed, `example.com`, analytics and open web search blocked, no direct egress from the desktop | tests/smoke.sh:210-231 |
-| The conductor unreachable from the host and the desktop, reachable only through `/api/control/*` | tests/smoke.sh:240-248 |
-| Session lifecycle: start, a countdown that decreases, desktop unlock, submit, results polling, and the solution and desktop gates re-locking | tests/smoke.sh:347-508 |
+| Cold boot reaching `/api/boot` state `ready`, with two Ready nodes | tests/smoke.sh |
+| Calico installed and kindnet gone, plus a behavioural check that a default-deny NetworkPolicy really blocks traffic | tests/smoke.sh |
+| ingress-nginx ready on the control-plane node, the `sim` helm repo, the exam registry | tests/smoke.sh |
+| The podman build, push and run loop against `registry:5000` on instance-1 | tests/smoke.sh |
+| An Ingress answering on the published host port 8081 | tests/smoke.sh |
+| Published ports binding 0.0.0.0 by default, the `SIM_BIND` contract | tests/smoke.sh |
+| Facilitator healthz, exam metadata, built UI assets, the desktop 403 while idle, and noVNC not published to the host | tests/smoke.sh |
+| The docs-proxy allowlist: `kubernetes.io` and `code.jquery.com` allowed, `example.com`, analytics and open web search blocked, no direct egress from the desktop | tests/smoke.sh |
+| The conductor unreachable from the host and the desktop, reachable only through `/api/control/*` | tests/smoke.sh |
+| Session lifecycle: start, a countdown that decreases, desktop unlock, submit, results polling, and the solution and desktop gates re-locking | tests/smoke.sh |
 | Solving every question the attempt DREW (22 of ckad-mock-01's 26), each on the instance its `exam.yaml` entry names, plus a check that no pool question lacks a solution script | tests/smoke.sh, `solve_bank` |
-| Warm restart keeping the score, and `./sim reset` returning it to 0 with `/opt/course` re-created empty | tests/smoke.sh:510-531 |
-| A bank round trip, CKAD to the hidden `smoke-01` fixture and back, including its one question and the fixture staying out of the exam selector's list | tests/smoke.sh:539-635 |
-| Switching to a coming-soon certification refused with 400 | tests/smoke.sh:563-571 |
-| A bank id or question id that is not a slug refused with 400, so neither reaches a filesystem path | tests/smoke.sh:572-576, tests/smoke.sh:926-928 |
-| The mcq engine on kcna-mock: a blank attempt grading 0, a partial one, full marks against the attempt's own drawn subset, and the answer gates | tests/smoke.sh:637-883 |
-| Training mode: hint tiers served one at a time, solutions readable mid-attempt, a practice grade that never becomes a result — and every one of those endpoints 403 in an exam attempt | tests/smoke.sh:885-956 |
+| Warm restart keeping the score, and `./sim reset` returning it to 0 with `/opt/course` re-created empty | tests/smoke.sh |
+| A bank round trip, CKAD to the hidden `smoke-01` fixture and back, including its one question and the fixture staying out of the exam selector's list | tests/smoke.sh |
+| Switching to a coming-soon certification refused with 400 | tests/smoke.sh |
+| A bank id or question id that is not a slug refused with 400, so neither reaches a filesystem path | tests/smoke.sh, tests/smoke.sh |
+| The mcq engine on kcna-mock: a blank attempt grading 0, a partial one, full marks against the attempt's own drawn subset, and the answer gates | tests/smoke.sh |
+| Training mode: hint tiers served one at a time, solutions readable mid-attempt, a practice grade that never becomes a result — and every one of those endpoints 403 in an exam attempt | tests/smoke.sh |
 | The pooled hands-on path, which no unit test can reach: a boot that seeds nothing, `POST /api/session/start` answering 202, the conductor's seed job, a clock that starts only once it succeeds, and `/api/exam` narrowing from the 26-question pool to the drawn 22 | tests/smoke.sh, `start_session` |
 | Re-seeding an IDENTICAL draw is allowed without a rebuild — the exam-gate attempt replays the training attempt's seed, which is the documented retry path and the only way a second attempt is permitted on a pooled bank | tests/smoke.sh, exam-gate block |
 | `GET /api/exam/tips` answering with no attempt running AND mid-exam, beside the hint and solution routes refusing — the one place the ungated/gated distinction is exercised against a real facilitator | tests/smoke.sh |
-| A session expiring unattended and re-locking the desktop | tests/smoke.sh:958-986 |
+| A session expiring unattended and re-locking the desktop | tests/smoke.sh |
 
 CKA is covered only as an assertion that switching to it is refused.
 The round trip runs through `smoke-01`, which has one question and
@@ -179,8 +185,8 @@ therefore reseeds in seconds.
 
 | Gate | Where |
 |---|---|
-| A fresh environment scores 0 | tests/smoke.sh:370, :531, :619, :635 |
-| Every `tests/solutions/<bank>/qNN.sh` scores 100% | tests/smoke.sh:432-453 |
+| A fresh environment scores 0 | tests/smoke.sh, :531, :619, :635 |
+| Every `tests/solutions/<bank>/qNN.sh` scores 100% | tests/smoke.sh |
 
 The fresh-scores-0 gate is the load-bearing one. It is what catches a
 check that passes by accident or against state a previous attempt left
@@ -237,7 +243,7 @@ unverifiable.
 
 | Not checked | What that means |
 |---|---|
-| `tests/smoke.sh` | Excluded on purpose (.github/workflows/ci.yml:9-11). Nothing end-to-end runs in CI, so both bank-honesty gates are never machine-enforced |
+| `tests/smoke.sh` | Excluded on purpose (.github/workflows/ci.yml). Nothing end-to-end runs in CI, so both bank-honesty gates are never machine-enforced |
 | `gofmt` | Only `go vet` runs, so a misformatted Go file merges clean |
 | `go test -race` | Races in the facilitator's session state surface at runtime, not on a pull request |
 | Coverage | No report and no threshold |

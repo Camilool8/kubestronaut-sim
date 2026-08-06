@@ -73,16 +73,26 @@ file. A landing page with its own hex values is a second source of truth
 that diverges the first time a token changes.
 
 The copy exists only because GitHub Pages serves a single directory and
-cannot reach up into `ui/`. It is held equal to its source the same way
-the rest of the product holds its mirrors equal (the Three Mirrors rule
-in `DESIGN.md`, enforced by `ui/src/styles/mirrors.test.ts`):
+cannot reach up into `ui/`.
+
+A value duplicated outside `tokens.css` is a mirror, and a mirror is only
+safe when something holds it equal to its source. Three exist:
+`site/tokens.css`, `ui/public/favicon.svg`, and the exam terminal's
+palette in `images/desktop/assets/`. The last two are enforced by
+`ui/src/styles/mirrors.test.ts`; this one is enforced by regenerating it:
 
 ```bash
 ./site/build.sh --check    # non-zero if a generated file is out of date
 ```
 
-Run that alongside the other offline gates in `AGENTS.md`. A token change
-that has not reached the landing page is then a failure, not a slow drift.
+Run that alongside the other offline gates in
+[../docs/testing.md](../docs/testing.md). A token change that has not
+reached the landing page is then a failure, not a slow drift.
+
+`build.sh` copies the favicon from its `<svg` element onward rather than
+whole. XML forbids `--` inside a comment, and the source file's header
+names CSS custom properties, which are all double-hyphenated — so the
+file as authored is not well-formed XML and only the element is copied.
 
 `--check` also verifies the link-preview card as far as it can, described
 under "The link-preview card" below, and re-derives the page's **figures**
@@ -122,8 +132,8 @@ To change a mark, edit `CertMark.tsx`, copy the shapes into the matching
 and not the other.
 
 **No Kubernetes, CNCF or Linux Foundation artwork is used anywhere on
-this page**, and none may be added. The reason is in
-[../PRODUCT.md](../PRODUCT.md) under Brand Commitments.
+this page**, and none may be added. See "Brand and affiliation" in
+[../SECURITY.md](../SECURITY.md).
 
 Fonts need `npm ci` to have run in `ui/`. Without them `build.sh` warns
 and the page falls through the token stacks to `system-ui` and
@@ -195,8 +205,7 @@ resolve only once Pages is serving this directory.
   hue alone.
 - **A code chip must never end a sentence.** `code` carries horizontal
   padding, which pushes a following full stop a clear space away and
-  leaves the punctuation looking detached. Word around it. Three places
-  on the page used to get this wrong.
+  leaves the punctuation looking detached. Word around it.
 - **Every figure on the page is countable.** Question counts come from
   `spec.questions` in `banks/*/exam.yaml`, durations and passing scores
   from `spec`, and the coming-soon reasons verbatim from

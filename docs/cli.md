@@ -11,17 +11,17 @@ after `./sim up` can also be done from the browser at
 |---|---|
 | Docker Engine, or Docker Desktop | Every service is a container. |
 | Docker Compose v2 (`docker compose`) | The stack is a single compose project. |
-| `python3` | `./sim up` and `./sim reset` read JSON fields with it (`sim:11`, `sim:166-169`). |
+| `python3` | `./sim up` and `./sim reset` read JSON fields with it (`sim`, `sim`). |
 | `curl` | `./sim up`, `./sim reset` and `./sim doctor` poll the facilitator with it. |
 | `bash` | `./sim` uses `$SECONDS` and `set -o pipefail`. |
 | ~9GB RAM available to Docker | An XFCE desktop plus a two-node cluster. |
 | ~25GB free disk | The images alone are about 10GB. |
 
 **`./sim up` needs `python3`.** It reads `state` out of `/api/boot`
-with it (`sim:11`), so without `python3` every poll yields an empty
+with it (`sim`), so without `python3` every poll yields an empty
 state, no phase line is printed, and the command spins until
 `SIM_BOOT_BUDGET` expires rather than finishing. `./sim doctor` reports
-it as `MISSING (./sim up needs it)` (`sim:119`).
+it as `MISSING (./sim up needs it)` (`sim`).
 
 ## Commands
 
@@ -36,7 +36,7 @@ it as `MISSING (./sim up needs it)` (`sim:119`).
 | `./sim ssh [instance]` | `docker compose exec <instance> su - candidate`, defaulting to `instance-1`. | Nothing. |
 | `./sim status` | `docker compose ps`. | Nothing. |
 | `./sim grade` | Runs the facilitator's read-only scoreboard against the environment as it stands (`docker compose exec facilitator /entrypoint.sh grade`). Scores the whole bank, or — on a [pooled](bank-spec.md#pooling-a-bank-specexamlength) one — the open attempt's drawn subset, since the questions it did not draw were never seeded. Hands-on banks only: an mcq bank's answers live in the session, not the cluster, so `grade` refuses with a pointer to the UI/API rather than printing a misleading 0%. | Nothing. It records no result and writes no session state. |
-| `./sim help` | Prints the usage string. It is also the default with no argument (`sim:4`), and what an unknown subcommand prints before exiting 1 (`sim:176`). | Nothing. |
+| `./sim help` | Prints the usage string. It is also the default with no argument (`sim`), and what an unknown subcommand prints before exiting 1 (`sim`). | Nothing. |
 
 ### grade
 
@@ -79,17 +79,20 @@ smoke suite and anyone who already knows what they want are doing. The
 argument sets `BANK` for that compose invocation and nothing more — see
 [BANK](#bank) below.
 
+`up` polls `/api/boot` and prints each phase as it completes, rather
+than using `docker compose --wait`, which prints one unmoving word for
+as long as it takes and has no timeout of its own.
+
 `up` exits 1 in two cases: `/api/boot` reported `failed`, in which case
-the error is printed verbatim (`sim:53-59`); or the boot budget elapsed
-(`sim:31-37`). Both print a `docker compose logs k8s-env` invocation
-that shows the rest.
+the error is printed verbatim; or the boot budget elapsed. Both print a
+`docker compose logs k8s-env` invocation that shows the rest.
 
 ### reset
 
 Requires a running stack: it drives the conductor through the
 facilitator at `http://localhost:8080`. The five phases are
 end-session, wipe-instances, recreate-cluster, restart-instances and
-verify (`conductor/internal/control/control.go:170-208`).
+verify (`conductor/internal/control/control.go`).
 
 Cached images are kept, so a reset needs no network. Bank switching is
 not available here — use the exam selector, or see [BANK](#bank).
@@ -110,19 +113,19 @@ way to lose it, and export from the app first if it matters.
 
 ### doctor
 
-The disk check runs `alpine:3.21` (`sim:126`), so the first `doctor` on
+The disk check runs `alpine:3.21` (`sim`), so the first `doctor` on
 a clean machine pulls that image.
 
 ## Configuration variables
 
 | Variable | Default | Read at |
 |---|---|---|
-| `SIM_BIND` | `0.0.0.0` | `docker-compose.yaml:21-23`, `docker-compose.yaml:208` |
+| `SIM_BIND` | `0.0.0.0` | `docker-compose.yaml`, `docker-compose.yaml` |
 | `SIM_BOOT_BUDGET` | `3600` | `sim` — how long `./sim up <bank>` waits for that exam's environment |
 | `SIM_SHELL_BUDGET` | `300` | `sim` — how long a bare `./sim up` waits for the shell to settle. Far smaller because it waits for a container runtime and a chart repository, never for a cluster |
 | `BANK` | unset | `sim`, and every service's compose environment. No default: nothing is built until an exam is chosen |
-| `PRELOAD` | `full` | `images/k8s-env/Dockerfile:94` (build arg, not runtime) |
-| `SESSION_DURATION_OVERRIDE` | unset | `facilitator/cmd/facilitator/main.go:91` |
+| `PRELOAD` | `full` | `images/k8s-env/Dockerfile` (build arg, not runtime) |
+| `SESSION_DURATION_OVERRIDE` | unset | `facilitator/cmd/facilitator/main.go` |
 
 ### SIM_BIND
 
@@ -164,7 +167,7 @@ SIM_SHELL_BUDGET=600 ./sim up
 
 Names the bank to activate, and only ever on a first boot.
 `bootstrap.sh` writes `/shared/bank` if it does not exist and reads it
-if it does (`images/k8s-env/bootstrap.sh:15-21`); the facilitator, the
+if it does (`images/k8s-env/bootstrap.sh`); the facilitator, the
 instances and the docs proxy all prefer that file over their `BANK`
 environment. So once the shared volume exists, the conductor owns the
 active bank and `BANK` is ignored.
@@ -186,7 +189,7 @@ A Docker build arg for `images/k8s-env`, not a variable `./sim` reads.
 `full` bakes every Calico, ingress-nginx and workload image into the
 image as `docker-archive` tarballs, which is what lets a reset run with
 no network. `none` skips that, and is what CI builds with
-(`.github/workflows/ci.yml:105`) to check the Dockerfile still builds
+(`.github/workflows/ci.yml`) to check the Dockerfile still builds
 without spending the bandwidth.
 
 ```bash
@@ -198,7 +201,7 @@ docker build --build-arg PRELOAD=none -t sim-k8s-env images/k8s-env
 Replaces the bank's exam duration with any Go duration string. It
 reaches `exam` and `speed` attempts and deliberately not Training, which
 has no clock to override
-(`facilitator/cmd/facilitator/main.go:112-123`).
+(`facilitator/cmd/facilitator/main.go`).
 
 ```bash
 SESSION_DURATION_OVERRIDE=20s docker compose up -d --wait facilitator

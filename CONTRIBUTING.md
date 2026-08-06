@@ -77,11 +77,13 @@ warning to hide in. Keep it that way.
 Vite stage needs `ui/` in the build context. The conductor and the proxy
 build from their own directories.
 
-**`facilitator/internal/web/dist/index.html` is tracked on purpose.**
-The facilitator serves the UI from `//go:embed all:dist`, and the embed
-fails to compile if that directory is empty. The real Vite output
-overwrites it at image build time and must never be committed.
-`.gitignore:13-21` has the details.
+**`facilitator/internal/web/dist/index.html` and
+`hub/internal/web/dist/index.html` are tracked on purpose.** Both
+services serve the UI from `//go:embed all:dist`, and the embed fails to
+compile if that directory is empty. The real Vite output overwrites the
+stub at image build time and must never be committed. If you build
+locally into either path, `git checkout` the stub before committing —
+`.gitignore` cannot protect a file that is already tracked.
 
 **Building Go in a container needs `GOFLAGS=-buildvcs=false`**, because
 a bind-mounted `.git` has the wrong ownership:
@@ -94,19 +96,25 @@ docker run --rm -e GOFLAGS=-buildvcs=false -v "$PWD/facilitator":/w -w /w golang
 
 **No third-party exam dump may ever be committed to this repository**,
 not even temporarily. The banks are licensed CC BY-SA 4.0, which
-requires them to be ours to license. `.gitignore` blocks the common
-filenames, but an ignore rule cannot protect against `git add -f`.
+requires them to be ours to license. `.gitignore` bans every `.txt`
+under `banks/` for this reason: a bank is YAML, Markdown and shell, so a
+`.txt` there is foreign material by definition. `git status` will not
+show one, and an ignore rule cannot protect against `git add -f`.
 
-**All user-facing copy belongs in `ui/src/strings.ts`.** Two files
-currently break this rule and should be pulled back in rather than
-copied from.
+**Two image tags must stay absent from `images/k8s-env/preload.txt`:**
+`nginx:1.99` and `nginx:0.0.0-corvus-nonexistent`. Question 02's broken
+image and question 11's failing Helm install are both built on those tags
+*not* resolving. Preloading them would break two questions silently, and
+only a smoke run on a cold cache would notice.
+
+**All user-facing copy belongs in `ui/src/strings.ts`.**
 
 **Every surface that names a certification carries the non-affiliation
 notice.** See the bottom of [README.md](README.md).
 
 **A bank that cannot produce a meaningful score is not offered at all.**
-A two-question CKA bank was removed rather than left in the catalog
-looking like an exam.
+A certification with too few questions belongs in the catalog as coming
+soon, not in the exam list looking like a sitting.
 
 ## Writing questions
 
