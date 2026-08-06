@@ -14,33 +14,7 @@ spec:
   duration: 120m
   passingScore: 66
   kubernetesVersion: "1.35"
-  # One attempt asks 22 of the 26 questions below, drawn fresh and
-  # domain-stratified every time it starts. The number is the sitting, not
-  # the bank: the real CKAD is around twenty tasks in two hours, and
-  # putting four more into the same 120 minutes would have made this a
-  # harder exam rather than a fuller one.
-  #
-  # The variety is a bonus and a modest one — with a pool this close to
-  # the draw, three of the five domains are asked in full every time and
-  # only Design and Build (4 of 7) and Observability (3 of 4) rotate.
-  # Deepening a domain widens its rotation; nothing else has to change.
-  #
-  # The cost is real and worth knowing before copying this line into
-  # another bank: a pooled hands-on bank is NOT seeded at boot. The draw
-  # has not happened yet at boot time, so images/k8s-env/bootstrap.sh
-  # pre-pulls the images and stops, and the drawn questions' setup.sh
-  # scripts run when the attempt starts — POST /api/session/start answers
-  # 202 and the clock waits on the conductor's seed job. See
-  # docs/bank-spec.md.
   examLength: 22
-  # The published CKAD curriculum weights. These are not documentation:
-  # a domain's share of this exam's points IS its weight here, and
-  # tests/bank-weights.sh fails the build if any domain drifts more than
-  # 2 percentage points from it. Points are therefore derived — a
-  # question is worth its domain's budget divided by the number of
-  # questions in that domain — which is why adding a question to a
-  # domain makes every question in it worth slightly less, and why the
-  # balance cannot silently rot the way it did in milestone H.
   domainWeights:
     Application Design and Build: 20
     Application Deployment: 20

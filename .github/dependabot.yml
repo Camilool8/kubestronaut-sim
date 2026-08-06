@@ -1,12 +1,3 @@
-# Deliberately narrow.
-#
-# No `gomod` entry: all three Go modules are stdlib-only, so no go.sum
-# exists and there is nothing for Dependabot to bump.
-#
-# No `docker` entry: the base image tags are hand-pinned, and a bump
-# needs a cold-cache smoke run to prove the preloaded images still
-# resolve offline. CI cannot run that, so an automated PR would arrive
-# unverifiable.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -18,7 +9,6 @@ updates:
       dev-dependencies:
         dependency-type: development
     ignore:
-      # Pinned to v2 for vite 5 compatibility. See CONTRIBUTING.md.
       - dependency-name: vitest
         update-types: [version-update:semver-major]
 

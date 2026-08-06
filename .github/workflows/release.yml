@@ -1,20 +1,3 @@
-# Publishes the seven images a hosted session is built from, and the hub
-# that hands sessions out. Eight in all; the hub is not part of a session,
-# which is why the coverage job below has to check for it separately.
-#
-# Until this existed the only copies on Docker Hub were `:dev` tags pushed
-# by hand from a laptop — cross-compiled to linux/amd64 through emulation,
-# untraceable to a commit, and overwritten by whoever pushed last. A hub
-# that creates session Pods cannot depend on that.
-#
-# Deliberately NOT on every push: these are ~4.5 GB in total and nothing
-# consumes them until a session is deployed. Tags only.
-#
-# Single-architecture (linux/amd64) on purpose. The runner is already
-# amd64, so every build here is native; the only consumer is the cluster,
-# which is amd64 too. Adding arm64 would mean QEMU emulation of a
-# 2.6 GB image build for nobody. Local development on an arm64 Mac keeps
-# building its own images, which is what `./sim up` has always done.
 name: Release images
 
 on:
@@ -29,8 +12,6 @@ on:
 permissions:
   contents: read
 
-# Two releases of the same tag racing would leave whichever finished last
-# on `:latest`, with no way to tell from the outside which one that was.
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -40,8 +21,6 @@ jobs:
     name: ${{ matrix.image }}
     runs-on: ubuntu-latest
     strategy:
-      # One image per runner, so k8s-env's 2.6 GB has a disk to itself and
-      # a single failure still tells you about the other seven.
       fail-fast: false
       matrix:
         include:
@@ -51,11 +30,6 @@ jobs:
           - image: k8s-env
             context: images/k8s-env
             file: images/k8s-env/Dockerfile
-            # The whole point of a released k8s-env. CI builds it with
-            # PRELOAD=none to check the Dockerfile still parses; a
-            # published one bakes the node image and the workload images
-            # the banks pull, which is what makes a cold session boot in
-            # minutes instead of downloading ~1 GB inside the cluster.
             build_args: PRELOAD=full
           - image: instance
             context: images/instance
@@ -69,20 +43,9 @@ jobs:
           - image: conductor
             context: conductor
             file: conductor/Dockerfile
-          # Context is banks/ for the banks image and proxy/ here: the
-          # root .dockerignore excludes banks/ so it stays out of the
-          # facilitator's context.
           - image: docs-proxy
             context: proxy
             file: proxy/Dockerfile
-          # Not a session container: the hub runs once per deployment, in
-          # front of every session Pod. It is published here because it
-          # ships from this repo and versions with the images it starts —
-          # the pod template it renders is this repo's manifest.
-          #
-          # Context is the root, like the facilitator's and for the same
-          # reason: it embeds ui/, because the sign-in and lobby screens
-          # have to be served before any session Pod exists to serve them.
           - image: hub
             context: .
             file: hub/Dockerfile
@@ -139,11 +102,6 @@ jobs:
             -t "$REPO:latest" \
             "$CONTEXT"
 
-      # Ties this image to the fix that made a hosted reset survive being
-      # re-run over ssh: NODE_IMAGE is baked as a file because an sshd
-      # session inherits none of the image's ENV. A published k8s-env
-      # without it would abort the rebuild at `set -u`, having already
-      # deleted the cluster.
       - name: k8s-env carries its node-image constant
         if: matrix.image == 'k8s-env'
         env:
@@ -154,10 +112,6 @@ jobs:
             'NODE_IMAGE="${NODE_IMAGE:-$(cat /opt/sim/node-image)}"; \
              test -n "$NODE_IMAGE" && echo "resolves with no environment: $NODE_IMAGE"'
 
-      # The hub image is FROM scratch, so a missing binary or a bad
-      # linker flag produces an image that cannot even fail usefully.
-      # Starting it misconfigured proves both that the binary runs and
-      # that it refuses to serve a login it could never complete.
       - name: hub starts and refuses to run misconfigured
         if: matrix.image == 'hub'
         env:
@@ -182,9 +136,6 @@ jobs:
           docker image inspect "$REPO:$VERSION" \
             --format 'published {{index .RepoDigests 0}} ({{.Architecture}}/{{.Os}}, {{.Size}} bytes)'
 
-  # A session Pod that references an image this workflow does not build
-  # fails at deploy time with ImagePullBackOff and no explanation. The
-  # eighth container, registry:2, is upstream and deliberately absent.
   coverage:
     name: Every Pod image is published here
     runs-on: ubuntu-latest

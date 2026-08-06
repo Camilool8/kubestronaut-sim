@@ -1,24 +1,3 @@
-# One multiple-choice exam session, as a single Pod.
-#
-# The second of the two flavours the hub stamps out. An MCQ attempt needs
-# no Kubernetes cluster, no candidate shells, no desktop and no registry:
-# the questions are answered in the browser. So this is the practical
-# Pod's eight containers minus six — around 128Mi against 4Gi, and it
-# schedules anywhere, unprivileged.
-#
-# It is a separate manifest rather than a toggle inside session-pod.yaml
-# because there is no YAML templating in this repo and no dependency that
-# would add it. Two files that each say plainly what they are beats one
-# that has to be read twice.
-#
-# Like its sibling, this is a plain manifest and not a chart template:
-# the chart parses it and rewrites only the images, the namespace,
-# placement and resources. See session-pod.yaml.
-#
-# The conductor is here and the desktop is not, which looks arbitrary
-# until you look at what answers GET /api/catalog: the facilitator, from
-# a server-side call to the conductor's bank list. Drop the conductor and
-# the exam picker has nothing to show. It is 32Mi.
 apiVersion: v1
 kind: Pod
 metadata:
@@ -34,8 +13,6 @@ spec:
   enableServiceLinks: false
   terminationGracePeriodSeconds: 10
 
-  # Same reason as the practical Pod: compose service names are used as
-  # hostnames in the code, and a Pod is one network namespace.
   hostAliases:
     - ip: "127.0.0.1"
       hostnames: [facilitator, conductor]
@@ -44,12 +21,6 @@ spec:
     - name: banks
       image: cjoga/kubestronaut-sim-banks:dev
       imagePullPolicy: Always
-      # /shared/ready is the authority on whether the environment is
-      # usable — every service gates on it, and bootstate treats its
-      # absence as "still booting" no matter what else it reads. Nothing
-      # boots here, so it is written once, now. Without it the
-      # facilitator would serve a permanent boot screen over a session
-      # that was ready before it started.
       command: ["sh", "-c", "cp -a /src/. /banks/ && touch /shared/ready"]
       volumeMounts:
         - {name: banks, mountPath: /banks}
@@ -64,17 +35,7 @@ spec:
       imagePullPolicy: Always
       env:
         - {name: BANK, value: "kcna-mock"}
-        # Same socket as the practical Pod, for uniformity rather than
-        # for a hole this flavour has: an MCQ session ships no shell and
-        # no desktop, so there is nothing here to reach :9000 from. One
-        # rule — the conductor never listens on TCP inside a Pod — is
-        # easier to keep true than one with an exemption, and this Pod
-        # is the one most likely to grow a container later.
         - {name: LISTEN, value: "unix:/run/control/conductor.sock"}
-        # No cluster and no instances to exec into. The ssh engine
-        # refuses a restart up front rather than part-way through, which
-        # is what keeps a switch from wiping state it cannot rebuild —
-        # and here the hub replaces the whole Pod anyway.
         - {name: ENGINE, value: "ssh"}
         - {name: INSTANCES, value: ""}
         - {name: FACILITATOR_URL, value: "http://127.0.0.1:8080"}
@@ -94,11 +55,7 @@ spec:
       env:
         - {name: BANK, value: "kcna-mock"}
         - {name: CONDUCTOR_ADDR, value: "unix:/run/control/conductor.sock"}
-        # No desktop container exists, so the proxy has nowhere to send
-        # /desktop/*. An MCQ bank never asks for one.
         - {name: DESKTOP_ADDR, value: ""}
-        # Filled per session by the hub. See the practical Pod for what
-        # the ticket is and why it lives in the spec.
         - {name: HISTORY_WEBHOOK_URL, value: ""}
         - {name: HISTORY_WEBHOOK_TOKEN, value: ""}
       volumeMounts:
@@ -106,8 +63,6 @@ spec:
         - {name: shared, mountPath: /shared, readOnly: true}
         - {name: control, mountPath: /run/control}
         - {name: session, mountPath: /session}
-        # Ephemeral here as it is in the practical Pod: the hub owns
-        # durable history, and this is the local cache the webhook drains.
         - {name: state, mountPath: /state}
       readinessProbe:
         httpGet: {path: /healthz, port: http}
@@ -120,8 +75,6 @@ spec:
   volumes:
     - {name: banks, emptyDir: {sizeLimit: 512Mi}}
     - {name: shared, emptyDir: {sizeLimit: 16Mi}}
-    # One socket, and mounted into the conductor and the facilitator
-    # only. See the LISTEN comment above.
     - {name: control, emptyDir: {sizeLimit: 1Mi}}
     - {name: session, emptyDir: {sizeLimit: 64Mi}}
     - {name: state, emptyDir: {sizeLimit: 64Mi}}

@@ -1,30 +1,12 @@
 name: kubestronaut-sim
-# SIM_BIND is the host interface every published port binds to. It
-# defaults to 0.0.0.0 so the simulator can be built on a desktop and used
-# from a laptop on the same network — which is the point of publishing at
-# all. There is NO authentication anywhere in this stack and the exam
-# desktop is a shell, so on a network you do not control, set
-# SIM_BIND=127.0.0.1. See the README.
 services:
   k8s-env:
     build: images/k8s-env
     hostname: k8s-env
     privileged: true
     environment:
-      # No default, deliberately. This used to read ${BANK:-ckad-mock-01},
-      # which meant a bare `./sim up` built one specific exam's cluster and
-      # seeded one specific exam's questions before anyone had chosen
-      # anything — and every other exam then cost a destructive rebuild of
-      # work nobody asked for. Empty means "no exam yet": k8s-env rests
-      # after its two exam-independent phases and the environment is built
-      # when a candidate picks one. `./sim up <bank>` still sets it.
       BANK: ${BANK:-}
     ports:
-      # The host end of the host -> cluster chain (see kind-config.yaml).
-      # 80/443 inside this container are the kind control-plane node's
-      # published ports, which ingress-nginx binds via hostPort; the
-      # 30080-30082 band is for NodePort Services. Offset on the host so
-      # they never contend with whatever else is listening there.
       - "${SIM_BIND:-0.0.0.0}:8081:80"
       - "${SIM_BIND:-0.0.0.0}:8443:443"
       - "${SIM_BIND:-0.0.0.0}:30080-30082:30080-30082"
@@ -33,70 +15,22 @@ services:
       - dind:/var/lib/docker
       - ./banks:/banks:ro
     healthcheck:
-      # 30 minutes (180 x 10s) after a 2-minute grace, up from a 16-minute
-      # budget that was written against a 3-question bootstrap and never
-      # revisited while that bootstrap grew Calico, ingress-nginx and 22
-      # seeded questions. A cold first boot could legitimately exceed the
-      # old ceiling, at which point compose reported an unhealthy
-      # dependency and the whole stack failed — which is what "env-1 stuck
-      # at Waiting" was. Booting containers by hand in OrbStack worked for
-      # exactly one reason: nothing was enforcing the deadline.
-      #
-      # Deliberately generous rather than tight. This gate is what holds
-      # the instances back, and a timeout here is no longer how a failure
-      # is detected — bootstrap.sh traps its own errors into
-      # /shared/boot.json, which the UI reads and reports directly.
       test: ["CMD", "test", "-f", "/shared/ready"]
       interval: 10s
       timeout: 5s
       retries: 180
       start_period: 120s
       start_interval: 2s
-    # Pinned rather than left to chance. The default gateway is elected
-    # across these two, and today `default` wins only because
-    # kubestronaut-sim_default sorts before _examnet. examnet sets
-    # enable_ip_masquerade=false, so an election that ever flipped would
-    # blackhole every image pull rather than failing fast — indefinite
-    # hangs with no error, the same symptom by another route.
     networks:
       default:
         priority: 100
       examnet:
         priority: 10
-  # The two exam instances are identical but for their /opt/course and
-  # container-storage volumes.
-  #
-  # NOT privileged. They were, until podman moved from 4.3.1 (Debian 12)
-  # to 5.4.2 (Debian 13): every setting below was tried against 4.3.1 and
-  # ignored, so `privileged: true` was the only thing that worked. Under
-  # 5.4.2 the same settings are honoured, and the five capabilities here
-  # are what an image build actually needs — measured one failure at a
-  # time, each removed and re-tested:
-  #
-  #   SYS_ADMIN    mount namespaces for the build's overlay/vfs layers
-  #   SYS_CHROOT   pivot into the build root
-  #   MKNOD        device nodes while unpacking a base image
-  #   SETFCAP      file capabilities carried by base image binaries
-  #   SYS_RESOURCE buildah raises RLIMIT_NPROC to 1048576 per build step
-  #
-  # NET_ADMIN was needed and no longer is: containers.conf sets
-  # netns=host, so nothing creates a network namespace. cgroup: host and
-  # the read-write /sys/fs/cgroup bind ARE still needed — crun enables
-  # cgroup controllers for each build step, and both were removed and
-  # re-tested to confirm it. See images/instance/containers.conf for the
-  # rest and SECURITY.md for what this leaves exposed.
   instance-1:
     build: images/instance
     hostname: instance-1
     environment:
       BANK: ${BANK:-}
-    # No depends_on, for the same reason the facilitator has none (see
-    # its comment below), now extended one step further. `service_healthy`
-    # makes `docker compose up` BLOCK until /shared/ready exists — and
-    # with no exam chosen it never does, so a bare `./sim up` would hang
-    # forever waiting for a cluster nobody asked for. The entrypoint's own
-    # wait is the real gate and always was: it waits for the kubeconfig
-    # and the ssh key, which is what this container actually needs.
     volumes:
       - shared:/shared:ro
       - ./banks:/banks:ro
@@ -109,12 +43,6 @@ services:
     devices: ["/dev/fuse"]
     cgroup: host
     networks: [default, examnet]
-    # These containers had no healthcheck at all, so an instance stuck in
-    # its own wait loop was invisible to compose and to `./sim status`.
-    # Checks what actually has to be true for a candidate to work: the
-    # kubeconfig the entrypoint installs, and sshd accepting connections
-    # (the desktop reaches these over ssh, so a listening port is the
-    # thing that matters, not a running process).
     healthcheck:
       test: ["CMD", "bash", "-c", "test -f /home/candidate/.kube/config && exec 3<>/dev/tcp/127.0.0.1/22"]
       interval: 10s
@@ -126,7 +54,6 @@ services:
     hostname: instance-2
     environment:
       BANK: ${BANK:-}
-    # See instance-1.
     volumes:
       - shared:/shared:ro
       - ./banks:/banks:ro
@@ -139,12 +66,6 @@ services:
     devices: ["/dev/fuse"]
     cgroup: host
     networks: [default, examnet]
-    # These containers had no healthcheck at all, so an instance stuck in
-    # its own wait loop was invisible to compose and to `./sim status`.
-    # Checks what actually has to be true for a candidate to work: the
-    # kubeconfig the entrypoint installs, and sshd accepting connections
-    # (the desktop reaches these over ssh, so a listening port is the
-    # thing that matters, not a running process).
     healthcheck:
       test: ["CMD", "bash", "-c", "test -f /home/candidate/.kube/config && exec 3<>/dev/tcp/127.0.0.1/22"]
       interval: 10s
@@ -152,11 +73,6 @@ services:
       retries: 30
       start_period: 30s
   registry:
-    # Push target for the image-building questions. Plain HTTP, no auth,
-    # no host port: it exists only so `podman push` from an instance has
-    # somewhere to go, the way the real exam gives you a registry. On
-    # examnet alone, so it has no internet and nothing outside the exam
-    # can reach it.
     image: registry:2
     hostname: registry
     environment:
@@ -179,11 +95,6 @@ services:
     build: images/desktop
     hostname: desktop
     depends_on:
-      # docs-proxy only. The k8s-env health gate came off for the same
-      # reason as the instances': it would block `up` on a cluster that
-      # does not exist until an exam is chosen. This container's own wait
-      # for the shared ssh key is unbounded and it carries
-      # `restart: unless-stopped`, so it simply sits until there is one.
       docs-proxy: {condition: service_started}
     volumes:
       - shared:/shared:ro
@@ -198,10 +109,6 @@ services:
   conductor:
     build: conductor
     hostname: conductor
-    # The ONLY container with the Docker socket. It lives alone with the
-    # facilitator on the internal control network: no host port, no exam
-    # network, unreachable from the desktop. Everything it does is
-    # driven through the facilitator's /api/control/* reverse proxy.
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./banks:/banks:ro
@@ -228,32 +135,8 @@ services:
       - ./banks:/banks:ro
       - shared:/shared:ro
       - session:/session
-      # A SECOND volume beside session, deliberately, and mounted on this
-      # service alone — the facilitator is the only process that can see
-      # every attempt.
-      #
-      # They are separate because their durability requirements are
-      # opposite. /session is one attempt's scratch state: a reset clears
-      # it, a bank switch invalidates it, and `./sim purge` is supposed to
-      # take it. /state holds every attempt the candidate has ever graded,
-      # which nothing short of an explicit `./sim purge --all` (or the
-      # UI's own Delete) may remove. Sharing one volume would mean one
-      # `docker compose down -v` erased both, which is exactly what purge
-      # used to do.
       - state:/state
     networks: [examnet, controlnet]
-    # No depends_on, deliberately, and all four entries had to go — not
-    # just the two service_healthy ones. instance-1/2 were only
-    # service_started, but they each depend on k8s-env being healthy, so
-    # leaving them would have re-imposed the entire wait transitively.
-    #
-    # The facilitator used to wait for a healthy k8s-env, which meant port
-    # 8080 served nothing for the whole of a cold first boot: the
-    # candidate's browser was dead for the exact stretch they most needed
-    # to see progress. It now starts immediately and serves a boot screen
-    # driven by /shared/boot.json, and POST /api/session/start refuses
-    # with 409 until the environment is genuinely ready — which is the
-    # protection the dependency was really providing.
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
       interval: 10s
@@ -267,7 +150,6 @@ volumes:
   course-1: {}
   course-2: {}
   session: {}
-  # The attempt record. The one volume `./sim purge` keeps.
   state: {}
   registry: {}
   containers-1: {}

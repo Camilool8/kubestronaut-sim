@@ -2,13 +2,6 @@
 {{- if not .Values.httpRoute.parentRefs }}
 {{- fail "kubestronaut-sim: httpRoute.enabled needs at least one httpRoute.parentRefs entry naming the Gateway to attach to" }}
 {{- end }}
-# Offered because it is what this project's own deployment uses. Any
-# other way of getting HTTP to the Service works as well — the hub cares
-# about one thing in front of it, which is that a WebSocket may stay open
-# for hours: the desktop stream is one, and a gateway with a short idle
-# timeout will cut it. websockify pings every 30s from inside the session
-# so the connection is never actually idle, but a hard maximum-lifetime
-# setting will still end it.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:

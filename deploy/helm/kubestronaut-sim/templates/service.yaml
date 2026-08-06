@@ -1,9 +1,3 @@
-# The hub's only door. Point your Ingress, Gateway or tunnel here.
-#
-# Session Pods deliberately get no Service: they are addressed by Pod IP
-# by the hub and by nothing else, and a Service in front of them would be
-# a second way to reach a candidate's exam that does not check who is
-# asking.
 apiVersion: v1
 kind: Service
 metadata:

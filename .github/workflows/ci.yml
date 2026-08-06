@@ -1,14 +1,3 @@
-# Every gate in this repo that does not need a Kubernetes cluster.
-#
-# Before this existed there were none running automatically: `go test`,
-# `npm test`, `tsc`, and the bank validators all ran only when someone
-# remembered, and `tests/smoke.sh` — the only thing that runs them
-# together — is destructive and takes ~35 minutes, so nobody runs it on a
-# whim.
-#
-# Deliberately NOT here: tests/smoke.sh. It purges every volume and
-# builds a two-node cluster; it belongs on a human's machine before a
-# merge, not on every push.
 name: CI
 
 on:
@@ -26,11 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      # All five are offline and take seconds in total. They are the
-      # cheapest failures in the project and the easiest to introduce:
-      # a mis-weighted question, a check that grades spelling, a hint
-      # that is really the solution, an answer key that drifted from
-      # its options.
       - name: Weights and domain balance
         run: bash tests/bank-weights.sh
       - name: Check idioms
@@ -41,19 +25,6 @@ jobs:
         run: bash tests/bank-hints.sh
       - name: MCQ banks
         run: bash tests/bank-mcq.sh
-      # Two different guarantees, both because nothing imports this page.
-      # site/tokens.css and site/favicon.svg are MIRRORS, regenerated into
-      # a temp tree and diffed, so a token change that never reached the
-      # landing page fails here. The figures in index.html are written by
-      # hand and cannot be regenerated, so they are ASSERTED against the
-      # banks instead — the advertised question total, its per-bank
-      # breakdown, and each pooled bank's drawn-of-pool pair.
-      #
-      # That second half is new, and it is new because this comment used
-      # to claim it and be wrong: a whole wave shipped while the page
-      # still told the world the product kept no attempt history, and
-      # nothing failed. A public page advertising numbers the product
-      # stopped producing is exactly what this step is for.
       - name: Landing page in sync
         run: bash site/build.sh --check
 
@@ -69,13 +40,7 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: "1.24"
-          # go.mod, not go.sum: all three modules are stdlib-only, so no
-          # go.sum exists and pointing at one made every run log a
-          # cache-restore warning.
           cache-dependency-path: ${{ matrix.module }}/go.mod
-      # buildvcs=false matches how these are built locally (in a
-      # container over a bind mount, where the .git directory's ownership
-      # makes the VCS stamp fail).
       - name: Test
         working-directory: ${{ matrix.module }}
         env:
@@ -92,8 +57,6 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        # Never from the repo root: vitest misses ui/vite.config.ts there
-        # and every DOM test fails with "document is not defined".
         working-directory: ui
     steps:
       - uses: actions/checkout@v7
@@ -110,11 +73,6 @@ jobs:
       - name: Test
         run: npm test
 
-  # The chart is the only place the Pod manifests and the hub meet, and
-  # they meet as bytes: helm renders YAML into JSON, the hub parses that
-  # JSON and stamps out a Pod. Checking each half alone proves nothing
-  # about the join — a manifest that stops declaring an env var the hub
-  # must fill renders perfectly and fails at the first candidate.
   chart:
     name: Helm chart
     runs-on: ubuntu-latest
@@ -133,9 +91,6 @@ jobs:
           helm lint deploy/helm/kubestronaut-sim \
             --set hub.baseURL=https://sim.invalid --set hub.existingSecret=hub
 
-      # Every one of these is a deployment that cannot work, and the
-      # chart's job is to say so before anything is applied rather than
-      # leave a CrashLoopBackOff where a working hub used to be.
       - name: Refuses a deployment it cannot make work
         run: |
           fails() {
@@ -160,15 +115,6 @@ jobs:
             --set hub.baseURL=https://sim.invalid --set hub.existingSecret=hub \
             --show-only templates/configmap-session-pods.yaml > /tmp/cm.yaml
 
-      # The per-exam manifest, which the default values render none of.
-      #
-      # `sessions.practical.banks.<id>.resources` is how an exam whose
-      # cluster is a different size gets a Pod sized for it, and the
-      # FILENAME is a contract: hub/cmd/hub/main.go's bankTemplates
-      # discovers these by looking for session-bank-<id>.json beside the
-      # flavour's own manifest. A rename on either side would leave every
-      # session silently taking the default Pod, which still boots — so
-      # nothing else would notice.
       - name: A per-exam Pod spec renders, merged over the flavour's
         run: |
           helm template sim deploy/helm/kubestronaut-sim -n kubestronaut-sim \
@@ -206,10 +152,6 @@ jobs:
           print(f'{name}: {env["resources"]}')
           PY
 
-      # What the chart is responsible for, as opposed to what the
-      # manifests are: that every first-party image was rewritten to the
-      # configured registry and tag, that no container was lost on the
-      # way through, and that privilege did not spread.
       - name: The rendered Pods are the manifests, with the images moved
         run: |
           mkdir -p /tmp/rendered
@@ -267,8 +209,6 @@ jobs:
               print(f'{name}: {inits} init + {containers} containers, images rewritten')
           PY
 
-      # The join. render() is the hub's, the JSON is the chart's, and
-      # this is the only thing that runs one against the other.
       - name: The hub can stamp out what the chart renders
         working-directory: hub
         env:
@@ -281,18 +221,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      # PRELOAD=none skips baking ~2GB of image archives. The point here
-      # is that the Dockerfiles still parse and their build steps still
-      # succeed — the archives themselves are verified by actually
-      # booting, which is smoke.sh's job.
       - name: k8s-env
         run: docker build --build-arg PRELOAD=none -t sim-k8s-env images/k8s-env
-      # bootstrap.sh does not only run from PID 1: a hosted reset re-runs
-      # it over ssh (ENGINE=ssh), and an sshd session inherits none of the
-      # image's ENV. That aborted the rebuild at `set -u` with
-      # "NODE_IMAGE: unbound variable" — after it had already deleted the
-      # cluster, so the session was left with none. `env -i` reproduces
-      # exactly that empty environment.
       - name: NODE_IMAGE resolves with no environment at all
         run: |
           docker run --rm --entrypoint env sim-k8s-env -i sh -c \
@@ -308,16 +238,10 @@ jobs:
         run: docker build -t sim-conductor conductor
       - name: docs-proxy
         run: docker build -t sim-proxy proxy
-      # Context is banks/, not the repo root: the root .dockerignore
-      # excludes banks/ so it stays out of the facilitator's context.
       - name: banks
         run: docker build -f images/banks/Dockerfile -t sim-banks banks
-      # Root context, like the facilitator: the hub embeds ui/ so it can
-      # serve sign-in and the lobby before a session Pod exists.
       - name: hub
         run: docker build -f hub/Dockerfile -t sim-hub .
-      # FROM scratch: there is no shell to check the image with, and a
-      # broken binary in one would otherwise only surface at deploy time.
       - name: hub refuses to start misconfigured
         run: |
           out=$(docker run --rm -e AUTH_MODE=github sim-hub 2>&1) && {
@@ -326,9 +250,6 @@ jobs:
           echo "$out" | grep -q GITHUB_CLIENT_ID
       - name: Compose config is valid
         run: docker compose config -q
-      # The hosted session Pod is not built from these, but a typo in it
-      # would only surface at deploy time. This parses it and checks the
-      # image names line up with the Dockerfiles above.
       - name: Session pod manifest is valid YAML
         run: |
           python3 - <<'PY'
@@ -421,8 +342,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      # smoke.sh cannot be RUN here, but a syntax error in it should not
-      # wait until someone spends 35 minutes finding out.
       - name: Parse every script
         run: |
           fail=0
@@ -433,23 +352,6 @@ jobs:
             bash -n "$f" || { echo "syntax error: $f"; fail=1; }
           done
           exit $fail
-      # /shared is a handoff between containers, and `>` truncates the
-      # destination before it writes it — so a reader polling for the file
-      # can open one that exists, is empty, and is about to be filled.
-      #
-      # Compose makes that window unreachable (every consumer declares
-      # depends_on k8s-env: service_healthy, so nothing reads while this
-      # writes) which is why it survived this long. A Pod has no
-      # depends_on and starts all eight containers at once: a session
-      # booted with instance-1 holding a 5574-byte kubeconfig and
-      # instance-2 holding a 0-byte one, whose kubectl then fell back to
-      # its localhost:8080 default — the facilitator — and failed every
-      # command. Eleven of the bank's twenty-two questions are graded on
-      # instance-2, so half the exam was unscoreable and nothing said so.
-      #
-      # Writers use write_shared() in bootstrap.sh, or the temp+mv that
-      # phase.sh has always used for boot.json. Both rename into place,
-      # and rename is atomic.
       - name: Writes into /shared are atomic
         run: |
           if grep -rnE '>>?[[:space:]]*/shared/' images/ proxy/; then

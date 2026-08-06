@@ -1,49 +1,3 @@
-# One practical exam session, as a single Pod.
-#
-# This is the compose stack translated container-for-container. It lives
-# inside the chart but it is NOT a chart template: it has no templating
-# in it and can be applied and debugged as it stands —
-#
-#   kubectl apply -f deploy/helm/kubestronaut-sim/files/session-pod.yaml
-#
-# The chart reads it, rewrites exactly four things and hands the result
-# to the hub as JSON: the first-party image references and their pull
-# policy, metadata.namespace, nodeSelector/tolerations, and per-container
-# resources. Every other line here reaches the API server as written. So
-# the fields below that the chart overrides — the image tags, the
-# namespace, the nodeSelector — are what a bare `kubectl apply` gets, and
-# values.yaml is what a deployment gets.
-#
-# Three things differ from docker-compose.yaml, and only three:
-#
-#   1. hostAliases. Compose gives every service a DNS name on a user
-#      network. A Pod is one network namespace, so those names resolve
-#      nowhere — and they are not only internal: banks/ckad-mock-01/q09
-#      has the candidate type `podman push registry:5000/...`. Every
-#      service name is aliased to 127.0.0.1 so bank content, the ssh
-#      targets and every hardcoded address keep working untouched.
-#
-#   2. /banks. Compose bind-mounts ./banks from the host into five
-#      services. There is no host here, so the banks ship as their own
-#      image and an init container stages them into a shared volume.
-#
-#   3. The conductor has no Docker socket. It is the only container that
-#      mounts one under compose, and a Pod cannot provide it. ENGINE=ssh
-#      replaces the three Engine calls; reset and switch are the hub's
-#      job here, so only training-mode reseed still needs the conductor.
-#
-# imagePullPolicy: Always on every first-party image, because :dev is a
-# mutable tag — without it the node serves its cached copy and a rebuild
-# never reaches the Pod. Upstream pinned tags (registry:2) keep the
-# default IfNotPresent on purpose. A chart install replaces both the tag
-# and this policy (images.tag, images.pullPolicy), because a released tag
-# is immutable and re-checking a 2.6 GB image every boot buys nothing.
-#
-# The privilege story: k8s-env is privileged because it runs dockerd and
-# `kind create cluster`. The instances are NOT — they carry exactly the
-# five capabilities compose gives them, and BUILDAH_ISOLATION=chroot in
-# their image is what makes a build work without the host cgroup
-# namespace. See docs/follow-ups.md.
 apiVersion: v1
 kind: Pod
 metadata:
@@ -55,23 +9,12 @@ metadata:
     kubestronaut-sim/kind: practical
 spec:
   restartPolicy: Never
-  # Nothing in this Pod talks to the Kubernetes API. The cluster the
-  # candidate works against is the kind cluster inside k8s-env.
   automountServiceAccountToken: false
   enableServiceLinks: false
-  # Placement is the cluster operator's, not this file's: a chart install
-  # replaces this wholesale from sessions.practical.nodeSelector.
   nodeSelector:
     kubestronaut-sim/session: "true"
   terminationGracePeriodSeconds: 30
 
-  # Every compose service name, resolved inside the namespace they share.
-  #
-  # The instances get their own loopback addresses rather than sharing
-  # .1: both run sshd on 22 and only one can bind it per namespace. All
-  # of 127.0.0.0/8 is loopback, so giving each its own address keeps the
-  # port free — `ssh instance-1` from the desktop and the facilitator's
-  # sshArgs both work unchanged, with no ssh_config and no -p anywhere.
   hostAliases:
     - ip: "127.0.0.1"
       hostnames: [k8s-env, registry, docs-proxy, desktop, conductor, facilitator]
@@ -81,10 +24,6 @@ spec:
       hostnames: [instance-2]
 
   initContainers:
-    # Banks are content, not code, and they are read by five containers
-    # built from three different Docker contexts. Staging them once from
-    # their own image keeps a single source of truth and lets a bank
-    # update ship without rebuilding the facilitator.
     - name: banks
       image: cjoga/kubestronaut-sim-banks:dev
       imagePullPolicy: Always
@@ -96,28 +35,19 @@ spec:
         limits: {memory: "128Mi", cpu: "200m"}
 
   containers:
-    # ---------------------------------------------------------------
     - name: k8s-env
       image: cjoga/kubestronaut-sim-k8s-env:dev
       imagePullPolicy: Always
-      # dockerd + kind. This is the one container that genuinely needs it.
       securityContext:
         privileged: true
       env:
         - {name: BANK, value: "ckad-mock-01"}
-        # Lets the conductor reach this container over ssh (ENGINE=ssh).
-        # Explicit address because the instances hold :22 on .2 and .3;
-        # binding 0.0.0.0 here would lock them out.
         - {name: SSHD_LISTEN, value: "127.0.0.1"}
       volumeMounts:
         - {name: shared, mountPath: /shared}
         - {name: dind, mountPath: /var/lib/docker}
         - {name: banks, mountPath: /banks, readOnly: true}
       startupProbe:
-        # bootstrap.sh traps its own errors into /shared/boot.json, which
-        # the UI reads, so this is a liveness gate and not the failure
-        # detector. Generous for the same reason the compose healthcheck
-        # is: a cold first boot builds a two-node cluster.
         exec: {command: ["test", "-f", "/shared/ready"]}
         periodSeconds: 10
         failureThreshold: 180
@@ -125,25 +55,17 @@ spec:
         requests: {memory: "2Gi", cpu: "300m"}
         limits: {memory: "6Gi", cpu: "2000m"}
 
-    # ---------------------------------------------------------------
-    # The two candidate shells. Identical but for their course and
-    # container-storage volumes.
     - name: instance-1
       image: cjoga/kubestronaut-sim-instance:dev
       imagePullPolicy: Always
       securityContext:
         capabilities:
-          # Measured one failure at a time; see docker-compose.yaml.
           add: [SYS_ADMIN, SYS_CHROOT, MKNOD, SETFCAP, SYS_RESOURCE]
         seccompProfile: {type: Unconfined}
         appArmorProfile: {type: Unconfined}
       env:
         - {name: BANK, value: "ckad-mock-01"}
-        # Matches this instance's hostAlias; see the note there.
         - {name: SSHD_LISTEN, value: "127.0.0.2"}
-        # Every container in a Pod shares one UTS namespace, so without
-        # this the prompt here is the Pod's name — identical to the one
-        # the candidate typed `ssh instance-1` at. See the entrypoint.
         - {name: SIM_HOSTNAME, value: "instance-1"}
       volumeMounts:
         - {name: shared, mountPath: /shared, readOnly: true}
@@ -175,9 +97,6 @@ spec:
         requests: {memory: "512Mi", cpu: "50m"}
         limits: {memory: "1536Mi", cpu: "500m"}
 
-    # ---------------------------------------------------------------
-    # Push target for the image-building questions. Plain HTTP, no auth —
-    # it exists so `podman push` from an instance has somewhere to go.
     - name: registry
       image: registry:2
       env:
@@ -188,11 +107,6 @@ spec:
         requests: {memory: "64Mi", cpu: "10m"}
         limits: {memory: "256Mi", cpu: "200m"}
 
-    # ---------------------------------------------------------------
-    # The docs allowlist. Under compose, examnet's masquerade-off is what
-    # forced traffic through here; one netns cannot express that, so this
-    # is now enforced by Firefox's proxy policy alone. Recorded as a
-    # hosted-mode divergence — a NetworkPolicy still bounds the Pod.
     - name: docs-proxy
       image: cjoga/kubestronaut-sim-docs-proxy:dev
       imagePullPolicy: Always
@@ -205,7 +119,6 @@ spec:
         requests: {memory: "32Mi", cpu: "10m"}
         limits: {memory: "128Mi", cpu: "200m"}
 
-    # ---------------------------------------------------------------
     - name: desktop
       image: cjoga/kubestronaut-sim-desktop:dev
       imagePullPolicy: Always
@@ -219,22 +132,11 @@ spec:
         requests: {memory: "768Mi", cpu: "100m"}
         limits: {memory: "2Gi", cpu: "500m"}
 
-    # ---------------------------------------------------------------
     - name: conductor
       image: cjoga/kubestronaut-sim-conductor:dev
       imagePullPolicy: Always
       env:
-        # A unix socket, not :9000. Compose keeps the conductor off the
-        # exam network entirely (`controlnet: internal: true`); one Pod
-        # is one network namespace, so the same TCP port would sit on
-        # the candidate's own loopback and let a shell on an instance
-        # reset their cluster. The control volume below is mounted into
-        # this container and the facilitator, and nowhere else — that
-        # mount is the boundary compose drew with a network.
         - {name: LISTEN, value: "unix:/run/control/conductor.sock"}
-        # No Docker socket in a Pod. Reset and switch are the hub's job
-        # (it recycles this Pod); ssh covers training-mode reseed, which
-        # is the only live exec left.
         - {name: ENGINE, value: "ssh"}
         - {name: INSTANCES, value: "instance-1,instance-2"}
         - {name: FACILITATOR_URL, value: "http://127.0.0.1:8080"}
@@ -246,8 +148,6 @@ spec:
         requests: {memory: "32Mi", cpu: "10m"}
         limits: {memory: "128Mi", cpu: "200m"}
 
-    # ---------------------------------------------------------------
-    # The only container the hub proxies traffic to.
     - name: facilitator
       image: cjoga/kubestronaut-sim-facilitator:dev
       imagePullPolicy: Always
@@ -257,31 +157,13 @@ spec:
         - {name: BANK, value: "ckad-mock-01"}
         - {name: CONDUCTOR_ADDR, value: "unix:/run/control/conductor.sock"}
         - {name: DESKTOP_ADDR, value: "127.0.0.1:6080"}
-        # Declared empty and filled per session by the hub, the same way
-        # BANK is. This Pod's /state dies with it, so the copy posted
-        # here is the one the candidate still has tomorrow.
-        #
-        # The token is a ticket naming one user, minted at Pod creation
-        # and good for appending to that user's history and nothing
-        # else. It is in the Pod spec rather than a Secret because that
-        # is one fewer object to create, delete and grant the hub RBAC
-        # over, and reading it needs Pod-read in this namespace — which
-        # is already inside the accepted threat model for a Pod that
-        # runs a privileged container. Unset under compose, where
-        # nothing is collecting attempts.
         - {name: HISTORY_WEBHOOK_URL, value: ""}
         - {name: HISTORY_WEBHOOK_TOKEN, value: ""}
       volumeMounts:
         - {name: banks, mountPath: /banks, readOnly: true}
         - {name: shared, mountPath: /shared, readOnly: true}
-        # The only other container that may reach the control API.
         - {name: control, mountPath: /run/control}
         - {name: session, mountPath: /session}
-        # Separate from /session deliberately: /session is one attempt's
-        # scratch, /state is every graded attempt. Under compose their
-        # durability requirements are opposite. Here both are ephemeral —
-        # the hub owns durable history, so /state is a local cache the
-        # history webhook drains.
         - {name: state, mountPath: /state}
       readinessProbe:
         httpGet: {path: /healthz, port: http}
@@ -294,18 +176,10 @@ spec:
   volumes:
     - {name: banks, emptyDir: {sizeLimit: 512Mi}}
     - {name: shared, emptyDir: {sizeLimit: 256Mi}}
-    # Holds one socket and must stay that way. It is mounted into the
-    # conductor and the facilitator only; anything else mounted here
-    # gets the control API, which is the thing this volume exists to
-    # keep away from the candidate's shell.
     - {name: control, emptyDir: {sizeLimit: 1Mi}}
-    # The inner dockerd: kind node images plus whatever the candidate
-    # builds. The single largest consumer of node disk.
     - {name: dind, emptyDir: {sizeLimit: 20Gi}}
     - {name: course-1, emptyDir: {sizeLimit: 1Gi}}
     - {name: course-2, emptyDir: {sizeLimit: 1Gi}}
-    # vfs copies whole layers rather than stacking them, so this is
-    # deliberately roomier than the images it holds would suggest.
     - {name: containers-1, emptyDir: {sizeLimit: 4Gi}}
     - {name: containers-2, emptyDir: {sizeLimit: 4Gi}}
     - {name: registry-data, emptyDir: {sizeLimit: 2Gi}}

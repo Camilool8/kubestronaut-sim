@@ -1,77 +1,33 @@
-# OS and editor noise
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
 *.swp
 
-# Dependencies, build output, logs
 node_modules/
 ui/dist/
 *.log
 
-# The facilitator serves the UI from `//go:embed all:dist`. The tiny
-# index.html stub in that directory is TRACKED on purpose — the embed
-# fails to compile if the directory has no files, so a plain `go build`
-# outside Docker needs it. The real Vite output is copied over it at image
-# build time (facilitator/Dockerfile), and none of that may be committed.
-# If you ever build locally into this path, check the stub back out before
-# committing: .gitignore cannot protect a file that is already tracked.
 facilitator/internal/web/dist/*
 !facilitator/internal/web/dist/index.html
 
-# The hub embeds the same bundle for the same reason, and needs its own
-# copy: it serves the sign-in and lobby screens in the window before a
-# session Pod exists to serve them. Everything above applies here too.
 hub/internal/web/dist/*
 !hub/internal/web/dist/index.html
 
-# Runtime state: volumes, and the active-bank pointer the conductor owns
-# after first boot.
 shared/
 
-# Secrets. Nothing here needs one today; this is so nothing arrives by
-# accident once the repo is public.
 .env
 .env.*
 !.env.example
 
-# Third-party exam dumps used as a topic map while authoring banks. These
-# are someone else's copyrighted material; the banks in this repo are
-# CC BY-SA 4.0 and must be ours to license, so no dump may ever be
-# committed here — not even "temporarily".
 killer-sh-*.txt
 *-dump.txt
 dump*.txt
-# The two patterns above name the files someone thought to name that way,
-# which is the weakness: a dump dropped in as `dump1.txt` inside a
-# plausible-looking bank directory matched neither, and sat in the tree
-# one `git add banks/` from being committed.
-#
-# A bank is YAML, Markdown and shell — nothing under banks/ has ever been
-# a .txt and nothing should be. So the rule stops guessing at filenames
-# and states that instead: a .txt under banks/ is foreign material by
-# definition. `git status` will not show it, which is the point.
 banks/**/*.txt
 
-# Local agent/tool state.
-#
-# Until now these were invisible only because of ~/.config/git/ignore and
-# .git/info/exclude — a machine-global file and a repo-local one, neither
-# of which survives a clone. Anyone else cloning this repo would have seen
-# every one of them as untracked. Listing them here is what makes a fresh
-# clone behave the way this working copy already does.
-# The .impeccable patterns are unanchored on purpose: ui/ has its own
-# .impeccable directory, and root-anchored patterns left its cache file
-# visible on a fresh clone.
 .claude/settings.local.json
 **/.impeccable/config.local.json
 **/.impeccable/hook.cache.json
 **/.impeccable/hook.pending.json
 **/.impeccable/live/sessions/
 .superpowers/
-
-# Deliberately NOT ignored, because they are project artifacts rather than
-# machine state, and a collaborator needs them to get the same results:
-#   .impeccable/live/config.json — which HTML file live mode injects into
-#   .claude/settings.json        — shared project config, if one is added

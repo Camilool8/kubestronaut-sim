@@ -1,10 +1,6 @@
 {{- $sessions := or (gt (int .Values.sessions.practical.seats) 0) (gt (int .Values.sessions.mcq.seats) 0) -}}
 {{- $secret := include "kubestronaut-sim.secretName" . -}}
 
-{{/* Checked here rather than left to the hub's own boot-time check.
-     Both refuse, but only one of them refuses before anything is
-     applied — and a hub that CrashLoopBackOffs on a missing client ID
-     has already replaced the working one. */}}
 {{- if eq .Values.hub.auth.mode "github" -}}
 {{- if not .Values.hub.baseURL -}}
 {{- fail "kubestronaut-sim: hub.baseURL is required — it is the OAuth redirect target and the address session Pods post attempts back to" -}}
@@ -26,12 +22,6 @@ metadata:
     {{- include "kubestronaut-sim.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.hub.replicas }}
-  # Recreate, not RollingUpdate: /state is ReadWriteOnce, so a second
-  # replica cannot mount it and a rolling upgrade would wait forever for
-  # a Pod that can never schedule. The cost is a few seconds of downtime
-  # on an upgrade, during which running sessions are untouched — they are
-  # Pods in their own right, and the hub re-adopts them when it comes
-  # back rather than counting their seats as free.
   strategy:
     type: Recreate
   selector:
@@ -43,15 +33,10 @@ spec:
         {{- include "kubestronaut-sim.labels" . | nindent 8 }}
       annotations:
         {{- if $sessions }}
-        # The Pod manifests are read once, at startup. Without this a
-        # `helm upgrade` that changes a session's spec would update the
-        # ConfigMap and leave the running hub stamping out the old one.
         checksum/session-pods: {{ include (print $.Template.BasePath "/configmap-session-pods.yaml") . | sha256sum }}
         {{- end }}
     spec:
       serviceAccountName: {{ include "kubestronaut-sim.serviceAccountName" . }}
-      # The hub is the one process here that talks to the Kubernetes API,
-      # so it is the one that needs its token.
       automountServiceAccountToken: {{ $sessions }}
       enableServiceLinks: false
       {{- with .Values.images.pullSecrets }}
@@ -69,28 +54,9 @@ spec:
           type: RuntimeDefault
       {{- if $sessions }}
       initContainers:
-        # The exam list, staged out of the banks image.
-        #
-        # The hub needs it because of WHEN the question is asked: a
-        # candidate in the lobby is choosing which certification to sit,
-        # and until they have chosen there is no session Pod, so there is
-        # nothing running that could be asked what exams exist.
-        #
-        # It copies /index — JSON generated at image build time from each
-        # bank's exam.yaml — and not /src. The hub is a FROM scratch
-        # image with no shell, and no Go binary in this repo parses YAML,
-        # so the conversion happens where the content lives. Same reason
-        # the session Pod stages banks from this image rather than baking
-        # them into six others.
         - name: banks
           image: {{ include "kubestronaut-sim.image" (dict "ctx" . "name" "banks") | quote }}
           imagePullPolicy: {{ .Values.images.pullPolicy }}
-          # -r and not -a, unlike the session Pod's identical-looking
-          # init container. That one runs as root; this Pod runs as
-          # 65532, and -a asks to preserve root ownership, which a
-          # non-root process cannot do and busybox reports as a failure.
-          # Nothing here needs the original ownership: the hub reads
-          # these files and no one else ever opens them.
           command: ["sh", "-c", "cp -r /index/. /banks/"]
           securityContext:
             allowPrivilegeEscalation: false
@@ -107,8 +73,6 @@ spec:
         - name: hub
           image: {{ include "kubestronaut-sim.image" (dict "ctx" . "name" "hub") | quote }}
           imagePullPolicy: {{ .Values.images.pullPolicy }}
-          # A FROM scratch image with one static binary and one writable
-          # volume. There is nothing else here to protect.
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -126,14 +90,6 @@ spec:
             - {name: COOKIE_SECURE, value: {{ .Values.hub.auth.cookieSecure | quote }}}
             - {name: HUB_BASE_URL, value: {{ .Values.hub.baseURL | quote }}}
 
-            # optional: true throughout, and not because they are
-            # optional. In header and none modes there may legitimately
-            # be no GitHub app at all — and COOKIE_KEY is what turns
-            # durable history on rather than what turns login on, so a
-            # self-hoster behind their own SSO sets one and no client
-            # credentials. A hub that needs one of these and cannot find
-            # it says so by name at boot, which is a better error than a
-            # Pod that will not start.
             - name: COOKIE_KEY
               valueFrom:
                 secretKeyRef: {name: {{ $secret | quote }}, key: COOKIE_KEY, optional: true}
@@ -174,11 +130,6 @@ spec:
             - {name: session-pods, mountPath: /etc/hub, readOnly: true}
             - {name: banks, mountPath: /banks, readOnly: true}
             {{- end }}
-          # /healthz answers before any of the interesting wiring, which
-          # is what makes it a liveness probe and not a readiness one: a
-          # hub whose Kubernetes credentials are wrong is still the right
-          # process to send traffic to, because it is the thing that will
-          # explain the failure.
           readinessProbe:
             httpGet: {path: /healthz, port: http}
             periodSeconds: 10
@@ -196,8 +147,6 @@ spec:
         - name: session-pods
           configMap:
             name: {{ include "kubestronaut-sim.fullname" . }}-session-pods
-        # Read once at startup and never again: banks are an image layer,
-        # so a new bank is a new image and therefore a new hub Pod.
         - name: banks
           emptyDir:
             sizeLimit: 16Mi

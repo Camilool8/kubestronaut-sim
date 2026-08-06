@@ -20,11 +20,6 @@ spec:
     Container Orchestration: 28
     Cloud Native Application Delivery: 16
     Cloud Native Architecture: 12
-  # A pooled bank: 97 authored questions, 65 drawn at random per attempt,
-  # stratified by domainWeights so every draw still lands within the
-  # published curriculum split (see exam.DrawMCQ). Below 65 the pool is
-  # small enough to just serve whole, as every mcq bank did before this
-  # field existed — see docs/bank-spec.md.
   examLength: 65
   questions:
     - id: q01

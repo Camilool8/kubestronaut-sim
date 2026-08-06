@@ -4,8 +4,6 @@ metadata:
   name: smoke-mcq
   title: Smoke Test MCQ Bank
   certification: NONE
-  # Keeps this out of the lobby while leaving it a valid switch target.
-  # See Entry.Hidden in conductor/internal/catalog/catalog.go.
   hidden: true
   description: >-
     Not an exam. Three trivial multiple-choice questions that exist so

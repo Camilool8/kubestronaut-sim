@@ -3,14 +3,8 @@ name: kubestronaut-sim
 description: A hosted kubestronaut-sim — the hub, and the session Pods it creates
 type: application
 
-# The chart versions independently of the images: a values-only change
-# (more seats, a different bank) is a chart bump and no new image.
 version: 0.1.0
 
-# The image tag every container defaults to. `images.tag` in values.yaml
-# overrides it; nothing else here reads it. It is a released tag rather
-# than `dev` on purpose — `dev` is whatever was last pushed by hand, and
-# a hosted deployment must be able to say what it is running.
 appVersion: "v0.1.0"
 
 home: https://github.com/Camilool8/kubestronaut-sim

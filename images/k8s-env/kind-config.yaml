@@ -4,18 +4,7 @@ name: sim
 networking:
   apiServerAddress: "0.0.0.0"
   apiServerPort: 6443
-  # kind's default CNI (kindnet) does routing and nothing else: it does
-  # not implement NetworkPolicy. A policy question against it can only be
-  # graded on the shape of the YAML, and a candidate cannot test their own
-  # answer — which is most of the skill. bootstrap.sh installs Calico
-  # instead, so policies are actually enforced and checks can assert on
-  # behaviour (this connection succeeds, that one times out).
   disableDefaultCNI: true
-  # Kept at kind's usual range rather than Calico's 192.168.0.0/16
-  # default: the simulator publishes ports on the host's LAN address, and
-  # a 192.168/16 pod network is very likely to collide with the network
-  # the laptop reaching it is sitting on. bootstrap.sh patches Calico's
-  # default IP pool to match.
   podSubnet: "10.244.0.0/16"
 nodes:
   - role: control-plane
@@ -27,15 +16,6 @@ nodes:
             - "k8s-env"
             - "localhost"
             - "127.0.0.1"
-    # The first link in the host -> cluster chain. "hostPort" here means
-    # the k8s-env container's network namespace (the DinD daemon is this
-    # node's host), and docker-compose republishes those onto the real
-    # host. So: laptop -> compose-published k8s-env port -> node port ->
-    # ingress-nginx hostPort / a NodePort Service.
-    #
-    # The ingress controller is pinned to this node (bootstrap.sh labels
-    # it ingress-ready) precisely because these mappings only exist here;
-    # NodePorts need no pinning, kube-proxy answers them on every node.
     extraPortMappings:
       - containerPort: 80
         hostPort: 80
@@ -43,9 +23,6 @@ nodes:
       - containerPort: 443
         hostPort: 443
         protocol: TCP
-      # A small NodePort band for questions that expose a Service without
-      # an Ingress. Deliberately three ports, not the whole 30000-32767
-      # range: docker publishes a range by opening one proxy per port.
       - containerPort: 30080
         hostPort: 30080
         protocol: TCP
@@ -55,14 +32,3 @@ nodes:
       - containerPort: 30082
         hostPort: 30082
         protocol: TCP
-# The workers are NOT here. bootstrap.sh copies this file and appends one
-# `- role: worker` per extra node the active bank's spec.environment.nodes
-# asks for, because the right number is a property of the certification
-# being rehearsed and not of the image: a CKA bank has to be able to
-# cordon one node and see the work move.
-#
-# So this file describes a single-node cluster, and that is exactly what
-# a bank asking for one node gets. Everything above the node list —
-# especially the port mappings and certSANs, which are the whole
-# host -> cluster chain — is shared by every size and lives here so there
-# is one copy of it.

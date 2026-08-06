@@ -4,8 +4,6 @@ metadata:
   name: smoke-01
   title: Smoke Test Bank
   certification: NONE
-  # Keeps this out of the lobby while leaving it a valid switch target.
-  # See Entry.Hidden in conductor/internal/catalog/catalog.go.
   hidden: true
   description: >-
     Not an exam. A single trivial question that exists so tests/smoke.sh

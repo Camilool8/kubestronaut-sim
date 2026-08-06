@@ -1,6 +1,3 @@
-{{/*
-Names and labels.
-*/}}
 {{- define "kubestronaut-sim.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
@@ -37,18 +34,10 @@ app.kubernetes.io/component: hub
 {{ include "kubestronaut-sim.fullname" . }}
 {{- end -}}
 
-{{/*
-Where session Pods are created. The hub can only create them where its
-Role says it may, so this is one value and both places read it.
-*/}}
 {{- define "kubestronaut-sim.sessionNamespace" -}}
 {{- .Values.sessions.namespace | default .Release.Namespace -}}
 {{- end -}}
 
-{{/*
-The name of the Secret holding COOKIE_KEY and the GitHub credentials —
-one this chart created, or one that was already there.
-*/}}
 {{- define "kubestronaut-sim.secretName" -}}
 {{- if .Values.hub.existingSecret -}}
 {{- .Values.hub.existingSecret -}}
@@ -64,38 +53,11 @@ true
 {{- end -}}
 {{- end -}}
 
-{{/*
-One image name. Every image this chart runs is <prefix><short>:<tag> —
-the seven session images plus the hub, from one release workflow.
-*/}}
 {{- define "kubestronaut-sim.image" -}}
 {{- $ctx := .ctx -}}
 {{- printf "%s%s:%s" $ctx.Values.images.prefix .name ($ctx.Values.images.tag | default $ctx.Chart.AppVersion) -}}
 {{- end -}}
 
-{{/*
-kubestronaut-sim.sessionPod renders one of the Pod manifests in files/
-into the JSON the hub stamps out per candidate.
-
-The manifest is the source of truth and it is NOT a template. It is
-parsed, four things are rewritten, and it is handed back:
-
-  1. image and imagePullPolicy on every first-party container, so a
-     deployment can pull a chosen release from a chosen registry;
-  2. metadata.namespace, because the API server rejects a create whose
-     body names a different namespace from the URL;
-  3. nodeSelector and tolerations, which are placement policy and belong
-     to whoever runs the cluster, not to the manifest;
-  4. per-container resources, merged over what the manifest declares.
-
-Everything else — every container, capability, volume, probe, hostAlias
-and env var — survives untouched. That is the whole point: the file in
-files/ is what was debugged against a real cluster, and this chart
-cannot silently disagree with it.
-
-Called with a dict: ctx (the root context), file, flavour (the
-.Values.sessions.<kind> block).
-*/}}
 {{- define "kubestronaut-sim.sessionPod" -}}
 {{- $ctx := .ctx -}}
 {{- $flavour := .flavour -}}
@@ -142,9 +104,6 @@ Called with a dict: ctx (the root context), file, flavour (the
 {{- $_ := set $spec "imagePullSecrets" $pullSecrets -}}
 {{- end -}}
 
-{{/* Values are authoritative for placement, including when they are
-     empty: `nodeSelector: {}` means "schedule this anywhere", and a
-     manifest default left in place would quietly ignore it. */}}
 {{- if $flavour.nodeSelector -}}
 {{- $_ := set $spec "nodeSelector" $flavour.nodeSelector -}}
 {{- else -}}

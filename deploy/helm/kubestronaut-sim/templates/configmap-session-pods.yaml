@@ -1,21 +1,4 @@
 {{- if or (gt (int .Values.sessions.practical.seats) 0) (gt (int .Values.sessions.mcq.seats) 0) }}
-# The Pod manifests, as JSON, for the hub to stamp out.
-#
-# JSON because the hub is stdlib-only and the standard library has no
-# YAML parser — a rule this repo keeps everywhere, and the conversion is
-# a one-liner here. The YAML in files/ stays the single source of truth,
-# comments and all, and no second copy of the spec exists to drift.
-#
-# Rendered from files/ at install time, so `helm template` shows exactly
-# what a session will be. See the sessionPod helper for the four fields
-# this chart rewrites and why.
-#
-# `session-pod.json` is a flavour's default. `session-bank-<id>.json` is
-# one exam's, rendered only for the banks given overrides under
-# sessions.<kind>.banks, and picked by the hub when a session for that
-# exam is created. The naming is the contract between this file and
-# hub/cmd/hub/main.go's bankTemplates: a bank with no file here simply
-# gets the flavour's default, which is every bank the product ships.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -31,10 +14,6 @@ data:
 {{- range $flavour, $file := dict "practical" "files/session-pod.yaml" "mcq" "files/session-pod-mcq.yaml" }}
 {{- $spec := index $.Values.sessions $flavour }}
 {{- range $bank, $override := ($spec.banks | default dict) }}
-{{/* The per-exam resources are merged OVER the flavour's, which the
-     helper then merges over the manifest's own measured numbers. Three
-     layers, most specific last, and deepCopy on each so a merge cannot
-     write back into .Values and leak into the next iteration. */}}
 {{- $merged := mergeOverwrite (deepCopy ($spec.resources | default dict)) (deepCopy ($override.resources | default dict)) }}
 {{- $perBank := merge (dict "resources" $merged) (omit (deepCopy $spec) "resources" "banks") }}
   session-bank-{{ $bank }}.json: |
