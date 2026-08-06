@@ -142,20 +142,15 @@ graders use:
 kubectl -n <ns> run tmp --rm -it --restart=Never --image=nginx:alpine -- curl -m 5 <svc>
 ```
 
-[docs/architecture.md](docs/architecture.md) covers the containers,
-networks and boot sequence.
-
 ## Documentation
 
 | Document | What it covers |
 |---|---|
 | [docs/cli.md](docs/cli.md) | `./sim` subcommands, environment variables, host ports |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Symptoms and fixes, from preflight to grading |
-| [docs/architecture.md](docs/architecture.md) | Containers, networks, boot sequence, data flow |
-| [docs/api.md](docs/api.md) | HTTP API for the facilitator and conductor |
-| [docs/bank-spec.md](docs/bank-spec.md) | Question bank format and the validator contract |
-| [docs/testing.md](docs/testing.md) | What CI enforces, and what only the smoke suite does |
 | [docs/hosting.md](docs/hosting.md) | The chart, its values, and what hosted mode does differently |
+| [docs/api.md](docs/api.md) | HTTP API for the facilitator, conductor and hub |
+| [docs/bank-spec.md](docs/bank-spec.md) | Question bank format and the validator contract |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Building, testing, and submitting changes |
 | [SECURITY.md](SECURITY.md) | Threat model and the boundaries that exist |
 

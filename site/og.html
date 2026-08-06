@@ -10,9 +10,6 @@
     <link rel="stylesheet" href="styles.css" />
 
     <style>
-      /* No literal colour here either, for the same reason styles.css has
-         none: this file is a second surface for the same design system,
-         not a second source of truth for it. */
 
       html,
       body {
@@ -21,9 +18,6 @@
         background: var(--bg);
       }
 
-      /* Exactly the Open Graph frame. Chrome is told to capture this
-         size, so any change here has to be matched in the --window-size
-         of the regeneration command in site/README.md. */
       .og {
         box-sizing: border-box;
         width: 1200px;
@@ -38,11 +32,6 @@
         -webkit-font-smoothing: antialiased;
       }
 
-      /* Sized in px rather than through the type scale. The scale is
-         built for a reading surface at arm's length; this is read as a
-         thumbnail in somebody's feed, where the whole card may be 500px
-         wide, so every step here is deliberately coarser than any step
-         the product itself uses. */
       .og-mark {
         font-size: 26px;
         font-weight: 600;
@@ -50,8 +39,6 @@
         color: var(--text);
       }
 
-      /* The same split the site header draws: the product is
-         "kubestronaut", and "-sim" says this is the rehearsal. */
       .og-mark span {
         color: var(--text-secondary);
       }
@@ -66,12 +53,6 @@
         text-wrap: balance;
       }
 
-      /* Measured in px against the column it sits in, not in ch. A ch
-         measure sized for prose left this at four lines with a
-         one-word last line, and a widow is the one typographic fault a
-         link preview cannot hide: the card is read at a glance or not at
-         all. pretty then keeps the last line from going short again if
-         the copy is ever edited. */
       .og-desc {
         margin: 26px 0 0;
         max-width: 540px;
@@ -81,24 +62,15 @@
         text-wrap: pretty;
       }
 
-      /* The figure fills its column. styles.css caps .orbit-svg at 21rem
-         for the hero, which is the wrong measure at card scale. */
       .og .orbit-svg {
         max-width: none;
         width: 420px;
       }
 
-      /* A raster has one frame, so the bodies sit at the angles they were
-         authored at rather than wherever the animation happened to be
-         when the shutter opened. Without this the card is not
-         reproducible: two runs would not be byte-identical. */
       .og .orbit-track {
         animation: none !important;
       }
 
-      /* Bumped from --text-xs. At 320 user units drawn into 420px the
-         ring labels would land near 14px, which survives a full-size
-         card and disappears in a feed thumbnail. */
       .og .orbit-label {
         font-size: 13px;
       }
