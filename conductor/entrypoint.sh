@@ -1,8 +1,4 @@
 #!/bin/sh
-# Bank-aware wrapper, same pattern as the facilitator/proxy entrypoints:
-# the Go binary never parses YAML, so every banks/<id>/exam.yaml is
-# pre-converted to JSON here (banks are a read-only mount; adding a bank
-# means restarting this container).
 set -eu
 mkdir -p /run/banks
 for f in /banks/*/exam.yaml; do

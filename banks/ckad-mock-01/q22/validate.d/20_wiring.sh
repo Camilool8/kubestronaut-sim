@@ -24,10 +24,6 @@ path=$(kubectl -n dorado get pod checkout \
   exit 1
 }
 
-# The pattern's actual promise: the application is ignorant of the
-# backend. Passing the Service name to the app as an env var, or mounting
-# the proxy config into it, would still make the wget below succeed while
-# defeating the entire point.
 appspec=$(kubectl -n dorado get pod checkout -o json 2>/dev/null \
   | jq -r '.spec.containers[] | select(.name == "app")')
 printf '%s' "$appspec" | grep -q 'payments-backend' && {

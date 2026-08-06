@@ -17,11 +17,6 @@ sel=$(kubectl -n orbit get netpol api-guard \
   exit 1
 }
 
-# policyTypes is a list, and the API preserves the order it was written
-# in. This used to hand-enumerate both permutations of Ingress/Egress —
-# correct for two values, and quietly wrong the moment a third exists.
-# It also reported the whole thing as one opaque string, so a candidate
-# who got the selector right and the types wrong could not tell.
 types=$(kubectl -n orbit get netpol api-guard -o json 2>/dev/null | jq -r '.spec.policyTypes[]?')
 same_set "$types" "$(printf 'Ingress\nEgress')" && echo "selector+types ok" || {
   echo "policyTypes are '$(printf '%s' "$types" | tr '\n' ' ')', want Ingress and Egress"

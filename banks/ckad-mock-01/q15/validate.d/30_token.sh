@@ -3,11 +3,6 @@
 # desc: a valid pipeline-runner token, good for at least an hour, was saved
 set -uo pipefail
 . /banks/_lib/checks.sh
-# No show_actual on the paths below: the artifact is persisted in the
-# session file and served back on every /api/results, and the only thing
-# there is to show is the credential itself. The decoded CLAIMS are shown
-# once they are available — they carry the subject and the lifetime,
-# which is what the question is about, and no signing material.
 tok=$(cat /opt/course/15/pipeline-token 2>/dev/null | tr -d '[:space:]')
 [ -n "$tok" ] || {
   echo "/opt/course/15/pipeline-token is missing or empty"
@@ -20,8 +15,6 @@ tok=$(cat /opt/course/15/pipeline-token 2>/dev/null | tr -d '[:space:]')
   exit 1
 }
 
-# Decode the claims rather than trusting the file: base64url differs from
-# base64 in two characters and carries no padding.
 payload=$(printf '%s' "$tok" | cut -d. -f2)
 pad=$(( (4 - ${#payload} % 4) % 4 ))
 [ "$pad" -gt 0 ] && payload="${payload}$(printf '=%.0s' $(seq 1 "$pad"))"
@@ -39,7 +32,6 @@ printf '%s' "$claims" | grep -q 'system:serviceaccount:phoenix:pipeline-runner' 
   exit 1
 }
 
-# iat/exp are seconds since the epoch; an hour is 3600.
 iat=$(printf '%s' "$claims" | jq -r '.iat // 0')
 exp=$(printf '%s' "$claims" | jq -r '.exp // 0')
 life=$((exp - iat))

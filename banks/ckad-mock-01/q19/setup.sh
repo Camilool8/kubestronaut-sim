@@ -2,12 +2,6 @@
 set -euo pipefail
 kubectl create ns serpens --dry-run=client -o yaml | kubectl apply -f -
 
-# The app listens on 8080, not 80, and its Pods carry app=inventory. The
-# Service gets both wrong: a selector that matches nothing (so it has no
-# endpoints at all) and a targetPort that would hit a closed port even if
-# the selector were right. Two faults on purpose — fixing only the
-# selector produces endpoints and still no answer, which is the more
-# instructive half of the exercise.
 kubectl -n serpens apply -f - <<'EOF'
 apiVersion: v1
 kind: ConfigMap

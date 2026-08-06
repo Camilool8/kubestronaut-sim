@@ -8,9 +8,6 @@ evidence() {
   show_why "$1"
 }
 
-# Accept the settings at either level: securityContext fields set on the
-# Pod apply to every container unless the container overrides them, and
-# both placements are correct answers.
 get() {
   local field=$1 v
   v=$(kubectl -n cygnus get pod vault-agent \

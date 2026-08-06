@@ -8,9 +8,6 @@ evidence() {
   show_why "$1"
 }
 
-# Rendering the overlay, rather than only inspecting the cluster, is what
-# distinguishes "completed the overlay" from "hand-wrote the manifests and
-# applied them". Read-only: kustomize build touches nothing.
 out=$(kubectl kustomize /opt/course/13/overlays/staging 2>&1)
 [ $? -eq 0 ] || {
   echo "kubectl kustomize failed: $(printf '%s' "$out" | head -2)"

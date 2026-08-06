@@ -3,9 +3,6 @@
 # desc: ledger-api reads the key that exists and is ready; ledger-creds untouched
 set -uo pipefail
 . /banks/_lib/checks.sh
-# The Secret must still hold what it was seeded with. Editing the Secret
-# to add a DB_PASSWORD key would also make the Pod start, and the
-# question explicitly rules it out — the Deployment is what was wrong.
 user=$(kubectl -n tucana get secret ledger-creds -o jsonpath='{.data.username}' 2>/dev/null | base64 -d 2>/dev/null)
 pass=$(kubectl -n tucana get secret ledger-creds -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null)
 keys=$(kubectl -n tucana get secret ledger-creds -o json 2>/dev/null | jq -r '.data | keys | sort | join(",")')

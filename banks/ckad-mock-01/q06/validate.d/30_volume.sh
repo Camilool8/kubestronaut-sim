@@ -31,13 +31,6 @@ ro=$(kubectl -n atlas get pod tuned \
   exit 1
 }
 
-# Declared and actually projected are different things — a wrong key or a
-# subPath typo passes every check above and still leaves no file.
-#
-# Spacing around the `=` is not part of the answer: --from-file preserves
-# the seeded file byte for byte, but a candidate who created the
-# ConfigMap by retyping `max_connections=512` has configured exactly the
-# same thing. Was a literal `grep -q 'max_connections = 512'`.
 projected=$(kubectl -n atlas exec tuned -c web -- cat /etc/app/limits.conf 2>/dev/null)
 contains_kv "$projected" "max_connections" "512" || {
   echo "/etc/app/limits.conf is not readable inside the container, or lacks max_connections=512"

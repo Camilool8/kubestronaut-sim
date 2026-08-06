@@ -4,21 +4,6 @@
 set -uo pipefail
 . /banks/_lib/checks.sh
 
-# The replacement is checked FIRST, and not as a courtesy to 10_deployment
-# — which grades the Deployment on its own merits and is unaffected by
-# this. It is what stops the check being vacuous.
-#
-# "There is no Pod called report-runner" is true of a cluster where this
-# question was never set up at all, so on its own this scored 2 points on
-# an untouched environment. That made it the one check in the bank a
-# freshly reset cluster could earn anything from, which is exactly what
-# the smoke suite's "a reset environment scores 0" assertion exists to
-# catch, and it caught it.
-#
-# Reading it as grading rather than as a bug fix: deleting the only
-# running copy of a workload with nothing standing in for it is not a
-# partially correct answer to "replace this Pod with a Deployment". It is
-# the one outcome worse than leaving the Pod alone.
 [ -n "$(kubectl -n auriga get deploy report-runner -o jsonpath='{.metadata.name}' 2>/dev/null)" ] || {
   echo "there is no Deployment report-runner, so nothing has replaced the bare Pod"
   show_actual text "$(kubectl -n auriga get all 2>/dev/null)"
@@ -26,8 +11,6 @@ set -uo pipefail
   exit 1
 }
 
-# The Deployment's Pods are named report-runner-<replicaset>-<suffix>, so
-# a Pod called exactly report-runner is the bare one and nothing else.
 owner=$(kubectl -n auriga get pod report-runner \
   -o jsonpath='{.metadata.ownerReferences[*].kind}' 2>/dev/null)
 rc=$?

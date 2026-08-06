@@ -22,9 +22,6 @@ status=${rest%%|*}
 revision=${rest##*|}
 version=${chart#sim-web-}
 
-# "Newer than the one it started on" — seeded at 1.0.0, so anything above
-# that counts. Compared as versions, not strings, so a future 1.10.0 does
-# not lose to 1.9.0.
 newest=$(printf '1.0.0\n%s\n' "$version" | sort -V | tail -1)
 [ "$version" != "1.0.0" ] && [ "$newest" = "$version" ] || {
   echo "chart is '$chart'; it must be newer than sim-web-1.0.0"

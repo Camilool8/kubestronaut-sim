@@ -4,13 +4,6 @@
 set -uo pipefail
 . /banks/_lib/checks.sh
 
-# Same reasoning as q19/10_service.sh, plus externalTrafficPolicy, which
-# only appears once a Service becomes a NodePort and is defaulted to
-# Cluster by the API server. spec.ports[].nodePort STAYS: the question
-# pins it, so it is the answer rather than an allocation. clusterIP and
-# clusterIPs are handled by k8s_clean itself. All five here are
-# candidates for promotion — every Service capture in the bank wants
-# them gone.
 defaults='del(.spec.internalTrafficPolicy, .spec.externalTrafficPolicy,
               .spec.ipFamilies, .spec.ipFamilyPolicy, .spec.sessionAffinity)'
 evidence() {
@@ -26,9 +19,6 @@ type=$(kubectl -n aquila get svc status-page -o jsonpath='{.spec.type}' 2>/dev/n
   exit 1
 }
 
-# The port entry is selected by its published port rather than by
-# position: the question pins port 80 and node port 30081, so `port == 80`
-# is the handle that says which entry is being asked about.
 np=$(kubectl -n aquila get svc status-page \
   -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}' 2>/dev/null)
 [ -n "$np" ] || {

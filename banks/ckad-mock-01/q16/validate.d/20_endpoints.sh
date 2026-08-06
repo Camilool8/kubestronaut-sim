@@ -4,20 +4,9 @@
 set -uo pipefail
 . /banks/_lib/checks.sh
 
-# Same view as q19/20_reachable.sh: an EndpointSlice is written by a
-# controller, so its generateName suffix, ownerReferences, labels and
-# annotations are nobody's answer. The addresses ARE Pod IPs and stay —
-# this pane is never compared against an authored document, and how many
-# ready addresses there are is the whole point of the check.
 view='.items[] | del(.metadata.ownerReferences, .metadata.generateName,
                      .metadata.annotations, .metadata.labels)'
 
-# Checks are independent, so this one cannot assume 10_probes.sh passed —
-# and "2 ready endpoints" is true of a Deployment with no readinessProbe
-# at all, because a container without one is ready the moment it starts.
-# Unqualified, this check handed out free points on an untouched
-# environment. Requiring the probe first is what makes the endpoint count
-# evidence of anything.
 probe=$(kubectl -n hydra get deploy orders-api \
   -o jsonpath='{.spec.template.spec.containers[?(@.name=="api")].readinessProbe.httpGet.port}' 2>/dev/null)
 [ -n "$probe" ] || {
@@ -35,9 +24,6 @@ ready=$(kubectl -n hydra get deploy orders-api -o jsonpath='{.status.readyReplic
   exit 1
 }
 
-# The behavioural half: readiness that never passes leaves the Pods
-# running and the Service empty. EndpointSlice rather than the deprecated
-# Endpoints object.
 count=$(kubectl -n hydra get endpointslice -l kubernetes.io/service-name=orders-api -o json 2>/dev/null \
   | jq '[.items[].endpoints[]? | select(.conditions.ready == true)] | length')
 [ "$count" = "2" ] && echo "2 ready endpoints" || {

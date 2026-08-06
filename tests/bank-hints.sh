@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# Validates a bank's hints.md files.
-#
-# The failure mode worth guarding against is not a missing hint — that
-# degrades gracefully, the UI just shows no tray. It is a hint that IS
-# the solution. A "hint" a candidate can paste is not a hint; it removes
-# the exercise while looking like help, and nothing else in the repo
-# would ever catch it.
-#
-# Offline and instant, run from smoke.sh beside bank-weights.sh.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

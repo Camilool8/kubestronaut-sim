@@ -9,12 +9,6 @@ evidence() {
   show_why "$1"
 }
 
-# Fetched as two values rather than one space-joined string, because each
-# has to be normalised before it is compared. resource.Quantity keeps the
-# spelling it was parsed from, so a quota of one CPU comes back as `1`,
-# `1000m` or `1.0` depending on what the candidate typed — all three are
-# the same quota, and the string match this replaced scored two of them
-# wrong. Same standard as q07/validate.d/30_resources.sh.
 pods=$(kubectl -n aurora-staging get quota staging-quota \
   -o jsonpath='{.spec.hard.pods}' 2>/dev/null)
 cpu=$(kubectl -n aurora-staging get quota staging-quota \
@@ -26,8 +20,6 @@ cpu=$(kubectl -n aurora-staging get quota staging-quota \
   exit 1
 }
 
-# Both fields are Quantities, so both go through milli() and both targets
-# are expressed in the same thousandths: 5 pods is 5000, 1 CPU is 1000.
 [ "$(milli "$pods")" = "5000" ] || {
   echo "pods limit is '$pods', want 5"
   evidence "spec.hard.pods caps how many Pods may exist in the Namespace at once; once it is reached, creating another is rejected outright rather than left Pending. The question asks for 5 and the quota holds a different number."

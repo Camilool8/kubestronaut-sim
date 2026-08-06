@@ -14,8 +14,6 @@ rm=$(kubectl -n cygnus get pod vault-agent -o jsonpath="${sel}.requests.memory}"
 lc=$(kubectl -n cygnus get pod vault-agent -o jsonpath="${sel}.limits.cpu}" 2>/dev/null)
 lm=$(kubectl -n cygnus get pod vault-agent -o jsonpath="${sel}.limits.memory}" 2>/dev/null)
 
-# Quantities are compared by value, not by spelling: 0.1 and 100m are the
-# same CPU request, and a candidate who wrote either answered correctly.
 milli() {
   case "$1" in
     *m) printf '%s' "${1%m}" ;;

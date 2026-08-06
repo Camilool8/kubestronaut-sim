@@ -2,11 +2,6 @@
 set -euo pipefail
 kubectl create ns helios --dry-run=client -o yaml | kubectl apply -f -
 
-# Each backend answers with its own name on every path. Serving a fixed
-# string from nginx.conf rather than an index.html keeps the question
-# about Ingress: with a static file, `/checkout` would 404 on a backend
-# that has no /checkout file, and the candidate would be debugging path
-# rewriting instead of routing.
 for app in storefront checkout; do
   kubectl -n helios apply -f - <<EOF
 apiVersion: v1

@@ -4,13 +4,6 @@
 set -uo pipefail
 . /banks/_lib/checks.sh
 
-# Both halves, and the second one is not decoration. "blue is still
-# running" is true before the candidate touches anything, so on its own
-# this would be a point every fresh environment scores — which is exactly
-# what the smoke suite's "a fresh environment scores 0" assertion exists
-# to catch. What is being graded is the CUTOVER having been made without
-# dismantling the rollback, and that is only a state a correct answer
-# reaches.
 want=$(kubectl -n lacerta get deploy checkout-blue -o jsonpath='{.spec.replicas}' 2>/dev/null)
 [ -n "$want" ] || {
   echo "Deployment checkout-blue is gone"
@@ -27,9 +20,6 @@ ready=$(kubectl -n lacerta get deploy checkout-blue -o jsonpath='{.status.readyR
   exit 1
 }
 
-# Standby means "not receiving traffic". While the Service still matches
-# blue's Pods, blue is the live release and there is no rollback to be
-# ready for.
 pods_for() {
   kubectl -n lacerta get pods -l "$1" \
     -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | sort

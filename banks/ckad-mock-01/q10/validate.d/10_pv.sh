@@ -4,20 +4,9 @@
 set -uo pipefail
 . /banks/_lib/checks.sh
 
-# spec.claimRef is written by the binding controller and carries the
-# claim's uid and resourceVersion; the pv-protection finalizer and the
-# bound-by-controller annotation are the controller's bookkeeping too.
-# None of it is anybody's answer, and all of it differs per cluster —
-# the same reasoning k8s_clean applies to clusterIP, one level down.
-# Candidates for promotion into k8s_clean if another question captures a
-# bound volume.
 noise='del(.spec.claimRef, .metadata.finalizers,
            .metadata.annotations."pv.kubernetes.io/bound-by-controller")'
 
-# accessModes[*] rather than [0]: the question asks for one access mode,
-# so the whole list is the answer. Reading the first element passed a
-# volume that also offered ReadWriteMany as long as RWO happened to be
-# written first — a laxer check than the question.
 out=$(kubectl get pv archive-pv \
   -o jsonpath='{.spec.capacity.storage}|{.spec.accessModes[*]}|{.spec.hostPath.path}|{.spec.storageClassName}|{.spec.persistentVolumeReclaimPolicy}' 2>/dev/null)
 want='2Gi|ReadWriteOnce|/mnt/archive|manual|Retain'

@@ -3,9 +3,6 @@
 # desc: the app reaches the backend through localhost, and only through it
 set -uo pipefail
 . /banks/_lib/checks.sh
-# From inside the app container, so this exercises the whole chain:
-# containers in a Pod share a network namespace, which is why localhost
-# reaches the ambassador at all, and the ambassador resolves the Service.
 out=$(kubectl -n dorado exec checkout -c app -- \
   wget -qO- -T 5 http://localhost:8080 2>/dev/null)
 printf '%s' "$out" | grep -q 'backend-ok' && echo "proxied through the ambassador" || {

@@ -1,32 +1,4 @@
 #!/usr/bin/env bash
-# Checks every mcq bank (spec.examType: mcq) the way bank-weights.sh
-# checks the hands-on ones. Offline: no cluster, no containers, no yq —
-# it reads banks/ off disk, so it runs in seconds and belongs at the
-# *top* of smoke.sh rather than forty minutes into it.
-#
-# Six invariants, per bank:
-#
-#   1. the questions in exam.yaml and the q*/ directories on disk are
-#      the same set;
-#   2. every question is well-formed: a non-empty question.md, a real
-#      explanation in solution.md, 3-6 options, and a correct list that
-#      is unique, sorted, in range, and sized to match `multi`;
-#   3. mcq purity: no setup.sh, no validate.d/, no files/ anywhere in
-#      the bank — those belong to hands-on banks, and a stray one here
-#      means a question was ported without changing shape;
-#   4. spec.domainWeights is present, sums to 100, and names exactly
-#      the domains the questions use;
-#   5. WITHOUT spec.examLength (or one >= the pool): each domain's share
-#      of the points is within TOLERANCE percentage points of its
-#      spec.domainWeights entry — the whole pool IS the exam every
-#      attempt, so its own composition has to match the curriculum.
-#      WITH a smaller spec.examLength: exam.Draw stratifies every
-#      draw to hit each domain's target count exactly regardless of the
-#      pool's own ratio (see facilitator/internal/exam/exam.go), so what
-#      this gate checks instead is that every domain's pool is at LEAST
-#      as deep as that target — a draw must always be possible;
-#   6. the answer key is not degenerate: no single option index is the
-#      answer to more than half of the single-answer questions.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -57,10 +29,8 @@ Q_RE = re.compile(
 
 failures = []
 
-
 def fail(bank, msg):
     failures.append(f"{bank}: {msg}")
-
 
 def domain_weights(text):
     """Parse the spec.domainWeights block: `  Name: 20` lines under a
@@ -82,12 +52,10 @@ def domain_weights(text):
             out[em.group(1).strip()] = int(em.group(2))
     return out or None
 
-
 def exam_length(text):
     """Parse spec.examLength: N, or None when absent."""
     m = re.search(r"^\s*examLength:\s*(\d+)\s*$", text, re.M)
     return int(m.group(1)) if m else None
-
 
 def domain_targets(weights, order, n):
     """Largest-remainder rounding of n across order's domains, in the
@@ -101,7 +69,6 @@ def domain_targets(weights, order, n):
     for d in remainders[:leftover]:
         targets[d] += 1
     return targets
-
 
 def parse_options(block):
     """Each option is one `- scalar` line, optionally quoted. A line
@@ -124,7 +91,6 @@ def parse_options(block):
         out.append(val)
     return out
 
-
 def parse_correct(raw):
     raw = raw.strip()
     if not raw:
@@ -133,7 +99,6 @@ def parse_correct(raw):
         return [int(x) for x in raw.split(",")]
     except ValueError:
         return None
-
 
 for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
     bank_dir = os.path.dirname(exam_path)

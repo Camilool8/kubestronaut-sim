@@ -21,7 +21,6 @@ printf '%s' "$releases" | grep -qw report-legacy && {
   evidence "This is the release the question asks you to find. helm ls shows only deployed releases, so a failed one is invisible without asking for all of them — which is the point of the task. It failed because it was installed with an image tag that does not exist, so its Pods never became ready; its objects stay in the cluster until the release is uninstalled."
   exit 1
 }
-# Removing everything is not the answer either.
 printf '%s' "$releases" | grep -qw report-web || {
   echo "report-web should have been left alone (releases: $releases)"
   evidence "Removing everything is not the answer: report-web was named as the one to leave untouched, and it is gone. Two named releases were to be uninstalled and no others."

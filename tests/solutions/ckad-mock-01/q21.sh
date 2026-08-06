@@ -31,5 +31,4 @@ spec:
           mountPath: /var/run/telemetry
 EOF
 kubectl -n pictor wait --for=condition=Ready pod/telemetry --timeout=180s
-# Let both loops tick at least once before anything reads metrics.prom.
 sleep 6

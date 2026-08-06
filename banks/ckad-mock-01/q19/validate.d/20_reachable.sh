@@ -4,16 +4,6 @@
 set -uo pipefail
 . /banks/_lib/checks.sh
 
-# The EndpointSlice is the object the question's own hint tells the
-# candidate to read, so both failures below show them the one their
-# cluster actually has.
-#
-# There is deliberately no expected/ document for it. An EndpointSlice is
-# written by a controller: its name carries a random suffix and its
-# addresses are Pod IPs, so an authored "expected" one would only teach a
-# candidate to look for numbers that were never going to be theirs. The
-# ownerReferences, labels and generateName go for the same reason —
-# nobody is being asked about the controller's bookkeeping.
 view='.items[] | del(.metadata.ownerReferences, .metadata.generateName,
                      .metadata.annotations, .metadata.labels)'
 evidence() {
@@ -29,17 +19,6 @@ count=$(kubectl -n serpens get endpointslice -l kubernetes.io/service-name=inven
   exit 1
 }
 
-# The Deployment was correct all along, so this only proves anything
-# about the Service — and only an end-to-end request proves the
-# targetPort as well as the selector.
-#
-# `exec` into a Pod the question already runs, rather than creating a
-# probe Pod. Scheduling one, pulling its image and tearing it down cost
-# most of the 30s a check is allowed, and two graders running
-# back-to-back pushed checks like this one over the line — costing a
-# correct answer 5 points at random. Exec is side-effect free and takes
-# about a second. The request still crosses DNS, kube-proxy, the
-# selector and the targetPort, which is the whole point of the check.
 out=$(kubectl -n serpens exec deploy/inventory -- \
   sh -c 'for i in 1 2 3; do
            curl -s -m 4 http://inventory.serpens.svc:80/ && exit 0

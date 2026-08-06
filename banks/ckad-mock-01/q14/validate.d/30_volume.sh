@@ -16,9 +16,6 @@ src=$(kubectl -n tucana get deploy ledger-api \
   exit 1
 }
 
-# The API stores file modes as decimal, so 0400 comes back as 256. Both
-# spellings are the same value and a candidate may legitimately have
-# written either.
 mode=$(kubectl -n tucana get deploy ledger-api \
   -o jsonpath='{.spec.template.spec.volumes[?(@.name=="api-keys")].secret.defaultMode}' 2>/dev/null)
 [ "$mode" = "256" ] || {

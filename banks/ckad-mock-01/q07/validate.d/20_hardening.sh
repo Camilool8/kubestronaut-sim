@@ -24,7 +24,6 @@ drops=$(kubectl -n cygnus get pod vault-agent -o jsonpath="${sel}.capabilities.d
   evidence "This mounts the container's own filesystem read-only, so an intruder cannot drop a binary into it and the image cannot be modified at runtime. Container-level only, like the two beside it. An image that needs a writable path gets an emptyDir mounted over exactly that path rather than the whole root filesystem back."
   exit 1
 }
-# ALL is the canonical spelling; "all" is not accepted by the API.
 printf '%s' "$drops" | grep -qw ALL || {
   echo "capabilities.drop is '$drops', want ALL"
   evidence "Linux capabilities are root's powers split into pieces, and a container gets a default set even when it is not running as root. Dropping ALL leaves it none, which is the baseline a hardened workload starts from before adding back anything it genuinely needs. ALL is spelled in capitals; the API does not accept 'all'."

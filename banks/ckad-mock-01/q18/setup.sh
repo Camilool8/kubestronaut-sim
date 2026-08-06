@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# legacy.yaml is delivered to the instance by q18/files/. The Service the
-# Ingress points at is seeded so the rule refers to something real.
 kubectl create ns lynx --dry-run=client -o yaml | kubectl apply -f -
 kubectl -n lynx apply -f - <<'EOF'
 apiVersion: apps/v1

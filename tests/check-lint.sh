@@ -1,17 +1,4 @@
 #!/usr/bin/env bash
-# Lints validate.d checks for the idioms that fail correct answers.
-#
-# The bug class this exists to prevent: a check that grades how a
-# candidate spelled something rather than what they did. A `diff` makes
-# line order part of the answer. A `grep` on a YAML file makes
-# indentation part of the answer. `kubectl get -o yaml` hands a check the
-# serialised form instead of the API's normalised object, which is the
-# only reason key order could ever matter. Each one passes review easily
-# and costs a candidate points they earned.
-#
-# Offline and instant, run from smoke.sh next to bank-weights.sh so a bad
-# check fails in two seconds rather than forty minutes into a cold boot.
-#
 # Escape hatch: `# lint: allow-<rule>` on the offending line.
 set -euo pipefail
 cd "$(dirname "$0")/.."

@@ -2,17 +2,6 @@
 set -euo pipefail
 kubectl create ns lacerta --dry-run=client -o yaml | kubectl apply -f -
 
-# Two releases of one service, both live and both healthy. What makes the
-# cutover observable is that each serves a different body: nothing about
-# a blue/green switch is visible in `kubectl get pods`, and a question
-# that could only be graded on the Service's YAML would be a question
-# about YAML rather than about releases.
-#
-# checkout-client exists so the candidate — and the behavioural check —
-# have somewhere to make a request FROM that is neither release. Curling
-# the Service from inside one of the two Deployments would work, but it
-# reaches the Service that may now point back at the Pod making the call,
-# and a hairpin is not what a client does.
 kubectl -n lacerta apply -f - <<'EOF'
 apiVersion: v1
 kind: ConfigMap

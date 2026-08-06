@@ -37,9 +37,5 @@ spec:
               mountPath: /var/log/feed
 EOF
 kubectl -n lyra rollout status deploy feed-writer --timeout=180s
-# Give the writer a couple of ticks so the tail has something to show.
 sleep 6
-# `logs deploy/...` picks a live Pod from the current ReplicaSet; a
-# label selector can still hand back one that is terminating from a
-# previous rollout.
 kubectl -n lyra logs deploy/feed-writer -c shipper > /opt/course/5/shipper.log

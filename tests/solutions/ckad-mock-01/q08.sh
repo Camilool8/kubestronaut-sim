@@ -27,8 +27,6 @@ spec:
                 port:
                   number: 80
 EOF
-# The controller needs a moment to pick up a new rule; the grader's own
-# check has only a 30s budget, so settle it here instead.
 for _ in $(seq 1 20); do
   out=$(kubectl -n helios run settle-$RANDOM --rm -i --restart=Never \
     --image=nginx:1.29-alpine --command --timeout=25s -- \

@@ -4,16 +4,6 @@
 set -uo pipefail
 . /banks/_lib/checks.sh
 
-# The behavioural half, and the one worth the most points: a selector
-# that looks right in YAML and a Service that actually delivers green are
-# different claims, and only the second one is the release.
-#
-# The request is made from checkout-client, which is neither release, so
-# it crosses DNS, the Service, kube-proxy and the EndpointSlice exactly
-# as a caller would. Retried because a selector edit and a reprogrammed
-# kube-proxy are not the same instant — the EndpointSlice updates first —
-# and a single attempt straight after the answer loses that race often
-# enough to fail correct work.
 body=""
 for _ in 1 2 3 4 5; do
   body=$(kubectl -n lacerta exec deploy/checkout-client -- \

@@ -13,10 +13,6 @@ evidence() {
   show_why "$1"
 }
 
-# Three of the five settings are legal on the Pod securityContext as well
-# as on the container's, where they apply to every container unless one
-# overrides them. Both placements are correct answers, so both panes are
-# read — an empty result means the field was set in neither.
 get() {
   local field=$1 v
   v=$(kubectl -n auriga get deploy report-runner \
@@ -25,7 +21,6 @@ get() {
     -o jsonpath="{${tmpl}.securityContext.${field}}" 2>/dev/null)
   printf '%s' "$v"
 }
-# The other two exist only on the container, so there is one place to look.
 container_only() {
   kubectl -n auriga get deploy report-runner \
     -o jsonpath="{${tmpl}.containers[?(@.name==\"report\")].securityContext.$1}" 2>/dev/null

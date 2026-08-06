@@ -8,7 +8,6 @@ evidence() {
   show_why "$1"
 }
 
-# Both ENV forms are valid Dockerfile syntax and both are correct answers.
 line=$(grep -iE '^[[:space:]]*ENV[[:space:]]+RELEASE_CHANNEL[[:space:]]*=?[[:space:]]*' \
   /opt/course/9/image/Dockerfile 2>/dev/null | tail -1)
 [ -n "$line" ] || {

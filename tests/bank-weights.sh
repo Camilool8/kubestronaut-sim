@@ -1,53 +1,4 @@
 #!/usr/bin/env bash
-# Checks that every bank's points are distributed the way its exam.yaml
-# says they should be. Offline: no cluster, no containers, no yq — it
-# reads banks/ off disk, so it runs in seconds and belongs at the *top*
-# of smoke.sh rather than forty minutes into it.
-#
-# Four invariants, per bank (see docs/bank-spec.md):
-#
-#   1. spec.domainWeights sums to 100;
-#   2. WITHOUT spec.examLength (or one >= the pool): each domain's share
-#      of the points is within TOLERANCE percentage points of its
-#      spec.domainWeights entry — the whole bank IS the exam every
-#      attempt, so its own composition has to match the curriculum.
-#      WITH a smaller spec.examLength the bank pools: exam.Draw
-#      stratifies every draw to hit each domain's target COUNT exactly
-#      regardless of the pool's own ratio, so what is checked instead is
-#      that every domain's pool is at least as deep as that target — a
-#      draw must always be possible. This is bank-mcq.sh's invariant (5),
-#      applied here because pooling stopped being mcq-only;
-#   3. a question's `weight:` equals the sum of its `# points:` headers;
-#   4. the questions in exam.yaml and the q*/ directories on disk are
-#      the same set;
-#   5. spec.examLength, when present, is positive and no larger than the
-#      pool — the same refusal facilitator/internal/exam.Load makes at
-#      boot, made here in seconds instead.
-#
-# A bank with no spec.domainWeights is skipped for (1) and (2) —
-# smoke-01, the hidden switch-test fixture, has no curriculum mapping —
-# but still checked for (3) and (4).
-#
-# What (2) proves changed when the graders started applying the weights
-# themselves (evaluate.Results.Finalize). It is no longer the thing that
-# makes a score curriculum-weighted: the grader weights every attempt by
-# spec.domainWeights whether or not the points agree, precisely because a
-# filtered or partial draw out of a bank cannot inherit a promise the
-# whole bank makes. What (2) still proves is the other half, which
-# nothing else does:
-#
-#   - the candidate's *effort* is distributed like the curriculum. A
-#     domain worth 25% that is one cheap question is a bad rehearsal
-#     however the score is computed, and this is the only gate that
-#     notices;
-#   - a full-bank attempt's weighted score and its raw points score are
-#     the same number, so `RESULT` in the smoke suite, the score page and
-#     the two bank-honesty gates all still speak about one score.
-#
-# (1) is new here (tests/bank-mcq.sh has always checked it for mcq
-# banks). The weights are now divided by their own sum at scoring time,
-# so a bank whose weights sum to 90 would silently score every domain
-# 11% heavier than it published.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -79,10 +30,8 @@ POINTS_RE = re.compile(r"^# points: (0|[1-9][0-9]*)$", re.M)
 
 failures = []
 
-
 def fail(bank, msg):
     failures.append(f"{bank}: {msg}")
-
 
 def domain_weights(text):
     """Parse the optional spec.domainWeights block: `  Name: 20` lines
@@ -104,14 +53,12 @@ def domain_weights(text):
             out[em.group(1).strip()] = int(em.group(2))
     return out or None
 
-
 def exam_length(text):
     """Parse spec.examLength: N, or None when absent. Same parser as
     tests/bank-mcq.sh, widened to match a negative so a typo is caught
     here rather than read as 'absent'."""
     m = re.search(r"^\s*examLength:\s*(-?\d+)\s*$", text, re.M)
     return int(m.group(1)) if m else None
-
 
 def domain_targets(weights, order, n):
     """Largest-remainder rounding of n across order's domains, in the
@@ -129,7 +76,6 @@ def domain_targets(weights, order, n):
         targets[d] += 1
     return targets
 
-
 def domain_order(questions):
     """Each distinct domain once, in first-appearance order — what
     exam.go's domainOrder produces, and what the largest-remainder
@@ -139,7 +85,6 @@ def domain_order(questions):
         if q["domain"] not in order:
             order.append(q["domain"])
     return order
-
 
 for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
     bank_dir = os.path.dirname(exam_path)

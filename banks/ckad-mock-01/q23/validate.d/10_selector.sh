@@ -18,10 +18,6 @@ sel=$(kubectl -n lacerta get svc checkout -o json 2>/dev/null \
   exit 1
 }
 
-# Graded on which Pods the selector REACHES, not on how it is spelled.
-# `release=green` alone and `app=checkout,release=green` select exactly
-# the same two Pods here, and both are correct answers; a check that
-# insisted on one of them would fail correct work.
 pods_for() {
   kubectl -n lacerta get pods -l "$1" \
     -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | sort

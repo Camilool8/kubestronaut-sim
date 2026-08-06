@@ -16,9 +16,6 @@ auto=$(kubectl -n phoenix get pod no-token \
   exit 1
 }
 
-# The declaration and the result are different things — the same field on
-# the ServiceAccount, or a projected volume added by hand, can change what
-# actually lands in the container. Prove the directory really is absent.
 if kubectl -n phoenix exec no-token -c web -- \
      test -e /var/run/secrets/kubernetes.io/serviceaccount 2>/dev/null; then
   echo "a token is still mounted inside the container"

@@ -9,10 +9,6 @@ evidence() {
   show_why "$1"
 }
 
-# The whole point of the question: a sidecar declared the modern way
-# lives in initContainers and carries restartPolicy: Always. A second
-# entry under .spec.containers would pass a naive "is there a container
-# called shipper" check while being a different thing entirely.
 policy=$(kubectl -n lyra get deploy feed-writer \
   -o jsonpath='{.spec.template.spec.initContainers[?(@.name=="shipper")].restartPolicy}' 2>/dev/null)
 [ "$policy" = "Always" ] || {

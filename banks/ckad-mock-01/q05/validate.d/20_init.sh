@@ -16,8 +16,6 @@ img=$(kubectl -n lyra get deploy feed-writer -o jsonpath="${sel}.image}" 2>/dev/
   exit 1
 }
 
-# A restartPolicy here would make it a sidecar too, and it would never
-# finish — the question asks for a true init container that exits.
 policy=$(kubectl -n lyra get deploy feed-writer -o jsonpath="${sel}.restartPolicy}" 2>/dev/null)
 [ -z "$policy" ] || {
   echo "wait-for-source has restartPolicy '$policy'; it must be a plain init container"

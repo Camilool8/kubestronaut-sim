@@ -8,9 +8,6 @@ evidence() {
   show_why "$1"
 }
 
-# Reaching the right end state by editing the image back would leave two
-# revisions; a genuine upgrade-then-undo leaves at least three, and the
-# change-cause proves the middle one was the 1.29 upgrade.
 rev=$(kubectl -n draco get deploy payments-api \
   -o jsonpath='{.metadata.annotations.deployment\.kubernetes\.io/revision}' 2>/dev/null)
 [ -n "$rev" ] && [ "$rev" -ge 3 ] 2>/dev/null || {

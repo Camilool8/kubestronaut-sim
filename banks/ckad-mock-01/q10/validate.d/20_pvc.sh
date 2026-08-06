@@ -4,15 +4,10 @@
 set -uo pipefail
 . /banks/_lib/checks.sh
 
-# The pvc-protection finalizer and the two pv.kubernetes.io/bind-*
-# annotations are written by the binding controller, not by the
-# candidate. spec.volumeName STAYS: it is what this check is about.
 noise='del(.metadata.finalizers,
            .metadata.annotations."pv.kubernetes.io/bind-completed",
            .metadata.annotations."pv.kubernetes.io/bound-by-controller")'
 
-# accessModes[*], not [0] — see the note in 10_pv.sh. One access mode was
-# asked for, so the whole list is the answer.
 out=$(kubectl -n orion get pvc archive-pvc \
   -o jsonpath='{.spec.resources.requests.storage}|{.spec.accessModes[*]}|{.spec.storageClassName}' 2>/dev/null)
 want='1Gi|ReadWriteOnce|manual'
@@ -23,9 +18,6 @@ want='1Gi|ReadWriteOnce|manual'
   exit 1
 }
 
-# Bound is the part that cannot be faked: a mismatched class, size or
-# access mode leaves the claim Pending forever, and the default dynamic
-# provisioner would otherwise quietly bind it to a volume of its own.
 phase=$(kubectl -n orion get pvc archive-pvc -o jsonpath='{.status.phase}' 2>/dev/null)
 vol=$(kubectl -n orion get pvc archive-pvc -o jsonpath='{.spec.volumeName}' 2>/dev/null)
 [ "$phase" = "Bound" ] || {

@@ -16,9 +16,6 @@ out=$(kubectl -n vega get job backfill \
   exit 1
 }
 
-# The container is checked by name rather than by position, and its
-# presence is the assertion: an empty result means there is no container
-# called `worker` at all.
 img=$(kubectl -n vega get job backfill \
   -o jsonpath='{.spec.template.spec.containers[?(@.name=="worker")].image}' 2>/dev/null)
 [ -n "$img" ] && echo "job spec ok" || {

@@ -3,9 +3,6 @@
 # desc: the container's log output was saved to /opt/course/9/pulsar.log
 set -uo pipefail
 . /banks/_lib/checks.sh
-# The agent prints its channel on startup, so a real capture from the
-# rebuilt image says "stable". A log saved before the Dockerfile edit
-# says "beta", which is the mistake this catches.
 log=$(cat /opt/course/9/pulsar.log 2>/dev/null)
 [ -n "$log" ] || {
   echo "/opt/course/9/pulsar.log is missing or empty"

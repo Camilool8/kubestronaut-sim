@@ -4,10 +4,6 @@
 set -uo pipefail
 . /banks/_lib/checks.sh
 
-# Read back from the cluster rather than carried here as a second copy of
-# the string, which would drift the first time setup.sh is edited.
-# Compared with the whitespace out: a trailing newline from `wget -O` and
-# one from an editor are not a wrong answer.
 want=$(kubectl -n perseus get cm ledger-api-page -o jsonpath='{.data.healthz}' 2>/dev/null)
 got=$(cat /opt/course/25/healthz 2>/dev/null)
 squash() { printf '%s' "$1" | tr -d '[:space:]'; }

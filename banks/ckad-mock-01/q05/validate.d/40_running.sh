@@ -11,9 +11,6 @@ ready=$(kubectl -n lyra get deploy feed-writer -o jsonpath='{.status.readyReplic
   exit 1
 }
 
-# The sidecar tails a file the main container writes with `date`, so any
-# real capture contains a year. An empty file, or `kubectl logs` output
-# from the wrong container, does not.
 grep -qE '[0-9]{4}' /opt/course/5/shipper.log 2>/dev/null && echo "running, logs captured" || {
   echo "/opt/course/5/shipper.log is missing or has no timestamped lines"
   show_actual text "$(head -20 /opt/course/5/shipper.log 2>/dev/null)"

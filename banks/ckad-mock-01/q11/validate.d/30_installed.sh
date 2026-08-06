@@ -28,9 +28,6 @@ replicas=$(kubectl -n carina get deploy report-cache -o jsonpath='{.spec.replica
   exit 1
 }
 
-# The question says "through Helm values", so the release's own values
-# have to carry it. Scaling the Deployment afterwards would satisfy the
-# check above and be undone by the next `helm upgrade`.
 value=$(helm -n carina get values report-cache -o json 2>/dev/null | jq -r '.replicaCount // empty')
 [ "$value" = "2" ] && echo "installed with replicaCount=2" || {
   echo "release values do not set replicaCount=2 (got '$value') — was the Deployment scaled instead?"

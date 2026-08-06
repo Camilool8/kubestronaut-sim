@@ -4,8 +4,6 @@
 set -uo pipefail
 . /banks/_lib/checks.sh
 got=$(cat /opt/course/18/cronjob-version 2>/dev/null | tr -d '[:space:]')
-# Read the answer from the cluster rather than hardcoding it, so this
-# check keeps working when the served version moves on.
 want=$(kubectl api-resources --api-group=batch -o wide 2>/dev/null \
   | awk '$NF == "CronJob" || $0 ~ /[[:space:]]CronJob[[:space:]]/ {print $3; exit}')
 [ -n "$want" ] || want="batch/v1"

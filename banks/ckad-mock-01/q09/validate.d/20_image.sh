@@ -3,10 +3,6 @@
 # desc: image registry:5000/pulsar-agent:v1 was built, and carries the new value
 set -uo pipefail
 . /banks/_lib/checks.sh
-# Checks run as root, so this is root's podman storage — the one `sudo
-# podman build` writes to. A rootless build lands in the candidate's own
-# store and would be invisible here, which is why the question insists
-# on sudo and why this message says so.
 podman image exists registry:5000/pulsar-agent:v1 2>/dev/null || {
   echo "registry:5000/pulsar-agent:v1 not found in root's podman storage — was it built with sudo?"
   show_actual text "$(podman images 2>/dev/null)"

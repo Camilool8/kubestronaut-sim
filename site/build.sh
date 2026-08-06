@@ -1,27 +1,4 @@
 #!/usr/bin/env sh
-# Generates the parts of site/ that are copies of files owned elsewhere.
-#
-# The landing page is plain HTML and CSS with no bundler, but it must not
-# hold a second copy of the design system. Three files here are OWNED
-# somewhere else in this repository and only mirrored into site/ so that
-# the directory can be served on its own:
-#
-#   ui/src/styles/tokens.css  ->  site/tokens.css
-#   ui/public/favicon.svg     ->  site/favicon.svg
-#   @fontsource latin subsets ->  site/fonts/*.woff2
-#
-# A mirror is only safe when something holds it equal to its source, which
-# is the same bargain the product already makes for the terminal palette,
-# the Go locked page and the favicon (the Three Mirrors rule in DESIGN.md,
-# enforced by ui/src/styles/mirrors.test.ts). `build.sh --check` is this
-# directory's version of that test: it regenerates into a temporary tree
-# and fails on any difference, so a token change that has not reached the
-# landing page is a failure rather than a slow drift.
-#
-#   ./site/build.sh            regenerate
-#   ./site/build.sh --check    fail if a generated file is out of date
-#
-# Run from anywhere; paths resolve against this script.
 
 set -eu
 
@@ -32,9 +9,6 @@ TOKENS_SRC="$repo/ui/src/styles/tokens.css"
 FAVICON_SRC="$repo/ui/public/favicon.svg"
 FONT_SRC="$repo/ui/node_modules/@fontsource"
 
-# Only the latin subsets, and only the two weights the page sets. The app
-# loads five faces; this page is 400 and 600 in each family and nothing
-# else, so vendoring the rest would be 700KB of unreferenced payload.
 FONT_FILES="ibm-plex-sans/files/ibm-plex-sans-latin-400-normal.woff2
 ibm-plex-sans/files/ibm-plex-sans-latin-600-normal.woff2
 ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2
@@ -59,19 +33,8 @@ generate() {
   mkdir -p "$out/fonts"
   { banner "ui/src/styles/tokens.css"; cat "$TOKENS_SRC"; } > "$out/tokens.css"
 
-  # The favicon is copied from its opening <svg tag onward, dropping the
-  # leading comment. That comment is not noise, but it names design tokens
-  # -- and a double hyphen is forbidden inside an XML comment, so the file
-  # as authored is not well-formed XML. A favicon survives that; an <img>
-  # source does not, and this page draws the mark in its header. Stripping
-  # is deterministic from the source, so --check still holds the two equal.
-  # The real fix belongs in ui/public/favicon.svg, which is outside this
-  # directory's remit.
   sed -n '/<svg/,$p' "$FAVICON_SRC" > "$out/favicon.svg"
 
-  # Fonts are optional: without them the page falls through the token
-  # stacks to system-ui / ui-monospace, which is a different look but a
-  # working page. They need `npm ci` to have run in ui/.
   if [ -d "$FONT_SRC" ]; then
     for f in $FONT_FILES; do
       cp "$FONT_SRC/$f" "$out/fonts/$(basename "$f")"
@@ -83,22 +46,6 @@ generate() {
   fi
 }
 
-# The figures on the page, against the banks they describe.
-#
-# The three mirrored files above are held equal by regenerating them, but
-# index.html is written by hand and nothing regenerates it -- so the
-# numbers it advertises could only ever drift. They have: a whole wave
-# shipped attempt history while the page still told the world there was
-# none, and this gate's own CI comment claimed to be catching exactly
-# that. It was not. A claim the build does not hold up does not ship
-# (PRODUCT.md, principle 3), and that applies to the build's claims too.
-#
-# Which banks count is the product's own answer, not a list kept here:
-# `hidden: true` is what keeps the smoke fixtures out of the exam
-# selector, and it keeps them out of the advertised total for the same
-# reason. exam.yaml is machine-shaped and simple, so it is parsed with
-# regexes -- the same bargain tests/bank-weights.sh takes, and the reason
-# neither needs yq on the host running it.
 check_figures() {
   python3 - "$repo" <<'PY'
 import pathlib, re, sys
@@ -159,26 +106,6 @@ sys.exit(1 if fail else 0)
 PY
 }
 
-# The link-preview card, against the page that advertises it.
-#
-# og.png is NOT a mirror and cannot be one here: it is a raster, and
-# regenerating it needs a browser, which is exactly the dependency this
-# directory refuses to take. So this holds the parts that CAN be held --
-# that the source and the artwork both exist, that the artwork is the
-# frame Open Graph expects, and that index.html advertises the frame the
-# file actually has. A card whose declared size is a lie gets cropped or
-# dropped by the scraper, and nobody finds out from the repository.
-#
-# What it deliberately does NOT check: whether the pixels are current.
-# Editing og.html without re-running the command in site/README.md leaves
-# a stale card and this gate green. Said plainly rather than implied,
-# because a check that is trusted for more than it does is worse than no
-# check -- which this file has already learned once (see check_figures).
-#
-# PNG dimensions come from the IHDR header: an 8-byte signature, a 4-byte
-# chunk length, the "IHDR" tag, then width and height as big-endian
-# uint32. That is a fixed offset in every PNG ever written, so it needs
-# no image library on the host.
 check_og() {
   python3 - "$repo" <<'PY'
 import pathlib, re, struct, sys
@@ -226,24 +153,6 @@ sys.exit(1 if fail else 0)
 PY
 }
 
-# The certification marks, against the component that owns them.
-#
-# ui/src/components/CertMark.tsx draws one mark per certification and the
-# app renders it from there. This page cannot import a React component,
-# so the same geometry is inlined into index.html -- a fourth mirror, and
-# mirrors held equal only by convention drift the moment nobody re-greps
-# (the lesson ui/src/styles/mirrors.test.ts was written for).
-#
-# Rather than regenerate, this compares: every <svg class="cert-mark">
-# carries data-cert, and its shapes must match that certification's entry
-# in the component exactly -- same elements, same attributes, same
-# values. Attribute ORDER and whitespace are normalised away, because JSX
-# self-closes with a space and the page does not, and neither difference
-# changes a single pixel.
-#
-# The set must match both ways. A mark added to the component and not the
-# page is a landing page advertising four exams out of five; a mark on
-# the page with no component behind it is art the app cannot render.
 check_cert_marks() {
   python3 - "$repo" <<'PY'
 import pathlib, re, sys
@@ -317,7 +226,7 @@ if [ "${1:-}" = "--check" ]; then
       status=1
     fi
   done
-  # Only compared when the source exists; see the note in generate().
+
   if [ -d "$FONT_SRC" ]; then
     for f in $FONT_FILES; do
       name=$(basename "$f")

@@ -3,15 +3,6 @@
 # desc: the policy is actually enforced — frontend reaches api, metrics does not
 set -uo pipefail
 . /banks/_lib/checks.sh
-# The three checks above read the policy's YAML. This one reads its
-# effect, which is a different question: a policy can be shaped perfectly
-# and still allow everything if podSelector matches nothing, or deny
-# everything if the ingress rule names the wrong label.
-#
-# Uses `exec` into the Deployments the question already provides rather
-# than creating probe Pods: no mutation, and it finishes in seconds
-# rather than eating the 30s check budget on Pod scheduling. The images
-# are alpine-based, so busybox wget is available.
 evidence() {
   show_actual yaml "$(kubectl -n orbit get netpol api-guard -o yaml 2>/dev/null | k8s_clean)"
   show_why "$1"
@@ -33,8 +24,6 @@ if ! kubectl -n orbit exec deploy/frontend -- \
   exit 1
 fi
 
-# Must fail. A policy that is present but unenforced lets this through,
-# which is precisely the gap this check exists to close.
 if kubectl -n orbit exec deploy/metrics -- \
      wget -q -T 5 -O /dev/null "http://${api}:80" 2>/dev/null; then
   echo "metrics reached api on port 80 — ingress is not restricted to role=frontend"

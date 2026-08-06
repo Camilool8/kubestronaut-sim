@@ -5,50 +5,18 @@ cmd=${1:-help}
 
 UI=http://localhost:8080
 
-# Reads one field out of a JSON object on stdin. python3 rather than jq
-# because the reset path below has always used it and it is the one
-# interpreter this script can count on.
 json_field() { python3 -c "import json,sys; print(json.load(sys.stdin).get('$1',''))" 2>/dev/null || true; }
 
 case "$cmd" in
   up)
-    # NOT `--wait`. That waits on the healthcheck with no timeout
-    # (compose's default --wait-timeout is 0, i.e. forever) and prints one
-    # unmoving word — so a first boot that takes 20 minutes and a first
-    # boot that died after 30 seconds look exactly alike. This is what
-    # "env-1 stuck at Waiting" was: not a hang, an unreported wait.
-    #
-    # The facilitator no longer waits for the cluster, so it answers
-    # within seconds and /api/boot can narrate the rest. The browser shows
-    # the same phases from the same source at the same time.
-    # No default bank. `./sim up` brings the shell up and stops there;
-    # naming one — `./sim up ckad-mock-01` — additionally builds that
-    # exam's environment and waits for it, which is what the smoke suite
-    # and anyone who already knows what they want are doing.
-    #
-    # A warm stack keeps whatever is already active: /shared/bank
-    # survives `down`, and every entrypoint prefers the file over this
-    # variable, so this only decides what a FRESH environment builds.
+
     BANK=${2:-} docker compose up -d --build
 
     budget=${SIM_BOOT_BUDGET:-3600}
     deadline=$((SECONDS + budget))
     last=""
     if [ -z "${2:-}" ]; then
-      # Nothing to BUILD, which is not the same as nothing to wait for.
-      #
-      # This used to return the moment /api/boot answered, which the
-      # facilitator does within a second or two of starting. k8s-env is
-      # not done at that point: it still has the two phases that are not
-      # about any particular exam — the inner Docker daemon, then the
-      # chart repository — and it reports `booting` throughout. So the
-      # line below printed "Choose an exam" while the browser was still
-      # showing a boot screen. Measured at ~8s on a warm laptop; the
-      # smoke suite caught it by sampling the state at ~2s.
-      #
-      # Waiting for the state to SETTLE fixes it and costs those same
-      # seconds. It never waits for an exam: `idle` is the expected
-      # answer, and it means the shell is up with nothing chosen.
+
       shell_deadline=$((SECONDS + ${SIM_SHELL_BUDGET:-300}))
       while :; do
         if [ "$SECONDS" -ge "$shell_deadline" ]; then
@@ -69,9 +37,7 @@ case "$cmd" in
             echo "Ready. Choose an exam at ${UI} — its environment is built when you pick one."
             exit 0 ;;
           ready)
-            # A warm stack whose exam survived a `down`. Nothing was
-            # chosen just now, so say what is actually there rather than
-            # inviting a choice that has already been made.
+
             echo "Exam environment ready. Exam UI: ${UI} — or ./sim ssh instance-1"
             exit 0 ;;
           failed)
@@ -122,22 +88,10 @@ case "$cmd" in
     echo "Exam environment ready. Exam UI: ${UI} — or ./sim ssh instance-1" ;;
   down)  docker compose down --remove-orphans ;;
   purge)
-    # This was `docker compose down -v`, which takes EVERY volume with it
-    # — including state, where every attempt the candidate has ever
-    # graded lives. Purge is what people run when the environment is
-    # wedged, i.e. precisely the moment losing five certifications of
-    # progress would hurt most, and nothing warned them.
-    #
-    # So: down without -v, then remove the project's volumes by name,
-    # skipping the one compose labelled `state`. The labels are compose's
-    # own (com.docker.compose.project / .volume), so nothing here has to
-    # guess at the "<project>_<name>" convention or hardcode the project.
+
     case "${2:-}" in
       "")
-        # Resolved BEFORE anything is torn down, so the failure path can
-        # honestly say nothing happened. Doing it after the `down` left
-        # this branch printing "Nothing was removed" with the containers
-        # and networks already gone.
+
         project=$(docker compose config --format json 2>/dev/null | json_field name)
         if [ -z "$project" ]; then
           echo "Could not determine the compose project name; refusing to guess which"
@@ -168,9 +122,7 @@ case "$cmd" in
         exit 1 ;;
     esac ;;
   doctor)
-    # The first-run failures that are not this project's fault are almost
-    # all environmental, and all of them are cheaper to find here than
-    # twenty minutes into a boot.
+
     echo "kubestronaut-sim preflight"
     echo
     printf 'docker            : '; docker version --format '{{.Server.Version}}' 2>/dev/null || echo "NOT REACHABLE"
@@ -203,15 +155,9 @@ case "$cmd" in
       echo "not running"
     fi ;;
   reset)
-    # Same code path the UI's "New attempt" button uses: the conductor
-    # owns the reset sequence; this is just a thin trigger + progress
-    # poll against the facilitator's /api/control proxy.
+
     echo "Resetting exam state via conductor (cluster + instances, cached images kept)..."
-    # The conductor refuses a reset while another job holds it: a bank
-    # switch, a reseed, or — since pooling — the seed job that prepares a
-    # pooled bank's cluster for the questions an attempt just drew. Bare
-    # `curl -fsS` exits 22 there and `set -e` takes this script with it,
-    # printing nothing at all, which reads as "reset does nothing".
+
     if ! reset_err=$(curl -fsS -X POST "${UI}/api/control/reset" 2>&1 >/dev/null); then
       echo "The conductor would not accept a reset: ${reset_err:-no answer from ${UI}}"
       echo "It is busy while a bank switch, a reseed, or the preparation of a drawn"

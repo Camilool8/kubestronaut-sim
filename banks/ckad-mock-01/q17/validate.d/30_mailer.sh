@@ -31,7 +31,6 @@ ready=$(kubectl -n corvus get deploy mailer -o jsonpath='{.status.readyReplicas}
   exit 1
 }
 
-# The healthy workload was a control, not a casualty.
 fe=$(kubectl -n corvus get deploy frontend -o jsonpath='{.status.readyReplicas}' 2>/dev/null)
 [ "$fe" = "1" ] && echo "mailer fixed, frontend untouched" || {
   echo "frontend was supposed to be left alone (readyReplicas='$fe')"

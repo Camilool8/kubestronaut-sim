@@ -12,11 +12,6 @@ evidence() {
   show_why "$1"
 }
 
-# The Pod has to be the one that was already there. `kubectl debug` never
-# restarts anything — an ephemeral container is added through a
-# subresource on the live Pod — so a Pod that was deleted and recreated
-# is a different answer to a different question, and it also threw away
-# whatever state was being diagnosed.
 containers=$(kubectl -n perseus get pod ledger-api \
   -o jsonpath='{range .spec.containers[*]}{.name}{"\n"}{end}' 2>/dev/null)
 [ -n "$containers" ] || {

@@ -8,15 +8,7 @@ evidence() {
   show_why "$1"
 }
 
-# The prefix carries no closing brace: it is completed per-field below.
-# Written the other way round, `{...spec}` terminates the jsonpath
-# expression and everything after it is emitted as literal text — which
-# looks like the whole Pod spec plus a stray suffix, not like a bug.
 tpl='.spec.jobTemplate.spec.template.spec'
-# Selected by name, which also *is* the name assertion: an empty result
-# means no container called `rotate`, whatever else the template holds.
-# Reading [0].name instead asked whether the first container happened to
-# be the right one, which is a different question and a weaker one.
 img=$(kubectl -n vega get cronjob log-rotate -o jsonpath="{${tpl}.containers[?(@.name==\"rotate\")].image}" 2>/dev/null)
 restart=$(kubectl -n vega get cronjob log-rotate -o jsonpath="{${tpl}.restartPolicy}" 2>/dev/null)
 [ -n "$img" ] || {

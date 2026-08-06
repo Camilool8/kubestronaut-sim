@@ -7,11 +7,6 @@ kubectl -n tucana create secret generic ledger-creds \
   --from-literal=password=Qx7-plasma-42 \
   --dry-run=client -o yaml | kubectl apply -f -
 
-# The Deployment asks for key DB_PASSWORD; the Secret holds `password`.
-# A missing secret key is not an admission error — the Deployment is
-# accepted and the Pods sit in CreateContainerConfigError, which is
-# exactly the shape of the real-world bug this asks the candidate to
-# read out of `kubectl describe`.
 kubectl -n tucana apply -f - <<'EOF'
 apiVersion: apps/v1
 kind: Deployment

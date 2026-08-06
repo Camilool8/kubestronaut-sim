@@ -2,11 +2,6 @@
 set -euo pipefail
 kubectl create ns volans --dry-run=client -o yaml | kubectl apply -f -
 
-# Neither imagePullPolicy nor terminationGracePeriodSeconds is set here,
-# so the API server defaults both: IfNotPresent for these pinned tags,
-# and 30 seconds. That matters for the question — the answer has to be a
-# value the server would not have written on its own, or a candidate who
-# changed nothing would score for it.
 kubectl -n volans apply -f - <<'EOF'
 apiVersion: apps/v1
 kind: Deployment
