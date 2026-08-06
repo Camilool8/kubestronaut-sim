@@ -17,10 +17,10 @@ front of it.
 - There is no unprivileged way to do that. User namespaces are
   incompatible with `privileged`, and sandboxed runtimes either cannot
   host a nested runtime or need nested virtualization.
-- **Treat these nodes as disposable.** Deploy on hardware you are
-  willing to rebuild, keep them out of any pool running something you
-  care about, and label only the nodes you have made that decision
-  about.
+- **Treat these nodes as disposable:**
+  - Deploy on hardware you are willing to rebuild.
+  - Keep them out of any pool running something you care about.
+  - Label only the nodes you have made that decision about.
 
 Mitigations that ship by default:
 

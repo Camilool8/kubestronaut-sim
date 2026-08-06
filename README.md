@@ -29,7 +29,7 @@ Then open <http://localhost:8080> and pick an exam. Everything after
 > ```
 
 Nothing is built until you choose an exam. Picking a certification is
-what creates its cluster, and the browser narrates each phase.
+what creates its cluster, and the page shows each phase as it completes.
 
 ## The exams
 

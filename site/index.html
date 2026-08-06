@@ -161,11 +161,11 @@
           <div class="section-head">
             <h2 id="quickstart-title">Three commands</h2>
             <p class="section-lede">
-              Everything after <code>up</code> happens in the browser: a
-              countdown that cannot be paused, a real Linux desktop with
-              terminals, a real Kubernetes cluster built for the exam you
-              picked, a per-check score with full solutions afterwards, and a
-              record of every graded attempt to measure the next one against.
+              Everything after <code>up</code> happens in the browser. A
+              countdown that cannot be paused. A real Linux desktop with
+              terminals, on a real cluster built for the exam you picked. A
+              per-check score with full solutions afterwards, and a record of
+              every attempt to measure the next one against.
             </p>
           </div>
 
@@ -337,15 +337,23 @@
           </h3>
           <p>
             It builds a real Kubernetes cluster inside itself with a container
-            runtime and hands a stranger a root shell next to it, and there is
-            no way to do that unprivileged. Treat those nodes as disposable:
-            deploy on hardware you are willing to rebuild and keep them out of
-            any pool running something you care about. The chart ships a
-            NetworkPolicy that stops a session reaching the cluster hosting it,
-            on by default, and turning it off is not a supported configuration
-            — it is the boundary that makes this an accepted risk rather than
-            an open one. Multiple-choice sessions are unprivileged and tiny,
-            and none of this applies to them.
+            runtime and hands a stranger a root shell next to it. There is no
+            way to do that unprivileged.
+          </p>
+          <p>
+            Treat those nodes as disposable. Deploy on hardware you are willing
+            to rebuild, and keep them out of any pool running something you
+            care about.
+          </p>
+          <p>
+            The chart ships a NetworkPolicy that stops a session reaching the
+            cluster hosting it. It is on by default, and turning it off is not
+            a supported configuration — it is the boundary that makes this an
+            accepted risk rather than an open one.
+          </p>
+          <p>
+            Multiple-choice sessions are unprivileged and tiny. None of this
+            applies to them.
           </p>
           <p class="run-warning-more">
             <a
