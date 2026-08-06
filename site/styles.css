@@ -665,11 +665,6 @@ img {
   color: var(--text-secondary);
 }
 
-.exam-note {
-  font-size: var(--text-m);
-  color: var(--text-muted);
-}
-
 .mode-table {
   width: 100%;
   border-collapse: collapse;
@@ -801,58 +796,6 @@ img {
 
 .term-cont {
   color: var(--machine-text);
-}
-
-.run-sizing {
-  margin-top: var(--space-7);
-}
-
-.run-sizing-title {
-  padding-bottom: var(--space-3);
-  margin-bottom: var(--space-2);
-  border-bottom: 1px solid var(--border);
-  font-size: var(--text-s);
-  font-family: var(--font-mono);
-  font-weight: 600;
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.run-spec-row {
-  display: grid;
-  gap: var(--space-1) var(--space-6);
-  padding-block: var(--space-4);
-}
-
-.run-spec-row + .run-spec-row {
-  border-top: 1px solid var(--border);
-}
-
-.run-spec dt {
-  font-size: var(--text-l);
-  font-weight: 600;
-  color: var(--text);
-  letter-spacing: var(--tracking-tight);
-}
-
-.run-spec dd {
-  max-width: 64ch;
-  font-size: var(--text-m);
-  color: var(--text-secondary);
-}
-
-.run-spec dd b {
-  font-family: var(--font-mono);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
-}
-
-.run-spec-note {
-  display: block;
-  margin-top: var(--space-1);
-  color: var(--text-muted);
 }
 
 .run-warning {
@@ -1049,10 +992,6 @@ img {
     align-items: baseline;
   }
 
-  .run-spec-row {
-    grid-template-columns: 16rem 1fr;
-    align-items: baseline;
-  }
 }
 
 @media (min-width: 900px) {
@@ -1227,6 +1166,23 @@ img {
   }
 }
 
+.closing {
+  margin-top: var(--space-7);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+.closing-line {
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-l);
+  color: var(--text-secondary);
+}
+
+.closing .hero-actions {
+  justify-content: center;
+}
+
 @media (prefers-reduced-motion: no-preference) {
 
   html {
@@ -1292,7 +1248,6 @@ img {
     .stat,
     .exam-card,
     .run-card,
-    .run-spec-row,
     .run-warning,
     .mode-table,
     .mode-notes,
@@ -1393,7 +1348,6 @@ img {
   .stat,
   .exam-card,
   .run-card,
-  .run-spec-row,
   .run-warning,
   .mode-table,
   .mode-notes,
