@@ -193,6 +193,20 @@ for label, (path, prefix) in pages.items():
         seen.setdefault(f, []).append((label, kind, int(w.group(1)) if w else None,
                                        int(h.group(1)) if h else None))
 
+# GitHub's markdown CSS is `img { max-width: 100% }` with no `height: auto`,
+# and it strips inline style. So a height attribute is honoured literally while
+# max-width shrinks the width, and every image in the README renders stretched.
+# The height must be absent there; the landing page sets height:auto in its own
+# stylesheet and wants both, which is what the loop below enforces per page.
+for tag in re.findall(r"<img\b[^>]*>", (repo / "README.md").read_text()):
+    src = re.search(r'src="([^"]+)"', tag)
+    if src and re.search(r'height="\d+"', tag):
+        fail.append(
+            f"README.md sets a height on {src.group(1).split('/')[-1]} -- GitHub "
+            f"honours it while max-width shrinks the width, so the image renders "
+            f"stretched. Give it a width only."
+        )
+
 if not seen:
     fail.append("no shot is referenced by README.md or index.html -- the parse is wrong")
 
@@ -212,14 +226,21 @@ for f, uses in sorted(seen.items()):
         # width/height by design; its size is checked against its twin below.
         if kind != "img":
             continue
-        if w is None or h is None:
-            fail.append(f"{label} embeds {f.name} without width/height -- it will shift the page as it loads")
+        if w is None:
+            fail.append(f"{label} embeds {f.name} without a width")
             continue
         # Captured at deviceScaleFactor 2, so the file is exactly twice the
         # size the page reserves for it. A re-capture at another viewport or
         # scale breaks this before it breaks the layout.
-        if got != (w * 2, h * 2):
-            fail.append(f"{label} declares {f.name} as {w}x{h} (expects a {w*2}x{h*2} file), got {got[0]}x{got[1]}")
+        if got[0] != w * 2:
+            fail.append(f"{label} declares {f.name} as {w} wide (expects a {w*2}px file), got {got[0]}")
+        if label.endswith(".html"):
+            # The landing page styles these height:auto, so both attributes are
+            # safe there and together they reserve the right box before load.
+            if h is None:
+                fail.append(f"{label} embeds {f.name} without a height -- it will shift the page as it loads")
+            elif got[1] != h * 2:
+                fail.append(f"{label} declares {f.name} as {w}x{h} (expects a {w*2}x{h*2} file), got {got[0]}x{got[1]}")
 
 # A <picture> pair whose halves differ in size jumps when the theme changes.
 for name, got in sorted(sizes.items()):

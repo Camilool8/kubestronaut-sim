@@ -159,6 +159,14 @@ Recapture with Chrome driven by Playwright over CDP, at
 await page.emulateMedia({ colorScheme: "dark" });   // then "light"
 ```
 
+**An image in the README takes a `width` and never a `height.`** GitHub's
+markdown CSS is `img { max-width: 100% }` with no `height: auto`, and it
+strips inline `style`, so a height attribute is honoured literally while
+`max-width` shrinks the width — every shot renders about 1.6x too tall.
+The landing page sets `height: auto` in its own stylesheet and wants
+both attributes, so it reserves the right box before the image loads.
+`build.sh --check` enforces each rule against its own page.
+
 Four things will each silently produce a wrong file:
 
 - **Chrome clears emulation overrides when a CDP client disconnects.**

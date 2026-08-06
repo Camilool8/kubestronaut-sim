@@ -1,6 +1,6 @@
 # kubestronaut-sim
 
-<img src="site/og.png" width="1200" height="630"
+<img src="site/og.png" width="1200"
      alt="kubestronaut-sim. An exam simulator you run yourself. A timed rehearsal for the Kubernetes certifications, run locally." />
 
 An open-source exam simulator for the Kubestronaut certifications, run
@@ -13,7 +13,7 @@ locally on your own machine.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="site/shots/progress-dark.webp" />
-  <img src="site/shots/progress-light.webp" width="1600" height="1040"
+  <img src="site/shots/progress-light.webp" width="1600"
        alt="The progress screen: a card per certification, a table of every attempt with its mode, date, time and score, and a weakest-domains list built from all attempts." />
 </picture>
 
@@ -68,7 +68,7 @@ routes.
 
    <picture>
      <source media="(prefers-color-scheme: dark)" srcset="site/shots/mode-dark.webp" />
-     <img src="site/shots/mode-light.webp" width="1600" height="1000"
+     <img src="site/shots/mode-light.webp" width="1600"
           alt="The mode screen: Training, Mastery and Exam side by side, each listing its clock and what help it allows, with chips below for narrowing the draw to particular domains." />
    </picture>
 
@@ -78,7 +78,7 @@ routes.
 
    <picture>
      <source media="(prefers-color-scheme: dark)" srcset="site/shots/exam-dark.webp" />
-     <img src="site/shots/exam-light.webp" width="1600" height="1000"
+     <img src="site/shots/exam-light.webp" width="1600"
           alt="The exam view: the task on the left, and on the right a Linux desktop where a terminal on instance-1 lists the namespaces the task asked for, with the Kubernetes documentation open behind it." />
    </picture>
 
@@ -89,7 +89,7 @@ routes.
 
    <picture>
      <source media="(prefers-color-scheme: dark)" srcset="site/shots/score-dark.webp" />
-     <img src="site/shots/score-light.webp" width="1600" height="1000"
+     <img src="site/shots/score-light.webp" width="1600"
           alt="The score screen: a pass against the threshold, a domain breakdown ordered weakest first with two domains flagged below threshold, and a table of per-task verdicts with the points each one earned." />
    </picture>
 
