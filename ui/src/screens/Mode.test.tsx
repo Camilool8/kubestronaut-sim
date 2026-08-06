@@ -61,10 +61,7 @@ const ckad: ExamInfo = {
     question("q02", "Application Design and Build"),
     question("q03", "Services and Networking"),
   ],
-  // The bank's DECLARED curriculum, which is what the chips are built
-  // from. Deliberately not a rollup of `questions`: once an attempt has
-  // drawn its subset, `questions` is that subset, and the two lists are
-  // different here so a test that confused them would fail.
+
   domains: [
     { name: "Application Design and Build", weightPct: 20, questionCount: 8 },
     { name: "Services and Networking", weightPct: 20, questionCount: 5 },
@@ -73,9 +70,6 @@ const ckad: ExamInfo = {
   modes,
 };
 
-// A bank whose `questions` and declared curriculum agree, for the tests
-// that count the draw rather than pin where the chips come from: 10
-// Design and Build, 6 Services and Networking, 4 Observability.
 const twentyQuestions: Pick<ExamInfo, "questions" | "domains"> = {
   questions: [
     ...Array.from({ length: 10 }, (_, i) =>
@@ -94,9 +88,7 @@ const twentyQuestions: Pick<ExamInfo, "questions" | "domains"> = {
 let exam: ExamInfo = ckad;
 let startStatus = 200;
 let startCalls: string[] = [];
-// The whole body, not just the mode: a filtered draw is the difference
-// between `{mode}` and `{mode, domains}`, and only the second is visible
-// here.
+
 let startBodies: { mode: string; domains?: string[] }[] = [];
 const runningSession: SessionSnapshot = {
   state: "running",
@@ -142,7 +134,6 @@ function mockApi() {
 const renderMode = (onSessionChange = () => {}, bankId = "ckad-mock-01") =>
   render(<Mode bankId={bankId} catalogVersion={0} onSessionChange={onSessionChange} />);
 
-/** The card whose heading is this mode. */
 const cardFor = (label: string) =>
   screen.getByRole("heading", { name: label }).closest("article") as HTMLElement;
 
@@ -170,9 +161,6 @@ describe("the mode cards", () => {
     expect(within(cardFor("Exam")).getByText("2h")).toBeInTheDocument();
   });
 
-  // A shortened clock only reads as shortened with the real one beside
-  // it, and it is said in words: a line through a number is a signal
-  // only a sighted reader gets.
   test("a shortened clock names the real one; a full one does not", async () => {
     renderMode();
     await screen.findByRole("heading", { name: "Mastery" });
@@ -181,9 +169,6 @@ describe("the mode cards", () => {
     expect(within(cardFor("Exam")).queryByText(/in the real exam/)).not.toBeInTheDocument();
   });
 
-  // The point of the whole mode-metadata change: every row is generated
-  // from the flag the facilitator enforces with, so a card cannot
-  // promise something the server then refuses.
   test("the capability rows follow the server's flags, and say yes or no in words", async () => {
     renderMode();
     await screen.findByRole("heading", { name: "Training" });
@@ -191,7 +176,7 @@ describe("the mode cards", () => {
     const training = within(cardFor("Training")).getByRole("list", {
       name: "What this mode allows",
     });
-    // The glyphs are decoration; these words are what carries the state.
+
     expect(within(training).getByText("Hints and reference solutions").textContent).toContain(
       "Yes:",
     );
@@ -202,8 +187,6 @@ describe("the mode cards", () => {
     expect(within(real).getByText("Kept as an attempt").textContent).toContain("Yes:");
   });
 
-  // Recommended is drawn in accent, which is one channel. The word is
-  // the second, and it is the only one a screen reader gets.
   test("exactly one card is recommended, and it says so", async () => {
     renderMode();
     await screen.findByRole("heading", { name: "Mastery" });
@@ -234,9 +217,6 @@ describe("starting", () => {
     expect(onSessionChange).toHaveBeenCalledWith(runningSession);
   });
 
-  // A 409 means something already changed session state under us — the
-  // poller, or a concurrent start. Refetch the truth rather than showing
-  // an error over a session that is running.
   test("a 409 refetches the authoritative session instead of erroring", async () => {
     const user = userEvent.setup();
     const onSessionChange = vi.fn();
@@ -262,23 +242,16 @@ describe("what the exam will ask", () => {
     expect(await screen.findByText(/2 drawn at random from 3/)).toBeInTheDocument();
   });
 
-  // The one number this panel can get wrong invisibly. `questions` is the
-  // DRAWN subset once an attempt exists, so counting it would advertise
-  // the last draw as the curriculum — the doc comment on ExamInfo.domains
-  // exists for this. The fixture's two lists disagree on purpose.
   test("the chips come from the declared curriculum, not from the drawn questions", async () => {
     renderMode();
     const chip = await screen.findByRole("button", { name: /Application Design and Build/ });
 
     expect(chip.textContent).toContain("8");
     expect(chip.textContent).not.toContain("2");
-    // A domain with no drawn question still has to be offerable.
+
     expect(screen.getByRole("button", { name: /Observability/ })).toBeInTheDocument();
   });
 
-  // The bank predates GET /api/exam's `domains`. There is nothing honest
-  // to filter on, so nothing is drawn as a control — a chip that looks
-  // clickable and is not is worse than a plain tag.
   test("a bank that declares no domains falls back to read-only tags", async () => {
     exam = { ...ckad, domains: undefined };
     renderMode();
@@ -303,8 +276,7 @@ describe("narrowing the draw", () => {
       "true",
     );
     await user.click(screen.getByRole("button", { name: "Start Exam" }));
-    // The bare-mode form: no `domains` key at all, which is what every
-    // other caller of POST /api/session/start sends.
+
     await waitFor(() => expect(startBodies).toEqual([{ mode: "exam" }]));
   });
 
@@ -313,31 +285,21 @@ describe("narrowing the draw", () => {
     renderMode();
     await user.click(await screen.findByRole("button", { name: /Services and Networking/ }));
 
-    // Said before the attempt starts, not after the result lands.
     expect(screen.getByText(/never reported as a pass/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "All domains" })).toHaveAttribute(
       "aria-pressed",
       "false",
     );
 
-    // The verb changes at the point of the act, because the chips are
-    // further down the page than the button is.
     await user.click(screen.getByRole("button", { name: "Start Exam drill" }));
     await waitFor(() =>
       expect(startBodies).toEqual([{ mode: "exam", domains: ["Services and Networking"] }]),
     );
   });
 
-  // Found in the browser: the panel kept saying "All 22, every attempt"
-  // beside a chip row that had just narrowed the draw to four. Of
-  // everything on this screen, the number of questions is the one claim a
-  // candidate carries into the exam with them.
   test("the summary counts the narrowed draw, not the whole bank", async () => {
     const user = userEvent.setup();
-    // A self-consistent bank: 20 authored questions, and the declared
-    // curriculum accounts for all 20. `ckad` above deliberately makes the
-    // two lists disagree, which is right for the tests that pin WHICH
-    // list the chips come from and wrong for one that counts them.
+
     exam = { ...ckad, ...twentyQuestions, questionCount: 20 };
     renderMode();
     expect(await screen.findByText(/All 20, every attempt/)).toBeInTheDocument();
@@ -349,9 +311,6 @@ describe("narrowing the draw", () => {
     expect(screen.getByText("10 of 20, from the 2 domains you picked.")).toBeInTheDocument();
   });
 
-  // The bank's own length still caps a filtered draw, exactly as
-  // exam.Draw does: a pooled bank asked for 8 does not hand back 10
-  // because the chips happened to select 10.
   test("a pooled bank's declared length still caps the narrowed draw", async () => {
     const user = userEvent.setup();
     exam = { ...ckad, ...twentyQuestions, questionCount: 8 };
@@ -374,8 +333,6 @@ describe("narrowing the draw", () => {
   });
 });
 
-// "Build a drill from these" on the dashboard lands here with the weak
-// domains in the fragment.
 describe("a drill deep link", () => {
   test("preselects the domains the route names", async () => {
     window.location.hash = "#/exams/ckad-mock-01/mode?domain=Observability";
@@ -391,11 +348,6 @@ describe("a drill deep link", () => {
     );
   });
 
-  // A domain name is free text from the bank and CKAD ships one with a
-  // comma in it. Packed into a single comma-joined parameter it would
-  // arrive here already split in two, and the server would be asked to
-  // draw from domains that do not exist — which is why the preselection
-  // travels as a repeated key.
   test("a domain name containing a comma survives the round trip", async () => {
     exam = {
       ...ckad,
@@ -413,9 +365,6 @@ describe("a drill deep link", () => {
     );
   });
 
-  // A bookmark from before a bank switch, or a link shared between two
-  // certifications. A name the loaded bank has never heard of must not
-  // reach the server as a filter: it would narrow the draw to nothing.
   test("a domain this bank does not have is dropped rather than sent", async () => {
     window.location.hash =
       "#/exams/ckad-mock-01/mode?domain=Observability&domain=Cluster+Setup";
@@ -429,9 +378,6 @@ describe("a drill deep link", () => {
   });
 });
 
-// A stale bookmark, or a switch that failed after this screen was
-// queued. Every card here would start the OTHER exam, so the screen must
-// leave rather than render a single one of them.
 describe("a route that names an exam the server does not have", () => {
   test("goes back to the selector and shows no way to start", async () => {
     renderMode(() => {}, "kcna-mock");
@@ -442,9 +388,6 @@ describe("a route that names an exam the server does not have", () => {
   });
 });
 
-// The tips sheet is bank data, so the control for it can only exist when
-// the loaded bank actually ships one. Drawing it unconditionally would
-// open an empty sheet on every bank that does not.
 describe("the exam tips opener", () => {
   test("is absent when the bank ships no tips", async () => {
     renderMode();
@@ -464,9 +407,6 @@ describe("the exam tips opener", () => {
     expect(await screen.findByRole("heading", { name: "Set the terminal up" })).toBeInTheDocument();
   });
 
-  // Both openers are one flex child of .mode-fine so its space-between
-  // still means "tips list, then buttons"; three loose children spread
-  // the first button into the middle of the row.
   test("shares a group with the layout card's opener", async () => {
     exam = { ...ckad, hasTips: true };
     renderMode();
@@ -478,11 +418,6 @@ describe("the exam tips opener", () => {
   });
 });
 
-// The last screen before the clock, and the one a hosted phone reaches
-// without ever choosing to: useSeatLanding navigates here by itself the
-// moment a Pod comes up, and a drill link or a bookmark lands here
-// directly. So it has to be right for a device that cannot sit the exam
-// it is about, not merely defensive.
 describe("a device that cannot sit this exam", () => {
   afterEach(() => {
     matchMediaMock([]);
@@ -495,14 +430,11 @@ describe("a device that cannot sit this exam", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: /needs a desktop/i }),
     ).toBeInTheDocument();
-    // Not the mode cards, not the domain filter, and not a tips list
-    // about a terminal this device does not have.
+
     expect(screen.queryByRole("heading", { name: strings.modes.exam.label })).toBeNull();
     expect(screen.queryByRole("button", { name: /start/i })).toBeNull();
   });
 
-  // The gate is about the terminal-and-desktop split screen, which an
-  // mcq exam does not have. This is the whole reason a phone is welcome.
   test("a multiple-choice exam is offered exactly as before", async () => {
     matchMediaMock([TOUCH_ONLY_QUERY]);
     exam = { ...ckad, examType: "mcq" };
@@ -512,9 +444,6 @@ describe("a device that cannot sit this exam", () => {
     expect(screen.queryByRole("heading", { level: 1, name: /needs a desktop/i })).toBeNull();
   });
 
-  // A desktop window dragged narrow has every capability the exam needs.
-  // WCAG 1.4.10 makes 320 CSS px the same as 1280px at 400% zoom, so a
-  // width test here would lock out the users who depend on that zoom.
   test("a narrowed desktop window still gets the mode cards", async () => {
     matchMediaMock([NARROW_QUERY]);
     renderMode();

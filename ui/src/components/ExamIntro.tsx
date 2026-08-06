@@ -16,22 +16,6 @@ export function resetIntroSeen(): void {
   localStorage.removeItem(INTRO_SEEN_KEY);
 }
 
-// The first-run explainer. This replaces a spotlight tour that measured
-// each target once with getBoundingClientRect() and positioned a card
-// beside it — an approach that could not work here. Two of its four
-// targets (the question panel and the desktop pane) are full-height
-// regions, and for those the "no room below, so place it above" branch
-// resolved to `bottom: innerHeight - rect.top`, which puts the card
-// entirely off the top of the screen. Half the tour was invisible by
-// construction, and the measurement was never refreshed on resize.
-//
-// So it does not point at the running layout at all. It *draws* the
-// layout: a static schematic with numbered regions, and a legend keyed
-// to the same numbers. Nothing to measure, nothing to re-measure,
-// nothing that can land off-screen; it reads the same at 1440px and at
-// 900px, and it is renderable (and therefore testable) without a live
-// exam behind it, which is also why the lobby can show it before the
-// clock starts.
 export function ExamIntro({
   onClose,
   durationSeconds,
@@ -40,12 +24,7 @@ export function ExamIntro({
   durationSeconds?: number;
 }) {
   const s = strings.intro;
-  // The schematic's countdown chip showed a hardcoded "1:59:58", i.e.
-  // CKAD's two hours, on a diagram explaining every exam's screen. It
-  // reads two seconds off the loaded exam's own clock — enough to look
-  // like a countdown that is running rather than one at its start —
-  // and falls back to the label when no exam is loaded, which is where
-  // the About drawer can open it.
+
   const timer =
     durationSeconds && durationSeconds > 2
       ? formatClock(durationSeconds - 2)
@@ -85,8 +64,6 @@ export function ExamIntro({
         ))}
       </ol>
 
-      {/* Below the legend and outside it: the legend's numbers key to the
-          four regions on the schematic, and grading is not one of them. */}
       <section className="intro-note" aria-label={s.methodTitle}>
         <strong>{s.methodTitle}</strong> — {s.method}
       </section>

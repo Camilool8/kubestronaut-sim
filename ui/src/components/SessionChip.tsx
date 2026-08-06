@@ -5,24 +5,8 @@ import { formatClock } from "../lib/format";
 import { useTick } from "../lib/useTick";
 import { strings } from "../strings";
 
-/** Under this much lease left, the countdown starts insisting. */
 const SOON_SECONDS = 15 * 60;
 
-/**
- * Who you are and how long you have.
- *
- * The countdown is the part that earns its place: a hosted session has a
- * hard cap and is taken back at it whatever the candidate is doing, so
- * the one thing they cannot be left to guess is how long that is. It is
- * recomputed from the server's `expiresAt` on every tick rather than
- * decremented, so a throttled background tab resyncs instead of drifting.
- *
- * Presentational, and deliberately so. The controls that used to sit
- * beside it are SessionActions below, and the confirmation they raise is
- * owned by the header — because on a narrow viewport those controls live
- * inside a popover that unmounts when it closes, and a dialog rendered
- * underneath them would be destroyed by the click that opened it.
- */
 export function SessionChip({
   login,
   session,
@@ -43,9 +27,7 @@ export function SessionChip({
         <span
           className="session-chip-clock"
           data-soon={soon || undefined}
-          // Announced only when it starts mattering. A clock in a live
-          // region that re-reads every second is unusable with a screen
-          // reader on, and for most of a ten-hour lease it is not news.
+
           role={soon ? "status" : undefined}
         >
           {secondsLeft === 0
@@ -59,23 +41,11 @@ export function SessionChip({
   );
 }
 
-// A full reload rather than a state update. Signing out invalidates a
-// cookie that every open fetch and the desktop's WebSocket are carrying,
-// and there is no partial version of that.
-//
-// Exported for the navbar's menu, which is now the only place either way
-// out of a session is offered.
 export async function signOut() {
   await logout().catch(() => undefined);
   window.location.assign("/");
 }
 
-/**
- * The two ways out.
- *
- * `onEnd` raises the confirmation rather than performing anything: see
- * SessionChip above for why the dialog cannot live here.
- */
 export function SessionActions({
   session,
   onEnd,
@@ -97,7 +67,6 @@ export function SessionActions({
   );
 }
 
-/** The confirmation, and the call it makes if confirmed. */
 export function EndSessionDialog({
   onClose,
   onChanged,

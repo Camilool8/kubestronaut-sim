@@ -17,7 +17,6 @@ describe("ErrorBoundary", () => {
   });
 
   test("renders a fallback with the error message when a child throws", () => {
-    // React logs the caught error to console.error; keep test output clean.
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     render(
       <ErrorBoundary>

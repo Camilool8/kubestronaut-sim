@@ -51,8 +51,6 @@ describe("Async", () => {
     expect(screen.queryByText("spinner")).not.toBeInTheDocument();
   });
 
-  // A call that resolves with nothing is still a call that resolved. Gating
-  // on `data !== null` reported a useAsync<void> as perpetually loading.
   test("a call that resolves with no value still counts as loaded", () => {
     render(
       <Async
@@ -67,8 +65,6 @@ describe("Async", () => {
     expect(screen.queryByText("spinner")).not.toBeInTheDocument();
   });
 
-  // A refetch over data already on screen is otherwise invisible: the
-  // screen keeps rendering values that may already be wrong.
   test("children are told when a refresh is in flight over stale data", () => {
     render(
       <Async

@@ -6,29 +6,12 @@ import { strings } from "../strings";
 const OVERRIDE_KEY = "sim.desktopGateOverride";
 
 export type GateVerdict =
-  /** Phone or tablet: the exam genuinely cannot work here. */
+
   | "blocked"
-  /** A desktop with a small window — offer a way through. */
+
   | "narrow"
   | "ok";
 
-/**
- * Decides whether a hands-on exam can be run here at all.
- *
- * The distinction matters: a touch-only device has no keyboard for a
- * terminal and no room for a desktop beside the questions, so there is
- * nothing useful to let through. A desktop user who merely shrank their
- * window — or zoomed to 400%, which reports the same width — is having
- * a layout problem, not a capability problem, and blocking them outright
- * would be a bug.
- *
- * Touch-only is checked FIRST and without reference to width. It used to
- * be reached only after the narrow test, which meant a tablet held in
- * landscape — 1024 CSS px, coarse pointer, no keyboard — was reported as
- * "ok" and walked into the split screen. Width was never the question
- * for that device: it is the missing keyboard, and rotating it does not
- * grow one.
- */
 export function useDesktopGate(): GateVerdict {
   const narrow = useMediaQuery(NARROW_QUERY);
   const touchOnly = useMediaQuery(TOUCH_ONLY_QUERY);
@@ -42,25 +25,10 @@ export function gateOverridden(): boolean {
 
 interface DesktopRequiredProps {
   verdict: GateVerdict;
-  /**
-   * The running attempt's clock and its submit control.
-   *
-   * Rendered FIRST, immediately under the heading. It used to sit below
-   * the explanation and the requirements list, which on a phone put the
-   * only way to submit an exam that is still being timed below the fold
-   * — three paragraphs of why this device cannot run the exam, read by
-   * someone whose actual question is "how do I get out of this". The
-   * explanation is why they are here; the clock is what they can do
-   * about it, and it goes first.
-   */
+
   children?: React.ReactNode;
 }
 
-/**
- * The screen a phone gets instead of a broken exam layout. It is the
- * page's real content, not an overlay over a hidden app, and it has to
- * work at 320 CSS px — it is the one screen these users will ever see.
- */
 export function DesktopRequired({ verdict, children }: DesktopRequiredProps) {
   const [, force] = useState(0);
 
@@ -80,18 +48,9 @@ export function DesktopRequired({ verdict, children }: DesktopRequiredProps) {
             <li key={r}>{r}</li>
           ))}
         </ul>
-        {/* Only where it is true, which is not everywhere this screen is
-            drawn. Over a running attempt the catalog is not reachable at
-            all: session.state is the outer switch, so `#/exams` renders
-            the exam anyway and a link to it would change nothing. The
-            sentence was unconditional, and on the one screen a phone
-            actually sees mid-attempt it was describing a place the
-            candidate could not go. The clock and the submit button above
-            are that case's way forward, and they are already there. */}
+
         {!children && <p className="desktop-required-still">{strings.mobile.stillAvailable}</p>}
-        {/* Last, and that is the right place for it: it is the "I have
-            read why this will not work" action, not an escape from a
-            running exam. */}
+
         {verdict === "narrow" && (
           <button className="btn desktop-required-anyway" onClick={continueAnyway}>
             {strings.mobile.continueAnyway}

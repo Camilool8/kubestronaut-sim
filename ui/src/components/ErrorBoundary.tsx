@@ -9,9 +9,6 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-// Last line of defense: a render throw anywhere below would otherwise
-// blank the screen mid-exam. Recovery is a full reload — session state
-// lives server-side, so reloading is always safe.
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { error: null };
 

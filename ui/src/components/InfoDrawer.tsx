@@ -7,12 +7,6 @@ interface InfoDrawerProps {
   onShowIntro?: () => void;
 }
 
-// Slide-over "About" panel: how the sim compares to the real exam,
-// non-affiliation disclaimer, and license attribution. Available from
-// every screen. The "How this exam works" entry appears wherever the
-// host screen can render the intro card — which, unlike the spotlight
-// tour it replaced, is every screen, because the card describes the exam
-// layout rather than pointing at a live one.
 export function InfoDrawer({ onClose, onShowIntro }: InfoDrawerProps) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -55,10 +49,6 @@ export function InfoDrawer({ onClose, onShowIntro }: InfoDrawerProps) {
             </thead>
             <tbody>
               {s.compareRows.map((row) => (
-                // data-label is what the stacked mobile layout prints
-                // above each value once the column headings are visually
-                // hidden. Same words, from the same place — a CSS
-                // ::before cannot invent copy, and it must not.
                 <tr key={row[0]}>
                   <th scope="row">{row[0]}</th>
                   <td data-label={s.compareHere}>{row[1]}</td>

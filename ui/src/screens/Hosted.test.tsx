@@ -8,14 +8,6 @@ import { TOUCH_ONLY_QUERY } from "../lib/deviceCapability";
 import { matchMediaMock } from "../test/setup";
 import { strings } from "../strings";
 
-// The hosted tier, from the outside: what a browser sees when the SPA is
-// served by the hub instead of by a facilitator.
-//
-// Every test here drives App itself rather than the screens underneath,
-// because the thing worth pinning down is the GATE — which product this
-// is, and which of five states the candidate is in. A test that mounted
-// HostedStart directly would pass whether or not App ever renders it.
-
 const now = Date.UTC(2026, 7, 4, 12, 0, 0);
 
 function me(overrides: Partial<Me> = {}): Me {
@@ -28,7 +20,6 @@ function me(overrides: Partial<Me> = {}): Me {
   };
 }
 
-/** A settled idle session, as the facilitator reports one. */
 const readySessionStub = {
   state: "idle",
   bank: "ckad-mock-01",
@@ -40,7 +31,6 @@ const readySessionStub = {
   untimed: false,
 };
 
-/** A ready local environment, so the ordinary app can mount over a hub. */
 const localStubs: Record<string, unknown> = {
   "/api/session": readySessionStub,
   "/api/boot": {
@@ -76,7 +66,6 @@ const localStubs: Record<string, unknown> = {
   "/api/control/status": { busy: false },
 };
 
-/** One graded attempt, as the hub keeps it. */
 const attemptRecord = {
   id: "8da8fa50",
   bank: "ckad-mock-01",
@@ -126,16 +115,9 @@ interface Posted {
 
 let posted: Posted[];
 let identity: Me | null;
-/** Status for the next POST /api/session/start, and what it answers with. */
+
 let startAnswer: { status: number; body: unknown };
-/**
- * What GET /hub/exams answers.
- *
- * Empty by default, which is a real deployment state — a hub with no
- * bank index staged — and the one the flavour-card tests below cover.
- * The tests that set it are the ordinary case: candidates choose the
- * certification.
- */
+
 let hubExams: unknown[];
 
 function stubFetch() {
@@ -151,8 +133,6 @@ function stubFetch() {
         posted.push({ url, body: String(init.body ?? "") });
       }
       if (url.endsWith("/api/me")) {
-        // A local facilitator JSON-404s any /api/* it does not know, and
-        // that 404 IS the detection mechanism.
         return identity === null
           ? json({ error: "not found" }, 404)
           : json(identity);
@@ -169,10 +149,7 @@ function stubFetch() {
         });
       }
       if (url.includes("/api/history/")) return json(attemptResults);
-      // Two failure fixtures for the session poll, opted into by writing
-      // a sentinel into localStubs. `null` is the hub's answer while it
-      // replaces a Pod — an expected wait. "boom" is a facilitator that
-      // has actually fallen over, which must still be reported.
+
       if (url.endsWith("/api/session")) {
         if (localStubs["/api/session"] === null) {
           return json(
@@ -210,14 +187,10 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   window.location.hash = "";
-  // Media mocks are module-global. A leaked one turns every later test
-  // in this file into a phone, and the ones that would then fail are
-  // exactly the ones asserting a Start button exists.
+
   matchMediaMock([]);
 });
 
-// The property the whole design rests on: `./sim up` is byte-identical,
-// and the only trace of hosted mode in it is one 404 at page load.
 test("a facilitator that 404s /api/me gets the local app and no sign-in", async () => {
   identity = null;
   render(<App />);
@@ -226,9 +199,6 @@ test("a facilitator that 404s /api/me gets the local app and no sign-in", async 
   expect(screen.queryByRole("link", { name: /continue with github/i })).toBeNull();
 });
 
-// Something in front of a facilitator answering 200 with its own body is
-// not a hub, however healthy the status line looks. Guessing "hosted"
-// wrongly puts a login screen over a product that has no accounts.
 test("a 200 that is not the hub's shape is still read as local", async () => {
   identity = { notAHub: true } as unknown as Me;
   render(<App />);
@@ -247,20 +217,12 @@ test("a signed-out visitor gets the sign-in screen and the seat count", async ()
 
   const link = await screen.findByRole("link", { name: /continue with github/i });
   expect(link.getAttribute("href")).toBe("/hub/auth/login");
-  // Capacity before sign-in, on purpose: someone deciding whether to
-  // create an account is entitled to know there is somewhere to sit.
+
   expect(screen.getByText(/2 of 3 hands-on seats free/i)).toBeTruthy();
-  // What pressing it actually costs, said first. The hub requests no
-  // OAuth scopes at all, and "Continue with GitHub" is a phrase people
-  // have learned to read as "grant this app my repositories".
+
   expect(screen.getByText(/No permissions are requested/i)).toBeTruthy();
 });
 
-// It used to be the only screen with no header, carrying a bespoke theme
-// button in a corner of its own — which made the front door the one place
-// the app's chrome was a different object. It has the same navbar as
-// everything else now, and the card below still draws the mark large,
-// because that is this screen's subject rather than its furniture.
 test("the sign-in screen carries the same navbar as every other screen", async () => {
   identity = {
     authenticated: false,
@@ -273,15 +235,12 @@ test("the sign-in screen carries the same navbar as every other screen", async (
   await screen.findByRole("link", { name: /continue with github/i });
   expect(document.querySelector(".signin-mark")).toBeTruthy();
   expect(screen.getByRole("banner")).toBeTruthy();
-  // The menu is on every screen at every width, including this one —
-  // signed out, there is simply nothing in its account section.
+
   expect(screen.getByRole("button", { name: strings.header.menuLabel })).toBeTruthy();
-  // The GitHub mark rides the button it belongs to.
+
   expect(document.querySelector(".signin-github .signin-github-mark")).toBeTruthy();
 });
 
-// AUTH_MODE=header behind a proxy that did not identify anyone. There is
-// genuinely nothing to sign in to, and a button that 404s is worse.
 test("no login URL means no sign-in button", async () => {
   identity = { authenticated: false, authMode: "header" };
   render(<App />);
@@ -290,10 +249,6 @@ test("no login URL means no sign-in button", async () => {
   expect(screen.queryByRole("link", { name: /continue with github/i })).toBeNull();
 });
 
-// The ordinary lobby: the candidate picks the certification they came
-// for. It used to offer "hands-on" or "multiple choice" and the exam
-// behind each was a chart value they never saw, which worked only while
-// there was exactly one of each.
 test("the lobby offers certifications and starts the one that is chosen", async () => {
   const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
   hubExams = [
@@ -324,8 +279,7 @@ test("the lobby offers certifications and starts the one that is chosen", async 
 
   expect(await screen.findByRole("heading", { name: "CKAD" })).toBeTruthy();
   expect(screen.getByRole("heading", { name: "KCNA" })).toBeTruthy();
-  // Seats stay per ENGINE: what a seat costs is a Pod, and every
-  // hands-on exam is one, so CKAD and CKA draw from the same pool.
+
   expect(screen.getByText("2 of 3 free")).toBeTruthy();
   expect(screen.getByText("30 of 30 free")).toBeTruthy();
 
@@ -334,15 +288,11 @@ test("the lobby offers certifications and starts the one that is chosen", async 
   await waitFor(() => {
     const start = posted.find((p) => p.url.endsWith("/api/session/start"));
     expect(start).toBeTruthy();
-    // The exam decides the seat. The kind rides along, but the hub
-    // derives the flavour from the bank's own engine.
+
     expect(JSON.parse(start!.body)).toEqual({ kind: "mcq", bank: "kcna-mock" });
   });
 });
 
-// A certification on the path whose bank is not written is listed —
-// seeing that CKS is coming is worth something — but there is nothing to
-// press, and the card says why rather than failing on the click.
 test("a certification with no bank yet is shown without a start button", async () => {
   hubExams = [
     {
@@ -378,16 +328,11 @@ test("signed in with no session, the lobby offers a flavour and posts a kind", a
   await waitFor(() => {
     const start = posted.find((p) => p.url.endsWith("/api/session/start"));
     expect(start).toBeTruthy();
-    // A kind, and deliberately no mode: this call is admission, not the
-    // start of an attempt. The facilitator inside the Pod configures
-    // that later, through the same door.
+
     expect(JSON.parse(start!.body)).toEqual({ kind: "practical" });
   });
 });
 
-// A deployment with no MCQ seats does not offer MCQ. The hub refuses it
-// anyway; a disabled card explaining an option that does not exist here
-// is a worse way to learn that.
 test("a flavour with no seats configured is not offered at all", async () => {
   identity = me({ seats: { practical: { used: 0, total: 3 } } });
   render(<App />);
@@ -396,11 +341,6 @@ test("a flavour with no seats configured is not offered at all", async () => {
   expect(screen.queryByRole("heading", { name: /multiple choice/i })).toBeNull();
 });
 
-// The lobby is the expensive door. Start claims one of a handful of
-// seats and boots a Pod, and when the pool is full it takes a place in
-// the queue — all of it for an environment a phone cannot use. The hub
-// refuses the request too (hub/internal/api/device.go); this is what
-// stops the candidate making the mistake at all.
 test("a phone is not offered a hands-on seat, and is told why", async () => {
   matchMediaMock([NARROW_QUERY, TOUCH_ONLY_QUERY]);
   render(<App />);
@@ -409,15 +349,11 @@ test("a phone is not offered a hands-on seat, and is told why", async () => {
   const card = practical.closest("article")!;
   expect(within(card).queryByRole("button")).toBeNull();
   expect(within(card).getByText(/needs a keyboard and a desktop browser/i)).toBeTruthy();
-  // Not "coming soon" and not a seat count: the exam is built, and
-  // someone on a laptop is sitting it right now.
+
   expect(within(card).getByText(strings.mobile.needsDesktop)).toBeTruthy();
   expect(within(card).queryByText(/free$/)).toBeNull();
 });
 
-// The other half of the same rule, and the one that would be easy to
-// break by gating the screen instead of the card. Multiple choice is
-// the whole reason a phone is welcome here.
 test("a phone can still take a multiple-choice seat", async () => {
   matchMediaMock([NARROW_QUERY, TOUCH_ONLY_QUERY]);
   const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -433,9 +369,6 @@ test("a phone can still take a multiple-choice seat", async () => {
   });
 });
 
-// A tablet held in landscape is wide enough to pass a width test and
-// has no more keyboard than a phone. Gating on NARROW_QUERY alone would
-// let it spend a seat.
 test("a wide tablet is refused a hands-on seat too", async () => {
   matchMediaMock([TOUCH_ONLY_QUERY]);
   render(<App />);
@@ -444,9 +377,6 @@ test("a wide tablet is refused a hands-on seat too", async () => {
   expect(within(practical.closest("article")!).queryByRole("button")).toBeNull();
 });
 
-// Certification cards take the same treatment as flavour cards: the
-// refusal is keyed on the exam's engine, not on which shape of card the
-// deployment happens to be showing.
 test("a phone is refused the hands-on certification card as well", async () => {
   matchMediaMock([NARROW_QUERY, TOUCH_ONLY_QUERY]);
   hubExams = [
@@ -484,9 +414,6 @@ test("a phone is refused the hands-on certification card as well", async () => {
   expect(within(kcna.closest("article")!).getByRole("button", { name: "Start" })).toBeTruthy();
 });
 
-// The button stays enabled when every seat is taken — the queue is the
-// answer to a full pool, and a greyed-out button offers no way to ask
-// for one — so it has to say what the click will actually produce.
 test("a full flavour offers the queue rather than promising a session", async () => {
   identity = me({
     seats: { practical: { used: 3, total: 3 }, mcq: { used: 0, total: 30 } },
@@ -495,7 +422,7 @@ test("a full flavour offers the queue rather than promising a session", async ()
 
   const queue = await screen.findByRole("button", { name: /join the queue/i });
   expect(queue).toBeEnabled();
-  // The flavour that is not full still says Start.
+
   expect(screen.getByRole("button", { name: "Start" })).toBeTruthy();
 });
 
@@ -515,25 +442,20 @@ test("a full pool answers 409 with a place in the queue", async () => {
 
   await screen.findByRole("heading", { name: /ready when you are/i });
   await user.click(screen.getAllByRole("button", { name: "Start" })[0]);
-  // What the hub does next: the place is in the identity from now on, so
-  // a reload lands back on it.
+
   identity = me({ queue: { position: 2 } });
 
   const dialog = await screen.findByRole("dialog");
   expect(dialog.textContent).toMatch(/number 2 in the queue/i);
-  // The hold is the mechanism, and it is why the page must stay open.
+
   expect(dialog.textContent).toMatch(/held briefly/i);
 
   await user.click(screen.getByRole("button", { name: /wait here/i }));
-  // Dismissing the interruption must not lose the state: a place in a
-  // queue is standing information, and the page keeps saying so.
+
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(screen.getByText(/number 2 in the queue/i)).toBeTruthy();
 });
 
-// The two waits mean different things to the person waiting, so they say
-// different things. Boots are serialised because two at once make both
-// slow rather than either fast.
 test("pending and starting are different screens", async () => {
   identity = me({
     session: {
@@ -597,21 +519,14 @@ test("a ready session renders the ordinary app with a lease countdown over it", 
   });
   render(<App />);
 
-  // The exam selector: the same screen a local candidate sees, reaching
-  // the same facilitator through the hub's proxy.
   expect(await screen.findByRole("heading", { name: /path to kubestronaut/i })).toBeTruthy();
-  // The countdown stays in the BAR at every width — it is the one number
-  // a hosted candidate cannot guess, and the seat is taken back at its
-  // cap whatever they are doing. Who they are is not urgent in the same
-  // way and moved into the menu with the rest of the account section.
+
   expect(screen.getByText("2:00:00 left")).toBeTruthy();
 
   await user.click(screen.getByRole("button", { name: strings.header.menuLabel }));
   expect(screen.getByText("octocat")).toBeTruthy();
 });
 
-// The whole argument for hosted history: a record you can read without
-// spending a seat to do it.
 test("a past attempt opens from the dashboard with no environment running", async () => {
   const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
   window.location.hash = "#/progress";
@@ -621,15 +536,10 @@ test("a past attempt opens from the dashboard with no environment running", asyn
   await user.click(row);
 
   expect(await screen.findByText(/expose the deployment/i)).toBeTruthy();
-  // Said before anything else, because everything below it is identical
-  // to the screen shown at the end of a live exam and is not one.
+
   expect(screen.getByText(/this is a record, not a live session/i)).toBeTruthy();
 });
 
-// Deep-dive links inside a past attempt must stay inside it. The same
-// component renders the live results screen, where they point at
-// /results — following those from a record would jump into a session
-// that may not exist.
 test("the deep dive inside a past attempt links back into the record", async () => {
   window.location.hash = "#/history/8da8fa50";
   render(<App />);
@@ -638,11 +548,6 @@ test("the deep dive inside a past attempt links back into the record", async () 
   expect(open.getAttribute("href")).toBe("#/history/8da8fa50/q01");
 });
 
-// Import is refused by the hub with a 501, and the reason is a property
-// of hosted history rather than a missing feature: this is the durable
-// copy, and accepting an arbitrary document would let it hold attempts
-// that were never graded. Export stays — it still imports into a local
-// `./sim`.
 test("the hosted dashboard exports but does not import", async () => {
   window.location.hash = "#/progress";
   render(<App />);
@@ -651,7 +556,6 @@ test("the hosted dashboard exports but does not import", async () => {
   expect(screen.queryByRole("button", { name: /^import$/i })).toBeNull();
 });
 
-/** A ready hosted seat, so SimApp mounts and its session poller runs. */
 function readySeat() {
   return {
     kind: "practical" as const,
@@ -664,45 +568,31 @@ function readySeat() {
   };
 }
 
-// The reported bug, in the window it actually happens in.
-//
-// SimApp has to be MOUNTED and its session poller running, because that
-// poller is what raises the toast. /api/me flips to "pending" about two
-// seconds after the POST and unmounts SimApp — but a toast pushed before
-// then lives in a module singleton and outlives it. So the fixture holds
-// /api/me at "ready" while the proxy has already started answering 503,
-// which is exactly the race.
 test("a Pod replacement raises no outage toast", async () => {
   identity = me({ session: readySeat() });
   render(<App />);
   await screen.findByRole("heading", { name: /path to kubestronaut/i });
 
-  // The hub begins replacing the Pod. Every proxied request is a 503 from
-  // here on; /api/me has not caught up.
   localStubs["/api/session"] = null;
-  window.dispatchEvent(new Event("focus")); // pollSession re-fetches on focus
-  await vi.advanceTimersByTimeAsync(0); // let the mocked 503 round-trip settle
+  window.dispatchEvent(new Event("focus"));
+  await vi.advanceTimersByTimeAsync(0);
 
   await waitFor(() => {
     expect(screen.queryByText(/cannot reach facilitator/i)).toBeNull();
   });
 });
 
-// The other half, and the reason the guard is a code and not a blanket
-// mute: a facilitator that has genuinely fallen over must still say so.
 test("a real failure still raises the toast", async () => {
   identity = me({ session: readySeat() });
   render(<App />);
   await screen.findByRole("heading", { name: /path to kubestronaut/i });
 
-  localStubs["/api/session"] = "boom"; // forces the 500 branch in stubFetch
+  localStubs["/api/session"] = "boom";
   window.dispatchEvent(new Event("focus"));
 
   expect(await screen.findByText(/cannot reach facilitator/i)).toBeInTheDocument();
 });
 
-// The rebuild screen names the exam and offers the honest way out. A
-// first boot must be untouched by all of this.
 test("a rebuild says so, and a first boot still reads as a first boot", async () => {
   hubExams = [
     {
@@ -729,22 +619,14 @@ test("a rebuild says so, and a first boot still reads as a first boot", async ()
   identity = me({ session: { ...booting, op: "reset" } });
   const rebuild = render(<App />);
   await screen.findByRole("heading", { name: strings.hosted.rebuildTitle });
-  // The heading needs no exam data and renders on the first pass; the
-  // body names the exam only once GET /hub/exams has round-tripped. That
-  // is an independent, unbounded number of microtask hops behind the
-  // heading, so a positive `waitFor` — which keeps retrying on every DOM
-  // mutation rather than checking once — is what actually waits for it,
-  // where a single timer flush proved to still race it.
+
   await waitFor(() => {
     expect(screen.getByText(/clean CKAD environment/i)).toBeInTheDocument();
   });
   expect(
     screen.getByRole("button", { name: strings.hosted.rebuildGiveUp }),
   ).toBeInTheDocument();
-  // The reassure line, not just the title: this is the sentence that used
-  // to say "a first build on a cold node pulls several gigabytes" about a
-  // node that already had every image, and past minute ten told a
-  // candidate trying to KEEP their seat to give it up.
+
   expect(
     screen.getByText("Tearing down the old cluster and starting a clean one."),
   ).toBeInTheDocument();
@@ -759,12 +641,6 @@ test("a rebuild says so, and a first boot still reads as a first boot", async ()
   expect(screen.getByText("Pulling images and starting the cluster.")).toBeInTheDocument();
 });
 
-// op clears the moment a recycle's job finishes, which session.go does
-// just before flipping state to "failed" — so by the time this screen
-// can render the failure, the hub's own answer no longer says it was a
-// rebuild. The screen has to remember what it watched happen across the
-// polls in between, or a failed rebuild reads as "your environment did
-// not start", which is false: a moment ago this seat had one running.
 test("a rebuild that fails still reads as a rebuild, not a first boot", async () => {
   const rebuilding = {
     kind: "practical" as const,
@@ -780,9 +656,6 @@ test("a rebuild that fails still reads as a rebuild, not a first boot", async ()
   render(<App />);
   await screen.findByRole("heading", { name: strings.hosted.rebuildTitle });
 
-  // The hub's own answer once the recycle has actually failed: op is
-  // gone (the job finished), state is "failed", same as any other boot
-  // that died.
   identity = me({
     session: {
       ...rebuilding,
@@ -802,10 +675,6 @@ test("a rebuild that fails still reads as a rebuild, not a first boot", async ()
   expect(screen.queryByRole("heading", { name: strings.hosted.bootFailedTitle })).toBeNull();
 });
 
-// A hosted seat is scoped to one exam — the Pod is stamped and sized for
-// it — so the picker at the end of a boot has one card on it and asks the
-// candidate to re-confirm what they chose in the lobby. After a rebuild
-// it reads as having been thrown out of the attempt they asked to repeat.
 test("an environment that comes up lands on its exam, not on the picker", async () => {
   identity = me({
     session: {
@@ -834,20 +703,12 @@ test("an environment that comes up lands on its exam, not on the picker", async 
     },
   });
 
-  // useHosted only re-polls /api/me every POLL_ACTIVE_MS (useHosted.ts) —
-  // 2s — while a session is not yet ready, so the ready state above sits
-  // unseen until that timer fires. Advance past it explicitly rather than
-  // trusting shouldAdvanceTime's real-time pace to outrun waitFor's
-  // shorter default timeout.
   await vi.advanceTimersByTimeAsync(2_000);
   await waitFor(() => {
     expect(window.location.hash).toBe("#/exams/ckad-mock-01/mode");
   });
 });
 
-// A tab that was already on a ready session is not mid-anything, and
-// yanking it to the mode screen would lose whatever the candidate was
-// reading.
 test("a page load into a ready seat is left where it is", async () => {
   window.location.hash = "#/progress";
   identity = me({
@@ -862,26 +723,11 @@ test("a page load into a ready seat is left where it is", async () => {
     },
   });
   render(<App />);
-  // A bare waitFor on an assertion that is already true on its first
-  // synchronous check resolves instantly, before the mocked /api/me
-  // round-trip (and the effect it would drive) ever runs — passing
-  // whether or not the hook is wired correctly. Flush that round-trip
-  // first so a wrongly-navigating hook has actually had its turn before
-  // the hash is checked. See Score.test.tsx and the Pod-replacement test
-  // above for the same pattern.
+
   await vi.advanceTimersByTimeAsync(0);
   await waitFor(() => expect(window.location.hash).toBe("#/progress"));
 });
 
-// The other guard the docstring calls "both matter" — and neither test
-// above reaches it. The first arrives on the default route, so the
-// yield list is passed through without being evaluated; the second's
-// session is already ready at mount, so it only exercises the baseline
-// guard, and being on /progress there is incidental. A rebuild finishing
-// behind a candidate who is deliberately reading their progress page
-// must not close it under them. `history` and `exams` are the same
-// branch of the same condition as `progress`, so proving this one yields
-// is enough — three near-copies would not cover anything more.
 test("a rebuild finishing behind a deliberate route does not close it", async () => {
   window.location.hash = "#/progress";
   identity = me({
@@ -897,10 +743,7 @@ test("a rebuild finishing behind a deliberate route does not close it", async ()
     },
   });
   render(<App />);
-  // /progress answers from the hub's own store regardless of session
-  // state — HostedHome renders it ahead of the booting screen for
-  // exactly that reason — so the export link, not a rebuild heading, is
-  // the settled signal to wait for here.
+
   await screen.findByRole("link", { name: /export/i });
 
   identity = me({
@@ -915,11 +758,6 @@ test("a rebuild finishing behind a deliberate route does not close it", async ()
     },
   });
 
-  // Same poll-cadence wait as the sibling starting->ready test above:
-  // advance past useHosted's POLL_ACTIVE_MS before checking, so the
-  // guard has actually run (in either direction) before the assertion
-  // does, rather than a bare waitFor resolving on its already-true first
-  // check.
   await vi.advanceTimersByTimeAsync(2_000);
   await waitFor(() => expect(window.location.hash).toBe("#/progress"));
 });

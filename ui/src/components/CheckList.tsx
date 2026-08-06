@@ -6,14 +6,6 @@ interface CheckListProps {
   checks: CheckResult[];
 }
 
-// Per-check rows for a graded question: pass/fail mark, description,
-// earned/points, and the grader's message.
-//
-// The header row is visually hidden rather than absent: four unlabelled
-// columns are unreadable to a screen reader, but a visible header would
-// repeat itself under every question on the score page. The ✓/✗ glyph
-// likewise carries a text equivalent, since result state must not rest
-// on a symbol alone.
 export function CheckList({ checks }: CheckListProps) {
   return (
     <div className="check-list-scroll">
@@ -28,10 +20,6 @@ export function CheckList({ checks }: CheckListProps) {
         </thead>
         <tbody>
           {checks.map((c) => {
-            // Three outcomes, not two: a skipped check never ran (its
-            // points header is malformed in the bank), and rendering it
-            // as a failure would point the candidate's next study hour
-            // at a bank bug. Glyph, sr text and message all say so.
             const state = c.skipped ? "skip" : c.passed ? "pass" : "fail";
             return (
               <tr key={c.name} className={`check-${state}`}>

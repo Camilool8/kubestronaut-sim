@@ -37,7 +37,7 @@ describe("Dialog", () => {
 
   test("Tab wraps focus inside the dialog", async () => {
     renderDialog();
-    // Cancel (initial) -> End Exam -> wraps back to Cancel
+
     await userEvent.tab();
     expect(screen.getByRole("button", { name: "End Exam" })).toHaveFocus();
     await userEvent.tab();

@@ -54,7 +54,6 @@ const exams: CatalogExam[] = [
   },
 ];
 
-// A full sitting: counted, and it decides the CKAD card's best score.
 const sitting: AttemptRecord = {
   id: "a1",
   bank: "ckad-mock-01",
@@ -75,7 +74,6 @@ const sitting: AttemptRecord = {
   counted: true,
 };
 
-// A domain drill: graded, kept, and excluded from the path.
 const drill: AttemptRecord = {
   id: "a2",
   bank: "ckad-mock-01",
@@ -159,11 +157,9 @@ function mockApi() {
 
 const renderProgress = () => render(<Progress catalogVersion={0} />);
 
-/** The path card for a certification, so a query can never drift cards. */
 const cardFor = (id: string) =>
   screen.getByText(id, { selector: ".path-card-id" }).closest("article") as HTMLElement;
 
-/** The attempt row whose mode cell contains this text. */
 const rowFor = (mode: string) => screen.getByText(mode).closest("tr") as HTMLElement;
 
 beforeEach(() => {
@@ -189,7 +185,6 @@ describe("the certification path", () => {
     renderProgress();
     await screen.findByText("KCNA", { selector: ".path-card-id" });
 
-    // The word is the channel; the tint only repeats it.
     expect(within(cardFor("KCNA")).getByText("Passed")).toBeInTheDocument();
     expect(within(cardFor("CKAD")).getByText("In progress")).toBeInTheDocument();
     expect(within(cardFor("CKS")).getByText("Not built")).toBeInTheDocument();
@@ -199,9 +194,6 @@ describe("the certification path", () => {
     expect(within(cardFor("CKS")).getByText("No attempts yet")).toBeInTheDocument();
   });
 
-  // The rule `AttemptRecord.counted` exists for. The drill is on the
-  // table below with a 100% on it; the card it belongs to must not read
-  // as a pass because of it.
   test("a card with only uncounted attempts shows no best score", async () => {
     catalog = {
       ...catalog,
@@ -232,9 +224,6 @@ describe("the attempt table", () => {
     expect(within(full).getByText("pass")).toBeInTheDocument();
   });
 
-  // Hiding uncounted attempts would erase a week of drilling. Showing
-  // them unmarked would make the table claim four sittings where there
-  // was one. Both are wrong; the mark is the answer.
   test("an uncounted attempt is listed, keeps its score, and is marked as a drill", async () => {
     renderProgress();
     await screen.findByRole("table");
@@ -242,8 +231,7 @@ describe("the attempt table", () => {
     const row = rowFor("Training · Services and Networking");
     expect(within(row).getByText("100%")).toBeInTheDocument();
     expect(within(row).getByText("drill")).toBeInTheDocument();
-    // Never "pass", however well it went — the record is `counted: false`
-    // and the results banner refuses the word too.
+
     expect(within(row).queryByText("pass")).not.toBeInTheDocument();
     expect(
       screen.getByText(/does not count toward the path/),
@@ -258,8 +246,7 @@ describe("the attempt table", () => {
     expect(await screen.findByText(/Nothing graded yet/)).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.getByText("Nothing to rank yet.")).toBeInTheDocument();
-    // The path cards still render: five certifications with nothing on
-    // them is the honest picture of a fresh environment.
+
     expect(screen.getByText("KCNA", { selector: ".path-card-id" })).toBeInTheDocument();
   });
 });
@@ -271,28 +258,21 @@ describe("the weak-domain panel", () => {
 
     const rows = screen.getAllByText(/%$/, { selector: ".weak-figure" });
     expect(rows.map((r) => r.textContent)).toEqual(["42%", "67%"]);
-    // One weak run is not a trend, and drills count here on purpose.
+
     expect(screen.getByText("from 3 attempts")).toBeInTheDocument();
   });
 
-  // Only one bank is loaded at a time, so the button can only offer the
-  // domains the loaded bank actually has.
   test("the drill button carries the drillable domains into the mode screen", async () => {
     const user = userEvent.setup();
     renderProgress();
 
     await user.click(await screen.findByRole("button", { name: "Build a drill from these" }));
-    // One `domain` per name rather than one comma-joined value: a domain
-    // name is free text from the bank and may contain the separator.
+
     expect(window.location.hash).toBe(
       "#/exams/ckad-mock-01/mode?domain=Services+and+Networking&domain=Observability",
     );
   });
 
-  // Found in the browser: with two certifications in the record the
-  // rollup returned nine rows spanning both, and the button under them
-  // still said "Build a drill from these" while silently dropping the
-  // four it could not draw.
   test("counts what the drill will take when the list spans certifications", async () => {
     history = {
       ...history,
@@ -307,7 +287,6 @@ describe("the weak-domain panel", () => {
     const user = userEvent.setup();
     renderProgress();
 
-    // The row that cannot be drilled says so, beside its own figure.
     expect(await screen.findByText("not in the loaded exam")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Build a drill from 2 of these" }));
@@ -316,8 +295,6 @@ describe("the weak-domain panel", () => {
     );
   });
 
-  // A list of everything, worst-first, is not a priority list — it is the
-  // domain breakdown again, sorted.
   test("ranks at most six domains", async () => {
     history = {
       ...history,
@@ -352,9 +329,6 @@ describe("the weak-domain panel", () => {
     ).not.toBeInTheDocument();
   });
 
-  // /api/exam did not answer — a cold cluster, most likely. Neither
-  // branch is honest then: the button would not work, and the note would
-  // tell the candidate to load a bank that is already loaded.
   test("offers neither button nor excuse when the loaded exam is unknown", async () => {
     examStatus = 503;
     renderProgress();
@@ -375,7 +349,7 @@ describe("the record itself", () => {
 
     await user.click(screen.getByRole("button", { name: "Erase history" }));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    // The dialog is a gate, not a receipt.
+
     expect(deleteCalls).toBe(0);
     expect(screen.getByText(/There is no undo/)).toBeInTheDocument();
 
@@ -397,8 +371,6 @@ describe("the record itself", () => {
     await waitFor(() => expect(screen.queryByRole("table")).not.toBeInTheDocument());
   });
 
-  // An export with no way back is a one-way door. Import merges rather
-  // than replaces, and the count it reports is the proof of that.
   test("importing a document merges it and reports what happened to it", async () => {
     const user = userEvent.setup();
     const { container } = renderProgress();
@@ -420,9 +392,7 @@ describe("the record itself", () => {
     await screen.findByRole("table");
 
     const picker = container.querySelector('input[type="file"]') as HTMLInputElement;
-    // A .json file the server refuses, not a .txt one the picker's own
-    // `accept` would filter out before this code ever ran: the case under
-    // test is the server's verdict, not the browser's.
+
     await user.upload(picker, new File(["not an export"], "notes.json", {
       type: "application/json",
     }));

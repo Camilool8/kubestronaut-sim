@@ -1,15 +1,9 @@
-// Tiny module-level toast store — no dependency, no context provider.
-// Components subscribe via useSyncExternalStore (see Toast.tsx); any
-// code (including non-React modules) can push. Info toasts auto-dismiss;
-// warnings stay until dismissed (they carry exam-critical facts like
-// "5 minutes remaining").
-
 export type ToastKind = "info" | "warning";
 
 export interface ToastInput {
   kind: ToastKind;
   message: string;
-  /** Toasts sharing a dedupeKey replace each other instead of stacking. */
+
   dedupeKey?: string;
 }
 

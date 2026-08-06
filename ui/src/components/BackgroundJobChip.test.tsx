@@ -4,7 +4,6 @@ import userEvent from "@testing-library/user-event";
 import { BackgroundJobChip } from "./BackgroundJobChip";
 import type { ControlJob } from "../api";
 
-// Six phases, two of them done — the real switch job's shape.
 const job: ControlJob = {
   id: "job-1",
   op: "switch",
@@ -25,10 +24,6 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-// Pressing Escape, or "Run in background", used to leave a 2-4 minute
-// cluster rebuild running with no indicator anywhere in the product. The
-// lobby underneath looked entirely idle while the exam it describes was
-// being wiped and rebuilt.
 describe("BackgroundJobChip", () => {
   test("names the phase that is actually running", () => {
     render(<BackgroundJobChip job={job} bankTitle="CKA Mock Exam 01" onReopen={() => {}} />);
@@ -38,8 +33,7 @@ describe("BackgroundJobChip", () => {
   test("reports progress by completed step, which is data already in hand", () => {
     render(<BackgroundJobChip job={job} bankTitle="CKA Mock Exam 01" onReopen={() => {}} />);
     const bar = screen.getByRole("progressbar");
-    // Determinate by step, not by time — a time-weighted bar would need
-    // persisted per-phase medians, which is a separate piece of work.
+
     expect(bar).toHaveAttribute("aria-valuenow", "2");
     expect(bar).toHaveAttribute("aria-valuemax", "6");
     expect(bar).toHaveAccessibleName(/progress/i);
@@ -68,10 +62,6 @@ describe("BackgroundJobChip", () => {
     expect(reopened).toHaveBeenCalledTimes(1);
   });
 
-  // The chip used to title ANY job carrying a bank as a switch, because a
-  // resolved bankTitle was checked before the op was. Both jobs below
-  // carry one, and neither is a switch: the overlay named them correctly
-  // while the chip for the very same job did not.
   test("titles a first-time build as a build", () => {
     render(
       <BackgroundJobChip

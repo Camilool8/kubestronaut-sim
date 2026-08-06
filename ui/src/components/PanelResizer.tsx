@@ -3,20 +3,8 @@ import { desktopResize } from "../lib/desktopResize";
 import { SPLIT_QUERY, useMediaQuery } from "../lib/useMediaQuery";
 import { strings } from "../strings";
 
-// A UI preference, so localStorage beside sim.theme rather than the
-// sessionStorage the per-attempt marks use.
 const STORAGE_KEY = "sim.panelWidth";
 
-// Mirrors the clamp on .question-panel in theme.css. Kept in both places
-// on purpose: CSS enforces it against the viewport (which JS never sees
-// without a listener), JS enforces it against the pointer.
-//
-// DEFAULT_WIDTH is --task-pane-width, the measure the design specifies by
-// number. It is duplicated rather than read back with getComputedStyle:
-// this value is needed before first paint, and a layout read in a layout
-// effect to recover a constant we already know is a worse trade than one
-// mirrored number. theme.css names the token in its fallback, so the two
-// are at least visibly a pair.
 const DEFAULT_WIDTH = 420;
 const MIN_WIDTH = 280;
 const MAX_WIDTH = 600;
@@ -32,8 +20,7 @@ function loadWidth(): number {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (raw === null) return DEFAULT_WIDTH;
     const parsed = Number(raw);
-    // A value from an older build, a hand-edited key, or a different
-    // screen must not be able to render the panel unusable.
+
     if (!Number.isFinite(parsed) || parsed < MIN_WIDTH || parsed > MAX_WIDTH) {
       return DEFAULT_WIDTH;
     }
@@ -47,28 +34,13 @@ function saveWidth(px: number | null): void {
   try {
     if (px === null) window.localStorage.removeItem(STORAGE_KEY);
     else window.localStorage.setItem(STORAGE_KEY, String(px));
-  } catch {
-    // Storage can be disabled outright. Losing a panel width is a
-    // downgrade the exam absorbs; throwing out of a pointer handler is not.
-  }
+  } catch {}
 }
 
 interface PanelResizerProps {
-  /** id of the panel being resized, for aria-controls. */
   panelId: string;
 }
 
-// The draggable boundary between the question panel and the remote
-// desktop. Follows the APG window-splitter pattern: a focusable
-// role="separator" carrying its own value, operable by pointer AND by
-// keyboard, because this codebase has no mouse-only controls and a
-// 44px coarse-pointer floor.
-//
-// The width is written to a CSS custom property imperatively during a
-// drag and committed to React state only on release. That is deliberate:
-// re-rendering Exam at 60fps would re-render QuestionPanel, and
-// <Markdown> re-parsing the question through react-markdown + remark-gfm
-// sixty times a second is real work for no benefit.
 export function PanelResizer({ panelId }: PanelResizerProps) {
   const split = useMediaQuery(SPLIT_QUERY);
   const [width, setWidth] = useState(loadWidth);
@@ -77,18 +49,10 @@ export function PanelResizer({ panelId }: PanelResizerProps) {
   const dragStart = useRef<{ x: number; width: number } | null>(null);
   const holding = useRef(false);
 
-  // On the document root, not on a container ref. Custom properties
-  // inherit, so .question-panel picks it up either way — but a child's
-  // layout effect runs BEFORE its parent's ref is attached, so writing to
-  // an ancestor ref here silently did nothing on the very first commit,
-  // which is exactly the paint a stored width needs to be correct for.
   const applyWidth = useCallback((px: number) => {
     document.documentElement.style.setProperty("--panel-width", `${px}px`);
   }, []);
 
-  // Before paint, so a stored width never shows as a default-width flash.
-  // The CSS fallback var(--panel-width, var(--task-pane-width)) covers the
-  // frame before this runs.
   useLayoutEffect(() => {
     applyWidth(width);
   }, [applyWidth, width]);
@@ -115,8 +79,6 @@ export function PanelResizer({ panelId }: PanelResizerProps) {
   if (!split) return null;
 
   const setResizingAttr = (on: boolean) => {
-    // Resolved from the handle rather than a ref, so there is no second
-    // place for the mount-order trap above to reappear.
     const body = handleRef.current?.closest(".exam-body");
     if (!body) return;
     if (on) body.setAttribute("data-resizing", "true");
@@ -129,19 +91,14 @@ export function PanelResizer({ panelId }: PanelResizerProps) {
     setResizingAttr(false);
     try {
       element.releasePointerCapture(pointerId);
-    } catch {
-      // Already released, or the capture was lost — either is fine.
-    }
+    } catch {}
     release();
   };
 
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     const element = event.currentTarget;
-    // Mandatory, not polish: noVNC binds raw mousedown/mousemove/mouseup
-    // and a focusCanvas handler on its own canvas, so a drag released over
-    // the desktop would inject a click into the live remote session and
-    // steal the keyboard into it.
+
     element.setPointerCapture(event.pointerId);
     dragStart.current = { x: event.clientX, width };
     setDragging(true);
@@ -153,7 +110,7 @@ export function PanelResizer({ panelId }: PanelResizerProps) {
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     const start = dragStart.current;
     if (!start) return;
-    // Imperative: no setState per frame. See the note above the component.
+
     applyWidth(clamp(start.width + (event.clientX - start.x)));
   };
 
@@ -165,7 +122,6 @@ export function PanelResizer({ panelId }: PanelResizerProps) {
   };
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    // Escape mid-drag puts the edge back where it was.
     if (event.key === "Escape" && dragStart.current) {
       applyWidth(dragStart.current.width);
       setWidth(dragStart.current.width);
@@ -173,12 +129,6 @@ export function PanelResizer({ panelId }: PanelResizerProps) {
       return;
     }
 
-    // Same guard QuestionPanel's global handler uses. Without it, ⌘→ or
-    // Ctrl+Home while this separator has focus resized the panel AND
-    // preventDefault'd the browser's own shortcut — so a Mac candidate
-    // reaching for "end of line" moved the divider instead. Shift is
-    // deliberately still allowed: Shift+Arrow is this control's own
-    // coarse step.
     if (event.altKey || event.ctrlKey || event.metaKey) return;
 
     const delta = event.shiftKey ? COARSE_STEP : STEP;
@@ -187,14 +137,11 @@ export function PanelResizer({ panelId }: PanelResizerProps) {
     else if (event.key === "ArrowRight") next = width + delta;
     else if (event.key === "Home") next = MIN_WIDTH;
     else if (event.key === "End") next = MAX_WIDTH;
-    // No Enter/Space collapse. The splitter pattern allows one, but this
-    // panel has no collapsed state to toggle into: the exam is a split
-    // screen and the questions are never dismissable.
+
     if (next === null) return;
 
     event.preventDefault();
-    // Held down, an arrow repeats ~30 times a second. hold() is idempotent
-    // and release() waits for keyup, so the whole burst is one server resize.
+
     hold();
     commit(next);
   };
@@ -205,8 +152,7 @@ export function PanelResizer({ panelId }: PanelResizerProps) {
       className="panel-resizer"
       role="separator"
       tabIndex={0}
-      // A separator's implicit orientation is horizontal, so a vertical
-      // one has to say so.
+
       aria-orientation="vertical"
       aria-controls={panelId}
       aria-valuenow={width}
@@ -219,8 +165,7 @@ export function PanelResizer({ panelId }: PanelResizerProps) {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
-      // A capture stolen by the browser (a context menu, a tab switch)
-      // must not strand resizeSession false for the rest of the session.
+
       onLostPointerCapture={release}
       onKeyDown={onKeyDown}
       onKeyUp={release}

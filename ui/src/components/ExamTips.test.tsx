@@ -37,9 +37,6 @@ describe("ExamTips", () => {
 
     render(<ExamTips onClose={() => {}} />);
 
-    // The prose is the BANK's. If this ever passes against a hardcoded
-    // panel, the per-bank part of the feature has been lost — a CKAD
-    // sitting and a KCNA one are not made fast by the same advice.
     expect(await screen.findByText(/Two hours is not long/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Set the terminal up" })).toBeInTheDocument();
   });
@@ -49,9 +46,6 @@ describe("ExamTips", () => {
 
     render(<ExamTips onClose={() => {}} />);
 
-    // Markdown's default (copyable) rather than the mcq `copyable={false}`
-    // branch: almost every line here is a command meant to be run on the
-    // exam desktop under a clock.
     expect(
       await screen.findByRole("button", { name: /--dry-run=client -o yaml/ }),
     ).toBeInTheDocument();

@@ -16,10 +16,6 @@ afterEach(() => {
 });
 
 describe("ClipboardPanel", () => {
-  // The reason this panel exists: navigator.clipboard.readText does not
-  // exist for web content in Firefox and needs a permission in Chrome, so
-  // the one-keystroke paste cannot work for a large share of candidates.
-  // Typing (or pasting) into a textarea and pressing Send always works.
   test("sends typed text to the desktop", async () => {
     const user = userEvent.setup();
     const pasted: string[] = [];
@@ -39,8 +35,7 @@ describe("ClipboardPanel", () => {
 
   test("says so plainly when no desktop is connected", async () => {
     const user = userEvent.setup();
-    // The panel pushes to the toast store; ToastLayer is what renders it,
-    // and in the app it is mounted by App.
+
     render(
       <>
         <ClipboardPanel onClose={() => {}} />
@@ -71,9 +66,6 @@ describe("ClipboardPanel", () => {
     desktopClipboard.receive("nginx:1.29-alpine");
     expect(await screen.findByText("nginx:1.29-alpine")).toBeInTheDocument();
 
-    // A click is a real user gesture — which is exactly what the
-    // WebSocket-driven path could never provide, and why the text is
-    // held here instead of being written on arrival.
     await user.click(screen.getByRole("button", { name: "Copy" }));
     expect(writes).toEqual(["nginx:1.29-alpine"]);
   });

@@ -5,12 +5,8 @@ import * as axeMatchers from "vitest-axe/matchers";
 
 expect.extend(axeMatchers);
 
-// vitest runs without injected globals, so testing-library's automatic
-// per-test cleanup never registers itself; do it explicitly.
 afterEach(cleanup);
 
-// jsdom 29 no longer ships a functional localStorage; provide a real
-// in-memory Storage so code under test uses the standard API.
 class MemoryStorage implements Storage {
   private store = new Map<string, string>();
   get length() {
@@ -38,24 +34,11 @@ Object.defineProperty(window, "localStorage", {
   configurable: true,
 });
 
-// Same story for sessionStorage, which marksStore uses to keep a
-// candidate's viewed/marked flags across a reload mid-exam.
 Object.defineProperty(window, "sessionStorage", {
   value: new MemoryStorage(),
   configurable: true,
 });
 
-// jsdom implements no part of the Pointer Capture API, and PanelResizer
-// calls setPointerCapture on pointerdown so a drag that leaves the
-// 6px-wide divider keeps tracking. Without these the drag tests threw
-// asynchronously, inside a jsdom event dispatch where no assertion could
-// catch it: every test still reported green, and vitest still exited 1
-// on the unhandled errors. That combination is why it went unnoticed —
-// the summary said "228 passed" and only the exit code disagreed.
-//
-// Capture is a no-op here rather than a simulation. These tests assert
-// what the resizer does with pointer coordinates, not what the browser
-// does with capture, so recording ids nobody reads would be fiction.
 for (const method of ["setPointerCapture", "releasePointerCapture"] as const) {
   Object.defineProperty(Element.prototype, method, {
     value: () => {},
@@ -69,10 +52,6 @@ Object.defineProperty(Element.prototype, "hasPointerCapture", {
   writable: true,
 });
 
-// jsdom has no CSS engine and therefore no matchMedia. Default every
-// query to "no match", which is the desktop case — components that gate
-// on viewport or pointer then behave as they would on a laptop unless a
-// test opts in with matchMediaMock().
 Object.defineProperty(window, "matchMedia", {
   value: (query: string) => matchMediaResult(query, false),
   configurable: true,
@@ -92,11 +71,6 @@ function matchMediaResult(query: string, matches: boolean): MediaQueryList {
   } as unknown as MediaQueryList;
 }
 
-/**
- * Makes the listed queries match. Pass the exported query constants
- * (NARROW_QUERY, TOUCH_ONLY_QUERY) so a test states the device it is
- * simulating rather than duplicating a media string.
- */
 export function matchMediaMock(matching: string[]): void {
   Object.defineProperty(window, "matchMedia", {
     value: (query: string) => matchMediaResult(query, matching.includes(query)),

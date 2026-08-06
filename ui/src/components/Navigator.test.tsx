@@ -4,8 +4,6 @@ import userEvent from "@testing-library/user-event";
 import { Navigator, type NavigatorQuestion } from "./Navigator";
 import { marksStore } from "./marksStore";
 
-// Twelve, so the grid is genuinely two rows of ten and the row-step
-// arrows have somewhere to go.
 const questions: NavigatorQuestion[] = Array.from({ length: 12 }, (_, i) => ({
   id: `q${String(i + 1).padStart(2, "0")}`,
   label: `Q${i + 1}`,
@@ -43,8 +41,7 @@ describe("Navigator tiles", () => {
   test("every question is one tile, and the current one says so", () => {
     renderNavigator();
     expect(screen.getAllByRole("button", { name: /^Q\d/ })).toHaveLength(12);
-    // aria-current, not just an accent border: selection that exists only
-    // as a colour is not selection.
+
     expect(tile("Q5")).toHaveAttribute("aria-current", "true");
     expect(tile("Q4")).not.toHaveAttribute("aria-current");
   });
@@ -56,8 +53,7 @@ describe("Navigator tiles", () => {
 
   test("one tile is Tab-reachable, and the arrows move between the rest", async () => {
     renderNavigator();
-    // A roving tabindex: Tab crosses the grid in one press instead of
-    // twelve, and the arrows do the moving inside it.
+
     expect(tile("Q5")).toHaveAttribute("tabindex", "0");
     expect(tile("Q6")).toHaveAttribute("tabindex", "-1");
 
@@ -75,15 +71,13 @@ describe("Navigator tiles", () => {
   test("the arrows stop at the ends instead of wrapping", async () => {
     renderNavigator({ selectedId: "q01" });
     await userEvent.keyboard("{ArrowLeft}");
-    // Wrapping the first tile round to the last under a clock that cannot
-    // be paused reads as having lost your place.
+
     expect(tile("Q1")).toHaveFocus();
   });
 
   test("down and up move a row, not a tile", async () => {
     renderNavigator({ selectedId: "q01" });
-    // jsdom reports no track list, so the row step falls back to the
-    // design's own ten rather than silently becoming one.
+
     await userEvent.keyboard("{ArrowDown}");
     expect(tile("Q11")).toHaveFocus();
     await userEvent.keyboard("{ArrowUp}");
@@ -94,10 +88,7 @@ describe("Navigator tiles", () => {
     renderNavigator({ selectedId: "q01" });
     await userEvent.keyboard("7");
     expect(tile("Q7")).toHaveFocus();
-    // "1" then "2" is question twelve, not question one then question
-    // two: a 65-question bank has to be reachable in two keystrokes. The
-    // "1" here lands on Q1 first, because 71 is not a tile and a dead
-    // buffer would swallow every digit after it.
+
     await userEvent.keyboard("12");
     expect(tile("Q12")).toHaveFocus();
   });
@@ -105,8 +96,7 @@ describe("Navigator tiles", () => {
   test("picking a tile hands the bank id back, not what the tile printed", async () => {
     const { onSelect } = renderNavigator();
     await userEvent.click(tile("Q7"));
-    // The mcq screen prints positions and stores ids; handing the label
-    // back would leak a position into an API call.
+
     expect(onSelect).toHaveBeenCalledWith("q07");
   });
 
@@ -119,8 +109,7 @@ describe("Navigator tiles", () => {
 
   test("the hands-on vocabulary never claims an answer", () => {
     renderNavigator({ progress: "opened" });
-    // marksStore knows this tab rendered the text and nothing more, so
-    // nothing on this surface may be labelled answered or complete.
+
     expect(tile("Q1")).toHaveAccessibleName(/opened/);
     expect(tile("Q12")).toHaveAccessibleName(/not opened/);
     expect(screen.queryByText("Answered")).toBeNull();
@@ -175,8 +164,6 @@ describe("Navigator flags", () => {
     tile("Q5").focus();
     await userEvent.keyboard("f");
 
-    // Q5 has just left the grid, taking the focus with it. Dropping a
-    // keyboard user on <body> mid-exam is the failure this guards.
     expect(screen.queryByRole("button", { name: /^Q5\b/ })).toBeNull();
     expect(tile("Q6")).toHaveFocus();
   });
@@ -204,8 +191,7 @@ describe("Navigator dismissal", () => {
 
   test("it is a disclosure, not a dialog", () => {
     const { container } = renderNavigator();
-    // No scrim, no role="dialog", no focus trap: dimming a live remote
-    // desktop to pick question 12 would read as a fault.
+
     expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 });

@@ -18,8 +18,6 @@ describe("parseRoute", () => {
     expect([...route.query]).toEqual([]);
   });
 
-  // "" and not "/": a caller has to be able to tell "the fragment is
-  // empty, use my default" apart from "the candidate asked for /".
   test.each(["", "#", "#/"])(
     "%s is an empty path, not a root path",
     (hash) => {
@@ -29,9 +27,6 @@ describe("parseRoute", () => {
     },
   );
 
-  // The point of splitting the query off FIRST: every screen matches on
-  // segments, and a parameter on the last one must not change what that
-  // segment is.
   test("a query does not leak into the last segment", () => {
     const route = parseRoute("#/exams/ckad/mode?domain=Services");
     expect(route.path).toBe("/exams/ckad/mode");
@@ -39,9 +34,6 @@ describe("parseRoute", () => {
     expect(route.query.get("domain")).toBe("Services");
   });
 
-  // The reason `query` is a URLSearchParams and not a flat object. CKAD
-  // ships a domain with a comma in its name; packed into one comma-joined
-  // value it would come back as three domains that do not exist.
   test("a repeated key carries a list whose items may contain a comma", () => {
     const names = ["Application Environment, Configuration and Security", "Services & Networking"];
     const params = new URLSearchParams();
@@ -54,7 +46,6 @@ describe("parseRoute", () => {
     expect([...parseRoute("#/progress?").query]).toEqual([]);
   });
 
-  // A hand-typed fragment is where the odd shapes come from.
   test.each(["#exams", "#/exams", "#//exams", "#/exams/", "#/exams//"])(
     "%s normalises to /exams",
     (hash) => {
@@ -70,8 +61,6 @@ describe("useRoute", () => {
     expect(result.current.path).toBe("/results");
   });
 
-  // pushState does not fire hashchange, so without the module's own
-  // event the hook would never see a navigate() at all.
   test("re-renders when navigate pushes a route", () => {
     const { result } = renderHook(() => useRoute());
     act(() => navigate("/progress"));
@@ -104,9 +93,6 @@ describe("navigate", () => {
     expect(window.history.length).toBe(before + 2);
   });
 
-  // Back/forward do not go through navigate() at all — the browser
-  // changes the URL and fires popstate — so the subscription is the only
-  // thing that can keep the rendered screen in step with the address bar.
   test("re-renders on popstate", () => {
     const { result } = renderHook(() => useRoute());
     act(() => navigate("/progress"));
@@ -119,9 +105,6 @@ describe("navigate", () => {
     expect(result.current.path).toBe("/exams");
   });
 
-  // The reason replace exists: a route the app is CORRECTING must not
-  // become a Back target, or Back lands somewhere the app immediately
-  // bounces out of again.
   test("replace does not add a history entry", () => {
     const before = window.history.length;
     act(() => navigate("/exams", { replace: true }));

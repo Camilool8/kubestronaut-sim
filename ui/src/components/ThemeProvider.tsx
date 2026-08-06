@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 
-// Theme preference: one localStorage key shared with the Go locked page
-// (facilitator/internal/desktop/proxy.go reads the same key inline).
-// "system" sets no data-theme attribute — tokens.css falls back to
-// prefers-color-scheme.
 export type ThemePreference = "system" | "light" | "dark";
 
 const STORAGE_KEY = "sim.theme";
@@ -33,10 +29,6 @@ export function cycleTheme(pref: ThemePreference): ThemePreference {
   }
 }
 
-// useTheme owns the preference state and keeps the DOM attribute in
-// sync. index.html's inline script has already applied a stored choice
-// before first paint; the mount-time applyTheme re-asserts it and
-// covers the "system" case the script leaves alone.
 export function useTheme(): [ThemePreference, () => void] {
   const [pref, setPref] = useState<ThemePreference>(() => loadTheme());
 

@@ -16,7 +16,7 @@ describe("progressStore", () => {
     vi.advanceTimersByTime(150);
     progressStore.done();
     vi.advanceTimersByTime(1000);
-    // A local fetch that resolves in 150ms must not flash a bar.
+
     expect(progressStore.isVisible()).toBe(false);
   });
 

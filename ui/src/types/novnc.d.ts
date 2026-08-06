@@ -1,5 +1,3 @@
-// Minimal typings for @novnc/novnc's single export (core/rfb.js). Only
-// the surface DesktopViewport uses is declared.
 declare module "@novnc/novnc" {
   export interface RFBOptions {
     shared?: boolean;
@@ -19,21 +17,11 @@ declare module "@novnc/novnc" {
     disconnect(): void;
     focus(): void;
     blur(): void;
-    /**
-     * Pushes text into the remote session's clipboard. A no-op unless
-     * the connection is established and viewOnly is false.
-     */
+
     clipboardPasteFrom(text: string): void;
-    /**
-     * Sends one key event. `down` omitted sends a press followed by a
-     * release. `code` is a DOM KeyboardEvent.code ("KeyC", "ControlLeft")
-     * and must be correct: rfb.js maps it through XtScancode when the
-     * server negotiates QEMU extended key events, so the keysym alone is
-     * not always what travels.
-     */
+
     sendKey(keysym: number, code: string, down?: boolean): void;
 
-    /** Typed overload for the "clipboard" event's CustomEvent detail. */
     addEventListener(
       type: "clipboard",
       listener: (event: CustomEvent<{ text: string }>) => void,

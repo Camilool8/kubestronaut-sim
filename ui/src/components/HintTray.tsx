@@ -10,19 +10,6 @@ interface HintTrayProps {
   hintCount: number;
 }
 
-/**
- * Progressive hints, plus the solution, for a training attempt.
- *
- * Revealed one tier at a time and fetched on demand — not because the
- * content is secret (every hints.md sits on the candidate's own disk,
- * exactly as PRODUCT.md says of solutions), but because a tray that
- * already holds the answer is one accidental scroll away from removing
- * the exercise. Taking a hint should be a decision.
- *
- * Rendered only in training mode; the endpoints 403 everywhere else, so
- * this is a UI affordance over a server-side rule rather than the rule
- * itself.
- */
 export function HintTray({ questionId, hintCount }: HintTrayProps) {
   const [hints, setHints] = useState<HintDetail[]>([]);
   const [solution, setSolution] = useState<string | null>(null);
@@ -30,13 +17,6 @@ export function HintTray({ questionId, hintCount }: HintTrayProps) {
   const [error, setError] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetting, setResetting] = useState(false);
-
-  // No reset effect here on purpose. A revealed hint belongs to the
-  // question it was revealed for, and the call site already keys this
-  // component by question id — so moving question remounts it and the
-  // state starts empty. Resetting in an effect instead would do the same
-  // job a render later, and trips react-hooks v7's
-  // set-state-in-effect rule for the trouble.
 
   const revealNext = useCallback(async () => {
     setBusy(true);
@@ -123,16 +103,13 @@ export function HintTray({ questionId, hintCount }: HintTrayProps) {
             {strings.hints.show(hints.length + 1, hintCount)}
           </button>
         )}
-        {/* Only offered once every hint has been taken. Jumping straight
-            to the answer is always possible — the file is on disk — but
-            the tray should not make it the path of least resistance. */}
+
         {!more && solution === null && (
           <button className="btn" onClick={() => void revealSolution()} disabled={busy}>
             {strings.hints.showSolution}
           </button>
         )}
-        {/* Behind a confirm because it is the only control in training
-            mode that destroys work, and it sits next to two that do not. */}
+
         <button className="btn" onClick={() => setConfirmReset(true)} disabled={resetting}>
           {resetting ? strings.hints.reseeding : strings.hints.reseed}
         </button>

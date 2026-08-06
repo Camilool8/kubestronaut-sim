@@ -7,15 +7,7 @@ interface ShortcutHelpProps {
   onClose: () => void;
 }
 
-/**
- * The shortcut reference, as a modal — unlike the keyboard settings
- * popover. This one is a table you read and dismiss, not a control you
- * flick while watching the desktop, so taking over the screen is the
- * right shape for it.
- */
 export function ShortcutHelp({ onClose }: ShortcutHelpProps) {
-  // Subscribed so toggling the remap in the settings popover updates
-  // this table underneath it.
   useSyncExternalStore(desktopKeymap.subscribe, desktopKeymap.getVersion, desktopKeymap.getVersion);
   const rows = desktopKeymap.rows();
   const showDesktop = desktopKeymap.isMac && desktopKeymap.enabled;

@@ -8,25 +8,6 @@ interface ClipboardPanelProps {
   onClose: () => void;
 }
 
-/**
- * Two-way clipboard between the browser and the exam desktop.
- *
- * ⌘V/Ctrl+V over the canvas already does this in one keystroke where the
- * browser permits it — but navigator.clipboard.readText does not exist
- * for web content in Firefox and needs a granted permission in Chrome,
- * so for a large share of candidates the keystroke cannot work. This is
- * the path that always works, in every browser, with no prompt: a
- * textarea you paste into normally, and a readout of what the desktop
- * last copied with a button to take it.
- *
- * It is always available rather than appearing only after a failure —
- * a candidate needs to know it exists before they hit the failure, in
- * the middle of a timed exam.
- *
- * Rendered absolutely inside the question panel, following QuestionJump:
- * anything that changes .desktop-pane's geometry fires noVNC's
- * ResizeObserver and costs a server-side framebuffer resize.
- */
 export function ClipboardPanel({ onClose }: ClipboardPanelProps) {
   const titleId = useId();
   const outId = useId();
@@ -54,8 +35,6 @@ export function ClipboardPanel({ onClose }: ClipboardPanelProps) {
   const copyOut = useCallback(async () => {
     if (!remote) return;
     try {
-      // A click is a real user gesture, which is exactly what the
-      // WebSocket-driven path could never provide.
       await navigator.clipboard.writeText(remote);
       toastStore.push({
         kind: "info",

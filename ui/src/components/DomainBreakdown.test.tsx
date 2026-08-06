@@ -15,8 +15,6 @@ const q = (id: string, domain: string, earned: number, total: number): QuestionR
 const rows = () => screen.getAllByRole("listitem");
 
 describe("DomainBreakdown", () => {
-  // Several questions per domain is the normal case; a per-question list
-  // would not answer "which domain am I weak in".
   test("aggregates questions into their domains", () => {
     render(
       <DomainBreakdown
@@ -37,8 +35,6 @@ describe("DomainBreakdown", () => {
     expect(within(deployment!).getByText("90%")).toBeInTheDocument();
   });
 
-  // Worst first, because alphabetical would bury the one row that should
-  // change what the candidate does next.
   test("orders weakest domain first", () => {
     render(
       <DomainBreakdown
@@ -50,8 +46,6 @@ describe("DomainBreakdown", () => {
       />,
     );
 
-    // The name element by class: every other cell in the row is a
-    // number, so a text query would match three of them.
     expect(rows().map((r) => r.querySelector(".domain-name")?.textContent)).toEqual([
       "Zebra",
       "Middle",
@@ -64,7 +58,6 @@ describe("DomainBreakdown", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  // A question with no domain must not vanish from the totals.
   test("keeps unclassified questions visible", () => {
     render(<DomainBreakdown questions={[q("q01", "", 3, 10)]} />);
     expect(screen.getByText("Unclassified")).toBeInTheDocument();
@@ -89,8 +82,6 @@ describe("DomainBreakdown weighting", () => {
     },
   ];
 
-  // The server's rollup is the ONLY place the curriculum weight lives —
-  // the client cannot derive "20% of exam" from points alone.
   test("prefers the server's rollup and prints its curriculum weight", () => {
     render(
       <DomainBreakdown
@@ -108,10 +99,6 @@ describe("DomainBreakdown weighting", () => {
     expect(screen.getByText(/weighted to the published curriculum/i)).toBeInTheDocument();
   });
 
-  // The path a real upgrade hits: the result was graded before the rollup
-  // existed and is served back verbatim, so `domains` never arrives. The
-  // breakdown still has to render — from the questions — and must not
-  // claim a weighting it did not do.
   test("falls back to the client rollup when the result carries no domains", () => {
     render(
       <DomainBreakdown
@@ -127,8 +114,6 @@ describe("DomainBreakdown weighting", () => {
     expect(screen.queryByText(/of exam/)).toBeNull();
   });
 
-  // An empty array is not a rollup. Treating it as one would render an
-  // empty sidebar beside a table full of results.
   test("an empty rollup is treated as no rollup", () => {
     render(
       <DomainBreakdown
@@ -139,8 +124,6 @@ describe("DomainBreakdown weighting", () => {
     expect(screen.getByText("Services and Networking")).toBeInTheDocument();
   });
 
-  // Colour is the second signal. Without the word, a red bar is the only
-  // thing saying this domain sank the attempt.
   test("names a domain under the threshold in words, not only in colour", () => {
     render(
       <DomainBreakdown

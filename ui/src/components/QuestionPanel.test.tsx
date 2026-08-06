@@ -11,8 +11,6 @@ const questions: ExamQuestionInfo[] = [
   { id: "q01", instance: "instance-1", domain: "Config", weight: 5, totalPoints: 5, hintCount: 0 },
 ];
 
-// Real bank markdown: the values a candidate must reproduce exactly are
-// already marked up as inline code.
 const markdown = [
   "Create a Namespace `aurora-staging` labeled `team=aurora`.",
   "",
@@ -50,8 +48,7 @@ function renderPanel() {
 describe("QuestionPanel copy affordance", () => {
   test("every inline value in a question is a real button", async () => {
     renderPanel();
-    // A typo in a resource name is an invisible zero, so each of these
-    // has to be copyable rather than retyped.
+
     for (const value of ["aurora-staging", "team=aurora", "/opt/course/1/aurora-namespaces"]) {
       expect(await screen.findByRole("button", { name: new RegExp(value) })).toBeInTheDocument();
     }
@@ -76,15 +73,11 @@ describe("QuestionPanel copy affordance", () => {
   test("the copy button is reachable and named for screen readers", async () => {
     renderPanel();
     const button = await screen.findByRole("button", { name: /aurora-staging/ });
-    // The label has to say what activating it does, not just echo the value.
+
     expect(button).toHaveAccessibleName(/copy/i);
   });
 });
 
-// Three questions across two domains, which is the smallest fixture that
-// exercises both ends of the navigator and the grid's grouping. q01
-// carries a title and the others do not, because title is optional in
-// the bank format and both renderings have to hold in one grid.
 const bank: ExamQuestionInfo[] = [
   { id: "q01", title: "Namespaces & quotas", instance: "instance-1", domain: "Config", weight: 5, totalPoints: 5, hintCount: 0 },
   { id: "q02", instance: "instance-2", domain: "Networking", weight: 7, totalPoints: 7, hintCount: 0 },
@@ -114,8 +107,7 @@ describe("QuestionPanel navigator", () => {
         onSelect={() => {}}
       />,
     );
-    // Wrapping q03 back to q01 under a clock that cannot be paused reads
-    // as having lost your place, not as a convenience.
+
     expect(screen.getByRole("button", { name: /next question/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /previous question/i })).toBeEnabled();
   });
@@ -123,8 +115,7 @@ describe("QuestionPanel navigator", () => {
   test("the navigator says where you are, for both kinds of reader", async () => {
     renderNav("q02");
     const trigger = await screen.findByRole("button", { name: /question 2 of 3/i });
-    // The glyphs are a drawn "2 / 3"; the accessible name has to be a
-    // sentence, and it has to also say what activating the button does.
+
     expect(trigger).toHaveAccessibleName(/show all questions/i);
     expect(trigger).toHaveAttribute("aria-expanded", "false");
   });
@@ -133,8 +124,6 @@ describe("QuestionPanel navigator", () => {
     const selected: string[] = [];
     renderNav("q02", (id) => void selected.push(id));
 
-    // "[[" is userEvent's escape for a literal "[" — a bare one opens a
-    // key-code descriptor.
     await userEvent.keyboard("]");
     await userEvent.keyboard("[[");
 
@@ -146,8 +135,7 @@ describe("QuestionPanel navigator", () => {
     expect(await screen.findByText("Namespaces & quotas")).toBeInTheDocument();
 
     renderNav("q02");
-    // q02 has no title: the header falls back to the id alone rather
-    // than rendering an empty span or the word "undefined".
+
     expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
   });
 
@@ -155,8 +143,6 @@ describe("QuestionPanel navigator", () => {
     const selected: string[] = [];
     const { container } = renderNav("q02", (id) => void selected.push(id));
 
-    // The RFB canvas owns the keyboard while focused — the candidate is
-    // typing into a shell, and "]" is a character, not a shortcut.
     const desktop = document.createElement("div");
     desktop.className = "desktop-pane";
     const target = document.createElement("button");
@@ -171,8 +157,6 @@ describe("QuestionPanel navigator", () => {
 });
 
 describe("QuestionPanel jump grid", () => {
-  // Scoped to the grid on purpose: the navigator's own trigger is also a
-  // button whose name starts with the current question's id.
   async function openGrid(selectedId: string, onSelect: (id: string) => void = () => {}) {
     const { container } = renderNav(selectedId, onSelect);
     await userEvent.click(await screen.findByRole("button", { name: /show all questions/i }));
@@ -190,9 +174,7 @@ describe("QuestionPanel jump grid", () => {
 
   test("what the tile has no room to draw is still said", async () => {
     const grid = await openGrid("q01");
-    // Ten tiles to a row leaves one line and it belongs to the number, so
-    // the bank's title, the domain, the instance and the points all travel
-    // in the button's accessible name rather than being dropped.
+
     const tile = grid.getByRole("button", { name: /^1\b/ });
     expect(tile).toHaveAccessibleName(/Namespaces & quotas/);
     expect(tile).toHaveAccessibleName(/Config/);
@@ -202,13 +184,7 @@ describe("QuestionPanel jump grid", () => {
 
   test("the grid prints task positions, the same as the counter above it", async () => {
     const grid = await openGrid("q01");
-    // This test used to assert the opposite, on the grounds that the
-    // panel's header printed bank ids too. It stopped doing that when the
-    // identity block started counting "Task 01 / 22", which left the grid
-    // as the only surface here still naming tasks the way the bank does —
-    // disagreeing with the heading directly above it. The mcq screen has
-    // always printed positions; the reason holds on both, and gets
-    // sharper once a hands-on draw is a subset rather than the whole bank.
+
     expect(grid.getByRole("button", { name: /^2\b/ })).toBeInTheDocument();
     expect(grid.queryByRole("button", { name: /^q02/ })).toBeNull();
   });
@@ -243,8 +219,6 @@ describe("QuestionPanel jump grid", () => {
     await userEvent.keyboard("g");
     expect(document.querySelector("#question-jump")).not.toBeNull();
 
-    // The same key closes it, and the focus goes back to the trigger it
-    // came from rather than being dropped on <body>.
     await userEvent.keyboard("g");
     expect(document.querySelector("#question-jump")).toBeNull();
     expect(screen.getByRole("button", { name: /show all questions/i })).toHaveFocus();
@@ -261,7 +235,6 @@ describe("QuestionPanel review marks", () => {
     marksStore.reset();
     marksStore.setScope("2026-07-27T10:00:00Z");
 
-    // A reload mid-exam is the only reason this state is persisted at all.
     expect(marksStore.isViewed("q02")).toBe(true);
     expect(marksStore.isViewed("q03")).toBe(false);
   });
@@ -292,24 +265,17 @@ describe("QuestionPanel review marks", () => {
   });
 });
 
-// The identity block above the task text: which task this is, what it is
-// called, and the four facts that place it. Every one of the four is
-// optional at the source, and two of them (`targetSeconds`,
-// `targetDerived`) arrive only from a facilitator new enough to send them.
 describe("QuestionPanel task header", () => {
   test("the counter is zero-padded to the width of the total", async () => {
     renderNav("q02");
-    // "TASK 02 / 3" would jump a pixel between 9 and 10 under a running
-    // clock; the padding is to the total's own width, so a 3-task attempt
-    // pads to one digit and a 20-task one to two.
+
     expect(await screen.findByText("Task 2 / 3")).toBeInTheDocument();
   });
 
   test("the chips place the task: domain, share of the points, host", async () => {
     renderNav("q01");
     expect(await screen.findByText("Config")).toBeInTheDocument();
-    // 5 of the fixture's 21 points, rounded. Computed over the DRAWN
-    // questions, so a random draw reports its own arithmetic.
+
     expect(screen.getByText("Weight 24%")).toBeInTheDocument();
     expect(screen.getByText("instance-1")).toBeInTheDocument();
   });
@@ -317,8 +283,7 @@ describe("QuestionPanel task header", () => {
   test("no target time is sent, so no pacing chip is drawn", async () => {
     renderNav("q01");
     await screen.findByText("Config");
-    // An older facilitator sends no targetSeconds at all. The chip is
-    // absent rather than empty, zero, or a guess.
+
     expect(screen.queryByText(/^Target/)).not.toBeInTheDocument();
   });
 
@@ -332,19 +297,14 @@ describe("QuestionPanel task header", () => {
       <QuestionPanel questions={timed} selectedId="q01" onSelect={() => {}} />,
     );
 
-    // Authored in the bank: a plain figure, and nothing anywhere may
-    // suggest running over it costs anything, because it does not.
     const authored = await screen.findByText("Target 6m");
     expect(authored).toHaveAttribute("title", expect.stringMatching(/budget, not a limit/i));
-    // The one thing this copy may never do is imply a cost. It says "not
-    // a limit" out loud; what it must not contain is a penalty at all.
+
     expect(authored).toHaveTextContent(/not a limit/i);
     expect(authored.textContent).not.toMatch(/penal|deduct|overdue|deadline|too slow/i);
 
     rerender(<QuestionPanel questions={timed} selectedId="q02" onSelect={() => {}} />);
 
-    // Derived: arithmetic about weights, not a judgement of how long the
-    // work takes, and it has to say so where it is read.
     const derived = await screen.findByText("Target ≈7m");
     expect(derived).toHaveAttribute("title", expect.stringMatching(/derived/i));
     expect(derived).toHaveTextContent(/derived from this task's share of the exam clock/i);
@@ -357,8 +317,6 @@ describe("QuestionPanel task header", () => {
     );
     await screen.findByText("Target 6m");
 
-    // Per-task time measures a pane being on screen. "Spent" and "worked"
-    // both claim to have measured attention, which nothing here can.
     expect(container.textContent).not.toMatch(/\bspent\b|\bworked\b|\beffort\b/i);
   });
 
@@ -388,13 +346,10 @@ describe("QuestionPanel task header", () => {
 
     await userEvent.keyboard("f");
 
-    // "f" is a character in a shell, not a shortcut.
     expect(marksStore.isMarked("q02")).toBe(false);
   });
 });
 
-// The machine block — now the only thing the task pane says that the
-// bank's markdown does not.
 describe("QuestionPanel work-from block", () => {
   test("the ssh command is on screen and copyable in one click", async () => {
     const pasted: string[] = [];
@@ -402,8 +357,7 @@ describe("QuestionPanel work-from block", () => {
 
     renderNav("q02");
     const copy = await screen.findByRole("button", { name: /copy ssh instance-2/i });
-    // The visible label is "Copy"; the accessible name says what gets
-    // copied and contains the visible word (WCAG 2.5.3).
+
     expect(copy).toHaveTextContent("Copy");
     await userEvent.click(copy);
 
@@ -414,12 +368,6 @@ describe("QuestionPanel work-from block", () => {
     renderNav("q02");
     await screen.findByRole("button", { name: /copy ssh instance-2/i });
 
-    // Both of these used to sit under every task: a "Graded on" card
-    // saying grading reads the state you leave behind, and a note that
-    // kubectl needs no context switch. Both are true of all 22 tasks in
-    // the bank, so both were the same paragraph repeated 22 times in the
-    // column the candidate is meant to read closely. They belong to the
-    // exam, not the task, and they live in ExamIntro now.
     expect(screen.queryByRole("region", { name: /graded on/i })).toBeNull();
     expect(screen.queryByText(/not the commands you typed/i)).toBeNull();
     expect(screen.queryByText(/no context to switch/i)).toBeNull();
@@ -435,12 +383,9 @@ describe("QuestionPanel failure and pending states", () => {
 
     renderNav("q02");
 
-    // Previously this rendered a bare String(err) with no role and no
-    // retry — the candidate's only move was reloading a running exam.
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/couldn't load this question/i);
-    // The clock keeps running through this, so it has to say what is
-    // still fine as well as what broke.
+
     expect(alert).toHaveTextContent(/timer are unaffected/i);
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
@@ -457,9 +402,6 @@ describe("QuestionPanel failure and pending states", () => {
       />,
     );
 
-    // A question fetch against a local facilitator lands in tens of
-    // milliseconds; throwing the text away for that long flashes the pane
-    // on every single step between questions.
     expect(screen.getByRole("button", { name: /aurora-staging/ })).toBeInTheDocument();
   });
 });

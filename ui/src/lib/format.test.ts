@@ -39,7 +39,6 @@ describe("formatElapsed", () => {
   });
 
   test("negative spans clamp to zero rather than rendering nonsense", () => {
-    // Clock skew between the conductor's stamp and the browser is real.
     expect(formatElapsed(-500)).toBe("0.0s");
   });
 });
@@ -76,7 +75,6 @@ describe("formatClockSpoken", () => {
   });
 
   test("seconds are dropped at or above a minute — the tick would re-announce", () => {
-    // 1:00:59 and 1:00:00 are the same reading out loud.
     expect(formatClockSpoken(3659)).toBe("1 hour");
     expect(formatClockSpoken(119)).toBe("1 minute");
   });
@@ -93,7 +91,6 @@ describe("formatClockSpoken", () => {
   });
 
   test("clamps and floors exactly as formatClock does", () => {
-    // Both read the same remaining-seconds value; they must not disagree.
     expect(formatClockSpoken(-5)).toBe("0 seconds");
     expect(formatClockSpoken(59.9)).toBe("59 seconds");
   });

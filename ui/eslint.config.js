@@ -10,10 +10,8 @@ export default tseslint.config(
     plugins: { "react-hooks": reactHooks },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      // Downgraded: the pre-existing fetch-in-effect patterns (QuestionPanel,
-      // Score) trip this; they get restructured in the design-system phases.
-      // Keep visible as warnings until then.
       "react-hooks/set-state-in-effect": "warn",
+      "no-empty": ["error", { allowEmptyCatch: true }],
     },
   },
 );

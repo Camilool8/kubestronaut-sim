@@ -62,14 +62,6 @@ interface FetchLogEntry {
   body: unknown;
 }
 
-// Stubs every endpoint the screen touches and logs writes, so tests can
-// assert exactly what was PUT where. Answer PUTs echo the selection
-// back sorted, matching the real handler.
-//
-// The screen PUTs to two endpoints now — the answer, and the focus report
-// that tells the server which question is on screen — so assertions about
-// "what was saved" filter to /answer rather than to the method. A test
-// that counts every PUT counts the timing traffic too.
 function stubFetch(
   stored: Record<string, number[]> = {},
   failPut = false,
@@ -117,7 +109,6 @@ function stubFetch(
   return log;
 }
 
-/** Everything an attempt can DO now lives in the navbar menu. */
 async function openMenu(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: strings.header.menuLabel }));
 }
@@ -126,10 +117,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   toastStore.clear();
   marksStore.reset();
-  // reset() drops the in-memory sets; the marks also live in
-  // sessionStorage, keyed by the attempt's startedAt — which every test
-  // here shares. Without this, one test's opened questions are the next
-  // test's, and anything counting unseen reads the previous run's state.
+
   window.sessionStorage.clear();
 });
 
@@ -187,7 +175,6 @@ describe("McqExam answering", () => {
     const user = userEvent.setup();
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
-    // Step to the multi question.
     await screen.findByText("Which component persists cluster state?");
     await user.click(screen.getByRole("button", { name: /next question/i }));
     await user.click(await screen.findByRole("checkbox", { name: /CRI/ }));
@@ -218,8 +205,6 @@ describe("McqExam answering", () => {
     const option = await screen.findByRole("checkbox", { name: /etcd/ });
     await user.click(option);
 
-    // 409 → revert to unanswered, toast raised. Nothing may pretend the
-    // click was recorded.
     await waitFor(() => expect(option).not.toBeChecked());
     expect(toastStore.list().length).toBeGreaterThan(0);
   });
@@ -231,15 +216,12 @@ describe("McqExam answering", () => {
 
     await screen.findByText("Which component persists cluster state?");
     await openMenu(user);
-    // On the last question the footer's Submit exam button joins the
-    // header's — same action, same label, two locations. Either
-    // opens the identical dialog; the header's is first in the DOM.
+
     await user.click(screen.getByRole("button", { name: /submit exam/i }));
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText(/1 question is unanswered/)).toBeInTheDocument();
-    // Listed as the attempt position, never the bank id — q02 is an
-    // artifact of the pool, and the candidate has only ever seen Q2.
+
     expect(screen.getByText("Q2", { selector: ".submit-review-ids" })).toBeInTheDocument();
     expect(screen.queryByText("q02", { selector: ".submit-review-ids" })).not.toBeInTheDocument();
   });
@@ -251,8 +233,7 @@ describe("McqExam answering", () => {
     render(<McqExam session={training} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
     await screen.findByText("Which component persists cluster state?");
-    // The educational mode must not wear exam urgency at the moment of
-    // commitment: label, dialog title and confirm all say Training.
+
     await openMenu(user);
     expect(screen.queryByRole("button", { name: /submit exam/i })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /submit session/i }));
@@ -261,10 +242,6 @@ describe("McqExam answering", () => {
   });
 });
 
-// The topbar tally, the flag key, and the focus report. The tally is the
-// one place this screen states the whole attempt at once, and it can say
-// all three numbers honestly: answers are server state, flags and
-// first-opens are the attempt's own marks.
 describe("McqExam attempt state", () => {
   test("the menu counts answered, flagged and unseen", async () => {
     stubFetch({ q01: [1] });
@@ -272,7 +249,6 @@ describe("McqExam attempt state", () => {
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
     await screen.findByText("Which component persists cluster state?");
 
-    // Q1 is answered and on screen (so seen); Q2 is neither.
     await openMenu(user);
     await waitFor(() =>
       expect(screen.getByText(/Answered 1 · Flagged 0 · Unseen 1/)).toBeInTheDocument(),
@@ -315,8 +291,6 @@ describe("McqExam attempt state", () => {
   });
 
   test("a facilitator with no focus route is a no-op, not a warning", async () => {
-    // 404 is what an older facilitator answers. Nothing about timing may
-    // interrupt an attempt — no toast, no error region.
     stubFetch({}, false, 404);
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
@@ -340,10 +314,6 @@ describe("McqExam navigator", () => {
     return { user, grid: within(grid) };
   }
 
-  // The shortcut the footer advertises has to survive the action the
-  // candidate just took. Selecting an option focuses a checkbox, and a
-  // "don't steal keys while typing" guard that treated every <input> as
-  // typing swallowed G on the one screen where it matters most.
   test("G opens the navigator with an option focused", async () => {
     stubFetch();
     const user = userEvent.setup();
@@ -361,8 +331,7 @@ describe("McqExam navigator", () => {
 
   test("the tiles are attempt positions, never bank ids", async () => {
     const { grid } = await openNavigator();
-    // q01/q02 are artifacts of the 97-question pool a random draw sampled
-    // from. The candidate has only ever seen Q1 and Q2.
+
     expect(grid.getByRole("button", { name: /^Q1\b/ })).toBeInTheDocument();
     expect(grid.getByRole("button", { name: /^Q2\b/ })).toBeInTheDocument();
     expect(grid.queryByRole("button", { name: /q0\d/ })).toBeNull();
@@ -396,10 +365,6 @@ describe("McqExam navigator", () => {
   });
 });
 
-// The footer is the whole of this screen's navigation now: the header
-// carries no steppers, so "Previous question" and "Next question" name
-// exactly one control each. The visible label is the short word, and the
-// accessible name is the longer one that contains it (WCAG 2.5.3).
 describe("McqExam footer navigation", () => {
   test("Previous is disabled on the first question and steps back from later ones", async () => {
     stubFetch();
@@ -427,10 +392,6 @@ describe("McqExam footer navigation", () => {
     await user.click(screen.getByRole("button", { name: /next question/i }));
     await screen.findByText("Which are container interface standards? Choose all that apply.");
 
-    // No more "Next" in the footer — the exam's last question replaces
-    // it with a Submit. Exactly one is on screen: the bar no longer
-    // carries a second copy, because every command an attempt has lives
-    // in the navbar menu now and is not drawn until it is opened.
     expect(screen.queryByRole("button", { name: /next question/i })).not.toBeInTheDocument();
     const submitButtons = screen.getAllByRole("button", { name: /submit exam/i });
     expect(submitButtons).toHaveLength(1);
@@ -443,21 +404,12 @@ describe("McqExam footer navigation", () => {
     stubFetch();
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
-    // Both halves matter and both are load-bearing: a candidate who does
-    // not know the click already saved either re-clicks or hesitates, and
-    // one who thinks it has been marked reads the screen as a verdict.
     expect(
       await screen.findByText(/answers save as you go · nothing is graded until submit/i),
     ).toBeInTheDocument();
   });
 });
 
-// The one exam a phone can sit, so the phone layout is not a fallback
-// here — it is the product. jsdom cannot see any of the CSS that makes
-// it work, but it can see the half that matters most: which controls
-// exist, where, and what they are called. Every branch below is a JS
-// branch precisely so that it IS testable, and so that no button ends up
-// with two accessible names.
 describe("McqExam on a phone", () => {
   afterEach(() => {
     matchMediaMock([]);
@@ -468,11 +420,6 @@ describe("McqExam on a phone", () => {
     return render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
   };
 
-  // The bar keeps the clock and the identity, and one control opens
-  // everything else. It is the SAME control, in the same corner, as on
-  // every other screen in both products — that is the whole point of the
-  // rebuild, and the reason this asserts the shared menu label rather
-  // than a name the exam invented for itself.
   test("the bar keeps the clock, and the menu is the same one every screen has", async () => {
     stubFetch();
     renderCompact();
@@ -480,8 +427,7 @@ describe("McqExam on a phone", () => {
 
     expect(screen.getByRole("timer")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: strings.header.menuLabel })).toBeInTheDocument();
-    // Submit is not in the bar. It ends the attempt, it cannot be
-    // undone, and the bar is where a thumb reaching for the notch lands.
+
     expect(screen.queryByRole("button", { name: "Submit exam" })).toBeNull();
   });
 
@@ -495,7 +441,7 @@ describe("McqExam on a phone", () => {
     const panel = screen.getByRole("group", { name: strings.header.menuLabel });
     expect(within(panel).getByText(/Answered 1/)).toBeInTheDocument();
     expect(within(panel).getByRole("button", { name: "Submit exam" })).toBeInTheDocument();
-    // And the sections every screen's menu has, in the same order.
+
     expect(within(panel).getByRole("button", { name: /Theme/ })).toBeInTheDocument();
   });
 
@@ -508,16 +454,10 @@ describe("McqExam on a phone", () => {
     await openMenu(user);
     await user.click(screen.getByRole("button", { name: "Submit exam" }));
 
-    // The menu closes behind it: two stacked panels over one decision is
-    // one too many, and the confirmation is the one that matters.
     expect(await screen.findByRole("dialog", { name: /submit/i })).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: strings.header.menuLabel })).toBeNull();
   });
 
-  // Three labelled controls do not fit a 320px row without every one of
-  // them ellipsing. The labels give way to the glyphs they already sit
-  // beside — and the navigator trades the word "Navigator" for the
-  // position it is the way to change.
   test("the action bar drops its labels but keeps every accessible name", async () => {
     stubFetch();
     renderCompact();
@@ -531,9 +471,6 @@ describe("McqExam on a phone", () => {
     expect(screen.getByRole("button", { name: /question 1 of 2/i })).toBeInTheDocument();
   });
 
-  // The reasoning that makes the desktop navigator a plain disclosure —
-  // a scrim over a live remote desktop reads as a fault — is about the
-  // remote desktop, and there is none behind an mcq question.
   test("the navigator opens as a modal sheet, not an inline panel", async () => {
     stubFetch();
     const user = userEvent.setup();

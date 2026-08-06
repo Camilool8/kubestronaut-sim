@@ -7,14 +7,6 @@ interface KeyboardSettingsProps {
   onShowHelp: () => void;
 }
 
-/**
- * Mac-shortcut translation settings.
- *
- * A popover, not a modal, and for the same reason QuestionJump is a
- * disclosure rather than a dialog: dimming a live remote desktop to flick
- * one checkbox reads as the app breaking. Escape and an outside click
- * close it; nothing is trapped.
- */
 export function KeyboardSettings({ onClose, onShowHelp }: KeyboardSettingsProps) {
   const titleId = useId();
   const macId = useId();
@@ -66,9 +58,7 @@ export function KeyboardSettings({ onClose, onShowHelp }: KeyboardSettingsProps)
         />
         <label htmlFor={reservedId}>{strings.keyboard.reservedToggle}</label>
       </div>
-      {/* Said plainly rather than discovered: these two are the chords a
-          browser will act on before this page can, so enabling them is a
-          gamble the candidate should take knowingly. */}
+
       <p className="clipboard-hint">{strings.keyboard.reservedHint}</p>
 
       <button className="btn" onClick={onShowHelp}>

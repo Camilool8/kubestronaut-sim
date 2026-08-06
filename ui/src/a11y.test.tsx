@@ -35,10 +35,6 @@ import { toastStore } from "./components/toastStore";
 import { strings } from "./strings";
 import type { ControlJob, ExamQuestionInfo, SessionSnapshot } from "./api";
 
-// Component-level scans run outside App's <main>, so the page-level
-// region rule is not meaningful here. Everything else runs at axe's
-// WCAG 2.1 AA defaults. (Color-contrast is skipped automatically in
-// jsdom — no layout engine — and is covered by the token design.)
 const AXE_OPTS = {
   rules: { region: { enabled: false } },
 } as const;
@@ -55,8 +51,7 @@ const examJSON = {
   questions: [
     { id: "q01", instance: "instance-1", domain: "Config", weight: 5, totalPoints: 5, hintCount: 0 },
   ],
-  // The mode screen renders one card per entry and one capability row
-  // per flag, so the scan needs all three or it covers a third of it.
+
   modes: [
     {
       id: "training",
@@ -88,9 +83,6 @@ const examJSON = {
   ],
 };
 
-// GET /api/catalog — the bank list joined to attempt history. The CKAD
-// row carries a counted, passing attempt so the scan covers the card's
-// best-attempt bar as well as its empty state; the CKA row has none.
 const catalogJSON = {
   active: "ckad-mock-01",
   exams: [
@@ -161,8 +153,7 @@ const historyJSON = {
       passed: true,
       counted: true,
     },
-    // The uncounted row: a drill, which must render with its mark rather
-    // than be hidden.
+
     {
       id: "a2",
       bank: "ckad-mock-01",
@@ -207,18 +198,11 @@ const resultsJSON = {
   ],
 };
 
-// Exercises both markdown surfaces the shared renderer produces: a fenced
-// block (figure.code-block, figcaption, language chip, copy-block button)
-// and an inline value (the CopyableCode button). Opening the solution
-// disclosure is what puts both on screen for the scan below.
 const solutionJSON = {
   id: "q01",
   markdown: "Apply it with `kubectl apply -f pod.yaml`:\n\n```yaml\nkind: Pod\n```\n",
 };
 
-// Shaped like real bank content: an h1 title, an italic instance line and
-// numbered steps with inline values. The heading level matters — every
-// question.md in the bank opens with one.
 const questionJSON = {
   id: "q01",
   instance: "instance-1",
@@ -231,7 +215,6 @@ const questionJSON = {
   ].join("\n"),
 };
 
-// Two domains, so the jump grid's grouping headings are exercised.
 const examQuestions: ExamQuestionInfo[] = [
   { id: "q01", instance: "instance-1", domain: "Config", weight: 5, totalPoints: 5, hintCount: 0 },
   { id: "q02", instance: "instance-2", domain: "Networking", weight: 7, totalPoints: 7, hintCount: 0 },
@@ -282,25 +265,12 @@ describe("axe: no WCAG violations", () => {
     vi.unstubAllGlobals();
     toastStore.clear();
     marksStore.reset();
-    // jsdom keeps one location for the whole file. The deep-dive scan
-    // navigates by fragment, and a fragment left behind would put every
-    // Score render after it on the deep dive instead of the results body.
+
     window.location.hash = "";
-    // matchMediaMock replaces window.matchMedia wholesale rather than
-    // scoping to one render, so any test in this describe that calls it
-    // — the panel resizer's SPLIT_QUERY, the compact header's
-    // HEADER_COMPACT_QUERY — otherwise leaves every later test seeing
-    // whatever query list it set rather than the default "everything
-    // answers false". One reset here ends the class of problem outright:
-    // no test has to remember its own cleanup, and reordering the file
-    // cannot make one test's mock leak into another's.
+
     matchMediaMock([]);
   });
 
-  // The exam screen was the one surface this suite never scanned, which is
-  // how a second h1 (the topbar's, plus every question.md's own) and a
-  // selection state with no aria-current both survived. QuestionPanel is
-  // scanned directly rather than through Exam, which lazy-imports noVNC.
   test("exam question panel", async () => {
     const { container } = render(
       <QuestionPanel
@@ -327,9 +297,6 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // The chip carries a progressbar, which axe requires to have an
-  // accessible name — the exact thing an unnamed role="progressbar" gets
-  // flagged for.
   test("backgrounded job chip", async () => {
     const { container } = render(
       <BackgroundJobChip job={runningJob} bankTitle="CKA Mock Exam 01" onReopen={() => {}} />,
@@ -337,10 +304,6 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // axe's aria-required-attr demands aria-valuenow on a focusable
-  // separator, which is exactly the attribute this pattern invites you to
-  // leave off. The default matchMedia stub answers false to everything, so
-  // the resizer has to be opted in.
   test("panel resizer", async () => {
     matchMediaMock([SPLIT_QUERY]);
     const { container } = render(
@@ -361,10 +324,6 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // Three mode cards, each with a capability list whose state is carried
-  // by an sr-only word beside a decorative glyph. If that word were ever
-  // dropped the list would say nothing at all to a screen reader, and a
-  // scan of a single card would not show it.
   test("mode selector", async () => {
     const { container } = render(
       <Mode bankId="ckad-mock-01" catalogVersion={0} onSessionChange={() => {}} />,
@@ -373,41 +332,25 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // The dashboard is the one screen in the product with a real <table>
-  // and a real <input>, which are the two things axe has the most to say
-  // about: a header cell with no scope and a file picker with no label
-  // are both silent on screen and both fatal to a screen reader.
   test("progress dashboard", async () => {
     const { container } = render(<Progress catalogVersion={0} />);
     await screen.findByRole("table");
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // The switch-confirm used to be hand-rolled divs with no role, no
-  // aria-modal and no focus trap, and this suite never caught it because
-  // the selector scan never opened it. Scan it open.
   test("exam selector with the switch-confirm dialog open", async () => {
     const user = userEvent.setup();
     const { container } = render(
       <Exams onControlStart={() => {}} catalogVersion={0} onBanksLoaded={() => {}} />,
     );
     await screen.findByText("CKA", { selector: "h2" });
-    // The second live card is not the active bank, so choosing it is a
-    // rebuild and must go through the dialog.
+
     await user.click(screen.getAllByRole("button", { name: /choose a mode/i })[1]);
-    // Assert it actually opened — a disabled card would leave this suite
-    // silently scanning a closed dialog, which is how the original gap
-    // survived.
+
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // A 502 from the catalog endpoint used to leave the lobby blank — see
-  // Async's comment on why its error prop is mandatory. This suite never
-  // scanned that state, so the role="alert" card's name/role/value
-  // (title, body, dynamic Retry button) never had an axe pass. (The lobby
-  // reads GET /api/catalog now rather than the conductor's
-  // /api/control/banks; the failure mode it guards is the same one.)
   test("exam selector catalog error card", async () => {
     vi.stubGlobal(
       "fetch",
@@ -423,44 +366,18 @@ describe("axe: no WCAG violations", () => {
     const { container } = render(
       <Exams onControlStart={() => {}} catalogVersion={0} onBanksLoaded={() => {}} />,
     );
-    // Confirm the error card is actually the thing on screen, not a
-    // loading or empty state a mis-routed mock would leave behind.
+
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // The verdict is the screen's h1 now ("Passed — 70% against a 66%
-  // threshold"), not a "PASS" badge under a bare percentage. Waiting on
-  // the heading by name is also what keeps the scan off the grading
-  // state, whose own h1 is on screen until the first poll lands.
   test("score screen with results", async () => {
     const { container } = render(<Score onNewAttempt={() => {}} endReason="submitted" />);
     await screen.findByRole("heading", { level: 1, name: /passed/i });
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // Solutions used to render through a bare, unstyled ReactMarkdown and this
-  // suite never scanned one, so the shared renderer's code-block chrome
-  // (figure/figcaption, a copy button with a dynamic per-language aria-label,
-  // and inline CopyableCode buttons) never had an axe pass.
-  //
-  // That chrome used to be reached by opening a disclosure inside a verdict
-  // row, and the old comment here justified the scan partly by the shape:
-  // a <details> (solution) inside a <details> (row), each with its own
-  // interactive summary and buttons inside both. The row carries no
-  // solution any more — it belongs to the screen with room for it — so
-  // that justification is gone and should not be quietly inherited: the
-  // deep dive renders the solution in a plain <section>, with no
-  // disclosure around it and nothing nested to hide a
-  // nested-interactive violation in.
-  //
-  // What the scan still buys is the chrome itself, on the screen the
-  // product actually renders it on, reached the way the product reaches
-  // it — Score owns `#/results/<id>` and the row's own anchor is the
-  // route in. Explain.test.tsx scans that component in isolation; this
-  // covers what Score assembles around it, which is the composition a
-  // candidate meets.
   test("score screen deep dive, with the reference solution rendered", async () => {
     const user = userEvent.setup();
     const { container } = render(<Score onNewAttempt={() => {}} endReason="submitted" />);
@@ -469,8 +386,6 @@ describe("axe: no WCAG violations", () => {
     await user.click(screen.getByText("q01"));
     await user.click(screen.getByRole("link", { name: /full explanation/i }));
 
-    // The shared renderer's code-block chrome, present only once the
-    // solution has actually loaded and rendered.
     expect(await screen.findByText("yaml")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy yaml code block/i })).toBeInTheDocument();
 
@@ -484,7 +399,6 @@ describe("axe: no WCAG violations", () => {
     );
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
 
-    // The build log pane is a focusable scroll region; scan it open.
     await user.click(screen.getByText(/show build log/i));
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
 
@@ -499,8 +413,6 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // The first screen anyone ever sees on a cold start, and the one a
-  // candidate stares at for several minutes.
   test("boot progress, building", async () => {
     const { container } = render(
       <BootProgress
@@ -539,10 +451,6 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // The clipboard panel is a form: two labelled controls and a live
-  // region of remote text. Labels are the whole point of it being usable.
-  // A data table with row headers — the one place in the app where
-  // header association actually carries meaning for a screen reader.
   test("domain breakdown", async () => {
     const { container } = render(
       <DomainBreakdown
@@ -584,16 +492,10 @@ describe("axe: no WCAG violations", () => {
   });
 
   test("desktop-required gate", async () => {
-    // The one screen a phone or a 400%-zoomed desktop ever sees.
     const { container } = render(<DesktopRequired verdict="narrow" />);
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // The navbar is on every screen in both products, so anything wrong
-  // here is wrong everywhere. Three states are scanned because three is
-  // all there are: at the top of the app, one step down it, and narrow
-  // with the menu open. There is no longer a second variant to scan —
-  // the arrangement is one arrangement.
   test("navbar at the top of the app", async () => {
     const { container } = render(
       <NavBar
@@ -607,9 +509,6 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // The state that used to replace the mark with a back button. The
-  // trail is a nav landmark of its own beside the banner's, and the
-  // clickable step and the current one must not both be links.
   test("navbar one step down, with a trail", async () => {
     const { container } = render(
       <NavBar
@@ -620,15 +519,6 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // What a phone actually renders: the nav links, the login and both
-  // ways out of a session all move into this panel, and that composition
-  // is the one worth sweeping open. The assertions before the scan are
-  // load-bearing — a mis-set matchMediaMock, or a menu that silently
-  // failed to open, would otherwise leave axe scanning a closed panel
-  // and pass for the wrong reason.
-  //
-  // No try/finally around matchMediaMock: the describe's own afterEach
-  // resets it unconditionally, pass or fail.
   test("navbar, narrow, with the menu open", async () => {
     matchMediaMock([HEADER_COMPACT_QUERY, MCQ_COMPACT_QUERY]);
     const user = userEvent.setup();
@@ -675,9 +565,6 @@ describe("axe: no WCAG violations", () => {
   });
 
   test("exam intro card", async () => {
-    // The schematic is a div tree carrying role="img"; the scan is what
-    // holds it to having an accessible name rather than being a pile of
-    // unlabelled boxes a screen reader walks through one at a time.
     const { container } = render(<ExamIntro onClose={() => {}} />);
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
@@ -688,10 +575,6 @@ describe("axe: no WCAG violations", () => {
     const { container } = render(<ToastLayer />);
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
-
-  // ---- mcq engine surfaces. Every state the multiple-choice screen can
-  // put on screen gets its own scan: unscanned states are exactly how
-  // past violations survived (see the exam-panel comment above).
 
   const mcqSession: SessionSnapshot = {
     state: "running",
@@ -778,9 +661,6 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // The two surfaces a phone gets instead of the wide bar and the inline
-  // panel. Both are modal, both are new, and an unscanned state is
-  // exactly how the violations above survived as long as they did.
   test("mcq navbar menu, narrow, with the attempt section open", async () => {
     matchMediaMock([HEADER_COMPACT_QUERY, MCQ_COMPACT_QUERY]);
     stubMcqFetch();
@@ -840,9 +720,6 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // The review renders three marked states (correct-selected,
-  // correct-missed, wrong-selected) plus a neutral row — all four at
-  // once here, each carrying icon + text, never colour alone.
   test("score answer review (mcq)", async () => {
     const { container } = render(
       <McqAnswerReview
@@ -862,14 +739,6 @@ describe("axe: no WCAG violations", () => {
     );
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
-
-  // ---- hosted mode ----
-  //
-  // Four surfaces a local candidate never sees, and the reason they are
-  // scanned here rather than trusted: every one of them was written
-  // after this suite existed, so none of them is covered by the App
-  // scans above, and the sign-in screen is the first thing a stranger
-  // ever meets.
 
   test("hosted sign-in", async () => {
     const { container } = render(
@@ -918,11 +787,6 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // The rebuild variant of the same screen: `op: "reset"` is what a
-  // hosted candidate sees for the 2-4 minutes their environment is torn
-  // down and rebuilt in place, and it renders different copy from a
-  // first boot (see the hub-side comments on why a rebuild must not read
-  // as an outage). Never scanned before this suite existed either.
   test("the boot screen, rebuilding", async () => {
     const { container } = render(
       <HostedBooting
@@ -942,8 +806,6 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // The one hosted surface that lives inside the header, beside the
-  // theme toggle and a backgrounded-job chip.
   test("session chip with a lease running out", async () => {
     const { container } = render(
       <SessionChip
@@ -961,17 +823,7 @@ describe("axe: no WCAG violations", () => {
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
-  // SessionChip above is presentational only (see its own file comment);
-  // the two ways out of a session live in SessionActions, and the
-  // confirmation they raise lives in EndSessionDialog. An earlier task
-  // split those out of what used to be one component, and this suite
-  // kept scanning only the chip — the controls and the dialog never had
-  // an axe pass of their own.
   test("session actions with an active session", async () => {
-    // A session is set so both controls render: the always-present
-    // sign-out and the end-session button that exists only when there is
-    // an environment to end. The bare-session case would leave the
-    // second button unswept.
     const { container } = render(
       <SessionActions
         session={{
@@ -992,8 +844,7 @@ describe("axe: no WCAG violations", () => {
 
   test("end-session confirmation dialog", async () => {
     const { container } = render(<EndSessionDialog onClose={() => {}} onChanged={() => {}} />);
-    // Confirms the dialog actually rendered its body rather than an
-    // empty modal shell, which axe would sweep and pass trivially.
+
     expect(screen.getByRole("dialog")).toHaveTextContent(strings.hosted.endConfirmTitle);
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });

@@ -17,14 +17,10 @@ function renderResizer() {
   );
 }
 
-/** The width lands on the document root, so custom-property inheritance
- *  reaches .question-panel without depending on a ref being attached. */
 function panelWidth() {
   return document.documentElement.style.getPropertyValue("--panel-width");
 }
 
-// jsdom implements neither pointer capture nor PointerEvent construction
-// in the way userEvent needs, so pointer gestures are driven directly.
 function stubCapture(el: HTMLElement) {
   const set = vi.fn();
   const release = vi.fn();
@@ -35,8 +31,7 @@ function stubCapture(el: HTMLElement) {
 function pointer(el: HTMLElement, type: string, clientX: number) {
   const ev = new MouseEvent(type, { bubbles: true, clientX, button: 0 });
   Object.defineProperty(ev, "pointerId", { value: 1 });
-  // act(), because pointerup commits React state and the assertions that
-  // follow read the rendered attribute.
+
   act(() => {
     el.dispatchEvent(ev);
   });
@@ -54,8 +49,6 @@ afterEach(() => {
 
 describe("PanelResizer suppression", () => {
   test("is absent below the split breakpoint", () => {
-    // Under 900px the panel leaves the flow and becomes an overlay drawer.
-    // A splitter there would resize something no longer beside anything.
     matchMediaMock([]);
     renderResizer();
     expect(screen.queryByRole("separator")).not.toBeInTheDocument();
@@ -66,7 +59,7 @@ describe("PanelResizer accessibility contract", () => {
   test("declares itself as a vertical separator carrying its own value", () => {
     renderResizer();
     const sep = screen.getByRole("separator");
-    // A separator's implicit orientation is horizontal, so this must be explicit.
+
     expect(sep).toHaveAttribute("aria-orientation", "vertical");
     expect(sep).toHaveAttribute("aria-controls", "question-panel");
     expect(sep).toHaveAttribute("aria-valuenow", "420");
@@ -109,10 +102,6 @@ describe("PanelResizer keyboard", () => {
     expect(sep).toHaveAttribute("aria-valuenow", "280");
   });
 
-  // The splitter pattern allows Enter to collapse, and this panel
-  // deliberately does not: the exam is a split screen, so there is no
-  // collapsed state to toggle into and a stray Enter must not move the
-  // boundary either.
   test("Enter does nothing — there is no collapsed state", async () => {
     renderResizer();
     const sep = screen.getByRole("separator");
@@ -122,11 +111,6 @@ describe("PanelResizer keyboard", () => {
     expect(sep).toHaveAttribute("aria-valuenow", before as string);
   });
 
-  // This is the test that protects the remote desktop, and it guards
-  // something no other gate in this repo can see. Without the hold, a held
-  // arrow key repeating ~30 times a second would ask the X server for a
-  // new framebuffer on every repeat — the desktop strobes and the
-  // candidate's terminal reflows its columns over and over.
   test("a whole key burst costs exactly one server-side resize", async () => {
     const hold = vi.spyOn(desktopResize, "hold");
     const release = vi.spyOn(desktopResize, "release");
@@ -134,8 +118,6 @@ describe("PanelResizer keyboard", () => {
     const sep = screen.getByRole("separator");
     sep.focus();
 
-    // A held key is repeated keydowns with no keyup until release — not
-    // three separate presses, which is what userEvent's "{Key}" sends.
     for (let i = 0; i < 4; i++) {
       sep.dispatchEvent(
         new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, repeat: i > 0 }),
@@ -149,10 +131,6 @@ describe("PanelResizer keyboard", () => {
 });
 
 describe("PanelResizer pointer", () => {
-  // Also mandatory rather than polish: noVNC binds raw mousedown/mousemove/
-  // mouseup and a focusCanvas handler on its own canvas, so a drag released
-  // over the desktop without capture injects a click into the live remote
-  // session and steals the keyboard into it.
   test("captures the pointer so a drag cannot leak into the remote session", () => {
     renderResizer();
     const sep = screen.getByRole("separator");
@@ -172,9 +150,7 @@ describe("PanelResizer pointer", () => {
 
     pointer(sep, "pointerdown", 500);
     pointer(sep, "pointermove", 560);
-    // Written to the custom property imperatively — no setState per frame,
-    // or <Markdown> would re-parse the question sixty times a second.
-    // 420 default + 60px of travel.
+
     expect(panelWidth()).toBe("480px");
 
     pointer(sep, "pointerup", 560);
@@ -218,11 +194,7 @@ describe("PanelResizer persistence", () => {
     window.localStorage.setItem(STORAGE_KEY, "480");
     renderResizer();
     expect(screen.getByRole("separator")).toHaveAttribute("aria-valuenow", "480");
-    // Applied in a layout effect, so a stored width never flashes at the
-    // default.
-    // This is the assertion that caught the original bug: written to an
-    // ancestor ref, it was empty here, because a child's layout effect
-    // runs before its parent's ref is attached.
+
     expect(panelWidth()).toBe("480px");
   });
 

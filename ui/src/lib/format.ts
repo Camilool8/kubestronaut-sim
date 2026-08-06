@@ -1,8 +1,3 @@
-// Shared time formatters. formatDuration is the human-friendly form used
-// on summary surfaces ("2h", "1h 30m"); formatClock is the ticking
-// H:MM:SS countdown used by the timer, and formatClockSpoken is the same
-// reading in words, for the assistive tech the glyphs are hidden from.
-
 export function formatDuration(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.round((totalSeconds % 3600) / 60);
@@ -11,11 +6,6 @@ export function formatDuration(totalSeconds: number): string {
   return `${h}h ${m}m`;
 }
 
-// formatElapsed renders a span in milliseconds as a duration for the
-// control-job checklist. The precision steps down as the span grows:
-// several phases finish in well under a second and would otherwise all
-// read "0s", while a cluster rebuild runs for minutes and doesn't want
-// a jittering decimal.
 export function formatElapsed(ms: number): string {
   const clamped = Math.max(0, ms);
   if (clamped < 10_000) return `${(clamped / 1000).toFixed(1)}s`;
@@ -36,12 +26,6 @@ export function formatClock(totalSeconds: number): string {
   return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-// formatClockSpoken carries formatClock's value in natural language,
-// because "1:47:12" is announced digit by digit with its colons and
-// arrives as noise. Seconds are dropped at or above a minute on purpose:
-// the countdown re-renders every second, and a reading whose tail changes
-// on every tick is re-announced faster than it can be heard out. Below a
-// minute they are the only thing left worth saying.
 export function formatClockSpoken(totalSeconds: number): string {
   const clamped = Math.max(0, Math.floor(totalSeconds));
   if (clamped < 60) return plural(clamped, "second");

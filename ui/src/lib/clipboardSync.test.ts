@@ -21,14 +21,6 @@ function stubClipboard(clipboard: Partial<Clipboard>) {
   });
 }
 
-/**
- * Drains every microtask already queued, however many `.then` hops deep,
- * without hardcoding a tick count: a macrotask boundary (a real timer)
- * always runs after all microtasks queued ahead of it have settled. Used
- * where a fixed number of `await Promise.resolve()` would work today but
- * silently stop covering the code the moment another `await` is inserted
- * anywhere in the chain under test.
- */
 function flushMicrotasks(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
@@ -135,7 +127,7 @@ describe("clipboardSync host read", () => {
   test("a browser with no readText at all is silent", async () => {
     const target = fakeTarget();
     desktopClipboard.connect(target);
-    stubClipboard({}); // Firefox: no readText for web content
+    stubClipboard({});
 
     expect(await clipboardSync.syncFromHost()).toBe(false);
     expect(target.pasted).toEqual([]);
@@ -144,17 +136,12 @@ describe("clipboardSync host read", () => {
   test("start wires focus to a host read", async () => {
     const target = fakeTarget();
     desktopClipboard.connect(target);
-    // Different values for the mount-time read and the focus-triggered read:
-    // if the two reads returned the same text, the dedup guard in
-    // pushToDesktop would make the second read a no-op even with the focus
-    // listener deleted, and the test would pass either way.
+
     let hostText = "5 Pods";
     stubClipboard({ readText: vi.fn(async () => hostText) });
     clipboardSync.start();
-    // Condition-based, not tick-counted: onFocus now runs syncToHost()
-    // ahead of syncFromHost(), so the number of microtask hops before this
-    // settles is an implementation detail, not a contract.
-    await vi.waitFor(() => expect(target.pasted).toEqual(["5 Pods"])); // the mount-time read
+
+    await vi.waitFor(() => expect(target.pasted).toEqual(["5 Pods"]));
 
     hostText = "3 Deployments";
     window.dispatchEvent(new Event("focus"));
@@ -167,7 +154,7 @@ describe("clipboardSync host read", () => {
     let hostText = "5 Pods";
     stubClipboard({ readText: vi.fn(async () => hostText) });
     clipboardSync.start();
-    await vi.waitFor(() => expect(target.pasted).toEqual(["5 Pods"])); // the mount-time read
+    await vi.waitFor(() => expect(target.pasted).toEqual(["5 Pods"]));
 
     hostText = "3 Deployments";
     document.dispatchEvent(new Event("visibilitychange"));
@@ -180,19 +167,14 @@ describe("clipboardSync host read", () => {
     let hostText = "5 Pods";
     stubClipboard({ readText: vi.fn(async () => hostText) });
     clipboardSync.start();
-    await vi.waitFor(() => expect(target.pasted).toEqual(["5 Pods"])); // the mount-time read
+    await vi.waitFor(() => expect(target.pasted).toEqual(["5 Pods"]));
 
     clipboardSync.stop();
-    hostText = "3 Deployments"; // a value distinct from lastSynced, so a
-    // stray read would not be caught by the dedup guard
+    hostText = "3 Deployments";
+
     window.dispatchEvent(new Event("focus"));
     document.dispatchEvent(new Event("visibilitychange"));
-    // Proving absence can't use vi.waitFor (it resolves the instant the
-    // assertion is true, which is immediately if nothing is wired — that
-    // would pass just as happily if the listener removal were broken and
-    // the push simply hadn't landed yet). A macrotask flush instead drains
-    // every microtask any surviving handler could have queued before this
-    // assertion runs, whatever the chain length.
+
     await flushMicrotasks();
 
     expect(target.pasted).toEqual(["5 Pods"]);
@@ -217,8 +199,6 @@ describe("clipboardSync host write", () => {
   });
 
   test("a value taken from the desktop is never pushed back to it", async () => {
-    // The loop this guards against: write X to the host, the next focus
-    // reads X back, and pushes it to the desktop again, forever.
     const target = fakeTarget();
     desktopClipboard.connect(target);
     const writeText = vi.fn(async () => {});
@@ -239,7 +219,7 @@ describe("clipboardSync host write", () => {
     stubClipboard({ writeText, readText: vi.fn(async () => "lyra") });
 
     await clipboardSync.syncFromHost();
-    desktopClipboard.receive("lyra"); // the server echoes it back
+    desktopClipboard.receive("lyra");
 
     expect(await clipboardSync.syncToHost()).toBe(false);
     expect(writeText).not.toHaveBeenCalled();
@@ -270,17 +250,12 @@ describe("clipboardSync desktop-change wiring", () => {
       clipboardSync.start();
 
       desktopClipboard.receive("candidate@instance-3");
-      // The subscribe callback's hasFocus() guard runs synchronously inside
-      // receive(); if it had passed, the write it triggers would already
-      // be underway. No tick to wait out for this half of the claim.
+
       expect(writeText).not.toHaveBeenCalled();
 
       hasFocusSpy.mockReturnValue(true);
       window.dispatchEvent(new Event("focus"));
 
-      // ...but nothing is lost: the focus handler tries syncToHost() on
-      // return, independently of the subscription, and picks up the value
-      // that arrived while the tab was elsewhere.
       await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith("candidate@instance-3"));
     } finally {
       hasFocusSpy.mockRestore();
@@ -296,11 +271,7 @@ describe("clipboardSync desktop-change wiring", () => {
       clipboardSync.stop();
 
       desktopClipboard.receive("candidate@instance-4");
-      // Were the subscription still live, hasFocus() would pass and
-      // syncToHost() would call writeText synchronously as part of
-      // handling receive() — so, as above, no tick to wait out. A
-      // trailing flush still guards against a future implementation that
-      // defers the call.
+
       await flushMicrotasks();
 
       expect(writeText).not.toHaveBeenCalled();
@@ -312,14 +283,6 @@ describe("clipboardSync desktop-change wiring", () => {
 
 describe("clipboardSync loop-guard edge cases", () => {
   test("a page copy between a desktop push and the next focus does not re-send stale desktop text and blocks the real host change", async () => {
-    // Reproduces the MERGE BLOCKER: syncToHost used to compare
-    // desktopClipboard.getRemote() (a level) against lastSynced alone (a
-    // watermark also moved by pushToDesktop). Step 2 below moves the
-    // watermark away from the desktop's still-current value, which made
-    // step 3 treat that stale value as "new" again — overwriting whatever
-    // the user actually just copied outside the tab, and returning true so
-    // syncFromHost (the only path that would have picked up the real host
-    // change) never ran.
     const target = fakeTarget();
     desktopClipboard.connect(target);
     const hasFocusSpy = vi.spyOn(document, "hasFocus").mockReturnValue(true);
@@ -334,21 +297,13 @@ describe("clipboardSync loop-guard edge cases", () => {
     try {
       clipboardSync.start();
 
-      // Step 1: terminal copy "pod-A" reaches the desktop, and because the
-      // tab is focused the subscribe wiring writes it straight to the host.
       desktopClipboard.receive("pod-A");
       await vi.waitFor(() => expect(hostClipboard).toBe("pod-A"));
 
-      // Step 2: a page copy of "value-C" moves the watermark. The desktop's
-      // remote value is still "pod-A" — nothing told desktopClipboard
-      // otherwise.
       stubSelection("value-C");
       window.dispatchEvent(new Event("copy"));
       expect(target.pasted).toContain("value-C");
 
-      // Step 3: the user copies "manifest-D" in another app (simulated by
-      // the host clipboard changing outside of writeText) and returns to
-      // the tab.
       hostClipboard = "manifest-D";
       window.dispatchEvent(new Event("focus"));
 
@@ -371,9 +326,6 @@ describe("clipboardSync stop/start lifecycle clears sync state", () => {
 
     clipboardSync.stop();
 
-    // A new attempt reconnects a fresh, empty desktop container. The host
-    // clipboard has not changed, so only a cleared watermark makes start()
-    // push it again.
     const target2 = fakeTarget();
     desktopClipboard.connect(target2);
     clipboardSync.start();
@@ -388,8 +340,6 @@ describe("clipboardSync pushToDesktop failure path", () => {
     clipboardSync.start();
     stubSelection("kube-system");
 
-    // No desktopClipboard.connect() yet: sendToDesktop returns false, and
-    // pushToDesktop must not record the text as synced anyway.
     window.dispatchEvent(new Event("copy"));
 
     const target = fakeTarget();

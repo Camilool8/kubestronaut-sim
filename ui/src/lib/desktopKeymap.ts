@@ -1,38 +1,10 @@
-// Translates macOS keyboard chords into what the exam desktop expects.
-//
-// The problem: noVNC delivers ⌘ to the remote X server as XK_Super_L
-// (core/input/keyboard.js), and nothing in this XFCE session binds Super.
-// So a Mac candidate's ⌘C and ⌘V — the two chords their hands produce
-// without being asked — do literally nothing, silently, in the middle of
-// a timed exam. Every piece of copy in the app told them to press
-// Ctrl+Shift+V instead, which works but is not what muscle memory does
-// under time pressure.
-//
-// The fix is a small, explicit chord map applied in the browser before
-// noVNC sees the event. Deliberately NOT a blanket ⌘→Ctrl remap, which
-// is what Microsoft Remote Desktop does: in a terminal that turns the
-// copy reflex into SIGINT, ⌘V into a literal ^V, and ⌘Z into a suspended
-// process. The three most common Mac reflexes would all do damage. So
-// each chord is mapped to the thing a Linux terminal actually wants.
-//
-// Follows the module-singleton shape of lib/desktopClipboard and
-// lib/desktopResize: the viewport registers its RFB connection here, and
-// nothing else needs to know whether a desktop is connected.
-
 import { isMac } from "./platform";
 import { strings } from "../strings";
 
-/** The slice of noVNC's RFB this module needs. */
 export interface KeyTarget {
   sendKey(keysym: number, code: string, down?: boolean): void;
 }
 
-// X11 keysyms, as a local table.
-//
-// NOT imported from @novnc/novnc/core/input/keysym.js: the package's
-// "exports" field is the single string "./core/rfb.js", so every subpath
-// is unresolvable and a deep import fails at build time. Do not "fix"
-// this by adding the import back.
 const XK = {
   Control_L: 0xffe3,
   Shift_L: 0xffe1,
@@ -43,62 +15,39 @@ const XK = {
   f: 0x0066,
   l: 0x006c,
   u: 0x0075,
-  // Shifted forms. A chord that holds Shift must name the shifted keysym:
-  // X11 derives the character from keycode + modifier state, so Shift plus
-  // a lowercase keysym is an inconsistent pair that GTK accelerators
-  // (Ctrl+Shift+V and friends) will not match.
+
   C: 0x0043,
   T: 0x0054,
   V: 0x0056,
   W: 0x0057,
 } as const;
 
-/** One key press, with the modifiers to hold around it. */
 interface Chord {
   keysym: number;
-  /** DOM code — rfb.js routes it through XtScancode, so it must be real. */
+
   code: string;
   ctrl?: boolean;
   shift?: boolean;
   alt?: boolean;
-  /** What this does on the desktop, for the shortcut help. */
+
   describes: string;
 }
 
-/**
- * ⌘/⌥ chords translated by default.
- *
- * Keyed by `event.key` lowercased, prefixed by the modifier. Everything
- * absent from this table passes straight through untouched — the map is
- * an allowlist, not an interception layer.
- */
 const MAC_CHORDS: Record<string, Chord> = {
-  // The two that matter. xfce4-terminal's copy/paste are Ctrl+Shift+C/V,
-  // and MiscShowUnsafePasteDialog is already off in the image, so a
-  // multi-line paste lands without a confirmation dialog.
   "meta+c": { keysym: XK.C, code: "KeyC", ctrl: true, shift: true, describes: strings.keymap.copy },
   "meta+v": { keysym: XK.V, code: "KeyV", ctrl: true, shift: true, describes: strings.keymap.paste },
-  // macOS Terminal clears with ⌘K; the Linux equivalent is Ctrl+L.
+
   "meta+k": { keysym: XK.l, code: "KeyL", ctrl: true, describes: strings.keymap.clearScreen },
-  // Line movement. On macOS these are ⌘←/→; readline wants Home/End.
+
   "meta+arrowleft": { keysym: XK.Home, code: "Home", describes: strings.keymap.startOfLine },
   "meta+arrowright": { keysym: XK.End, code: "End", describes: strings.keymap.endOfLine },
-  // Word movement. macOS uses ⌥←/→; readline binds Alt+B / Alt+F.
+
   "alt+arrowleft": { keysym: XK.b, code: "KeyB", alt: true, describes: strings.keymap.backWord },
   "alt+arrowright": { keysym: XK.f, code: "KeyF", alt: true, describes: strings.keymap.forwardWord },
-  // ⌘⌫ deletes to the start of the line on macOS; readline is Ctrl+U.
+
   "meta+backspace": { keysym: XK.u, code: "KeyU", ctrl: true, describes: strings.keymap.deleteToStartOfLine },
 };
 
-/**
- * Chords the browser refuses to give up.
- *
- * Chrome and Firefox reserve new-tab and close-tab, and preventDefault
- * does not stop them outside an installed/standalone window. Shipping
- * them as defaults would mean two mappings that visibly do nothing,
- * which costs more trust than the shortcuts are worth — so they are
- * offered explicitly, with that caveat, rather than enabled quietly.
- */
 export const BROWSER_RESERVED: Record<string, Chord> = {
   "meta+t": { keysym: XK.T, code: "KeyT", ctrl: true, shift: true, describes: strings.keymap.newTerminalTab },
   "meta+w": { keysym: XK.W, code: "KeyW", ctrl: true, shift: true, describes: strings.keymap.closeTerminalTab },
@@ -107,11 +56,9 @@ export const BROWSER_RESERVED: Record<string, Chord> = {
 const STORAGE_KEY = "sim.desktopKeymap.enabled";
 const STORAGE_KEY_RESERVED = "sim.desktopKeymap.reserved";
 
-/** A row for the shortcut-help table. */
 export interface ChordRow {
-  /** What the candidate presses, e.g. "⌘C". */
   press: string;
-  /** What the desktop receives, e.g. "Ctrl+Shift+C". */
+
   sends: string;
   describes: string;
 }
@@ -149,16 +96,11 @@ class DesktopKeymap {
     this.reservedPref = readFlag(STORAGE_KEY_RESERVED, false);
   }
 
-  /** Called by the viewport once its connection is established. */
   attach(target: KeyTarget): void {
     this.target = target;
     this.emit();
   }
 
-  /**
-   * Ignores a stale target so a viewport torn down after a newer one
-   * connected cannot clear the live link (same guard as desktopClipboard).
-   */
   detach(target: KeyTarget): void {
     if (this.target === target) {
       this.target = null;
@@ -177,17 +119,14 @@ class DesktopKeymap {
     return isMac();
   }
 
-  /** Whether the remapping is switched on (regardless of platform). */
   get enabled(): boolean {
     return this.enabledPref;
   }
 
-  /** Whether the browser-reserved chords are opted into. */
   get reservedEnabled(): boolean {
     return this.reservedPref;
   }
 
-  /** Whether chords are actually being translated right now. */
   get active(): boolean {
     return this.isMac && this.enabledPref && this.target !== null;
   }
@@ -204,7 +143,6 @@ class DesktopKeymap {
     this.emit();
   }
 
-  /** The whole map, for the shortcut-help table. */
   rows(): ChordRow[] {
     const all = { ...MAC_CHORDS, ...(this.reservedPref ? BROWSER_RESERVED : {}) };
     return Object.entries(all).map(([key, c]) => ({
@@ -214,18 +152,9 @@ class DesktopKeymap {
     }));
   }
 
-  /**
-   * Handles a keydown over the desktop canvas. Returns true when the
-   * event was consumed and the caller must preventDefault + stopPropagation.
-   */
   handleKeyDown(event: KeyboardEvent): boolean {
     if (!this.active) return false;
 
-    // Swallow the bare Meta press. Without this, ⌘ on its own has already
-    // reached noVNC and asserted Super_L on the remote X server by the
-    // time the letter arrives — leaving a modifier stuck down that
-    // nothing here ever releases. Super binds to nothing in this XFCE
-    // session, so suppressing it costs the candidate nothing.
     if (event.key === "Meta") return true;
 
     const chord = this.lookup(event);
@@ -234,7 +163,6 @@ class DesktopKeymap {
     return true;
   }
 
-  /** Symmetric with handleKeyDown: a consumed chord must not leak its keyup. */
   handleKeyUp(event: KeyboardEvent): boolean {
     if (!this.active) return false;
     if (event.key === "Meta") return true;
@@ -244,18 +172,13 @@ class DesktopKeymap {
   private lookup(event: KeyboardEvent): Chord | null {
     const key = event.key?.toLowerCase();
     if (!key) return null;
-    // metaKey wins when both are held: ⌘ is the one being translated.
+
     const prefix = event.metaKey ? "meta" : event.altKey ? "alt" : null;
     if (!prefix) return null;
     const table = { ...MAC_CHORDS, ...(this.reservedPref ? BROWSER_RESERVED : {}) };
     return table[`${prefix}+${key}`] ?? null;
   }
 
-  /**
-   * Presses the modifiers, taps the key, releases the modifiers — in
-   * that order, on one socket, so the server sees a well-formed chord
-   * and is never left holding a modifier.
-   */
   private send(chord: Chord): void {
     const t = this.target;
     if (!t) return;
@@ -269,18 +192,13 @@ class DesktopKeymap {
       t.sendKey(chord.keysym, chord.code, true);
       t.sendKey(chord.keysym, chord.code, false);
       for (const [ks, code] of mods.reverse()) t.sendKey(ks, code, false);
-    } catch {
-      // A viewport that dropped between the keypress and here. Nothing
-      // useful to say: the reconnect overlay is already up.
-    }
+    } catch {}
   }
 
-  /** Sends an arbitrary chord — used by the clipboard paste path. */
   sendPasteChord(): void {
     this.send({ keysym: XK.V, code: "KeyV", ctrl: true, shift: true, describes: "Paste" });
   }
 
-  /** Test-only, mirroring desktopResize.reset. */
   reset(): void {
     this.target = null;
     this.enabledPref = true;
@@ -300,48 +218,22 @@ function readFlag(key: string, fallback: boolean): boolean {
     const raw = window.localStorage.getItem(key);
     return raw === null ? fallback : raw === "true";
   } catch {
-    return fallback; // private mode, or storage disabled
+    return fallback;
   }
 }
 
 function writeFlag(key: string, value: boolean): void {
   try {
     window.localStorage.setItem(key, String(value));
-  } catch {
-    // Preference is a nicety; failing to persist it must not break input.
-  }
+  } catch {}
 }
 
 export const desktopKeymap = new DesktopKeymap();
 
-/**
- * What to tell the candidate to press to paste into the exam terminal.
- *
- * One answer, everywhere. The viewport intercepts Ctrl+V and ⌘V
- * identically on every platform and turns either into the terminal's real
- * Ctrl+Shift+V, so there is no longer a per-platform instruction to give.
- * This used to branch on isMac and return "⌘V" or "Ctrl+Shift+V", which
- * meant the copy changed depending on who was reading it and on whether a
- * preference happened to be on — and a Mac user who pressed Ctrl+V
- * (perfectly reasonable) got the one chord that printed `^V`.
- */
 export function pasteChordLabel(): string {
   return "Ctrl+V";
 }
 
-/**
- * Is this keydown the candidate asking to paste?
- *
- * Ctrl+V and ⌘V, on every platform, independent of every preference. It
- * lives here rather than inline in the viewport so the rule can be
- * asserted directly: the viewport must consume ALL of these, because the
- * one thing it must never do is forward a paste to the remote terminal,
- * where a bare Ctrl+V is readline's verbatim-insert prefix and prints
- * `^V` instead of pasting.
- *
- * Shift and Alt are excluded deliberately: Ctrl+Shift+V is the terminal's
- * own paste and must pass straight through untouched.
- */
 export function isPasteChord(event: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "shiftKey" | "altKey">): boolean {
   return (
     event.key?.toLowerCase() === "v" &&

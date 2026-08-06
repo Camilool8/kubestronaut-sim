@@ -1,38 +1,5 @@
 import type { ReactNode } from "react";
 
-// The product's icons, hand-authored and bundled.
-//
-// They used to be Unicode literals, and eight of them — every functional
-// one — did not exist in the fonts this app ships. @fontsource declares a
-// `unicode-range` on each @font-face, which is a hard gate: a codepoint
-// outside every declared range never reaches the woff2 at all. ◆ ◇ ✓ ✗ ⧉
-// ◐ ☀ ☾ are all outside both families' subsets, so they fell through to
-// whatever the operating system had. ⧉ — the copy affordance — renders as
-// a tofu box on many Linux font sets, and ☀/☾ can resolve to Apple Color
-// Emoji on macOS, which DESIGN.md explicitly bans.
-//
-// ⧉ no longer appears on the click-to-copy value itself. It sits on the
-// two copy controls that have a real slot for it: the clipboard panel and
-// the question pane's ssh hint. See `.copy-value` in theme.css for why
-// the inline one has no icon at all.
-//
-// These are hand-authored on a 24 grid with round caps and joins, no
-// fill, and a stroke proportional to the grid. Everything is drawn here
-// rather than imported, which keeps the offline promise absolute —
-// nothing about an icon can fail to arrive.
-//
-// Brand marks are deliberately NOT in this set — neither this product's
-// (BrandMark.tsx, a filled multi-colour drawing on its own field, mirrored
-// in ui/public/favicon.svg) nor anyone else's (the GitHub mark, drawn in
-// HostedSignIn beside the button it belongs to). These are monochrome
-// outlines on a 24 grid that take `currentColor`, and mixing a logo into
-// them would invite a call site to restyle one.
-//
-// The <svg> hardcodes aria-hidden and takes no label prop, deliberately.
-// Every glyph in this product already sits beside .sr-only text or an
-// aria-label on its own button, so by construction an icon here can never
-// be the only carrier of meaning, and no later call site can make it one.
-
 export type IconName =
   | "chevron-left"
   | "chevron-right"
@@ -49,9 +16,7 @@ export type IconName =
   | "theme-dark"
   | "help"
   | "menu"
-  // The navbar menu's rows. Every row carries a glyph so the labels
-  // align down one edge, which is the whole reason the menu reads as a
-  // list rather than as a pile of borrowed controls.
+
   | "chart"
   | "user"
   | "exit"
@@ -93,11 +58,7 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="M5 15.5A1.5 1.5 0 0 1 4 14V5.5A1.5 1.5 0 0 1 5.5 4H14a1.5 1.5 0 0 1 1.5 1.5" />
     </>
   ),
-  // The navigator trigger. The design draws this as ⊞, which is a boxed
-  // plus and reads as "add" at 14px; four cells say "every task at once",
-  // which is what the popover actually contains. Two rows of two rather
-  // than the popover's real ten columns — at 14px a 10-wide grid is a
-  // smear, and this is a signpost, not a diagram.
+
   grid: (
     <>
       <rect x="4" y="4" width="7" height="7" rx="1.5" />
@@ -106,8 +67,7 @@ const PATHS: Record<IconName, ReactNode> = {
       <rect x="13" y="13" width="7" height="7" rx="1.5" />
     </>
   ),
-  // Same 24 grid, same round caps: a key row and a space bar, which reads
-  // as a keyboard at 14px without needing the individual keys drawn.
+
   keyboard: (
     <>
       <rect x="2.5" y="6" width="19" height="12" rx="2" />
@@ -115,9 +75,7 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="M8 14h8" />
     </>
   ),
-  // Half-lit disc: the same "auto" idea as the old ◐, drawn rather than
-  // borrowed. The filled half is a real half-circle arc, so it reads at
-  // 14px as well as at 44px.
+
   "theme-auto": (
     <>
       <circle cx="12" cy="12" r="8" />
@@ -146,8 +104,7 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="M4 17h16" />
     </>
   ),
-  // Three bars of increasing height on a baseline: progress over a set
-  // of exams, which is what the dashboard ranks.
+
   chart: (
     <>
       <path d="M4 20h16" />
@@ -162,8 +119,7 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="M5.5 19.5a6.5 6.5 0 0 1 13 0" />
     </>
   ),
-  // A door with an arrow leaving it. Sign out, not "close": the arrow
-  // points away from the panel rather than at a cross.
+
   exit: (
     <>
       <path d="M14.5 5.5h-7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h7" />
@@ -171,8 +127,7 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="M18 9l3 3-3 3" />
     </>
   ),
-  // Submit: a sheet with a tick, not a paper plane. Nothing is being
-  // sent anywhere — the attempt is being handed in for grading.
+
   send: (
     <>
       <path d="M18.5 11V6.5a2 2 0 0 0-2-2h-9a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2H12" />
@@ -192,9 +147,6 @@ interface IconProps {
   className?: string;
 }
 
-// Always 1em: an icon rides the type it sits in, and no call site ever
-// asked for anything else — the size prop that offered to was dead code
-// pretending to be an API (#32). A fixed-size control sizes its type.
 export function Icon({ name, className }: IconProps) {
   return (
     <svg
@@ -215,5 +167,4 @@ export function Icon({ name, className }: IconProps) {
   );
 }
 
-/** Test-only: the full name list, so a scan can assert every one renders. */
 export const ICON_NAMES = Object.keys(PATHS) as IconName[];

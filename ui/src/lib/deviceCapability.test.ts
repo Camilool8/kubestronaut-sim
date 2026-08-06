@@ -17,10 +17,6 @@ describe("pointerClass", () => {
     expect(pointerClass()).toBe("fine");
   });
 
-  // A touchscreen laptop matches `any-pointer: coarse` AND
-  // `any-pointer: fine`, so the query as a whole does not match and it
-  // is reported as what it is. The gate exists for the missing keyboard,
-  // and this device has one.
   test("a touchscreen laptop reports fine", () => {
     matchMediaMock([]);
     expect(pointerClass()).toBe("fine");
@@ -60,9 +56,6 @@ describe("pointerHeader", () => {
     expect(pointerHeader()).toEqual({ [POINTER_HEADER]: "coarse" });
   });
 
-  // The server admits a request that says nothing, so an unknown device
-  // must send nothing at all rather than a guess that would be
-  // indistinguishable from a measurement.
   test("is empty when the device could not be read", () => {
     const saved = window.matchMedia;
     // @ts-expect-error deleting a DOM global for the duration of one test

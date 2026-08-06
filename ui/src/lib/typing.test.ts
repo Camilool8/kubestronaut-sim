@@ -9,9 +9,6 @@ function make(html: string): HTMLElement {
 
 describe("isTypingTarget", () => {
   it("is false for a checkbox — the bug this exists for", () => {
-    // An mcq option is a checkbox inside a label. Clicking the answer
-    // focuses it, so a guard that treated every <input> as typing killed
-    // G, F, [ and ] on the single most ordinary action in the exam.
     const label = make(`<label><input type="checkbox"><span>Annotations</span></label>`);
     expect(isTypingTarget(label.querySelector("input"))).toBe(false);
   });

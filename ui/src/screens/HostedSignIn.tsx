@@ -3,16 +3,6 @@ import { BrandMark } from "../components/BrandMark";
 import { NavBar } from "../components/NavBar";
 import { strings } from "../strings";
 
-/**
- * The GitHub mark, drawn here rather than added to the icon set.
- *
- * It is a third-party logo: filled, on a fixed 16 grid, and not ours to
- * restyle. Icon.tsx is a set of monochrome 24-grid outlines that any call
- * site may tint and scale, and a logo in that drawer would eventually be
- * treated as one of them. It takes `currentColor` so it sits correctly on
- * the button in both themes, which is the one liberty GitHub's brand
- * guidance allows and the only one taken.
- */
 function GitHubMark() {
   return (
     <svg
@@ -29,45 +19,15 @@ function GitHubMark() {
   );
 }
 
-/**
- * The one screen a signed-out visitor sees.
- *
- * It exists only in hosted mode. The local product has no accounts and
- * gains none — this is served by the hub, in front of a facilitator that
- * still has no authentication of any kind and never learns that any of
- * this happened.
- *
- * It is the only screen in the product with NO HEADER, which is what made
- * the first draft of it look like a different application: a left-aligned
- * page heading floating at the top of an empty viewport, with the product
- * mark, the wordmark and the theme control — all of them header furniture
- * everywhere else — simply missing. So this screen carries its own. The
- * mark and wordmark move to the top of the card, the theme toggle keeps
- * the corner it has on every other screen, and the whole thing is
- * centred: a door, not a truncated page.
- *
- * Seat counts before sign-in, deliberately: someone deciding whether to
- * create an account here is entitled to know whether there is anywhere to
- * sit. It is a capacity number, not a fact about anyone.
- */
 export function HostedSignIn({ me }: { me: Me }) {
   const seats = me.seats?.practical;
-  // The other flavour is not a footnote: it is thirty seats that need no
-  // cluster, and a visitor who reads "all 3 seats in use" and leaves was
-  // told something true about a third of what is on offer.
+
   const mcq = me.seats?.mcq;
   const mcqLine = mcq ? strings.hosted.signInSeatsMcq(mcq.total - mcq.used) : "";
 
   return (
     <div className="signin">
-      {/* The same navbar as every other screen, with the sections that
-          need an account simply absent. It used to carry a bespoke
-          theme button in a corner of its own, which made this the one
-          screen where the app's chrome was a different object — and the
-          front door is the worst place to teach someone a layout they
-          will not see again. The card below still draws the mark large,
-          because that is this screen's subject rather than its
-          furniture. */}
+
       <NavBar />
 
       <main className="signin-main">
@@ -85,18 +45,12 @@ export function HostedSignIn({ me }: { me: Me }) {
 
           {me.loginURL ? (
             <>
-              {/* A link and not a fetch: the OAuth flow is a redirect to
-                  GitHub and back, and there is nothing for JavaScript to
-                  do in the middle of it. */}
+
               <a className="btn btn-primary signin-github" href={me.loginURL}>
                 <GitHubMark />
                 {strings.hosted.signInGitHub}
               </a>
-              {/* What the button actually does, said before it is pressed.
-                  The hub requests NO OAuth scopes (hub/internal/auth:
-                  GitHub), which is the difference between signing in and
-                  granting an app your repositories — and a visitor cannot
-                  read that comment. */}
+
               <p className="signin-scope">{strings.hosted.signInScope}</p>
 
               {seats && (
@@ -110,9 +64,6 @@ export function HostedSignIn({ me }: { me: Me }) {
               )}
             </>
           ) : (
-            // AUTH_MODE=header or none, reached without the header being
-            // set. There is genuinely no login here, and offering a button
-            // that 404s would be worse than saying so.
             <p className="signin-unavailable" role="alert">
               {strings.hosted.signInUnavailable}
             </p>

@@ -1,28 +1,5 @@
-// Contrast enforcement for the token palette.
-//
-// tokens.css records a measured ratio beside almost every colour. Those
-// comments were previously the ONLY contrast check in the product: the
-// axe suite skips the color-contrast rule because jsdom has no layout
-// engine, so nothing caught a token whose value drifted away from the
-// number written next to it. A hand-maintained ledger that nothing
-// verifies is a ledger that goes stale silently.
-//
-// This test reads the real stylesheet and re-derives the ratios, so the
-// floors are enforced rather than asserted. It deliberately checks the
-// PAIRINGS THE PRODUCT CAN ACTUALLY PRODUCE — a token is measured
-// against the fills it can rest on, not against every fill that exists.
-// Widening a set here is a claim that a component now renders that
-// combination; narrowing one is a claim that it no longer can.
-//
-// WCAG 2.1: 1.4.3 sets 4.5:1 for body text, 1.4.11 sets 3:1 for the
-// boundary of a control and for meaningful graphics. Both except
-// components that are inactive, which is why --text-disabled has no
-// floor and is reported for information only.
-
 import { describe, expect, it } from "vitest";
 import { readTokensCss } from "../test/readCss";
-
-// ---------------------------------------------------------------- colour
 
 function srgbToLinear(channel: number): number {
   const c = channel / 255;
@@ -38,18 +15,14 @@ function luminance(hex: string): number {
   );
 }
 
-/** WCAG 2.1 contrast ratio, 1..21. Order-independent. */
 export function contrast(a: string, b: string): number {
   const [la, lb] = [luminance(a), luminance(b)];
   const [hi, lo] = la > lb ? [la, lb] : [lb, la];
   return (hi + 0.05) / (lo + 0.05);
 }
 
-// ---------------------------------------------------------------- parsing
-
 type Tokens = Record<string, string>;
 
-/** Custom properties declared by every rule whose selector matches. */
 function collect(css: string, matches: (selector: string) => boolean): Tokens {
   const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
   const out: Tokens = {};
@@ -70,10 +43,8 @@ const mediaBlock = collect(css, (s) => s.startsWith(":root:not("));
 const light: Tokens = { ...root };
 const dark: Tokens = { ...root, ...darkBlock };
 
-/** The fills any control or its label can rest on. */
 const FILLS = ["bg", "surface", "surface-raised", "surface-hover", "raised-hover"];
 
-/** Worst ratio for `token` across `fills`, plus which fill produced it. */
 function worst(t: Tokens, token: string, fills: string[]) {
   expect(t[token], `--${token} is not declared`).toBeTruthy();
   let low = { fill: "", ratio: Infinity };
@@ -85,7 +56,6 @@ function worst(t: Tokens, token: string, fills: string[]) {
   return low;
 }
 
-// token -> the fills it can rest on, beyond the five above
 const TEXT_4_5: Record<string, string[]> = {
   text: [],
   "text-body": [],
@@ -106,7 +76,6 @@ const GRAPHIC_3: Record<string, string[]> = {
   warn: ["warn-soft"],
 };
 
-// --progress fills a track; it never sits under a control's hover fill.
 const BAR_FILLS = ["bg", "surface", "surface-raised", "neutral-soft"];
 
 const ON_INK: Record<string, number> = {
@@ -117,19 +86,12 @@ const ON_INK: Record<string, number> = {
   "warn-marker": 3,
 };
 
-// The exam tint is a family of ALIASES — --exam-tint: var(--accent) —
-// so no measured ratio sits beside it in the ledger and the sweeps below
-// cannot see it. What has to hold is the pairing: an exam card's avatar
-// prints two letters in --exam-tint on --exam-tint-soft, which is text.
-// Repointing a variant at a graphics-only token (--progress, --success)
-// would be silent everywhere else.
 const TINTS: [string, string][] = [
   ["practical", ":root"],
   ["mcq", '[data-engine="mcq"]'],
   ["coming soon", '[data-engine="soon"]'],
 ];
 
-/** "var(--accent)" -> "accent". Anything else comes back unchanged. */
 function dealias(value: string): string {
   return value.replace(/^var\(\s*--([a-z0-9-]+)\s*\)$/, "$1");
 }
@@ -175,8 +137,6 @@ describe.each([
     expect(contrast(t["accent-contrast"], t.accent)).toBeGreaterThanOrEqual(4.5);
   });
 
-  // A fenced code block is --surface-raised. Highlighting that does not
-  // clear the floor is worse than no highlighting: it looks deliberate.
   it.each(["syntax-string", "syntax-number"])("--%s reads in a code block", (token) => {
     const ratio = contrast(t[token], t["surface-raised"]);
     expect(ratio, `--${token} is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5);
@@ -208,9 +168,6 @@ describe.each([
 
 describe("theme structure", () => {
   it("the media-query twin matches the explicit dark block exactly", () => {
-    // CSS has no mixins, so the "system" choice duplicates every dark
-    // declaration. A token added to one block and not the other is
-    // invisible until someone switches their OS theme.
     const explicit = Object.keys(darkBlock).sort();
     expect(Object.keys(mediaBlock).sort()).toEqual(explicit);
     for (const token of explicit) {
@@ -225,8 +182,7 @@ describe("theme structure", () => {
     const missing = Object.entries(root)
       .filter(([token, value]) => isColour(value) && !(token in darkBlock))
       .map(([token]) => token)
-      // The machine family and its diff washes are the same in both
-      // themes on purpose — a terminal has no light mode.
+
       .filter((token) => !token.startsWith("machine-") && !token.startsWith("diff-"));
     expect(missing).toEqual([]);
   });

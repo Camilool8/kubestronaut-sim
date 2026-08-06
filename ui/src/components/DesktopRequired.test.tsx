@@ -22,27 +22,18 @@ describe("useDesktopGate", () => {
     expect(renderHook(() => useDesktopGate()).result.current).toBe("blocked");
   });
 
-  // The case a width-only check gets wrong. WCAG 1.4.10 defines 320 CSS
-  // px as equivalent to a 1280px window at 400% zoom, so gating on width
-  // alone would lock out exactly the users who depend on that zoom.
   test("a zoomed or narrowed desktop is offered a way through, not blocked", () => {
-    matchMediaMock([NARROW_QUERY]); // narrow, but a fine pointer exists
+    matchMediaMock([NARROW_QUERY]);
     expect(renderHook(() => useDesktopGate()).result.current).toBe("narrow");
   });
 
   test("a touchscreen laptop counts as a desktop", () => {
-    // It reports a coarse pointer AND a fine one, so TOUCH_ONLY_QUERY
-    // does not match and the exam stays available.
     matchMediaMock([]);
     expect(renderHook(() => useDesktopGate()).result.current).toBe("ok");
   });
 
-  // The case the old ordering got wrong. A tablet in landscape is wide
-  // enough to fail NARROW_QUERY, and the gate returned "ok" for it — but
-  // width was never what it lacked. Rotating a tablet does not grow a
-  // keyboard.
   test("a wide tablet is blocked, not waved through on width", () => {
-    matchMediaMock([TOUCH_ONLY_QUERY]); // coarse pointer, roomy viewport
+    matchMediaMock([TOUCH_ONLY_QUERY]);
     expect(renderHook(() => useDesktopGate()).result.current).toBe("blocked");
   });
 });
@@ -65,8 +56,6 @@ describe("DesktopRequired", () => {
   });
 
   test("a running session's controls stay reachable through the gate", () => {
-    // The server-side clock keeps counting on a phone, so there must
-    // always be a way to submit.
     render(
       <DesktopRequired verdict="blocked">
         <button>End Exam</button>
@@ -75,10 +64,6 @@ describe("DesktopRequired", () => {
     expect(screen.getByRole("button", { name: "End Exam" })).toBeInTheDocument();
   });
 
-  // Reachable is not enough on the device this screen exists for. Below
-  // three paragraphs and a requirements list, on a phone, the only way to
-  // submit a still-running exam is off the bottom of the screen — which
-  // is what a candidate arriving here is actually looking for.
   test("the running session's controls come before the explanation, not after it", () => {
     render(
       <DesktopRequired verdict="narrow">
@@ -91,8 +76,6 @@ describe("DesktopRequired", () => {
     expect(submit.compareDocumentPosition(why) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  // The override is the one control that belongs after the reasons: it
-  // is "I have read why this will not work", not a way out of an exam.
   test("continue anyway stays last", () => {
     render(
       <DesktopRequired verdict="narrow">

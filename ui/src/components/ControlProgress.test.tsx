@@ -4,8 +4,6 @@ import userEvent from "@testing-library/user-event";
 import { ControlProgress } from "./ControlProgress";
 import type { ControlJob } from "../api";
 
-// A job mid-rebuild: two phases settled with real durations, the long
-// one running, the rest untouched.
 const runningJob: ControlJob = {
   id: "job-1",
   op: "reset",
@@ -33,16 +31,12 @@ const runningJob: ControlJob = {
 const noop = () => {};
 const props = { onRetry: noop, onDismiss: noop, onBackground: noop };
 
-// These tests assert on interaction, not on rendered durations, so they
-// step off the pinned clock — userEvent's internal delays never settle
-// against fake timers.
 const setupUser = () => {
   vi.useRealTimers();
   return userEvent.setup();
 };
 
 beforeEach(() => {
-  // Pin "now" 64s into the running phase so elapsed values are stable.
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-07-24T12:01:06.100Z"));
 });
@@ -144,8 +138,7 @@ describe("ControlProgress", () => {
         onBackground={onBackground}
       />,
     );
-    // A modal with no reachable control is a keyboard dead end for the
-    // several minutes a rebuild takes.
+
     await user.click(screen.getByRole("button", { name: /background/i }));
     expect(onBackground).toHaveBeenCalledOnce();
     expect(onDismiss).not.toHaveBeenCalled();
@@ -188,9 +181,7 @@ describe("ControlProgress", () => {
 
   test("progress is announced once per phase, not once per tick", () => {
     render(<ControlProgress job={runningJob} {...props} />);
-    // One polite status line carries the current step; the ticking
-    // numbers must not live inside a live region or a screen reader
-    // hears them every second for four minutes.
+
     const status = screen.getByRole("status");
     expect(status).toHaveTextContent(/Recreate Kubernetes cluster/);
     expect(status).not.toHaveTextContent("1m 04s");
@@ -210,8 +201,6 @@ describe("ControlProgress", () => {
     try {
       render(<ControlProgress job={runningJob} {...props} />);
 
-      // Closed by default, and no fetch until opened: the checklist is
-      // the summary, the log is the appendix.
       expect(screen.queryByText(/Preparing nodes/)).not.toBeInTheDocument();
       expect(fetch).not.toHaveBeenCalled();
 
@@ -223,11 +212,6 @@ describe("ControlProgress", () => {
     }
   });
 
-  // Nothing is built until an exam is chosen, so the first choice runs a
-  // job that has no outgoing exam behind it. It reaches this dialog
-  // through the same overlay as every other job, and if it borrowed the
-  // switch's wording the first thing a new candidate would read is that
-  // their environment is being wiped and replaced.
   describe("the first exam an environment is given", () => {
     const provisionJob: ControlJob = {
       id: "job-2",
@@ -279,8 +263,7 @@ describe("ControlProgress", () => {
           onRetry={onRetry}
         />,
       );
-      // A failed provision must offer retry — unlike a seed, whose retry
-      // would tear down an environment the candidate still has.
+
       await user.click(screen.getByRole("button", { name: /retry/i }));
       expect(onRetry).toHaveBeenCalled();
     });

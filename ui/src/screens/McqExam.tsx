@@ -43,21 +43,8 @@ interface McqExamProps {
   onSessionChange: (session: SessionSnapshot) => void;
 }
 
-// Option letters. Banks cap options at six (docs/bank-spec.md), so this
-// never runs out.
 const LETTERS = "ABCDEF";
 
-// The multiple-choice exam screen: one question at a time in a single
-// centred column — stem, options, navigation. No desktop, no clipboard
-// bridge, no keymap translation; this is the one exam type that works on
-// a phone, and the layout is single-column mobile-first because of it.
-//
-// Answers are server state, not component state. Every option click PUTs
-// immediately (the session file is the answer sheet), and the map below
-// is hydrated from GET /api/answers on mount so a reload — or a
-// facilitator restart — resumes with every selection intact. The
-// optimistic update exists so a click never waits a round-trip; a failed
-// save reverts and says so, because an unsaved answer scores zero.
 export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -70,15 +57,8 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
   const examState = useAsync((signal) => getExam(signal), []);
   const exam = examState.data;
 
-  // One read, passed down. Both the topbar and the action bar branch on
-  // it, and two independent matchMedia subscriptions for one breakpoint
-  // is two chances for them to disagree mid-resize.
   const compact = useMediaQuery(MCQ_COMPACT_QUERY);
 
-  // Resume: the server's stored selections are the truth this screen
-  // starts from. Failure is non-fatal (the candidate can still answer —
-  // each PUT stands alone) but must not be silent, since the screen
-  // would show every question blank while the server holds answers.
   useEffect(() => {
     let stopped = false;
     getAnswers()
@@ -99,7 +79,6 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
     };
   }, []);
 
-  // Same per-attempt scoping the hands-on screen uses for viewed/marked.
   useEffect(() => {
     marksStore.setScope(session.startedAt);
   }, [session.startedAt]);
@@ -118,10 +97,6 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
     if (selectedId) marksStore.markViewed(selectedId);
   }, [selectedId]);
 
-  // Which question is on screen, reported for the server's per-question
-  // timing. Identical wiring to the hands-on screen, including that every
-  // failure is a no-op: an older facilitator has no route to call, and
-  // timing may never interrupt an attempt.
   useEffect(() => {
     if (!selectedId) return;
     const controller = new AbortController();
@@ -129,8 +104,6 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
     return () => controller.abort();
   }, [selectedId]);
 
-  // [ and ] step between questions, exactly like the hands-on panel —
-  // minus its desktop-canvas guard, which has no counterpart here.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "[" && event.key !== "]") return;
@@ -150,16 +123,13 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
   const applySelection = useCallback(
     async (qid: string, selection: number[]) => {
       const previous = answers[qid] ?? [];
-      // Optimistic: the click lands instantly. The server echo below
-      // (sorted) or the revert on failure reconciles.
+
       setAnswers((a) => ({ ...a, [qid]: selection }));
       try {
         const result = await putAnswer(qid, selection);
         if (result.ok) {
           setAnswers((a) => ({ ...a, [qid]: result.selected }));
         } else {
-          // 409: the attempt ended under us. The poller flips the screen
-          // momentarily; meanwhile the truthful state is the old one.
           setAnswers((a) => ({ ...a, [qid]: previous }));
           toastStore.push({
             kind: "warning",
@@ -183,11 +153,6 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
     (q) => (answers[q.id] ?? []).length > 0,
   ).length;
 
-  // Computed when the dialog opens, matching the hands-on screen's
-  // reasoning: nobody is looking at these lists until then. Listed as
-  // attempt positions (Q7), never bank ids — the ids are artifacts of
-  // the pool this attempt was drawn from, and every other part of this
-  // screen already says Q-numbers.
   const unansweredIds = confirmOpen
     ? questions
         .map((q, i) => ({ q, i }))
@@ -250,11 +215,7 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
         fetchedAt={fetchedAt}
         title={exam?.title ?? strings.exam.fallbackTitle}
         onEndClick={() => setConfirmOpen(true)}
-        // Rows in the navbar menu's attempt section, in the same shape
-        // as every other row there. The tally used to sit in the bar as
-        // free-floating text, which is what pushed the row onto three
-        // lines on a phone; it is a fact about the attempt, and facts
-        // belong beside the things you can do to it.
+
         extras={
           <>
             {questions.length > 0 && (
@@ -270,13 +231,9 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
           </>
         }
       />
-      {/* The determinate rail under the topbar: answered out of the
-          attempt's own length. aria-hidden, because the topbar tally
-          beside it says the same three numbers in words — a bar that
-          announces "37 percent" adds a second voice for one fact. */}
+
       <div className="mcq-rail" aria-hidden="true">
-        {/* scaleX rather than width — only transform and opacity animate
-            without relayout. Same as .job-chip-bar-fill. */}
+
         <div
           className="mcq-rail-bar"
           style={{
@@ -376,8 +333,7 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
           <p className="control-hint">{strings.practice.note}</p>
           {practice.questions.map((q, i) => (
             <details key={q.id} className="score-question">
-              {/* Position, never the bank id — the id is an artifact of
-                  the pool this attempt was drawn from. */}
+
               <summary>
                 {strings.practice.questionScore(strings.mcq.questionNumber(i + 1), q.earned, q.total)}
               </summary>
@@ -403,7 +359,7 @@ interface McqQuestionProps {
   answers: Record<string, number[]>;
   selectedId: string;
   mode: SessionSnapshot["mode"];
-  /** Phone-sized: the action bar drops its labels for its glyphs. */
+
   compact: boolean;
   prev?: ExamQuestionInfo;
   next?: ExamQuestionInfo;
@@ -412,8 +368,6 @@ interface McqQuestionProps {
   onEndExam: () => void;
 }
 
-// One question: head row, stem, options, footer. Keyed by question id from
-// the parent, so per-question state (the training reveal) resets on step.
 function McqQuestion({
   info,
   index,
@@ -449,8 +403,6 @@ function McqQuestion({
         : [...selection, optionIndex].sort((a, b) => a - b);
       onAnswer(info.id, next);
     } else {
-      // Radio semantics, plus deselect on re-click: "I want to leave
-      // this blank after all" must stay reachable.
       onAnswer(info.id, selection.includes(optionIndex) ? [] : [optionIndex]);
     }
   };
@@ -460,10 +412,6 @@ function McqQuestion({
     if (returnFocus) jumpTriggerRef.current?.focus();
   };
 
-  // G opens and closes the navigator and F flags the question on screen,
-  // the same two bindings the hands-on panel carries — minus its
-  // desktop-canvas guard, which has no counterpart here, exactly like the
-  // [ and ] handler in the parent.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.altKey || event.ctrlKey || event.metaKey) return;
@@ -478,8 +426,7 @@ function McqQuestion({
         });
         return;
       }
-      // While the navigator is open it owns F, for the tile under the
-      // cursor rather than the question behind it.
+
       if ((event.key === "f" || event.key === "F") && !jumpOpen) {
         event.preventDefault();
         marksStore.toggleMark(info.id);
@@ -491,15 +438,12 @@ function McqQuestion({
 
   return (
     <section className="mcq-question" aria-label={strings.mcq.regionLabel}>
-      {/* One row above the stem: where you are, what it is about, and the
-          flag. Navigation is not here — it is the footer's, at the end of
-          the reading, where the answer has just been picked. */}
+
       <header className="mcq-head">
         <span className="mcq-counter">
           {strings.mcq.questionCounter(index + 1, total)}
         </span>
-        {/* The domain: the one per-question fact an mcq candidate can use,
-            where the hands-on screen shows the ssh host. */}
+
         <span className="mcq-domain">{info.domain}</span>
         <button
           className="question-mark"
@@ -531,8 +475,7 @@ function McqQuestion({
         >
           {(data) => (
             <>
-              {/* copyable={false}: there is no desktop in an mcq session
-                  and therefore nothing to paste into. */}
+
               <Markdown copyable={false}>{data.markdown}</Markdown>
               <fieldset className="mcq-options">
                 <legend>
@@ -575,23 +518,6 @@ function McqQuestion({
         </Async>
       </div>
 
-      {/* Previous / the reassurance line / navigator + next. The middle
-          span is not decoration: this is the one engine where the answer
-          is saved the instant it is clicked and nothing is marked until
-          submit, and a candidate who does not know that either re-clicks
-          or hesitates. Submit exam replaces Next on the last question and
-          opens the same confirm dialog the topbar's does — the
-          unanswered/marked review lives there once, not twice. */}
-      {/* The action bar. On a phone the labels give way to the glyphs
-          they already sit beside, and the navigator trades the word
-          "Navigator" for the position it is the way to change — the one
-          fact a candidate reaching for it actually wants.
-
-          Branched in JS rather than hidden with CSS, deliberately. Two
-          spans in one button, one of them display:none, still contribute
-          BOTH to its accessible name: a screen reader would hear
-          "Navigator, question 7 of 65, Navigator" with no way to tell
-          that only one is drawn. Same rule the app header follows. */}
       <footer className="mcq-footer">
         <button
           className="btn"
@@ -651,8 +577,7 @@ function McqQuestion({
           asSheet={compact}
           questions={toNavigator(questions, answers)}
           selectedId={selectedId}
-          // "answered" is a fact here, not a guess: the answers are server
-          // state this screen holds a copy of.
+
           progress="answered"
           onSelect={(id) => {
             onSelect(id);
@@ -665,13 +590,6 @@ function McqQuestion({
   );
 }
 
-// The attempt's state in three numbers, in the topbar.
-//
-// Its own component so the marks subscription lives here rather than on
-// the screen: flagging a question would otherwise re-render the whole
-// engine, including the question fetch's Async wrapper. Answered is a
-// server fact the parent already holds; flagged and unseen are this
-// attempt's own scratch marks.
 function McqTally({
   questions,
   answeredCount,
@@ -708,9 +626,6 @@ function McqSkeleton() {
   );
 }
 
-// Training-mode reveal: the same 403-gated solution endpoint the score
-// screen uses, shown inline as a disclosure. In an mcq bank solution.md
-// is the explanation — correct answer plus why each distractor is wrong.
 function McqCheckAnswer({ questionId }: { questionId: string }) {
   const [solution, setSolution] = useState<SolutionDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -749,15 +664,6 @@ function McqCheckAnswer({ questionId }: { questionId: string }) {
   );
 }
 
-/**
- * This screen's questions as the shared navigator wants them.
- *
- * The tile prints the attempt position, never the bank id — q61 is an
- * artifact of the 97-question pool a random draw sampled from, and it is
- * non-sequential and meaningless to whoever is sitting the exam. Every
- * other mcq surface already says Q-numbers: the nav badge, the submit
- * dialog's unanswered list, the practice dialog.
- */
 function toNavigator(
   questions: ExamQuestionInfo[],
   answers: Record<string, number[]>,
@@ -765,8 +671,7 @@ function toNavigator(
   return questions.map((q, i) => ({
     id: q.id,
     label: strings.mcq.questionNumber(i + 1),
-    // The domain is the one per-question fact an mcq candidate can use,
-    // and the same one the nav header shows for the current question.
+
     detail: q.domain,
     done: (answers[q.id] ?? []).length > 0,
   }));

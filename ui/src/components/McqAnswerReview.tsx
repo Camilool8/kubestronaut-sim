@@ -5,10 +5,6 @@ import { strings } from "../strings";
 
 const LETTERS = "ABCDEF";
 
-// The mcq counterpart of CheckList: instead of a table of validate.d
-// checks, every option with what happened to it — correct and selected,
-// correct but missed, selected but wrong. State is carried by an icon
-// AND text on every marked row, never colour alone.
 export function McqAnswerReview({ question }: { question: QuestionResult }) {
   const selected = new Set(question.selected ?? []);
   const correct = new Set(question.correct ?? []);
