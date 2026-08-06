@@ -1,7 +1,0 @@
-{
-  "files": ["ui/index.html"],
-  "exclude": ["ui/dist/**"],
-  "insertBefore": "</body>",
-  "commentSyntax": "html",
-  "cspChecked": true
-}

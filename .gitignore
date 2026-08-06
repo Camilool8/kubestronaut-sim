@@ -25,9 +25,6 @@ killer-sh-*.txt
 dump*.txt
 banks/**/*.txt
 
-.claude/settings.local.json
-**/.impeccable/config.local.json
-**/.impeccable/hook.cache.json
-**/.impeccable/hook.pending.json
-**/.impeccable/live/sessions/
+.claude/
 .superpowers/
+**/.impeccable/
