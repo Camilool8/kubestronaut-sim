@@ -1,52 +1,15 @@
-/* Base layer: element defaults, focus visibility, and motion guards.
-   Everything here is theme-agnostic — colors come from tokens.css. */
-
 * {
   box-sizing: border-box;
 }
 
-/* The full-height chain, unbroken from the viewport to the screen. Every
-   screen root asserts a height against it — `.exam-layout` and
-   `.score-screen` at 100%, `.page` at min-height 100% — and a
-   percentage height resolves to `auto` the moment ONE ancestor in the
-   chain is content-sized. `main` was once the missing link: the lobby
-   stopped centering, the score page scrolled the body instead of itself,
-   and the exam desktop entered a resize feedback loop (a
-   `.desktop-canvas` whose height came from the noVNC canvas inside it,
-   watched by noVNC's own ResizeObserver, which then asked the server to
-   resize to match). One declaration; four screens. */
 html,
 body,
 #root {
   height: 100%;
-  /* And then again in dynamic viewport units, which is the same number
-     on every desktop and a different one on a phone.
-     On mobile Safari and Chrome the "viewport" a percentage resolves
-     against is the LARGE one — the height the page would have if the
-     URL bar were fully retracted — so 100% is taller than what is
-     actually on screen whenever the bar is showing. Everything pinned to
-     the bottom of this chain (the exam's footer, a full-bleed sheet's
-     last button) then sits under the browser's own chrome.
-     100dvh tracks the real height as the bar shows and hides. The cost
-     is a reflow on each of those transitions, which is why the rest of
-     this system uses dvh only where something must reach the bottom
-     edge, never for a hero or a decorative fill.
-     Declared second so it simply wins where it is understood, and is
-     dropped as an unparsable value where it is not — leaving the 100%
-     above as the fallback rather than needing @supports. */
+
   height: 100dvh;
 }
 
-/* `main` used to be in that list. It cannot be, now that `.app-header`
-   is its sibling: 100% of #root PLUS a 56px header is taller than the
-   viewport, which hands the body a scrollbar — the exact failure the
-   score screen has its own `height: auto` override to avoid.
-
-   A column flex container instead. `main` takes the space the header
-   leaves, and because #root's height is definite the flex item's
-   resolved height is definite too, so every percentage height inside it
-   still has something real to resolve against. The chain holds whether
-   or not the header is rendered. */
 #root {
   display: flex;
   flex-direction: column;
@@ -91,20 +54,12 @@ h3 {
   letter-spacing: -0.01em;
 }
 
-/* Keyboard focus is always visible, on every interactive element, in
-   both themes. Mouse clicks don't trigger it (focus-visible). */
 :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
-  /* No border-radius here. It used to set --radius-s, which is not a
-     property of the outline — it changes the ELEMENT's own corners, so
-     every pill-shaped control (the theme toggle, the info button) visibly
-     became a 6px rectangle the moment it took keyboard focus, and inline
-     `code` jumped from 3px. The outline already follows whatever radius
-     the element has. */
+
 }
 
-/* Motion is an enhancement, never a requirement. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -116,21 +71,8 @@ h3 {
   }
 }
 
-/* Windows High Contrast and friends. forced-colors overrides every colour
-   we set and drops box-shadow entirely, which costs this system BOTH of
-   selection's channels at once — the accent border and the inset bar. What
-   survives is `outline` and the system colour keywords, so currency
-   re-declares itself with one. Without this block a chosen exam, the
-   current question and a marked question are all indistinguishable
-   rectangles. */
 @media (forced-colors: active) {
-  /* .navigator-tile, not the .question-tile this rule named until the
-     navigator replaced the jump grid. The selector went stale silently,
-     and forced colors is exactly where that costs the most: the current
-     tile is drawn everywhere else with --accent-soft, an accent border
-     and an inset shadow, and forced colors overrides all three and drops
-     box-shadow entirely. This outline was the only channel left, and it
-     was matching nothing. */
+
   .navigator-tile[aria-current="true"],
   .mode-card-on,
   .question-mark[aria-pressed="true"] {
@@ -138,22 +80,14 @@ h3 {
     outline-offset: -3px;
   }
 
-  /* Answered reads as a fill and a stronger border, both of which forced
-     colors overrides away, leaving it identical to unanswered. Width is
-     geometry rather than colour, so it survives. The flagged state needs
-     no twin: it carries an icon. */
   .navigator-tile.is-done {
     border-width: 3px;
   }
 
-  /* --text-disabled is overridden away; GrayText is the system's own. */
   .btn:disabled {
     color: GrayText;
   }
 
-  /* The countdown's low-time reading is colour plus a pulse. The pulse
-     survives; the colour does not, so the edge takes a system colour that
-     is not the resting one. */
   .timer-low {
     border-color: Mark;
   }
@@ -164,8 +98,6 @@ h3 {
   }
 }
 
-/* Visually hidden but available to assistive tech — for labels that a
-   sighted reader gets from layout (table headers, a pass/fail glyph). */
 .sr-only {
   position: absolute;
   width: 1px;

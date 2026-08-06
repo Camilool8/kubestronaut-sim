@@ -1,11 +1,3 @@
-/* kubestronaut-sim component styles. All color/spacing/type values come
-   from styles/tokens.css (dual light/dark themes); element defaults and
-   focus/motion guards live in styles/base.css. Identity: calm terminal-
-   professional — IBM Plex Sans for prose, IBM Plex Mono wherever the
-   product talks in numbers, ids, or code. The exam desktop's terminal
-   stays on JetBrains Mono on purpose; see the --machine-* note in
-   styles/tokens.css. */
-
 .btn {
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
@@ -16,12 +8,6 @@
   font-weight: 600;
 }
 
-/* Hover moves the FILL, not the edge. The accent border this used to take
-   was the same declaration selection takes, so "the control under my
-   pointer" and "the thing I have chosen" drew the same outline — see the
-   Rare Accent Rule. The label still goes --accent-strong (5.0:1 on the
-   hover fill, where plain --accent is 3.7:1), which is a text channel and
-   cannot be mistaken for a boundary. */
 .btn:hover:not(:disabled) {
   background: var(--raised-hover);
   color: var(--accent-strong);
@@ -64,32 +50,17 @@
   color: var(--danger);
 }
 
-/* ---- icons ----
-   Hand-authored SVG on a 24 grid, stroked in currentColor so every theme
-   and every state colour comes free. Sized on 1em by default: an icon
-   rides the type it sits in rather than carrying a size of its own. */
 .icon {
   flex-shrink: 0;
-  /* Optical centring against the x-height of the text beside it. */
+
   vertical-align: -0.125em;
 }
 
-/* The disclosure chevron points down when closed and up when open. That
-   rotation is the whole open/closed signal now — it replaced an accent
-   border whose rule body was byte-identical to the current question
-   tile's, forty pixels away in the same panel. */
 .disclosure-chevron {
   margin-left: var(--space-1);
   color: var(--text-muted);
 }
 
-/* A glyph that names what a trigger opens rather than signalling whether
-   it is open — the navigator button's grid. Deliberately NOT
-   .disclosure-chevron: rotating a grid 180 degrees says nothing, and
-   these two triggers already carry their open state as a filled
-   background and a stronger border (.task-nav-jump[aria-expanded="true"],
-   .mcq-jump-trigger[aria-expanded="true"]), so nothing is lost by not
-   turning. */
 .trigger-glyph {
   margin-left: var(--space-1);
   color: var(--text-muted);
@@ -100,14 +71,10 @@
   transform: rotate(180deg);
 }
 
-/* An open disclosure's content must not start where its trigger's hover
-   band ends. */
 .question-result[open] > summary,
 .solution-details[open] > summary {
   margin-bottom: var(--space-2);
 }
-
-/* ---- theme toggle ---- */
 
 .theme-toggle {
   background: transparent;
@@ -129,34 +96,18 @@
   transform: translateY(1px);
 }
 
-/* ---- the navbar ----
-
-   One bar, one anatomy, every screen in both products:
-
-     [ mark  wordmark ]  [ › trail ]  ……  [ status ]  [ menu ]
-       always              contextual        ambient     always
-
-   What this replaced had two layouts and a menu that came and went by
-   route. The rules now: the mark never leaves the left, the menu never
-   leaves the right, and width PROMOTES the navigation into the row
-   rather than rearranging anything. See DESIGN.md's Navigation section. */
-
 .navbar {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   height: 56px;
-  /* A flex BASE size only, without this. As a flex item inside #root's
-     column, a tall page squashed the bar to its min-content height —
-     29px on the score screen and 56 on the lobby, a header that was a
-     different height depending on how long the page below it was. */
+
   flex-shrink: 0;
   padding: 0 var(--space-4);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
 
-/* Identity and place, in that order and never swapped. */
 .navbar-lead {
   display: flex;
   align-items: center;
@@ -172,8 +123,7 @@
   color: inherit;
   text-decoration: none;
   border-radius: var(--radius-s);
-  /* Its own min-width: 0 before the wordmark inside it can shrink at
-     all — a flex item's default floor is its content. */
+
   min-width: 0;
   flex-shrink: 0;
 }
@@ -182,8 +132,6 @@
   color: var(--accent-strong);
 }
 
-/* Mid-attempt the mark is identity and not a link, so it must not wear
-   a link's affordances. Nothing hover-able, nothing focusable. */
 .navbar-home-static {
   cursor: default;
 }
@@ -204,12 +152,10 @@
   min-width: 0;
 }
 
-/* The product is "kubestronaut"; "-sim" says this is the rehearsal. */
 .navbar-wordmark-tail {
   color: var(--text-secondary);
 }
 
-/* The path, read left to right from the mark beside it. */
 .navbar-trail {
   display: flex;
   align-items: center;
@@ -254,15 +200,11 @@
   color: var(--accent-strong);
 }
 
-/* Where you are. Ink rather than accent, and weight rather than colour:
-   under the Rare Accent Rule blue is for what you can act on, and the
-   last crumb is the one thing in the trail you cannot. */
 .navbar-crumb-on {
   color: var(--text);
   font-weight: 600;
 }
 
-/* Status, promoted nav, and the menu — in that order, always. */
 .navbar-tail {
   display: flex;
   align-items: center;
@@ -276,9 +218,6 @@
   gap: var(--space-1);
 }
 
-/* A promoted menu row. Same glyph, same label, same order as the row it
-   was lifted out of — so a candidate who learns the menu on a phone
-   already knows this bar on a laptop. */
 .navbar-link {
   display: inline-flex;
   align-items: center;
@@ -304,8 +243,6 @@
   font-size: var(--text-l);
 }
 
-/* Two channels, never hue alone: the fill AND the ink both move, and
-   aria-current carries it for anyone reading neither. */
 .navbar-link-on {
   background: var(--accent-soft);
   color: var(--accent-strong);
@@ -315,8 +252,6 @@
 .navbar-link-on .navbar-link-glyph {
   color: var(--accent-strong);
 }
-
-/* ---- the navbar's menu ---- */
 
 .nav-menu {
   position: relative;
@@ -348,12 +283,6 @@
   color: var(--text);
 }
 
-/* Three bars that become a cross.
-   Drawn here rather than swapped for a different glyph: swapping icons
-   is a change of subject, and moving the same three lines says the thing
-   you opened is the thing now closing. The middle bar fades while the
-   outer two rotate onto each other — one transform each, both
-   compositor-only. */
 .nav-menu-bars {
   position: relative;
   width: 16px;
@@ -411,11 +340,6 @@
   box-shadow: var(--shadow-3);
 }
 
-/* One row shape for everything the menu holds — a destination, a
-   preference, a fact, a way out. A fixed height, a leading glyph on a
-   fixed rail so every label starts on the same edge, and an optional
-   trailing value. The point is that a nav link and a sign-out read as
-   members of one list rather than as borrowed widgets. */
 .nav-menu-item {
   display: flex;
   align-items: center;
@@ -446,7 +370,6 @@ button.nav-menu-item:hover {
   flex-shrink: 0;
 }
 
-/* Pushed to the trailing edge: a value, not a second label. */
 .nav-menu-item-detail {
   margin-left: auto;
   color: var(--text-muted);
@@ -465,8 +388,6 @@ button.nav-menu-item:hover {
   color: var(--accent-strong);
 }
 
-/* The one row that ends something. Ink until reached for, then danger:
-   a red row at rest would make the menu look like a warning. */
 .nav-menu-item-danger:hover {
   background: var(--danger-soft);
   color: var(--danger);
@@ -476,7 +397,6 @@ button.nav-menu-item:hover {
   color: var(--danger);
 }
 
-/* A statement, not a control. No pointer, no hover, no focus stop. */
 .nav-menu-item-fact {
   color: var(--text-muted);
   cursor: default;
@@ -500,8 +420,7 @@ button.nav-menu-item:hover {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* Only transform and opacity, both compositor-only, and both written
-     inside the guard rather than as a default a reduce-rule undoes. */
+
   .nav-menu-bars > span {
     transition:
       transform var(--dur-quick) var(--ease-out),
@@ -533,10 +452,6 @@ button.nav-menu-item:hover {
     gap: var(--space-2);
   }
 
-  /* Clipped, not display:none, and that is load-bearing: BrandMark is
-     aria-hidden, so this span is the home link's ONLY accessible name.
-     Three characters of an ellipsed brand is worse than none when the
-     mark beside it already IS the brand. */
   .navbar-wordmark {
     position: absolute;
     width: 1px;
@@ -549,10 +464,6 @@ button.nav-menu-item:hover {
     border: 0;
   }
 
-  /* One control: a back chevron labelled with where you ARE. The label
-     answers "what screen is this", which is what a 390px row has room to
-     say; the chevron already says the other thing, and the accessible
-     name says where it goes. */
   .navbar-back {
     display: inline-flex;
     align-items: center;
@@ -582,9 +493,6 @@ button.nav-menu-item:hover {
     height: var(--tap-min);
   }
 
-  /* The panel rises from the bottom edge instead of hanging off the
-     top-right corner — which is where the trigger is, and the one place
-     on a phone a thumb cannot reach. Same panel, same rows, same order. */
   .nav-menu-panel-sheet {
     position: fixed;
     inset: auto 0 0 0;
@@ -597,15 +505,11 @@ button.nav-menu-item:hover {
     overscroll-behavior: contain;
   }
 
-  /* Reached for rather than aimed at, like every other control that
-     arrives under the thumb. */
   .nav-menu-panel-sheet .nav-menu-item {
     min-height: var(--tap-comfortable);
     font-size: var(--text-m);
   }
 }
-
-/* ---- loading ---- */
 
 .loading-screen {
   height: 100%;
@@ -614,8 +518,6 @@ button.nav-menu-item:hover {
   justify-content: center;
   color: var(--text-muted);
 }
-
-/* ---- error boundary ---- */
 
 .error-boundary {
   height: 100%;
@@ -628,13 +530,6 @@ button.nav-menu-item:hover {
   text-align: center;
 }
 
-/* ---- page shell ----
-   The screens that are a PAGE: the exam selector and the mode selector.
-   Both sit under .app-header, both are centred at --page-max, and both
-   scroll the document rather than a box of their own — a nested
-   scrollbar under a fixed header is the failure the score screen has its
-   own override to avoid. */
-
 .page {
   min-height: 100%;
   max-width: var(--page-max);
@@ -642,8 +537,6 @@ button.nav-menu-item:hover {
   padding: var(--space-7) var(--space-5) var(--space-8);
 }
 
-/* Title on the left, a figure on the right. Wraps rather than shrinks:
-   the capsule is mono digits and squeezing it is worse than moving it. */
 .page-head {
   display: flex;
   align-items: flex-end;
@@ -653,7 +546,6 @@ button.nav-menu-item:hover {
   margin-bottom: var(--space-6);
 }
 
-/* The mode screen has nothing to put on the right. */
 .page-head-stacked {
   display: block;
 }
@@ -695,14 +587,6 @@ button.nav-menu-item:hover {
   text-align: center;
 }
 
-/* ---- exam selector (the exam catalog) ---- */
-
-/* How much of the path is DONE. The bar is one segment per card in the
-   grid below, carrying that exam's pass state — which is what the figure
-   beside it counts, so the two halves of the capsule read as one
-   sentence. It used to carry the engine hue and double as the grid's
-   legend; a capsule whose figure counted passes and whose bar counted
-   engines was two readings of one object. */
 .coverage {
   display: flex;
   align-items: center;
@@ -740,17 +624,10 @@ button.nav-menu-item:hover {
   gap: 4px;
 }
 
-/* The resting tone is the track: "not started" and "not built" both mean
-   there is nothing to show, and the card below is where they are told
-   apart. Graphics tokens only — this bar is aria-hidden and carries no
-   text, so the 3:1 tier is the right one. */
 .coverage-bar > span {
   width: 22px;
   height: 6px;
-  /* The pill token, not a literal half-height: on a 6px box it draws the
-     same lozenge, and it is what every other bar in the system uses
-     (.domain-bar, .pending-bar, .job-chip-bar). A 3px literal only
-     stays correct while the height never changes. */
+
   border-radius: var(--radius-pill);
   background: var(--muted-soft);
 }
@@ -768,22 +645,11 @@ button.nav-menu-item:hover {
   margin: 0 0 var(--space-4);
   padding: 0;
   display: grid;
-  /* min(330px, 100%), not a bare 330px, and the same everywhere this
-     file writes an auto-fit floor.
-     `minmax(330px, 1fr)` creates a track 330px wide even when its
-     container is 305px: minmax's minimum is a floor, not a preference.
-     At the 320px WCAG 1.4.10 reflow width that is a horizontally
-     scrolling page with the card's own button hanging off the right
-     edge of the screen — measured, in Chrome, at 320px: a 305px
-     viewport with a 346px document.
-     min() collapses the floor to the container's width exactly when it
-     would otherwise exceed it, and changes nothing at any width where
-     the track already fits. */
+
   grid-template-columns: repeat(auto-fit, minmax(min(330px, 100%), 1fr));
   gap: var(--space-4);
 }
 
-/* Denser: these carry a name and a reason, not a stat strip. */
 .exam-grid-soon {
   grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
 }
@@ -797,9 +663,7 @@ button.nav-menu-item:hover {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
-  /* The card is not a control, so its edge is structural and takes the
-     --border tier. What lifts it off the page is the shadow; the
-     coming-soon card below drops both. */
+
   box-shadow: var(--shadow-1);
 }
 
@@ -819,15 +683,12 @@ button.nav-menu-item:hover {
   border-radius: var(--radius-l);
   background: var(--exam-tint-soft);
   color: var(--exam-tint);
-  /* The type rules are the fallback path only: a certification with no
-     drawn mark still sets its acronym here. See ExamAvatar. */
+
   font-family: var(--font-mono);
   font-size: var(--text-s);
   font-weight: 600;
 }
 
-/* 24 of the tile's 44, which is the proportion the marks were drawn and
-   checked at. The coming-soon tile scales both together below. */
 .cert-mark {
   width: 24px;
   height: 24px;
@@ -877,9 +738,6 @@ button.nav-menu-item:hover {
   border-bottom: 1px solid var(--border);
 }
 
-/* column-reverse, not a reordered DOM: <dl> requires dt before dd, and a
-   screen reader wants to hear "Duration, 2h" in that order. Drawing the
-   figure above its label is a visual arrangement only. */
 .exam-stats > div {
   flex: 1;
   min-width: 0;
@@ -902,8 +760,6 @@ button.nav-menu-item:hover {
   font-weight: 600;
 }
 
-/* The pool half of "65 / 97". Quieter than the drawn count, but a real
-   number a reader would miss — --text-muted, not --text-decorative. */
 .exam-stat-of {
   font-weight: 400;
   color: var(--text-muted);
@@ -913,10 +769,6 @@ button.nav-menu-item:hover {
   color: var(--exam-tint);
 }
 
-/* The best-attempt bar, in the slot .exam-desc holds until an attempt has
-   been graded. Same three-part shape as the dashboard's weak rows — a
-   label and a figure over a track — because they answer the same question
-   at two scales. */
 .exam-attempts {
   display: flex;
   flex-direction: column;
@@ -946,10 +798,6 @@ button.nav-menu-item:hover {
   overflow: hidden;
 }
 
-/* Cyan while the score is still moving, green once the exam is passed —
-   the system's two graphics tokens for "in progress" and "done". Not the
-   exam tint, which says which ENGINE grades the card and would make one
-   bar carry two unrelated facts. */
 .exam-attempts-fill {
   display: block;
   height: 100%;
@@ -971,8 +819,6 @@ button.nav-menu-item:hover {
   overflow: hidden;
 }
 
-/* Pushed to the bottom so every card's button sits on the same line,
-   whatever the length of the pitch above it. */
 .exam-card-actions {
   margin-top: auto;
   display: flex;
@@ -1007,8 +853,6 @@ button.nav-menu-item:hover {
   color: var(--text-secondary);
 }
 
-/* The reason is the entire point of listing an exam nobody can sit, so
-   it is never dimmed below the body floor and never clamped. */
 .exam-note {
   margin: 0;
   color: var(--text-muted);
@@ -1037,8 +881,6 @@ button.nav-menu-item:hover {
   margin: 0;
 }
 
-/* ---- mode selector ---- */
-
 .mode-grid {
   list-style: none;
   margin: 0 0 var(--space-5);
@@ -1058,11 +900,6 @@ button.nav-menu-item:hover {
   border-radius: var(--radius-xl);
 }
 
-/* The recommended card, in three channels — an accent edge, a tinted
-   shadow, and the word itself inside. Two of those are colour, and
-   colour alone is one channel, which is none for a reader who cannot
-   see it. box-sizing is border-box globally, so the thicker edge costs
-   a pixel of padding rather than shifting the grid. */
 .mode-card-on {
   border: 2px solid var(--accent);
   box-shadow: var(--shadow-accent);
@@ -1163,9 +1000,6 @@ button.nav-menu-item:hover {
   color: var(--success);
 }
 
-/* Sits at the bottom of the body, directly above the button it
-   qualifies — and it is what takes the slack, so the three capability
-   lists above it each follow their own blurb. */
 .mode-recommended {
   margin: auto 0 0;
   font-family: var(--font-mono);
@@ -1176,14 +1010,6 @@ button.nav-menu-item:hover {
   color: var(--accent);
 }
 
-/* The card's own footer, edge to edge. Its corners come from the card's
-   overflow: hidden, so it never needs to know the radius.
-
-   Geometry only. Setting `background` here beat .btn-primary's, which
-   left the recommended card's label at --accent-contrast on --bg — the
-   same colour in dark, so "Start Mastery" was invisible. The fill and
-   the hover belong to .btn / .btn-primary, which already have both
-   themes right. */
 .mode-start {
   width: 100%;
   border: 0;
@@ -1202,12 +1028,6 @@ button.nav-menu-item:hover {
   font-size: var(--text-s);
 }
 
-/* What the exam will ask, and which parts of it to ask about. The domain
-   list is a real control now — POST /api/session/start takes
-   { mode, domains } — so it wears a control's border, hover and cursor.
-   The read-only tag list below it survives for a bank that publishes no
-   `domains` field: there is nothing honest to filter on there, so nothing
-   is drawn as a control. */
 .draw-panel {
   display: flex;
   flex-wrap: wrap;
@@ -1284,10 +1104,6 @@ button.nav-menu-item:hover {
   gap: var(--space-2);
 }
 
-/* An anchored control, so its edge takes --border-strong (the tier WCAG
-   1.4.11's 3:1 floor applies to) where the read-only tag beside it takes
-   none at all. Hover moves the FILL and never the edge, so a chip under
-   the pointer is never mistaken for a chip that is chosen. */
 .draw-chip {
   display: flex;
   align-items: center;
@@ -1311,18 +1127,11 @@ button.nav-menu-item:hover {
   transform: translateY(1px);
 }
 
-/* Drawn on every chip and REVEALED by selection rather than inserted by
-   it — visibility, not display, so the box it reserves never changes and
-   the label cannot move out from under the pointer between mousedown and
-   mouseup. */
 .draw-chip-mark {
   visibility: hidden;
   color: var(--accent);
 }
 
-/* Three channels for one state: the accent edge, the accent wash, and the
-   tick. aria-pressed is the fourth, and the only one a screen reader
-   gets. */
 .draw-chip[aria-pressed="true"] {
   border-color: var(--accent);
   background: var(--accent-soft);
@@ -1337,10 +1146,6 @@ button.nav-menu-item:hover {
   color: var(--accent);
 }
 
-/* What a narrowed draw actually is, said before the attempt rather than
-   after the result. --warn-strong is the TEXT tier of the flag hue; the
-   base --warn is measured for graphics at 3:1. Specificity has to beat
-   `.draw-panel p`, which sets the muted body colour for the lead. */
 .draw-panel .draw-note {
   margin: var(--space-4) 0 0;
   color: var(--warn-strong);
@@ -1357,17 +1162,12 @@ button.nav-menu-item:hover {
   margin-top: var(--space-6);
 }
 
-/* ---- exam layout ---- */
-
 .exam-layout {
   height: 100%;
   display: flex;
   flex-direction: column;
 }
 
-/* Wraps rather than compressing: the row packs a title, two icon
-   buttons, the countdown and Submit exam, and below ~500px the countdown
-   and the button were being squeezed off the edge. */
 .exam-env {
   flex: 1 1 8rem;
   min-width: 0;
@@ -1378,10 +1178,6 @@ button.nav-menu-item:hover {
   text-overflow: ellipsis;
 }
 
-/* How far through the tasks the attempt is. The sentence carries it; the
-   bar is aria-hidden reinforcement, and it is cyan rather than blue —
-   progress is the one thing in this product that moves, and the Rare
-   Accent Rule keeps blue for things you can act on. */
 .exam-progress {
   display: flex;
   align-items: center;
@@ -1404,10 +1200,6 @@ button.nav-menu-item:hover {
   overflow: hidden;
 }
 
-/* Full width, scaled by transform — the same shape as .job-chip-bar-fill,
-   which is this product's determinate bar. The radius is gone with the
-   width: .exam-progress-track already clips to a pill, so the fill's own
-   corners were never visible, and scaling a border-radius stretches it. */
 .exam-progress-bar {
   height: 100%;
   width: 100%;
@@ -1416,12 +1208,7 @@ button.nav-menu-item:hover {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* A determinate bar that jumps between discrete steps needs the step to
-     be legible as a movement — the same reasoning, and the same token, as
-     .job-chip-bar-fill's.
-     transform, not width: width is a layout property, so animating it
-     relayouts on every frame of the transition. BackgroundJobChip states
-     the rule outright, and these two bars were the exception to it. */
+
   .exam-progress-bar,
   .mcq-rail-bar {
     transition: transform var(--dur-progress) var(--ease-out);
@@ -1437,11 +1224,7 @@ button.nav-menu-item:hover {
   border-radius: var(--radius-s);
   background: var(--surface-raised);
   border: 1px solid var(--border);
-  /* Ink, not accent. The clock is the most-read value on the screen and
-     it is not something you act on, so under the Rare Accent Rule it has
-     no claim on blue — the design brief draws it in ink for the same
-     reason. 15.78:1 on --surface-raised. .timer-low overrides to
-     --danger, which is the one state where intensity IS information. */
+
   color: var(--text);
   letter-spacing: 0.03em;
 }
@@ -1473,60 +1256,13 @@ button.nav-menu-item:hover {
   flex-direction: column;
   background: var(--surface);
   border-right: 1px solid var(--border);
-  /* One authority for the width. --panel-width is written imperatively by
-     PanelResizer; the clamp is what makes that safe, and it is also the
-     whole "auto-adjusting" behaviour:
 
-       min(600px, 50vw)  narrows the panel automatically as the window
-                         narrows, WITHOUT touching the stored preference —
-                         widen the window again and the preference comes
-                         back. No listener, no re-render, no JS.
-       600px             is a measure decision, not a round number. Less
-                         the pane's 1rem gutters that is 568px, which at
-                         the 15px base is about 75ch — the top of a
-                         comfortable line. 700px would be ~90ch, a worse
-                         read than the --task-pane-width default.
-       280px             is where the footer nav stops fitting on one row
-                         (Previous, All tasks and Next, labelled).
-                         The navigator halves to five columns just above
-                         it, at a 320px container — measured, because ten
-                         22px tiles clip a three-character label.
-
-     Deliberately a custom property and not an inline `width`: an inline
-     style beats a class rule, so a persisted width could otherwise win
-     over the clamp and render the panel unusably narrow. */
   width: clamp(280px, var(--panel-width, var(--task-pane-width)), min(600px, 50vw));
   flex-shrink: 0;
   position: relative;
-  /* --control-size lived here for the header's 28px icon steppers, which
-     the footer nav replaced. It is gone rather than kept "in case": the
-     coarse-pointer block that raised it to 44px had nothing left to
-     raise, and a variable no rule reads is a rule nobody can see is
-     dead. The footer's own touch targets are set above. */
-  /* The collapse is instant on purpose. This used to ease the panel's
-     own width over 150ms, which is neither compositor-only nor authored
-     inside prefers-reduced-motion — and animating a layout property for
-     150ms relayouts the adjacent .desktop-pane every frame, which is the
-     one element in the product with a ResizeObserver watching it (noVNC).
-     There is no transform-only way to move this edge without changing the
-     collapsed and expanded geometry, so a utility toggle simply snaps. */
+
 }
 
-/* ---- question navigator ----
-   The task pane's three bands: the identity header, the machine block
-   inside the scroll region, and the footer nav.
-
-   Navigation used to be a compact stepper row at the top of this header,
-   beside the current question's id. It is now the labelled footer row at
-   the foot of the reading — the same three moves, discoverable without a
-   keyboard, and the header is free to be what the task IS rather than
-   where it sits in a list.
-
-   Nothing in here declares a fixed column count or a fixed width. The
-   candidate DRAGS this pane between 280px and 600px (.panel-resizer), and
-   no media query can observe that — so every row here wraps intrinsically
-   instead, which is the one behaviour that cannot be wrong at a width
-   nobody tested. */
 .task-head {
   flex-shrink: 0;
   display: flex;
@@ -1542,10 +1278,6 @@ button.nav-menu-item:hover {
   gap: var(--space-2);
 }
 
-/* "TASK 04 / 20" — a mono eyebrow, uppercased here rather than in the
-   copy so the string stays a sentence for anything that reads it aloud.
-   Tabular figures because the counter changes under a running clock and
-   nothing beside it should move when it does. */
 .task-counter {
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
@@ -1556,9 +1288,6 @@ button.nav-menu-item:hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* The bank's own name for the task. Wraps rather than ellipses: this is
-   the one line on the screen a candidate uses to decide whether they know
-   how to do it, and half a title is no use at 280px. */
 .task-title {
   margin: 0;
   font-size: var(--text-xl);
@@ -1568,10 +1297,6 @@ button.nav-menu-item:hover {
   text-wrap: pretty;
 }
 
-/* Domain, share of the points, pacing budget, host. A wrapping list, not
-   a grid: the pane's width is dragged, and a fixed track count clips a
-   label at the narrow end without anything failing loudly enough to
-   notice. */
 .task-chips {
   list-style: none;
   margin: 0;
@@ -1592,24 +1317,12 @@ button.nav-menu-item:hover {
   white-space: nowrap;
 }
 
-/* The domain is the one chip whose text the bank writes, so it is the one
-   that cannot promise to be short: CKAD ships "Application Environment,
-   Configuration and Security", which is wider than the pane's 280px floor
-   and overflowed it even at the 360px default — nowrap meant the chip
-   never shrank, it just ran past the edge and was clipped. It wraps
-   instead of ellipsing because a truncated domain is a domain you cannot
-   read, and the row already wraps. */
 .task-chip-domain {
   white-space: normal;
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-/* The host chip keeps the accent treatment it has always had — which box
-   to ssh into is the single most load-bearing fact per task, and it is the
-   one accent object this header is allowed. `.instance-chip` carries the
-   colours (see the navigator section); this only sets the shape it takes
-   in the row. */
 .task-chip.instance-chip {
   align-self: auto;
   background: var(--accent-soft);
@@ -1617,9 +1330,6 @@ button.nav-menu-item:hover {
   padding: 0.2em 0.7em;
 }
 
-/* Previous / all tasks / next. Wraps at narrow pane widths rather than
-   compressing: the jump button gives up its place on the row first,
-   because the two steppers are the moves under the clock. */
 .task-nav {
   flex-shrink: 0;
   display: flex;
@@ -1640,10 +1350,6 @@ button.nav-menu-item:hover {
   padding: 0.5em 0.9em;
 }
 
-/* Navigation is a footer row of .btn in both engines now, and .btn is not
-   in the coarse-pointer touch-target list further down this file (that
-   list names the icon-scale controls). Keyed to pointer type, not width,
-   like that block: a mouse sees none of it. */
 @media (any-pointer: coarse) {
   .task-nav .btn,
   .mcq-footer .btn {
@@ -1655,29 +1361,17 @@ button.nav-menu-item:hover {
   flex-shrink: 0;
 }
 
-/* The one button state the shared rules do not cover. `.btn:disabled`
-   outranks `.btn-primary` for colour and border but not for background,
-   which would leave --text-disabled sitting on the accent fill at about
-   2:1. The last task disables Next rather than growing a second submit —
-   the topbar carries the only one — so this state is reached on every
-   attempt, not in some edge case. */
 .task-nav .btn-primary:disabled {
   background: var(--surface-raised);
   border-color: var(--border);
   color: var(--text-disabled);
 }
 
-/* The navigator trigger. Expanded is a disclosure state, not a currency
-   state, so it never takes the accent — the rotating chevron carries the
-   open/closed reading. */
 .task-nav-jump[aria-expanded="true"] {
   background: var(--raised-hover);
   border-color: var(--border-strong);
 }
 
-/* A drawn chord, beside the control it belongs to. aria-hidden in the
-   markup: it is a reminder for the eye, and the shortcut reference (?) is
-   where it is said out loud. */
 .key-hint {
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
@@ -1688,9 +1382,6 @@ button.nav-menu-item:hover {
   line-height: 1.6;
 }
 
-/* The review mark is a candidate's own scratch note, not a reading from
-   the grader, so it stays muted at rest and never takes the accent — the
-   host chip below it is the one accent object this header is allowed. */
 .question-mark {
   margin-left: auto;
   display: inline-flex;
@@ -1716,25 +1407,12 @@ button.nav-menu-item:hover {
   transform: translateY(1px);
 }
 
-/* Pressed used to change only the text colour — which hover also did, so
-   marked-and-unhovered and unmarked-and-hovered were the same pixels and
-   the glyph was doing all the work. It now adds a fill and an edge that
-   hover does not. */
 .question-mark[aria-pressed="true"] {
   color: var(--text);
   background: var(--surface-raised);
   border-color: var(--border-strong);
 }
 
-/* THE MACHINE IS NOT THE APP. This block is the one part of the task pane
-   drawn in the --machine-* family — the dark palette that is identical in
-   both themes — because it is literally a computer: the command, and where
-   to run it. tokens.css is explicit that nothing may reach for these to
-   "look technical", so the rest of the pane stays on app surfaces.
-
-   The label and the note take --machine-faint (5.41:1) rather than the
-   --machine-dim the brief draws them in: dim is documented as decorative,
-   for pictures of terminal output, and this is real text. */
 .work-from {
   display: flex;
   flex-direction: column;
@@ -1761,9 +1439,6 @@ button.nav-menu-item:hover {
   color: var(--machine-faint);
 }
 
-/* --machine-dim on the edge, not --machine-border-strong: the brief's
-   #2a3546 is 1.55:1 against this fill, and a control's boundary owes
-   3:1 (1.4.11). This clears it at 3.79:1 on the lightest machine fill. */
 .work-from-copy {
   display: inline-flex;
   align-items: center;
@@ -1794,22 +1469,6 @@ button.nav-menu-item:hover {
   word-break: break-word;
 }
 
-/* ---- navigator ----
-   The full-panel disclosure of every question, shared by both exam
-   engines (components/Navigator.tsx).
-
-   It overlays its host rather than displacing it. .question-panel is
-   already position: relative, and so is .mcq-question, so this costs no
-   flex geometry — which matters more than it looks: any height change in
-   .question-panel resizes .desktop-pane, and .desktop-pane is the one
-   element in the product with a ResizeObserver watching it (noVNC). It
-   also survives the <=900px rule unchanged, where .question-panel itself
-   becomes absolutely positioned.
-
-   Three bands: the filters, the scrolling grid, and a foot naming the
-   four tile states and the keys that work here. Only the middle band
-   scrolls (Scroll-Inside), so the counts and the legend hold still while
-   sixty-five tiles move under them. */
 .navigator {
   position: absolute;
   inset: 0;
@@ -1817,10 +1476,7 @@ button.nav-menu-item:hover {
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  /* Named container so the grid below can size itself to THIS box rather
-     than to the viewport. What constrains it is the question panel's
-     width, which the candidate drags with .panel-resizer, and no media
-     query can see that number. */
+
   container: navigator / inline-size;
 }
 
@@ -1836,10 +1492,6 @@ button.nav-menu-item:hover {
   gap: var(--space-2);
 }
 
-/* The anchored idioms every control in this product borrows: 6px, a
-   hairline, a --surface-raised fill. The chosen filter takes the accent
-   edge AND the wash — two channels, like the tile below it, so which
-   filter is on is never carried by hue alone. */
 .navigator-chip {
   display: inline-flex;
   align-items: center;
@@ -1868,9 +1520,6 @@ button.nav-menu-item:hover {
   border-color: var(--accent);
 }
 
-/* Mono and tabular: it is a count, and counts that change width make a
-   stable reading look unstable. --text on --accent-soft is 12.5:1 light
-   and 11.4:1 dark, so it holds on the pressed chip too. */
 .navigator-chip-count {
   font-family: var(--font-mono);
   font-weight: 700;
@@ -1886,11 +1535,6 @@ button.nav-menu-item:hover {
   padding: var(--space-3);
 }
 
-/* Ten to a row, so row two starts at eleven and a position is found by
-   counting rows instead of reading every tile. The tiles size to the
-   container and not the other way round: the same ten columns are ~30px
-   wide in a 360px question panel and ~70px in the mcq screen's 760px
-   column, and neither needs its own rule. */
 .navigator-grid {
   list-style: none;
   margin: 0;
@@ -1900,30 +1544,12 @@ button.nav-menu-item:hover {
   gap: var(--space-1);
 }
 
-/* Ten columns need about 310px to hold a three-character label. The
-   question panel's resizer bottoms out at 280px, where ten columns are
-   22px wide and .navigator-tile's overflow: hidden quietly ate the
-   second digit — 56 of 65 tiles rendered "Q6" for "Q65", which is worse
-   than no navigator at all. Halve the grid below that, the same shape
-   the coarse-pointer rule already uses for a thumb.
-
-   Keyed to the container and not the viewport because the panel is
-   dragged, not resized with the window: a 1440px desktop with a narrow
-   panel is exactly the case a media query would miss. */
 @container navigator (max-width: 320px) {
   .navigator-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 
-/* Four states, four channels, no two sharing a value. Unseen takes the
-   structural hairline; opened/answered takes the strong one plus a fill
-   (this was a STATE carried by a 1.50:1 border, the one unambiguous WCAG
-   1.4.11 failure in the old palette); flagged takes the warn edge plus a
-   drawn flag; current takes the accent edge plus a wash plus a 3px inset
-   bar. Hover moves the fill and never the edge, so the tile under a
-   cursor is never mistaken for the question you are on. Every state that
-   is a colour carries a second channel that survives greyscale. */
 .navigator-tile {
   position: relative;
   width: 100%;
@@ -1958,8 +1584,6 @@ button.nav-menu-item:hover {
   background: var(--surface-hover);
 }
 
-/* A tile that already carries a fill hovers to the fill's own hover
-   step, or the hover would read as a state change rather than a cursor. */
 .navigator-tile.is-done:hover:not([aria-current="true"]) {
   background: var(--raised-hover);
 }
@@ -1974,10 +1598,6 @@ button.nav-menu-item:hover {
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
-/* The flag rides the corner rather than taking a line of its own: at ten
-   tiles to a row there is one line, and it belongs to the number.
-   --warn-strong rather than --warn because a 10px stroked glyph is a
-   thin graphic, and the text tier is the safer floor for it. */
 .navigator-tile-flag {
   position: absolute;
   top: 1px;
@@ -2018,9 +1638,6 @@ button.nav-menu-item:hover {
   gap: 0.4em;
 }
 
-/* Each swatch is a miniature of the tile it names, drawn from the same
-   tokens the grid uses. A legend whose swatch is not the real thing
-   teaches the wrong mapping. */
 .navigator-swatch {
   width: 1em;
   height: 1em;
@@ -2044,9 +1661,6 @@ button.nav-menu-item:hover {
   box-shadow: inset 2px 0 0 var(--accent);
 }
 
-/* The keys that work while the grid is open, where they are being used.
-   The shortcut reference behind ? lists the same four; this strip exists
-   because nobody opens a help dialog to find out how to move one tile. */
 .navigator-keys {
   margin: 0;
   display: flex;
@@ -2078,10 +1692,6 @@ button.nav-menu-item:hover {
   padding: 0 0.25em;
 }
 
-/* Ten 30px tiles do not survive a thumb, and the mcq exam is the one
-   this product runs on a phone. Keyed to pointer type rather than
-   width: a tile is hard to hit because of the finger, not the viewport,
-   and a mouse at the same width should keep the dense grid. */
 @media (any-pointer: coarse) {
   .navigator-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -2093,9 +1703,6 @@ button.nav-menu-item:hover {
   }
 }
 
-/* Motion-additive, like every other transition in the product: written
-   inside no-preference rather than as a default a reduce-guard later has
-   to neutralise. */
 @media (prefers-reduced-motion: no-preference) {
   .navigator-tile,
   .navigator-chip {
@@ -2107,10 +1714,6 @@ button.nav-menu-item:hover {
   }
 }
 
-/* which box to ssh into — the single most load-bearing fact per question.
-   The text sits on --accent-soft, where plain --accent is 4.0:1, so it
-   takes --accent-strong (5.4:1); the border stays --accent, which clears
-   the 3:1 non-text floor and keeps the chip's weight unchanged. */
 .instance-chip {
   display: inline-flex;
   align-items: center;
@@ -2125,32 +1728,11 @@ button.nav-menu-item:hover {
   align-self: flex-start;
 }
 
-/* Pane layout only — how the question panel's scroll region sizes and
-   insets itself. Deliberately separate from `.md` below: `.md` is
-   Markdown's own wrapper and is also dropped straight into
-   `.solution-details` on the Score screen, which has no flex ancestor
-   and no matching padding to pair with this. Bundling the two onto one
-   selector previously nested `.md` inside a `.question-pane`-flavored
-   `.md`, doubling the inset. */
 .question-pane {
   flex: 1;
   overflow-y: auto;
   padding: var(--space-4);
 }
-
-/* ---- question and solution prose ----
-   The single most-read surface in the product: 15px in a ~328px measure,
-   read under a clock that cannot be paused. It ran on browser defaults
-   until now, which put the bank's own "# Question 8 | ..." at 2em with
-   0.67em margins — four wrapped lines of display type before the task
-   began — and left the numbered steps 21 of 22 questions are built from
-   at whatever the UA felt like.
-
-   Everything here sizes toward body and carries structure in weight and
-   space instead of scale. Markdown.tsx shifts the whole heading ramp down
-   one level (the exam screen's h1 is the topbar's), so h1 and h2
-   deliberately share a size: whichever one a document produces first is
-   its title, and the rules stay correct either way. */
 
 .md > :first-child {
   margin-top: 0;
@@ -2173,9 +1755,6 @@ button.nav-menu-item:hover {
   color: var(--text);
 }
 
-/* The ramp tightened when the type scale moved to the brief's steps, so
-   these are re-pinned rather than re-pointed: --text-m is now the body
-   size, and a heading that matches its own body text is not a heading. */
 .md h1,
 .md h2 {
   font-size: var(--text-xl);
@@ -2185,10 +1764,6 @@ button.nav-menu-item:hover {
   font-size: var(--text-l);
 }
 
-/* Past h3 the size ramp has run out — another step down would land under
-   the body size in a column this narrow. Weight and tracking carry the
-   rest, which is the label role the rest of the system already uses for
-   section heads. */
 .md h4,
 .md h5,
 .md h6 {
@@ -2217,8 +1792,6 @@ button.nav-menu-item:hover {
   margin-top: var(--space-1);
 }
 
-/* A step number is a count, not prose — the Mono-For-Truth Rule applies
-   to the marker as much as to the values inside the step. */
 .md ol > li::marker {
   font-family: var(--font-mono);
   color: var(--text-muted);
@@ -2233,15 +1806,10 @@ button.nav-menu-item:hover {
   color: var(--text-muted);
 }
 
-/* Questions use a blockquote for a constraint that carries points ("run
-   every podman command with sudo"). Tone and a rule, never a coloured
-   panel: a callout tinted danger or accent would read as a system state
-   rather than as part of the task. */
 .md blockquote {
   margin: 0 0 var(--space-3);
   padding: var(--space-2) var(--space-3);
-  /* 1px, per the Hairline Rule — every border in this system is 1px, and
-     a blockquote is no exception. The indent and the tone do the work. */
+
   border-left: 1px solid var(--border);
   border-radius: 0 var(--radius-s) var(--radius-s) 0;
   background: var(--bg);
@@ -2284,24 +1852,6 @@ button.nav-menu-item:hover {
   overflow-x: auto;
 }
 
-/* Inline code carries TWO channels, and it needs both.
-   The fill alone used to be the whole treatment (`background: var(--bg)`),
-   which worked in the hands-on question panel — that sits on --surface, so
-   a --bg chip reads against it — and was invisible on the multiple-choice
-   screen, where .mcq-body IS --bg. Identical fill, no edge, 0.1em of
-   padding: a keyword in an mcq stem was distinguished from the prose
-   around it by nothing but the monospace face, at a stem size where that
-   is a very quiet signal. Candidates found out a value was a value by
-   hovering it.
-   So: --surface-raised is the chip fill everywhere else in the system
-   (DESIGN.md, Colours), and the hairline is what survives a surface whose
-   tone happens to be close. Neither channel is load-bearing alone.
-
-   .mcq-option-text is here because an option is not markdown and never
-   passes through .md — it is a single-line string out of exam.yaml,
-   rendered by InlineCode. Its code spans are the same object and must
-   not be a second definition of one. base.css already gives every `code`
-   element the mono face, so only the chrome is stated here. */
 .md code,
 .mcq-option-text code {
   background: var(--surface-raised);
@@ -2310,13 +1860,6 @@ button.nav-menu-item:hover {
   border-radius: var(--radius-xs);
 }
 
-/* Every inline value in a hands-on question is a click-to-copy button. It
-   has to read as part of the sentence rather than as a form control — but
-   it does have to read as a control, which is the Two-Tier Hairline rule:
-   --border-strong is for an edge that identifies a hit area (and answers
-   WCAG 1.4.11's 3:1 floor), --border for everything structural. This was
-   `1px solid transparent` until now, which is how the affordance came to
-   be hover-only. */
 .copy-value {
   display: inline-block;
   vertical-align: baseline;
@@ -2332,21 +1875,10 @@ button.nav-menu-item:hover {
 
 .copy-value code {
   border-color: var(--border-strong);
-  /* A bank value can be a 31-character /opt/course path in a panel the
-     candidate has dragged down to 280px. Breaking inside the chip is the
-     better failure than pushing the pane sideways. */
+
   overflow-wrap: anywhere;
 }
 
-/* Except in a table, where the column can grow instead.
-   `anywhere` also collapses the cell's intrinsic minimum width, so a
-   two-column table squeezed the first column down and split the token
-   inside it: the exam tips' symptom table rendered "ImagePullBackOf" and
-   a lone "f" on the next line. These are strings a candidate greps for,
-   so a broken one is worse than a wide column. `break-word` keeps the
-   token whole and lets the column size to it, only breaking when the
-   token cannot fit on a line of its own — which is the behaviour the
-   rule above wants and cannot have where there is no column to grow. */
 .md th code,
 .md td code {
   overflow-wrap: break-word;
@@ -2359,37 +1891,14 @@ button.nav-menu-item:hover {
   color: var(--accent-strong);
 }
 
-/* There is no hover icon, and this comment is the record of why not.
-   Three geometries were tried. An inline glyph at `opacity: 0` reserved
-   its own width plus a margin, so a paragraph with six copyable values
-   read as though it had been typeset with holes in it. `width: 0` would
-   have reflowed the sentence under the cursor while it was being read.
-   Absolute positioning at `left: 100%` reserved nothing and therefore
-   collided with everything: at the mcq stem's 19px it ran ~18px past the
-   chip into a ~4px word gap, and because neither the button nor the icon
-   opened a stacking context, the NEXT chip's opaque fill painted over it.
-   An icon that is drawn behind the following word is worse than no icon.
-   The chip's own resting hairline is the affordance now, its accent
-   treatment is the hover state, and the toast is the confirmation. Three
-   channels, none of them out of flow. */
-
 .md pre code {
   background: none;
   border: 0;
   padding: 0;
 }
 
-/* ---- desktop viewport (first-party RFB client) ---- */
-
-/* ---- panel resizer ----
-   A 6px grab strip straddling the panel's right edge. It is a sibling of
-   both panes rather than a child of either: inside .desktop-pane it would
-   kill the [ and ] question shortcuts (QuestionPanel stands them down for
-   anything in there), and inside .question-panel it would have to survive
-   the collapsed state. */
 .panel-resizer {
-  /* position + z-index so the negative margin can overlap the panel's
-     border without the panel painting over the hit area. */
+
   position: relative;
   z-index: 1;
   flex: 0 0 auto;
@@ -2400,22 +1909,15 @@ button.nav-menu-item:hover {
   border: 0;
   background: transparent;
   cursor: col-resize;
-  /* Without this the browser claims the gesture for scrolling and the
-     pointermove stream stops after the first few events. */
+
   touch-action: none;
 }
 
-/* The second and last exception to the Rare Accent Rule, for the same
-   reason as the click-to-copy value: a 6px strip has no interior to tone,
-   so the accent IS its whole hover state. */
 .panel-resizer:hover,
 .panel-resizer[data-dragging="true"] {
   background: var(--accent);
 }
 
-/* Set on .exam-body for the length of a drag — one state flip at each end
-   of the gesture, not one per frame. Without it the cursor flickers as it
-   crosses elements and a fast drag selects the question text it passes. */
 .exam-body[data-resizing="true"] {
   cursor: col-resize;
   user-select: none;
@@ -2434,13 +1936,6 @@ button.nav-menu-item:hover {
   min-width: 0;
 }
 
-/* Absolutely positioned on purpose, and it must stay that way. noVNC
-   observes this element with a ResizeObserver and asks the server for a
-   framebuffer of exactly its size, then draws a canvas of that size back
-   into it. If the box can take any part of its size from its own content,
-   that is a loop: resize -> canvas grows -> observer fires -> resize. Out
-   of flow, its size comes only from `.desktop-viewport`, so the loop is
-   structurally impossible regardless of what any ancestor does. */
 .desktop-canvas {
   position: absolute;
   inset: 0;
@@ -2457,8 +1952,6 @@ button.nav-menu-item:hover {
   color: var(--text-muted);
   background: var(--bg);
 }
-
-/* ---- confirm dialog ---- */
 
 .confirm-overlay {
   position: fixed;
@@ -2486,14 +1979,6 @@ button.nav-menu-item:hover {
   width: min(560px, 92%);
 }
 
-/* The sheet variant: the same dialog, anchored to the bottom edge.
- *
- * On a wide screen it stays a centred dialog — a panel pinned to the
- * bottom of a 27" display is further from the pointer than the middle
- * is, and the thumb-zone argument that justifies it on a phone is an
- * argument about a hand holding the device. So everything below is
- * inside the mobile query; on a desktop `.confirm-dialog-sheet` adds
- * nothing but the grip, which is hidden there for the same reason. */
 .sheet-grip {
   display: none;
 }
@@ -2503,27 +1988,15 @@ button.nav-menu-item:hover {
     align-items: flex-end;
   }
 
-  /* Scoped through the overlay for SPECIFICITY, not for clarity. The
-     600px block further down makes every .confirm-dialog full-bleed —
-     width 100%, max-height 100dvh, radius 0 — and it appears later in
-     this file, so at equal specificity it would win and the sheet would
-     become an ordinary full-screen dialog on exactly the widths it
-     exists for. Two classes beat one wherever they are written. */
   .confirm-overlay-sheet .confirm-dialog-sheet {
     width: 100%;
     max-width: 100%;
-    /* Not 100dvh, unlike the full-bleed dialogs above. A sheet that
-       covers everything is a screen and should have been one; leaving
-       the top of the page visible is what says "this is a layer over
-       what you were doing, and dismissing it puts you back". */
+
     max-height: 85dvh;
-    /* Corners at the top only: the bottom edge reaches the physical
-       edge of the display and rounding it would float the sheet on a
-       sliver of scrim no thumb can hit. */
+
     border-radius: var(--radius-l) var(--radius-l) 0 0;
     border-bottom: 0;
-    /* The home indicator lives in the last ~20px. Without this the final
-       control in the sheet sits under it. */
+
     padding-bottom: calc(var(--space-5) + var(--safe-b));
   }
 
@@ -2537,10 +2010,6 @@ button.nav-menu-item:hover {
   }
 }
 
-/* Rises from the edge it is anchored to rather than fading in place.
-   transform only, so it composites, and inside the no-preference guard
-   like every other animation in this file — a reduced-motion reader gets
-   the sheet already in position, which is the same layout. */
 @media (prefers-reduced-motion: no-preference) {
   .confirm-overlay-sheet .confirm-dialog-sheet {
     animation: sheet-in var(--dur-modal-in) var(--ease-out);
@@ -2573,17 +2042,6 @@ button.nav-menu-item:hover {
   margin-top: var(--space-4);
 }
 
-/* ---- exam tips sheet ---- */
-
-/* A dialog that is READ rather than answered.
-   560px is the right measure for a sentence and two buttons, which is
-   what every other dialog here is. The tips are a document — pipe tables,
-   and command lines like `k create cj nightly --image=... --schedule=...`
-   — and at 560px every one of those wraps or scrolls sideways, which is
-   exactly the retyping the page exists to save. Selected off the body
-   rather than by adding a third size to Dialog, because this is the only
-   reading dialog the product has; `.screen:has(> .score-screen)` above
-   sets the same precedent. */
 .confirm-dialog-wide:has(> .tips-body) {
   width: min(760px, 94%);
 }
@@ -2593,43 +2051,21 @@ button.nav-menu-item:hover {
   margin-bottom: var(--space-4);
 }
 
-/* The lobby's two sheet openers, kept together as one flex child of
-   .mode-fine so its space-between still means "tips list, then buttons"
-   rather than spreading three items across the row. */
 .mode-fine-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
 }
 
-/* .score-actions centres inline content and had exactly one button in it
-   until the tips opener arrived; JSX puts no whitespace between adjacent
-   elements, so without this the two would touch. */
 .score-actions .btn + .btn {
   margin-left: var(--space-3);
 }
 
-/* Ruled off from the lead the way .intro-note is ruled off from its
-   legend: what follows is the bank's own prose rather than this app's
-   copy, and the two should not read as one paragraph. The dialog itself
-   scrolls (max-height + overflow-y), so this deliberately does NOT open a
-   second scroll container inside it. */
 .tips-body {
   padding-top: var(--space-4);
   border-top: 1px solid var(--border);
 }
 
-/* ---- score screen ---- */
-
-/* The score screen flows in the page and the PAGE scrolls it — one
-   scrollbar, not two.
-   It used to be height: 100% + overflow-y: auto, which made it a viewport-
-   sized box with its own scrollbar. With twenty-two results expanded and a
-   solution open inside each, that box was the thing you scrolled while the
-   page behind it sat still, and the browser's own scroll position, Find,
-   and Home/End all applied to the wrong element. The exam screen still
-   needs the full-height chain (a split layout that must not grow); a
-   results page does not. */
 .score-screen {
   min-height: 100%;
   padding: var(--space-6) var(--space-4);
@@ -2637,8 +2073,6 @@ button.nav-menu-item:hover {
   margin: 0 auto;
 }
 
-/* The wrapper is height: 100% for the exam's sake. The score screen is the
-   one screen that must be allowed to grow past the viewport instead. */
 .screen:has(> .score-screen) {
   height: auto;
   min-height: 100%;
@@ -2655,9 +2089,6 @@ button.nav-menu-item:hover {
   height: 100%;
 }
 
-/* One card: the ink band on top, the two-column body under it. The
-   radius has to be clipped or the band's square corners sit proud of the
-   card's rounded ones. */
 .results-card {
   border: 1px solid var(--border);
   border-radius: var(--radius-l);
@@ -2666,11 +2097,6 @@ button.nav-menu-item:hover {
   overflow: hidden;
 }
 
-/* --ink is a near-black band used INSIDE light mode, and a raised band
-   above --bg in dark. It is NOT --machine-*: that family is reserved for
-   things that are literally a computer (the terminal, the VNC desktop),
-   and a results banner is the product raising its voice, not a machine
-   talking. */
 .results-banner {
   padding: var(--space-7) var(--space-6) var(--space-6);
   background: var(--ink);
@@ -2685,9 +2111,6 @@ button.nav-menu-item:hover {
   flex-wrap: wrap;
 }
 
-/* The basis matters more than the grow factor. Without one the lead's
-   base size is its max-content — a 66ch paragraph — so the stat block
-   wrapped onto its own line at widths where both fit comfortably. */
 .results-banner-lead {
   display: flex;
   flex: 1 1 24rem;
@@ -2706,17 +2129,10 @@ button.nav-menu-item:hover {
   color: var(--ink-accent);
 }
 
-/* The eyebrow is set in caps and the seed is not: the API's contract is
-   six LOWERCASE hex digits, and a seed shouted back in capitals is a
-   seed a replay field can reject. */
 .results-seed {
   text-transform: lowercase;
 }
 
-/* The screen's <h1>, and the whole verdict: "Passed — 74% against a 66%
-   threshold". It used to be a bare percentage with PASS underneath,
-   which split one sentence across two type sizes and left the number the
-   verdict was measured against off the banner entirely. */
 .results-headline {
   margin: 0;
   font-size: var(--text-5xl);
@@ -2750,11 +2166,6 @@ button.nav-menu-item:hover {
   gap: var(--space-1);
 }
 
-/* --ink-text, not a verdict tint. There is no success-on-ink token: plain
-   --success measures 3.98:1 on light --ink, which clears 1.4.3 only
-   because this figure is large, and the palette's contrast ledger has no
-   entry for the pairing. The verdict is in the headline above and in the
-   bar below; this figure does not need to repeat it in colour. */
 .results-stat-figure {
   font-family: var(--font-mono);
   font-size: var(--text-6xl);
@@ -2779,10 +2190,6 @@ button.nav-menu-item:hover {
   margin-top: var(--space-5);
 }
 
-/* Deliberately NOT overflow: hidden. The threshold marker stands proud of
-   the track top and bottom so it reads as a gate rather than as a notch
-   in the fill, and clipping the track would cut it back to 10px. The fill
-   carries its own radius instead. */
 .results-meter-track {
   position: relative;
   height: 10px;
@@ -2804,11 +2211,6 @@ button.nav-menu-item:hover {
   background: var(--danger);
 }
 
-/* The pass threshold. --warn-marker is a DECORATIVE token (1.68:1 on
-   --surface) and is permitted here for exactly the reason tokens.css
-   gives: it is drawn on --ink, where it reads 10.5:1, and it never
-   carries the threshold alone — "pass 66%" is spelled out underneath it
-   in the same colour, as text. */
 .results-meter-mark {
   position: absolute;
   top: -5px;
@@ -2843,10 +2245,6 @@ button.nav-menu-item:hover {
   color: var(--ink-muted);
 }
 
-/* 340px is the brief's measure, and --results-sidebar is where it lives.
-   minmax(0, 1fr) rather than 1fr: a grid track's default min-content
-   floor lets a long task title push the whole table wider than the card
-   and take the page's horizontal scrollbar with it. */
 .results-body {
   display: grid;
   grid-template-columns: var(--results-sidebar) minmax(0, 1fr);
@@ -2861,14 +2259,6 @@ button.nav-menu-item:hover {
   background: var(--surface-raised);
 }
 
-/* Pinned to the bottom of the sidebar, under whatever the breakdown
-   needed. Prose, not a control — see NextSession in Score.tsx. */
-/* Directly under the breakdown, NOT pinned to the foot of the column.
-   `margin-top: auto` reads well in a mockup, where the sidebar is about
-   as tall as what it sits beside — but this column stretches to the
-   verdict table, and a 65-question attempt made that 3993px, so the one
-   card telling the candidate what to study next landed 3393px below the
-   weak-domain list it names. Advice belongs against its evidence. */
 .results-next {
   margin-top: var(--space-5);
   padding: var(--space-4);
@@ -2889,24 +2279,17 @@ button.nav-menu-item:hover {
   color: var(--text-secondary);
 }
 
-/* Full width, because it is the one act this card recommends and a button
-   hugging its own label in a 340px sidebar reads as an aside. */
 .results-next-drill {
   width: 100%;
   margin-top: var(--space-3);
 }
 
-/* The consequence, stated before the click rather than discovered after
-   it: this control rebuilds the environment. Smaller than the advice it
-   follows — it qualifies the button, it is not a second recommendation. */
 .results-next-hint {
   margin-top: var(--space-2);
   font-size: var(--text-xs);
   line-height: 1.55;
   color: var(--text-muted);
 }
-
-/* ---- score: task verdicts ---- */
 
 .task-verdicts {
   padding: var(--space-5);
@@ -2963,24 +2346,9 @@ button.nav-menu-item:hover {
 }
 
 .verdict-table {
-  /* One template, four shapes. WEIGHT and TIME are both absent on a
-     result graded before they existed, and a column of dashes costs
-     width to say nothing.
 
-     There is no DOMAIN column any more. It was a fixed 150px and no name
-     in this bank fits it — at --results-sidebar plus this table's own
-     gutters the whole strip has about 700px to spend, and 150px of it
-     bought three wrapped lines of "Application Environment,
-     Configuration and Security" beside a title cut to an ellipsis. The
-     domain rides the task's meta line now, which hands 160px back to the
-     column a candidate is actually scanning. */
   --tv-cols: 44px minmax(0, 1fr) 104px;
-  /* The height of a row's FIRST line, shared by every cell in the strip.
-     A title that wraps makes rows unequal, so the cells can no longer
-     centre against the row — they align to its TOP, and without a band
-     they would each start at their own font's line box and the numbers
-     would sit on five different baselines. Each cell sets this as its
-     line-height, or as a min-height it centres inside. */
+
   --tv-line: 1.375rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
@@ -3014,16 +2382,10 @@ button.nav-menu-item:hover {
   color: var(--text-muted);
 }
 
-/* Over a flush-right figure column. */
 .tv-head-figure {
   text-align: right;
 }
 
-/* A row is a <details>, not a <tr>: it has to disclose its grader checks
-   in place, and a <details> cannot be a table row. It still expands now
-   that the deep dive exists — this table is the scanning surface and
-   screens/Explain.tsx is the reading one — and the link into the deep
-   dive lives inside the disclosure, as .tv-open below. */
 .tv-row {
   border-bottom: 1px solid var(--border);
   padding: 0 var(--space-4) 0;
@@ -3033,12 +2395,6 @@ button.nav-menu-item:hover {
   border-bottom: 0;
 }
 
-/* `start`, not `center`. Once the title wraps, rows have unequal heights
-   and centring would float the number, the figures and the verdict to
-   each row's own middle — the strip would drift up and down the table
-   and stop being a column you can run an eye down. Top-aligned, every
-   cell begins in the same band (--tv-line) at the top of its row,
-   whatever the title below it does. */
 .tv-row > summary {
   display: grid;
   grid-template-columns: var(--tv-cols);
@@ -3060,17 +2416,10 @@ button.nav-menu-item:hover {
   background: var(--surface-hover);
 }
 
-/* A tinted row, never a tinted row ALONE: the verdict word in the last
-   cell is what says which state this is. Only `failed` is tinted —
-   --danger-row is the palette's one row tint, and washing `partial` in
-   the same colour would say the two outcomes are the same. */
 .tv-row.is-failed > summary {
   background: var(--danger-row);
 }
 
-/* The chevron and the number centre against each other inside the band,
-   so the pair sits on the title's first line rather than on the top of a
-   three-line row. */
 .tv-num {
   display: flex;
   align-items: center;
@@ -3083,10 +2432,6 @@ button.nav-menu-item:hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* Two lines by construction: the title, with the review flag riding its
-   first baseline, and a meta line under it. The break is the meta's 100%
-   flex basis rather than a second wrapper element — which also means a
-   row with nothing to put on the meta line simply has one line. */
 .tv-task {
   display: flex;
   flex-wrap: wrap;
@@ -3097,16 +2442,6 @@ button.nav-menu-item:hover {
   font-weight: 500;
 }
 
-/* It WRAPS. This was `white-space: nowrap` with an ellipsis, and it cut
-   the one string a candidate comes to this table to find: "Secrets, and
-   a Deployment that cannot read one" arrived as "Secrets, and a Deplo…",
-   which is not enough to pick a task out of twenty-two. With the domain
-   off the strip every title in the bank fits one line, and a longer one
-   from a future bank takes a second rather than losing its end.
-   `break-word` is the backstop for a pathological unbroken id: the
-   column is minmax(0, 1fr) precisely so a long task title can never push
-   the table past the card, and a single unbreakable word is the one
-   thing that still could. */
 .tv-task-name {
   flex: 0 1 auto;
   min-width: 0;
@@ -3120,9 +2455,6 @@ button.nav-menu-item:hover {
   color: var(--warn-strong);
 }
 
-/* The row's second line: the ssh-able question directory and the
-   curriculum domain, in full and at the title's own left edge, so it
-   reads as this task's provenance rather than as two more columns. */
 .tv-task-meta {
   flex: 1 0 100%;
   font-size: var(--text-xs);
@@ -3131,21 +2463,10 @@ button.nav-menu-item:hover {
   color: var(--text-muted);
 }
 
-/* Mono because it is a path — the id IS the question directory a
-   candidate can ssh into. The domain beside it is prose and keeps the
-   sans face, matching .domain-name in the sidebar: a curriculum domain
-   is not something anyone types or compares digit by digit. */
 .tv-task-id {
   font-family: var(--font-mono);
 }
 
-/* Flush right, because they are figures. Mono and tabular already, but
-   what actually lets 7% be read against 12% down twenty rows is a shared
-   right edge; the head labels move with them.
-   No ellipsis: neither ever had `white-space: nowrap`, so the
-   `text-overflow` these carried could not fire — an over-target time
-   long enough to need the width wraps into the room the title's line
-   already left, and a clipped duration is a lost measurement. */
 .tv-weight,
 .tv-time {
   min-width: 0;
@@ -3157,8 +2478,6 @@ button.nav-menu-item:hover {
   color: var(--text-muted);
 }
 
-/* Over the pacing budget. The tint is the second signal; the "+2m 15s"
-   printed beside the figure is the first. */
 .tv-time.is-over {
   color: var(--warn-strong);
 }
@@ -3167,10 +2486,6 @@ button.nav-menu-item:hover {
   margin-left: var(--space-1);
 }
 
-/* The pill's height is the band rather than its own padding: with the
-   row top-aligned, 4px of vertical padding put the pill 2px proud of the
-   line every other cell sits on, which is exactly the drift the band
-   exists to stop. Same drawn height, held to the strip. */
 .tv-verdict {
   display: flex;
   align-items: center;
@@ -3223,30 +2538,16 @@ button.nav-menu-item:hover {
   margin: var(--space-3) 0 0;
 }
 
-/* The bottom padding only exists while the row is open. */
 .tv-row[open] {
   padding-bottom: var(--space-3);
 }
 
-/* What an opened row discloses, as ONE inset panel rather than as loose
-   blocks in the row. The row used to end in a second disclosure, and
-   that summary was what gave the open state an edge; with the solution
-   gone the checks needed a container of their own or an opened row read
-   as a row with a hole in it.
-   --bg inside a --surface card is the documented inversion — the page
-   tone is darker than the card in light and lighter in dark — so this
-   reads as inset in both themes without a border or a shadow.
-   No margin-top: .question-result[open] > summary already sets the gap
-   under the trigger, and two would be one too many. */
 .tv-detail {
   padding: var(--space-3);
   border-radius: var(--radius-s);
   background: var(--bg);
 }
 
-/* The panel supplies the inset; the check list's own margins would sit
-   inside it and double the gap. Scoped, because .check-list is shared
-   with the exam screen and the deep dive. */
 .tv-detail > :first-child {
   margin-top: 0;
 }
@@ -3255,13 +2556,6 @@ button.nav-menu-item:hover {
   margin: 0;
 }
 
-/* The way out of the table and into the deep dive (screens/Explain.tsx),
-   and now the row's only action. Drawn AFTER the checks: it led the
-   disclosure only because a link buried under a check list AND a
-   solution disclosure is a link nobody finds, and the row is short
-   enough now to read in its natural order. A link, not a button: it
-   navigates, and the fragment router means it can be an ordinary
-   anchor. */
 .tv-more {
   margin: var(--space-3) 0 0;
 }
@@ -3276,9 +2570,6 @@ button.nav-menu-item:hover {
   text-decoration: none;
 }
 
-/* Underline on hover rather than at rest. The row above it is already a
-   pointer target, and a permanently underlined line inside a disclosure
-   that is itself clickable reads as two controls stacked. */
 .tv-open:hover {
   text-decoration: underline;
 }
@@ -3307,9 +2598,6 @@ button.nav-menu-item:hover {
   color: var(--danger);
 }
 
-/* Never ran, so neither verdict colour: the mark is the same muted "·"
-   the phase checklist uses for pending, and the message column carries
-   the words. Colour is the third channel here, not the first. */
 .check-skip .check-mark {
   color: var(--text-muted);
 }
@@ -3327,20 +2615,6 @@ button.nav-menu-item:hover {
   color: var(--text-muted);
 }
 
-/* .solution-details has ONE call site left: the training mode's
-   check-answer disclosure on the mcq exam screen
-   (screens/McqExam.tsx:703, `solution-details mcq-check-answer`). The
-   verdict row used to be the other one, and this block stays here — in
-   the score screen's section, where the shared `.tv-row > summary`
-   groupings above it also live — rather than moving to the mcq section
-   and colliding with work in flight there.
-   Its own `margin-top` rule went with the verdict row: .mcq-check-answer
-   already declares the identical --space-4 for the remaining call site.
-
-   --accent-strong, not --accent: the summary's resting fill is
-   --surface, but hovering puts this label on --surface-hover where plain
-   --accent measures 3.8:1. The inline-only negative margin lets the
-   hover band reach the container's gutters without the label moving. */
 .solution-details summary {
   display: flex;
   align-items: center;
@@ -3364,10 +2638,6 @@ button.nav-menu-item:hover {
   margin-top: var(--space-2);
 }
 
-/* ---- control job overlay (reset / bank switch progress) ---- */
-
-/* Pre-submit review. Informational, never blocking — a candidate who is
-   out of time must not have to argue with a dialog. */
 .submit-review {
   margin: var(--space-3) 0;
   padding: var(--space-3);
@@ -3388,11 +2658,6 @@ button.nav-menu-item:hover {
   font-family: var(--font-mono);
 }
 
-/* ---- score: per-domain breakdown ---- */
-
-/* A stacked list, not a table. At --results-sidebar (340px) a two-column
-   table gives the domain name about twelve characters before it wraps,
-   and every row in this bank has a name longer than that. */
 .domain-breakdown h2 {
   margin: 0 0 var(--space-1);
   font-size: var(--text-l);
@@ -3441,9 +2706,6 @@ button.nav-menu-item:hover {
   white-space: nowrap;
 }
 
-/* Decorative: the figure above it and the meta below it both carry the
-   value, so this reads the same with CSS off and needs no motion to be
-   legible. */
 .domain-bar {
   height: 7px;
   border-radius: var(--radius-pill);
@@ -3472,8 +2734,6 @@ button.nav-menu-item:hover {
   color: var(--text-muted);
 }
 
-/* The non-colour carrier for a domain under the threshold. --danger is
-   the text tier (4.53:1 worst), not --danger-bar beside it. */
 .domain-below {
   margin-left: var(--space-2);
   color: var(--danger);
@@ -3481,9 +2741,6 @@ button.nav-menu-item:hover {
   letter-spacing: var(--tracking-label);
 }
 
-/* The results card stacks below the brief's two-column measure: 340px of
-   sidebar plus a six-column table needs the width it asks for, and
-   squeezing either is worse than putting one under the other. */
 @media (max-width: 900px) {
   .results-body {
     grid-template-columns: minmax(0, 1fr);
@@ -3503,9 +2760,6 @@ button.nav-menu-item:hover {
   }
 }
 
-/* Below this the six-column strip is unreadable however it is squeezed,
-   so the row becomes a stacked block: the column headings go, and each
-   cell carries its own label instead. */
 @media (max-width: 640px) {
   .results-banner {
     padding: var(--space-5) var(--space-4);
@@ -3537,10 +2791,6 @@ button.nav-menu-item:hover {
   }
 }
 
-/* ---- attempt modes, hints ---- */
-
-/* On the score banner, under the verdict. A training or speed result is
-   not comparable to an exam one, and the banner is what gets screenshot. */
 .score-mode {
   margin-top: var(--space-2);
   font-size: var(--text-s);
@@ -3557,9 +2807,6 @@ button.nav-menu-item:hover {
   margin-bottom: var(--space-2);
 }
 
-
-/* Named in the topbar for anything that is not a plain exam, so a
-   training result is never mistaken for a real one at a glance. */
 .mode-chip {
   padding: 0 var(--space-2);
   border: 1px solid var(--border-strong);
@@ -3600,12 +2847,6 @@ button.nav-menu-item:hover {
   gap: var(--space-2);
 }
 
-/* ---- clipboard panel and keyboard settings ---- */
-
-/* Both are position: fixed so they are out of flow entirely. Anything
-   that changes .desktop-pane's box fires noVNC's ResizeObserver and buys
-   a server-side framebuffer resize — the same reason QuestionJump is
-   absolutely positioned inside .question-panel rather than laid out. */
 .clipboard-panel,
 .keyboard-popover {
   position: fixed;
@@ -3669,8 +2910,7 @@ button.nav-menu-item:hover {
   margin: 0;
   max-height: 8rem;
   overflow: auto;
-  /* Remote clipboard content is arbitrary and often long — wrap it
-     rather than letting one line push the panel wider than the viewport. */
+
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -3741,11 +2981,6 @@ button.nav-menu-item:hover {
   }
 }
 
-/* Boot progress is a SCREEN, not an overlay: there is nothing behind it
-   to dim. It borrows the control dialog's checklist wholesale (same
-   .control-phases / .phase-* rules) because a candidate who sees both
-   should recognise the second from the first — but it is a page, so it
-   gets page padding and no scrim, no focus trap, no dismiss. */
 .boot-screen {
   min-height: 100dvh;
   display: flex;
@@ -3796,9 +3031,6 @@ button.nav-menu-item:hover {
   z-index: var(--z-overlay);
 }
 
-/* Header and actions stay pinned; only the checklist scrolls, so the
-   progress a user is waiting on can never scroll out of view and a long
-   checklist can never run off a short viewport. */
 .control-dialog {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -3831,8 +3063,6 @@ button.nav-menu-item:hover {
   gap: var(--space-2);
 }
 
-/* Each row is mark | label | elapsed, with the running phase's output
-   line spanning the full width underneath it. */
 .control-phases li {
   display: grid;
   grid-template-columns: 1em 1fr auto;
@@ -3854,9 +3084,6 @@ button.nav-menu-item:hover {
   color: var(--text-muted);
 }
 
-/* The live output tail: monospace because it is literally command
-   output, clipped to one line so a long line can't reflow the dialog
-   on every poll. */
 .phase-detail {
   grid-column: 2 / -1;
   font-family: var(--font-mono);
@@ -3873,10 +3100,6 @@ button.nav-menu-item:hover {
   margin-left: var(--space-2);
 }
 
-/* The build log disclosure: the retained output behind the checklist's
-   one-line tails. The pane scrolls inside itself (Scroll-Inside rule) so
-   the dialog's header and actions never move, and flex-shrink keeps the
-   checklist the senior scroll region when height runs out. */
 .control-log {
   margin: 0 0 var(--space-2);
   flex-shrink: 0;
@@ -3929,19 +3152,11 @@ button.nav-menu-item:hover {
   color: var(--danger);
 }
 
-/* No font-family: the ✓/✗ that used to live here are icons now, and the
-   one remaining glyph (the pending ·) is in the bundled latin subset. The
-   pair used to render mono here and sans on the score screen, which meant
-   the same two marks came from two different fallback fonts. */
 .phase-mark {
   width: 1em;
   text-align: center;
 }
 
-/* The running phase gets a spinning arc instead of a static glyph:
-   cluster re-bootstrap can take minutes, and without visible motion the
-   dialog reads as frozen. Under prefers-reduced-motion the global rule
-   in base.css stops the rotation, leaving a static arc as the marker. */
 .phase-mark-spinner {
   width: 0.75em;
   height: 0.75em;
@@ -3971,8 +3186,6 @@ button.nav-menu-item:hover {
   margin-top: var(--space-3);
 }
 
-/* ---- narrow viewports: the question panel becomes an overlay drawer ---- */
-
 @media (max-width: 900px) {
   .question-panel {
     position: absolute;
@@ -3991,17 +3204,10 @@ button.nav-menu-item:hover {
     margin-left: 36px;
   }
 
-  /* The first thing the topbar gives up. Below this width the row is
-     already wrapping to fit the clock and the submit button, and the
-     environment line is context rather than something you act on — the
-     same facts are on the mode screen and in the About drawer. The
-     progress readout stays: it is the attempt's own state. */
   .exam-env {
     display: none;
   }
 }
-
-/* ---- toast layer ---- */
 
 .toast-layer {
   position: fixed;
@@ -4025,26 +3231,13 @@ button.nav-menu-item:hover {
   align-items: flex-start;
   gap: var(--space-2);
   background: var(--surface);
-  /* This used to carry a 3px accent stripe down its left edge, and
-     .toast-warning overrode nothing but that hue. Two faults in one
-     declaration: an info
-     toast is only ever a confirmation ("Copied aurora-staging") and had no
-     business reading as an accent object on a slate screen — the Rare
-     Accent Rule — and toast kind was left conveyed by colour alone, a
-     WCAG 1.4.1 failure that the role="status"/role="alert" split hid from
-     everyone except the sighted reader who could not distinguish the hues.
-     Now: a plain hairline on all four sides, per the Hairline Rule, and no
-     side stripe at all. */
+
   border: 1px solid var(--border);
   border-radius: var(--radius-s);
   box-shadow: var(--shadow-2);
   padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
 }
 
-/* A warning is a state reading — the 30/15/5-minute marks, a lost desktop,
-   a refused control action — so it takes the colour on its whole edge
-   rather than a decorative tab, and the mono "!" beside the message is the
-   channel that survives colour-blindness and a greyscale display. */
 .toast-warning {
   border-color: var(--warn);
 }
@@ -4053,7 +3246,7 @@ button.nav-menu-item:hover {
   flex-shrink: 0;
   font-family: var(--font-mono);
   font-weight: 700;
-  /* A glyph, not an icon — text tier. */
+
   color: var(--warn-strong);
   line-height: 1.55;
 }
@@ -4064,14 +3257,11 @@ button.nav-menu-item:hover {
 
 .toast-dismiss {
   background: transparent;
-  /* Transparent rather than none, so the hover fill does not shift the
-     glyph by a pixel when a border appears under it. */
+
   border: 1px solid transparent;
   border-radius: var(--radius-s);
   color: var(--text-muted);
-  /* Sized up because the × glyph is small at body size. Goes away with
-     the icon set, which sizes on 1em and needs no compensation. Was a
-     literal 1.1rem; the widened ramp has a step within a pixel of it. */
+
   font-size: var(--text-xl);
   line-height: 1;
   cursor: pointer;
@@ -4087,14 +3277,6 @@ button.nav-menu-item:hover {
   background: var(--surface-hover);
   transform: translateY(1px);
 }
-
-/* ---- exam intro card ----
-
-   A drawing of the exam screen, not an overlay on top of it. Every box
-   below is sized in relative units off the dialog's own width, so it
-   holds its proportions at any viewport and never has to be measured
-   against the live layout — which is exactly what the spotlight tour
-   this replaced got wrong. */
 
 .intro-schematic {
   border: 1px solid var(--border);
@@ -4139,8 +3321,7 @@ button.nav-menu-item:hover {
 
 .intro-desktop {
   flex: 1;
-  /* Stands in for the remote desktop without pretending to be a
-     screenshot: a faint grid reads as "something else lives here". */
+
   background-image: linear-gradient(var(--border) 1px, transparent 1px),
     linear-gradient(90deg, var(--border) 1px, transparent 1px);
   background-size: 1.25rem 1.25rem;
@@ -4221,11 +3402,6 @@ button.nav-menu-item:hover {
   color: var(--text);
 }
 
-/* The grading note under the legend. Indented to the legend's text
-   column (the number's 1.4rem plus its gap) so it reads as a continuation
-   of the list rather than a new section, and separated by a rule instead
-   of a fifth number — the numbers key to the schematic's four regions,
-   and grading is not a region of the screen. */
 .intro-note {
   display: block;
   margin: 0 0 var(--space-4);
@@ -4240,12 +3416,6 @@ button.nav-menu-item:hover {
   color: var(--text);
 }
 
-/* ---- info button + drawer ---- */
-
-/* The system's small icon button. Named for its first use (About) and
-   now also the topbar's clipboard and keyboard triggers, and the
-   clipboard panel's close — one component, not three near-duplicates.
-   Worth renaming to .icon-button when something else touches this file. */
 .info-button {
   background: transparent;
   border: 1px solid var(--border-strong);
@@ -4352,15 +3522,6 @@ button.nav-menu-item:hover {
   margin-bottom: var(--space-1);
 }
 
-/* ---- skip link (keyboard exit past the VNC canvas) ----
-   Hidden with the same clip idiom as .sr-only (base.css), NOT with a
-   transform: a translate is proportional to the element's own height, so
-   whether it clears the viewport depends on how far down the page its
-   container starts and whether the label wrapped. That is how it ended up
-   21px visible under the topbar. Clipping is height- and container-
-   independent, and :focus restores it as position: fixed so the visible
-   state is anchored to the viewport rather than to the desktop pane. */
-
 .skip-link {
   position: absolute;
   width: 1px;
@@ -4391,26 +3552,12 @@ button.nav-menu-item:hover {
   color: var(--accent);
 }
 
-/* ---- desktop-required gate ---- */
-
-/* This is the page for a phone, not an overlay over a hidden app, and
-   it has to stay fully usable at 320px — it is the one screen these
-   users will ever see (WCAG 1.4.10 counts 320px as a 1280px window at
-   400% zoom, which is why the gate is capability-based, not width-only). */
 .desktop-required {
   min-height: 100%;
   display: flex;
   padding: var(--space-5) var(--space-4);
 }
 
-/* Centred by AUTO MARGINS, not by align-items/justify-content. A flex
-   centre whose item is taller than the line pushes the item's top edge
-   past the container's, and that overflow is unreachable — no scrollbar
-   goes there. This card grows: three paragraphs, a requirements list, a
-   live exam's clock and two controls, at 320px, at 200% text zoom. Auto
-   margins centre while there is room and collapse to zero when there is
-   not, which is the whole difference between a centred card and a
-   heading nobody can scroll back up to. */
 .desktop-required-card {
   width: min(34rem, 100%);
   margin: auto;
@@ -4438,8 +3585,6 @@ button.nav-menu-item:hover {
   font-size: var(--text-s);
 }
 
-/* A running session must stay submittable from a phone: the server-side
-   clock keeps counting regardless of what the candidate is holding. */
 .gate-session {
   margin: var(--space-5) 0;
   padding: var(--space-4);
@@ -4456,24 +3601,19 @@ button.nav-menu-item:hover {
   margin: 0;
 }
 
-/* ---- narrow viewports ---- */
-
 @media (max-width: 600px) {
   .desktop-required-card {
     padding: var(--space-4);
   }
 
-  /* The page gutters close up before anything inside them does. */
   .page {
     padding: var(--space-5) var(--space-4) var(--space-6);
   }
 
-  /* One column, and the mode cards' footers become full-width taps. */
   .mode-fine {
     flex-direction: column;
   }
 
-  /* Full-bleed rather than a desktop dialog shrunk onto a phone. */
   .confirm-dialog,
   .control-dialog {
     width: 100%;
@@ -4490,10 +3630,6 @@ button.nav-menu-item:hover {
     width: 100%;
   }
 
-  /* A single-purpose screen's single control is a full-width tap. Both
-     of these are the last thing on a card the reader has just scrolled
-     through, and a 90px button hugging the left edge below three
-     paragraphs is easy to miss entirely. */
   .desktop-required-anyway,
   .gate-session .btn,
   .hosted-queue .btn,
@@ -4501,9 +3637,6 @@ button.nav-menu-item:hover {
     width: 100%;
   }
 
-  /* The hosted screens close their gutters with everything else. The
-     sign-in card keeps a smaller inset than the lobby cards do: it is
-     the only content on its viewport, so its edge is the page's. */
   .signin-card,
   .hosted-flavour {
     padding: var(--space-4);
@@ -4514,8 +3647,6 @@ button.nav-menu-item:hover {
   }
 }
 
-/* Wide content scrolls inside itself instead of pushing the page
-   sideways. */
 .compare-table-scroll,
 .check-list-scroll,
 .md-table-scroll {
@@ -4523,15 +3654,6 @@ button.nav-menu-item:hover {
   overscroll-behavior-x: contain;
 }
 
-/* Touch targets on the screens a phone can actually reach. Keyed to
-   pointer type, not width, and everything stays inside this query — a
-   mouse sees none of it.
-
-   .theme-toggle shares the floating cluster with .info-button and was
-   half its neighbour's height; .toast-dismiss was ~18px and is the only
-   way to clear a warning toast, which never auto-expires. .drawer-close
-   and .code-block-copy are the other two icon-scale controls reachable
-   on a phone. */
 @media (any-pointer: coarse) {
   .info-button,
   .theme-toggle,
@@ -4543,11 +3665,6 @@ button.nav-menu-item:hover {
     min-height: 44px;
   }
 
-  /* These three keep their padding-derived box on a mouse, so growing
-     them to 44px would otherwise push their glyph off-centre against
-     asymmetric padding (.toast-dismiss is `0 0.2em` in a flex row).
-     Centring in the enlarged box leaves the mark exactly where the
-     desktop layout already put it, horizontally and vertically. */
   .toast-dismiss,
   .drawer-close,
   .code-block-copy {
@@ -4556,16 +3673,6 @@ button.nav-menu-item:hover {
     justify-content: center;
   }
 }
-
-/* ---- pending vocabulary ----
-   Local waits: a bar for regions the user is watching, and a skeleton for
-   regions about to be replaced by content of a known shape.
-
-   Both are motion-additive, and neither is ever the only signal. The rule
-   the whole system runs on is that a pending state must carry at least one
-   channel that changes WITHOUT motion — an elapsed counter, a step label,
-   an attempt number. A bar with the animation switched off is a horizontal
-   rule; a number that ticks reads identically either way. */
 
 .pending-bar {
   height: 3px;
@@ -4581,7 +3688,6 @@ button.nav-menu-item:hover {
   transform-origin: 0 50%;
 }
 
-/* Sized by its call site; the shape is what carries the meaning. */
 .skeleton {
   display: block;
   height: 1em;
@@ -4589,10 +3695,6 @@ button.nav-menu-item:hover {
   background: var(--surface-raised);
 }
 
-/* ---- backgrounded job chip ----
-   Rides in the floating-controls cluster. Quiet enough to sit beside the
-   theme toggle without competing with the lobby, loud enough that a
-   2-4 minute rebuild is never invisible. */
 .job-chip {
   display: flex;
   flex-direction: column;
@@ -4700,17 +3802,12 @@ button.nav-menu-item:hover {
   margin-top: var(--space-3);
 }
 
-/* An inline failure inside a scroll region, not a screen. It replaces the
-   pane's content and nothing else — the timer and the desktop keep
-   working, which is the whole reason this failure is survivable. */
 .pane-error {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-3);
 }
-
-/* ---- global progress bar ---- */
 
 .top-progress {
   position: fixed;
@@ -4731,27 +3828,12 @@ button.nav-menu-item:hover {
   height: 100%;
   width: 100%;
   background: var(--accent);
-  /* Calm default: a static full-width accent rule. The travelling
-     animation is layered on only for users who accept motion. */
+
   transform-origin: 0 50%;
 }
 
-/* Hover and press transitions. These lived on the rules themselves in
-   hardcoded seconds, relying on base.css's global reduce guard to
-   neutralise them — which is exactly what the Motion-Additive Rule says
-   not to do. Authored here they read from the motion tokens, and a
-   reduced-motion user gets the instant state change without depending on
-   an override landing correctly. */
 @media (prefers-reduced-motion: no-preference) {
-  /* Hover is a fill change now, so `background` is the property that
-     actually needs easing on every one of these — the border-color entry
-     is what is left over from when hover moved the edge, and it still
-     serves the states that legitimately move a border (selection,
-     disabled, pressed toggles). transform carries the press.
 
-     50ms on transform is below the token scale's floor and stays a
-     literal: DESIGN.md specifies the press at 50ms, and the next step up
-     (160ms) reads as a movement rather than a key-down. */
   .btn,
   .theme-toggle,
   .info-button,
@@ -4767,9 +3849,6 @@ button.nav-menu-item:hover {
       transform 50ms var(--ease-out);
   }
 
-  /* --dur-progress finally has its one use: a determinate bar that jumps
-     between discrete steps needs the step to be legible as a movement, or
-     the reader cannot tell a redraw from a real advance. */
   .job-chip-bar-fill {
     transition: transform var(--dur-progress) var(--ease-out);
   }
@@ -4795,10 +3874,6 @@ button.nav-menu-item:hover {
     }
   }
 
-  /* Opacity, not a travelling gradient: DESIGN.md rules out gradient fills,
-     and this reuses the pulse the countdown already uses under five
-     minutes. Slower and shallower than that one — a skeleton reports
-     "still loading", not "act now". */
   .skeleton {
     animation: skeleton-pulse 1.6s ease-in-out infinite;
   }
@@ -4814,32 +3889,12 @@ button.nav-menu-item:hover {
   }
 }
 
-/* ---- motion ----
-   Written motion-additive: the calm state is the default and animation
-   is layered on only when the user has expressed no preference against
-   it. base.css also carries a global reduce guard, so this is belt and
-   braces — but writing it this way means a reduced-motion user never
-   depends on an animation being neutralised correctly, and never
-   downloads a frame of it.
-
-   Durations and the easing curve come from tokens.css: short, sharp,
-   no overshoot. Only transform and opacity are animated — both are
-   compositor-only, which matters for the overlay that stays on screen
-   for minutes. */
-
-/* Outside the media query so layout is identical for reduced-motion
-   users: the wrapper's box model must not depend on motion being on. */
 .screen {
   height: 100%;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* Additive only: `.screen`'s resting style (outside this block, and
-     whenever this animation hasn't started or has already finished) is
-     the plain, fully-visible element. This keyframe only ever plays
-     forward from opacity: 0 to the element's real style, so a screen
-     that never gets to run it — or runs it in a hidden tab whose timeline
-     is paused — still ends up visible rather than stuck invisible. */
+
   .screen {
     animation: screen-in var(--dur-base) var(--ease-out) both;
   }
@@ -4863,8 +3918,6 @@ button.nav-menu-item:hover {
     animation: toast-in var(--dur-base) var(--ease-out) both;
   }
 
-  /* Staggered only on first mount of the checklist — re-staggering on
-     every poll would make the list feel unstable for four minutes. */
   .control-phases li {
     animation: row-in var(--dur-base) var(--ease-out) both;
   }
@@ -4917,8 +3970,6 @@ button.nav-menu-item:hover {
   }
 }
 
-/* ---- fenced code blocks ---- */
-
 .code-block {
   margin: var(--space-3) 0;
   border: 1px solid var(--border);
@@ -4964,15 +4015,6 @@ button.nav-menu-item:hover {
   transform: translateY(1px);
 }
 
-/* A code block reads as ONE object: the figure above owns the border,
-   the radius and the body background. `.md pre` (a prose rule that
-   predates this chrome, and still styles fenced code that renders
-   without it) sets its own background/border/border-radius; since this
-   selector has the same specificity and comes later in the cascade, it
-   has to null those three out explicitly or they leak through and
-   occlude the figure's background with a second, redundant border drawn
-   just inside the first. overflow-x stays — a long line scrolls inside
-   the block instead of moving the page. */
 .code-block pre {
   margin: 0;
   padding: var(--space-3);
@@ -4982,12 +4024,6 @@ button.nav-menu-item:hover {
   border-radius: 0;
 }
 
-/* highlight.js class names, mapped onto theme tokens so both themes work.
-   Contrast ratios against --surface-raised are recorded in tokens.css.
-   Plain --accent only reaches 4.1:1 on --surface-raised in the light
-   theme — under the 4.5:1 floor — so the keyword group below uses
-   --accent-strong instead, the same substitution tokens.css already
-   documents for --accent on --accent-soft. */
 .md .hljs-attr,
 .md .hljs-attribute,
 .md .hljs-keyword,
@@ -4995,10 +4031,6 @@ button.nav-menu-item:hover {
   color: var(--accent-strong);
 }
 
-/* Strings and numbers carry their own hues, not --text. In YAML almost
-   everything right of the colon is one or the other, so mapping them to
-   the body colour meant a manifest rendered as blue keys against an
-   otherwise monochrome block — highlighted in the DOM, not to the eye. */
 .md .hljs-string,
 .md .hljs-literal {
   color: var(--syntax-string);
@@ -5015,25 +4047,12 @@ button.nav-menu-item:hover {
   font-style: italic;
 }
 
-/* ===== Multiple-choice exam screen =====
-
-   One question, centred at --mcq-measure, everything else out of the way:
-   a determinate rail under the topbar, one head row, the stem, the
-   options, and a footer. It shares the topbar, the review mark and the
-   .navigator with the hands-on engine so the two read as one product;
-   everything else is namespaced .mcq-*. Mobile-first — this is the one
-   exam type with no desktop requirement, so the column simply narrows on
-   a phone. */
-
 .mcq-layout {
   height: 100%;
   display: flex;
   flex-direction: column;
 }
 
-/* The attempt's state in the topbar, pushed to the right of the title.
-   Three numbers this screen genuinely knows: answers are server state,
-   flags and first-opens are the attempt's own scratch marks. */
 .mcq-tally {
   margin-left: auto;
   font-size: var(--text-xs);
@@ -5042,9 +4061,6 @@ button.nav-menu-item:hover {
   white-space: nowrap;
 }
 
-/* 5px under the topbar, edge to edge. Cyan, not blue: progress is the
-   thing that moves, and the Rare Accent Rule keeps blue for what you can
-   act on. aria-hidden in the markup — the tally above says it in words. */
 .mcq-rail {
   flex-shrink: 0;
   height: 5px;
@@ -5059,11 +4075,6 @@ button.nav-menu-item:hover {
   transform-origin: 0 50%;
 }
 
-/* overflow: hidden, not auto — the column below owns its own scroll
-   (Scroll-Inside Rule) so .mcq-footer can stay pinned under it instead
-   of drifting off with a long stem. A short question no longer leaves a
-   dead run of viewport under the options: the footer's margin-top: auto
-   pulls it down to the bottom of this box every time. */
 .mcq-body {
   flex: 1;
   min-height: 0;
@@ -5074,12 +4085,6 @@ button.nav-menu-item:hover {
   background: var(--bg);
 }
 
-/* position: relative is load-bearing: .navigator is absolutely
-   positioned against this box, exactly as it is against .question-panel
-   on the hands-on screen — layout.test.ts pins both halves of that
-   pairing, so neither can drift alone. min-height: 0 lets
-   .mcq-pane's overflow-y actually engage instead of stretching the flex
-   column past its parent. */
 .mcq-question {
   position: relative;
   width: 100%;
@@ -5089,9 +4094,6 @@ button.nav-menu-item:hover {
   flex-direction: column;
 }
 
-/* Where you are, what it is about, and the flag. One row, and the only
-   thing in it that can shrink is the domain — the counter and the mark
-   are fixed reference points. */
 .mcq-head {
   flex-shrink: 0;
   display: flex;
@@ -5110,9 +4112,6 @@ button.nav-menu-item:hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* The domain chip takes the progress cyan rather than the action blue:
-   it is a label, not something to act on, and this screen's one accent
-   object is the selected option. */
 .mcq-domain {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -5130,20 +4129,11 @@ button.nav-menu-item:hover {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  /* The flick at the end of a question stops here instead of scrolling
-     the page behind it — which on a phone means the address bar sliding
-     back into view and the whole layout resizing, mid-read, because the
-     candidate reached the bottom of a stem. Same declaration, same
-     reason, as .navigator-body and .confirm-dialog. */
+
   overscroll-behavior: contain;
   padding: var(--space-4) 0;
 }
 
-/* Previous / the reassurance line / navigator + Next-or-Submit, pinned
-   to the foot of the column. Exactly one primary button on screen at a
-   time: Submit exam only replaces Next once there is no next question to go
-   to. Wraps on a phone, where three controls and a sentence do not fit on
-   one line. */
 .mcq-footer {
   flex-shrink: 0;
   margin-top: auto;
@@ -5168,9 +4158,6 @@ button.nav-menu-item:hover {
   gap: var(--space-2);
 }
 
-/* The position, on the face of the button that changes it. Tabular so
-   the bar does not twitch as the number grows a digit, and mono because
-   every other position in this product is. */
 .mcq-jump-position {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -5182,9 +4169,6 @@ button.nav-menu-item:hover {
   border-color: var(--border-strong);
 }
 
-/* Both halves of this sentence are load-bearing: every click is already
-   saved, and none of it has been marked. It is the middle of the row on a
-   desktop and its own line on a phone. */
 .mcq-save-note {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -5194,12 +4178,6 @@ button.nav-menu-item:hover {
   min-width: 0;
 }
 
-/* --text-m is 15px because the hands-on question panel shares the
-   screen with a terminal (DESIGN.md, Typography). Nothing here shares
-   space with anything: this column is the whole screen, so its prose
-   gets the next step up rather than staying pinned to that constraint.
-   --text-l is an existing permission, not a new size — see p/li below;
-   headings are untouched, they already sit at --text-l or above. */
 .mcq-question .md p,
 .mcq-question .md li,
 .mcq-question .md blockquote {
@@ -5207,11 +4185,6 @@ button.nav-menu-item:hover {
   line-height: 1.65;
 }
 
-/* The stem itself is the largest type on the screen, because it is the
-   only thing on the screen. Scoped with child combinators all the way
-   down so it cannot reach the training reveal's prose, which is a second
-   `.md` nested inside .mcq-check-answer — same specificity as the rule
-   above, so it has to sit after it to win. */
 .mcq-question .mcq-pane > .md > p {
   font-size: var(--text-2xl);
   font-weight: 500;
@@ -5235,11 +4208,6 @@ button.nav-menu-item:hover {
   margin-bottom: var(--space-2);
 }
 
-/* An anchored control, so 6px like every other one — radius-m is for
-   things that float. States follow the tile-state system: hover moves
-   the fill and never the edge, and selection takes all three channels
-   (accent edge, wash, inset bar) so it can never be mistaken for a
-   hovered row or reduced to color alone. */
 .mcq-option {
   display: flex;
   align-items: flex-start;
@@ -5249,7 +4217,7 @@ button.nav-menu-item:hover {
   border-radius: var(--radius-s);
   background: var(--surface-raised);
   cursor: pointer;
-  /* 44px minimum touch target on the row itself. */
+
   min-height: 44px;
 }
 
@@ -5264,8 +4232,6 @@ button.nav-menu-item:hover {
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
-/* The native control stays visible and focusable — it is the input, and
-   its focus ring is the keyboard affordance. */
 .mcq-option input {
   margin-top: 2px;
   accent-color: var(--accent);
@@ -5286,16 +4252,6 @@ button.nav-menu-item:hover {
   color: var(--accent-strong);
 }
 
-/* The live exam draws the letter as a circle — how people talk about mcq
-   items ("the answer is C") given a shape of its own. Scoped to this
-   screen: the score review's letters stay at its own compact scale, and
-   that surface is another component's.
-
-   The circle is a FOURTH channel on top of the row's edge, wash and inset
-   bar, not a replacement for any of them, and the native checkbox beside
-   it stays visible and focusable — it is the input, and its focus ring is
-   the keyboard affordance. The brief draws the row without one; a fill
-   that only a sighted mouse user can read is not a control. */
 .mcq-question .mcq-option-letter {
   width: 24px;
   height: 24px;
@@ -5318,20 +4274,14 @@ button.nav-menu-item:hover {
   min-width: 0;
 }
 
-/* Scoped to the live exam, not the shared .mcq-option-text/-letter used
-   by the score screen's answer review — that stays at the review's own
-   compact scale. */
 .mcq-question .mcq-option-text {
   font-size: var(--text-l);
   line-height: 1.5;
 }
 
-
 .mcq-check-answer {
   margin-top: var(--space-4);
 }
-
-/* ===== Score-screen answer review (mcq) ===== */
 
 .mcq-review-summary {
   margin: var(--space-2) 0 var(--space-3);
@@ -5372,8 +4322,6 @@ button.nav-menu-item:hover {
   border-color: var(--danger);
 }
 
-/* Icon + text, right-aligned; the border colour is reinforcement, the
-   words are the information. */
 .mcq-review-state {
   margin-left: auto;
   display: inline-flex;
@@ -5404,46 +4352,15 @@ button.nav-menu-item:hover {
     padding: var(--space-4) var(--space-3) 0;
   }
 
-  /* The action bar.
-   *
-   * The footer used to be three controls and a sentence sharing a
-   * wrapped flex row, and it sat on the literal bottom edge of the
-   * viewport — under the home indicator on any recent iPhone, and under
-   * the URL bar whenever it was showing. Both are fixed here: the safe
-   * inset is real now that index.html opts into it, and the height chain
-   * tracks dvh.
-   *
-   * Full width, 48px tall, and the three targets in the order the thumb
-   * expects: back, where-am-I, forward. 48 rather than the 44 the rest of
-   * this system uses because these are the controls a candidate reaches
-   * for WITHOUT looking — their eyes are on the question — and a target
-   * found by feel wants Material's floor rather than the minimum.
-   *
-   * A surface of its own, not the page: it stays put while the question
-   * scrolls behind it, and a bar that shares the reading surface's fill
-   * looks like it scrolled off. */
   .mcq-footer {
     margin-inline: calc(-1 * var(--space-2));
     padding: var(--space-2) var(--space-3);
     padding-bottom: calc(var(--space-2) + var(--safe-b));
     gap: var(--space-2);
-    /* Wrapping stays ON, and the reassurance line below is why: it takes
-       a full-width row of its own above the controls, which is a wrap.
-       Setting nowrap here — the obvious way to keep three controls on
-       one line — instead squeezed that line into a 40px column beside
-       them, eight words stacked one per line, eating a fifth of the
-       viewport height. The controls hold their row through their own
-       flex values, not through the container forbidding a break. */
+
     background: var(--surface);
   }
 
-  /* The reassurance line moves ABOVE the bar. It used to take a row of
-     its own beneath the controls, which put a permanent sentence in the
-     one band of the screen a thumb can reach without moving — paid for
-     every question, to say something that is only news once.
-     `order` is safe here because the line is not focusable, so the
-     visual order and the tab order cannot disagree (WCAG 1.3.2 /
-     2.4.3). */
   .mcq-save-note {
     order: -1;
     flex: 0 0 100%;
@@ -5451,11 +4368,6 @@ button.nav-menu-item:hover {
     font-size: var(--text-2xs);
   }
 
-  /* Their row is held here rather than by nowrap on the parent. Previous
-     and the navigator take their content's width and refuse to shrink
-     below it; the forward action takes everything left. Nothing in the
-     row can grow past its share, so nothing pushes a sibling onto a
-     second line. */
   .mcq-footer > .btn:first-of-type {
     flex: 0 0 auto;
   }
@@ -5465,10 +4377,6 @@ button.nav-menu-item:hover {
     justify-content: center;
   }
 
-  /* Previous and the navigator hold their size; the forward action takes
-     the rest. It is the one pressed on nearly every question, and on the
-     last one it becomes Submit — the only button on the screen that ends
-     the attempt, and the only one worth making unmissable. */
   .mcq-footer-end {
     flex: 1;
     gap: var(--space-2);
@@ -5478,9 +4386,6 @@ button.nav-menu-item:hover {
     flex: 1;
   }
 
-  /* Icon-only Previous: the label is on the button as an accessible
-     name already, and three labelled controls do not fit a 320px row
-     without every one of them ellipsing. */
   .mcq-footer > .btn:first-child {
     flex-shrink: 0;
     padding-inline: var(--space-3);
@@ -5489,15 +4394,6 @@ button.nav-menu-item:hover {
   .mcq-footer > .btn:first-child .btn-label {
     display: none;
   }
-
-
-  /* The stem stays at its full reading size. It used to step DOWN here
-     — --text-2xl to --text-xl — which is backwards: the token ramp now
-     raises the body text underneath it, and a stem that shrank while its
-     own body grew would invert the hierarchy on the one screen where the
-     question is the whole point. What made 19px feel wrong at this width
-     was the four-words-to-a-line measure, and `text-wrap: pretty` on the
-     rule this overrides already handles that. */
 
   .mcq-review-option {
     flex-wrap: wrap;
@@ -5508,21 +4404,6 @@ button.nav-menu-item:hover {
     justify-content: flex-end;
   }
 
-  /* The navigator as a sheet.
-   *
-   * As a panel it is `position: absolute; inset: 0` inside
-   * .mcq-question, which on a desktop is a 720px column with room for a
-   * ten-wide grid. On a phone that box is the width of the screen and
-   * the height of one question, and sixty-five tiles at a coarse-pointer
-   * size are thirteen rows plus filter chips plus a legend — so the
-   * panel became a scrolling box inside a scrolling column, opened by a
-   * control at the bottom, drawing its grid at the top.
-   *
-   * As a sheet it rises from the edge the thumb pressed, keeps its
-   * filters and legend pinned, and scrolls only the grid. Fixed rather
-   * than absolute, so it escapes the column entirely — which is also why
-   * it needs the scrim and the focus trap the panel deliberately does
-   * without. */
   .navigator-sheet {
     position: fixed;
     inset: auto 0 0 0;
@@ -5532,8 +4413,7 @@ button.nav-menu-item:hover {
     border-top: 1px solid var(--border);
     box-shadow: var(--shadow-3);
     padding-top: var(--space-3);
-    /* The home indicator, again. The legend is the last thing in the
-       sheet and it is the thing that would sit under it. */
+
     padding-bottom: var(--safe-b);
   }
 
@@ -5544,23 +4424,10 @@ button.nav-menu-item:hover {
     z-index: var(--z-dialog);
   }
 
-  /* Bigger than the 44px the coarse-pointer block gives them. This is a
-     grid of sixty-five adjacent targets with no gaps to miss into, and
-     hitting Q34 instead of Q35 costs a candidate the same gesture
-     again. */
   .navigator-sheet .navigator-tile {
     min-height: var(--tap-comfortable);
   }
 
-  /* The answer rows. 44px is the floor for a control you aim at; these
-     are the screen's whole purpose, they are read before they are
-     pressed, and the option text is often two lines anyway — so the
-     height comes from real padding rather than from a min-height
-     propping up a cramped row.
-
-     The letter circle grows with it. At 24px on a phone it was a detail
-     beside the text; at 28px it is the thing you press, which is what it
-     already is on a touchscreen. */
   .mcq-options {
     gap: var(--space-3);
   }
@@ -5577,38 +4444,16 @@ button.nav-menu-item:hover {
     font-size: var(--text-s);
   }
 
-  /* The head row becomes two rows, on purpose, in this order:
-       QUESTION 7 / 65                    [flag] Mark for review
-       Kubernetes Fundamentals
-   *
-   * It wrapped by default and produced the opposite arrangement — the
-   * domain filling row one beside the counter, and the flag stranded on
-   * row two, right-aligned under nothing.
-   *
-   * One row was tried first and does not fit at any phone width. The
-   * counter and the flag are ~220px together; "Kubernetes Fundamentals"
-   * wants 166 and gets 97 at 390px and 40 at 320px, which is "Kub…" —
-   * three characters that name nothing and still cost the width of a
-   * chip. DESIGN.md calls the domain the one per-question fact an mcq
-   * candidate can use, so twenty pixels of second row is the cheaper
-   * loss.
-   *
-   * `order` is safe because the chip is not focusable: the visual order
-   * and the tab order cannot disagree (WCAG 1.3.2 / 2.4.3). */
   .mcq-head {
     gap: var(--space-1) var(--space-2);
   }
 
-  /* Whole, on its own line, and no wider than the words in it. */
   .mcq-domain {
     order: 1;
     flex-basis: 100%;
     max-width: max-content;
   }
 
-  /* Neither may give way: row one is where you are and how to come back
-     to it. Without this the counter wraps its own text into
-     "QUESTION 1 /" over "65". */
   .mcq-counter,
   .mcq-head .question-mark {
     white-space: nowrap;
@@ -5616,15 +4461,6 @@ button.nav-menu-item:hover {
   }
 }
 
-
-/* ===== Progress dashboard (1k) =====
-   Owned by the progress screen alone. It is a PAGE, so it inherits
-   .page from the shell section above and only adds what the path cards,
-   the attempt table and the weak-domain panel need. */
-
-/* The header closes up because a hint line follows it, and that line —
-   where the record lives, what Import does to it — is part of the same
-   block of prose the lead started. */
 .progress-screen .page-head {
   margin-bottom: var(--space-3);
 }
@@ -5636,22 +4472,12 @@ button.nav-menu-item:hover {
   gap: var(--space-2);
 }
 
-/* Export is an <a> wearing .btn: a browser gives an anchor neither a
-   button's centring nor its line box, so one control in a row of four
-   would sit a pixel proud of the others without this. */
 .progress-actions .btn {
   display: inline-flex;
   align-items: center;
   text-decoration: none;
 }
 
-/* The export and import hints used to live here, as one paragraph under
-   the lead. Two sentences about two different buttons, set a column away
-   from both of them, read as a single claim that described neither — so
-   each now travels on its own control and this rule is gone. */
-
-/* What the last import or erase did, next to the list it changed rather
-   than in a toast over the corner of the screen. */
 .progress-notice {
   margin: 0 0 var(--space-5);
   font-size: var(--text-s);
@@ -5660,8 +4486,6 @@ button.nav-menu-item:hover {
 .progress-notice[role="alert"] {
   color: var(--danger);
 }
-
-/* ---- the five path cards ---- */
 
 .path-cards {
   list-style: none;
@@ -5672,11 +4496,6 @@ button.nav-menu-item:hover {
   gap: var(--space-3);
 }
 
-/* Tone and a hairline, no shadow: five small cards in a row are a legend
-   for the page below them, not five things floating over it. Every one
-   keeps the --surface fill whatever its state — the status word, the
-   badge's own wash and the bar carry that, and a tinted card would leave
-   its badge sitting on a fill of the same hue. */
 .path-card {
   height: 100%;
   display: flex;
@@ -5688,9 +4507,6 @@ button.nav-menu-item:hover {
   border-radius: var(--radius-l);
 }
 
-/* The same language the coming-soon exam card speaks: dashed on the page
-   fill, because an exam nobody can sit is not work the candidate has
-   failed to do. */
 .path-card[data-status="soon"] {
   background: var(--bg);
   border-style: dashed;
@@ -5723,8 +4539,6 @@ button.nav-menu-item:hover {
   white-space: nowrap;
 }
 
-/* Both are text on a soft fill, so both take the -strong tier (--accent
-   needs no substitution: it clears 4.5:1 on every fill in the product). */
 .path-card[data-status="passed"] .path-badge {
   background: var(--success-soft);
   color: var(--success-strong);
@@ -5749,8 +4563,6 @@ button.nav-menu-item:hover {
   color: var(--text-muted);
 }
 
-/* auto pins the bottom pair, so the bar and the meta line up across five
-   cards whose heads are different heights. */
 .path-bar {
   margin-top: auto;
   height: 5px;
@@ -5776,10 +4588,6 @@ button.nav-menu-item:hover {
   color: var(--text-muted);
 }
 
-/* ---- the attempt table and the weak-domain panel ---- */
-
-/* 1.4fr / 1fr, as the brief draws it: the table needs the width and the
-   panel beside it is a column of short rows. */
 .progress-body {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
@@ -5801,8 +4609,6 @@ button.nav-menu-item:hover {
   font-weight: 600;
 }
 
-/* Scroll-Inside: five columns of mono do not compress, so the wrapper
-   takes the overflow and the page never scrolls sideways for a table. */
 .history-scroll {
   overflow-x: auto;
   overscroll-behavior-x: contain;
@@ -5814,9 +4620,6 @@ button.nav-menu-item:hover {
   font-size: var(--text-s);
 }
 
-/* The Table-Cell rule: no display:flex on a th or a td. The cell would
-   leave the table layout model, stop stretching to the row height, and
-   step its border-bottom off its neighbours'. */
 .history-table th,
 .history-table td {
   padding: var(--space-3) var(--space-2);
@@ -5845,9 +4648,6 @@ button.nav-menu-item:hover {
   font-weight: 600;
 }
 
-/* The one cell allowed to wrap. A mode plus a list of domain names is by
-   far the longest thing in the row, and holding it on one line would make
-   the table scroll for it alone. */
 .history-table .history-mode {
   white-space: normal;
   min-width: 13rem;
@@ -5872,9 +4672,6 @@ button.nav-menu-item:hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* The word carries the state and the tint repeats it. Three tints and no
-   words would be three tints — and the threshold a percentage is measured
-   against differs per exam, so the number alone cannot say. */
 .history-mark {
   display: block;
   font-family: var(--font-mono);
@@ -5954,12 +4751,6 @@ button.nav-menu-item:hover {
   white-space: nowrap;
 }
 
-/* Not the brief's red. This panel ranks a candidate's domains against
-   each other, so the weakest of five good scores is still a good score,
-   and a bar that reddened 92% because it happened to sort last would be
-   telling them something untrue. --accent is what the score screen's
-   .domain-bar-fill already uses for the same shape; weakest-first
-   ordering and the heading are what say "weakest". */
 .weak-bar {
   height: 6px;
   border-radius: var(--radius-pill);
@@ -5981,10 +4772,6 @@ button.nav-menu-item:hover {
   color: var(--text-muted);
 }
 
-/* Marks a row the drill below cannot include, because its domain belongs
-   to a certification this environment has not loaded. Only drawn when the
-   list is genuinely mixed — a note on every row when none of them can be
-   drilled would say nothing, and that case has its own sentence. */
 .weak-elsewhere {
   padding: 0 var(--space-2);
   border-radius: var(--radius-xs);
@@ -5992,8 +4779,6 @@ button.nav-menu-item:hover {
   color: var(--text-subtle);
 }
 
-/* Pinned to the foot of the panel however short the list above it is, so
-   it lands on the table's last row the way the brief draws it. */
 .weak-drill,
 .weak-unavailable {
   margin-top: auto;
@@ -6006,9 +4791,6 @@ button.nav-menu-item:hover {
   color: var(--text-muted);
 }
 
-/* The two-column body is the brief's measure, and below it the table
-   would get about nine characters of domain name. One column under the
-   other, table first: it is the thing that was asked for. */
 @media (max-width: 900px) {
   .progress-body {
     grid-template-columns: minmax(0, 1fr);
@@ -6020,35 +4802,10 @@ button.nav-menu-item:hover {
   }
 }
 
-/* ===== Explanation deep dive (1j) =====
-   The one screen where the machine surfaces appear outside the VNC
-   canvas: both document panes are --machine-*, because what they show
-   is the cluster, not the app.
-
-   It renders INSIDE .score-screen (screens/Score.tsx owns the route),
-   which is what gives it the page-scroll override every long results
-   surface needs. Everything below only narrows that and fills it. */
-
-/* 960px is the brief's card, and it is a measure decision as much as a
-   copy of the mock: it is the widest this screen can be before the why
-   card's prose runs past ~90ch, and the narrowest the two document panes
-   can sit side by side without either falling under about 45 mono
-   columns. The score screen's own --page-max (1160px) fails the first
-   test; anything under ~900px fails the second, which is what the
-   stacking query near the foot of this section is for. */
 .explain-screen {
   max-width: 960px;
 }
 
-/* ONE prose measure for the whole screen, declared once so the three
-   places that read at it — the notes, a check's `show_why` text, and the
-   reference solution's paragraphs — are provably the same width rather
-   than three copies of the same number that drift apart.
-
-   It is a `ch`, so it is substituted at use time and resolves against
-   each user's own font-size. Every site below is --text-m, so they agree;
-   a future site at another size would get the same MEASURE rather than
-   the same pixels, which is the behaviour worth having. */
 .explain {
   --explain-measure: 72ch;
   display: flex;
@@ -6056,9 +4813,6 @@ button.nav-menu-item:hover {
   gap: var(--space-4);
 }
 
-/* The way back to the table, deliberately OUTSIDE the card. It is not
-   part of the task being explained, and a card whose first line is a
-   link out reads as though the link belongs to the content. */
 .explain-back {
   align-self: flex-start;
   display: inline-flex;
@@ -6074,9 +4828,6 @@ button.nav-menu-item:hover {
   text-decoration: underline;
 }
 
-/* Same card as .results-card, and for the same reason: this is one
-   object about one task, and its internal divisions are hairlines rather
-   than gaps between floating boxes. */
 .explain-card {
   border: 1px solid var(--border);
   border-radius: var(--radius-l);
@@ -6085,11 +4836,6 @@ button.nav-menu-item:hover {
   overflow: hidden;
 }
 
-/* align-items: flex-start is load-bearing, not tidiness: a three-line
-   title has to grow DOWNWARDS past the steppers rather than centring
-   them against it, so the nav keeps its line with the eyebrow whatever
-   the title does. The pair of them wrap onto separate rows before either
-   is squeezed — see .explain-nav. */
 .explain-head {
   display: flex;
   align-items: flex-start;
@@ -6108,12 +4854,6 @@ button.nav-menu-item:hover {
   min-width: 0;
 }
 
-/* Wraps. "Task 07 · Application Environment, Configuration and Security ·
-   weight 9%" is a real eyebrow on this bank, and uppercase at
-   --tracking-label it is wider than the lead column at every width this
-   card has. It breaks at the separators, which is the good outcome; what
-   it must never do is take an ellipsis, because the domain is the half
-   that would be cut. */
 .explain-eyebrow {
   margin: 0;
   font-family: var(--font-mono);
@@ -6125,19 +4865,6 @@ button.nav-menu-item:hover {
   overflow-wrap: break-word;
 }
 
-/* --text-3xl and not the --text-4xl DESIGN.md gives screen titles: this
-   h1 is a bank-authored sentence ("Expose a Deployment through an
-   Ingress with a path rewrite"), not a two-word screen name, and 26px
-   takes three lines of it in a 960px column under a mono eyebrow. One
-   step up from the task pane's own --text-2xl title says "the same task,
-   read rather than worked" without shouting.
-
-   THREE LINES IS A SUPPORTED OUTCOME. There is no ellipsis, no nowrap
-   and no height here on purpose: the title is the one thing on this
-   screen that says which task is being explained, and half of it is
-   worse than a tall header. `overflow-wrap: break-word` is the last
-   resort for a bank that writes an unbroken /opt/course/... path into a
-   title — it breaks the path rather than letting it run past the card. */
 .explain-title {
   margin: 0;
   font-size: var(--text-3xl);
@@ -6155,9 +4882,6 @@ button.nav-menu-item:hover {
   margin: 0;
 }
 
-/* The same treatment .tv-verdict takes in the row this screen was opened
-   from, at the same tokens. A verdict that changed colour between the
-   table and the detail would read as a different verdict. */
 .explain-verdict {
   display: inline-flex;
   align-items: center;
@@ -6202,15 +4926,6 @@ button.nav-menu-item:hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* Right-aligned as a group, so the pair does not shift when the first or
-   last task drops one half of it.
-
-   flex: 0 0 auto is the fix for the long-title case. As a shrinkable
-   item the nav gave width back to a wrapping title until "Task 12" broke
-   across two lines inside its own button — a control deformed by its
-   neighbour's content. Refusing to shrink means the head's own
-   flex-wrap resolves the conflict instead, and the steppers drop to a
-   row of their own at full size. */
 .explain-nav {
   display: flex;
   flex: 0 0 auto;
@@ -6219,12 +4934,6 @@ button.nav-menu-item:hover {
   margin-left: auto;
 }
 
-/* .btn carries the fill, the edge and the hover; this only undoes what
-   an <a> brings with it and sets the icon beside the label. A link
-   wearing a button's clothes is deliberate here — these two step through
-   the attempt exactly as the task pane's footer steppers do, and the
-   candidate should not have to learn that one pair is a control and the
-   other a navigation. */
 .explain-step {
   display: inline-flex;
   align-items: center;
@@ -6256,47 +4965,26 @@ button.nav-menu-item:hover {
   color: var(--text-secondary);
 }
 
-/* A note is the whole of a section when there is no evidence to show, and
-   a trailing note under the panes when there is. Both want air above them
-   only in the second case. */
 .explain-panes + .explain-note,
 .explain-note + .explain-note {
   margin-top: var(--space-3);
 }
 
-/* One section, one heading, and the capturing checks as items inside it.
-   The eyebrow that used to head every block ("WHAT THIS CHECK SAW") is
-   gone: it said the same four words above each of q19's two checks, and
-   the section heading now says it once in the plural. Mono eyebrows
-   still label ARTIFACTS on this screen — the pane captions, the why
-   note — and sans headings still label SECTIONS; what changed is that a
-   check is now an item within a section rather than a section of its
-   own. */
 .explain-checks {
   display: flex;
   flex-direction: column;
 }
 
-/* Divided by a hairline rather than by a gap, which is the card's own
-   idiom one level down: this is still one object about one task. The
-   rule reads as "and the next check", where empty space would read as
-   "and now something else". */
 .explain-check + .explain-check {
   margin-top: var(--space-5);
   padding-top: var(--space-5);
   border-top: 1px solid var(--border);
 }
 
-/* The diff legend, when it is drawn, sits between the heading and the
-   first check and needs its own air below it. */
 .explain-note + .explain-checks {
   margin-top: var(--space-4);
 }
 
-/* A check's own description, one step under the section heading. It is a
-   bank-authored sentence ("Service selects the Deployment's pods"), so
-   it wraps for the same reason .explain-title does and takes no ellipsis
-   for the same reason. */
 .explain-check-title {
   margin: 0 0 var(--space-3);
   font-size: var(--text-xl);
@@ -6306,21 +4994,12 @@ button.nav-menu-item:hover {
   overflow-wrap: break-word;
 }
 
-/* minmax(0, 1fr), not 1fr: a grid track's default min-content floor is
-   the widest unbreakable line in the pane, so one long YAML line would
-   push the card wider than the page and take the document's horizontal
-   scrollbar with it. The panes scroll inside themselves instead. */
 .explain-panes {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
 }
 
-/* A capture with no counterpart takes the whole row rather than sitting
-   in the left column with the right one empty. This is the MAJORITY
-   case, not an edge: most checks show what they read off the cluster and
-   have no authored document to compare it against, and a half-width pane
-   beside dead space reads as a missing pane rather than a whole one. */
 .explain-pane:only-child {
   grid-column: 1 / -1;
 }
@@ -6333,11 +5012,6 @@ button.nav-menu-item:hover {
   min-width: 0;
 }
 
-/* flex-wrap, because a caption is text: below 1100px the panes stack and
-   run the full card, but inside the 1100-960px band each is ~450px and
-   "YOUR CLUSTER STATE" uppercase at --tracking-label plus a language
-   chip is close enough to that to matter. The chip drops to its own line
-   rather than squeezing the caption. */
 .explain-pane-head {
   display: flex;
   align-items: baseline;
@@ -6352,22 +5026,11 @@ button.nav-menu-item:hover {
   color: var(--text-muted);
 }
 
-/* The artifact's own `lang`. It is the one honest use of that field here:
-   the pane is not syntax-highlighted, because its single colour channel
-   is spent on the comparison. */
 .explain-pane-lang {
   font-weight: 400;
   color: var(--text-subtle);
 }
 
-/* The machine, in both themes. --text-xs matches .control-log-pane, the
-   product's other pane of retained machine output.
-
-   The horizontal padding is on the LINE and not on the pane, which is
-   what lets a marked line's wash reach both edges. Padding here instead
-   would inset every wash by 16px, and a negative margin to claw it back
-   would put content outside the scroll container's left edge, where it
-   is unreachable rather than merely invisible. */
 .explain-pane-body {
   margin: 0;
   padding: var(--space-3) 0;
@@ -6380,12 +5043,6 @@ button.nav-menu-item:hover {
   overscroll-behavior-x: contain;
 }
 
-/* base.css sets 0.92em on code, pre AND kbd, which compounds through the
-   <pre><code> pairing and lands the pane two steps below the size set
-   above it. inline-block + min-width: 100% is the other half: the lines
-   are block-level so their wash can span the row, and a block child of an
-   overflowing box is otherwise only as wide as the VISIBLE box, which
-   would cut every wash off at the scroll edge. */
 .explain-pane-body code {
   display: inline-block;
   min-width: 100%;
@@ -6397,11 +5054,6 @@ button.nav-menu-item:hover {
   padding-inline: var(--space-4);
 }
 
-/* Two channels on every marked line and never one: the "-"/"+" in the
-   gutter is the first and survives greyscale, monochrome and every form
-   of colour blindness; the wash is the second. The legend under the
-   panes names the glyphs, so neither channel depends on the reader
-   already knowing diff conventions. */
 .explain-line.is-removed {
   background: var(--diff-del-bg);
   color: var(--diff-del-fg);
@@ -6412,18 +5064,12 @@ button.nav-menu-item:hover {
   color: var(--diff-add-fg);
 }
 
-/* user-select: none so a candidate copying the expected YAML out of the
-   pane gets YAML and not diff output. Fixed width, so the text of every
-   line starts at the same column whether or not it is marked. */
 .explain-line-mark {
   display: inline-block;
   width: 1.5ch;
   user-select: none;
 }
 
-/* --bg, not --surface: this is a panel inset WITHIN a card, and the page
-   tone is darker than the card in light and lighter in dark, so the
-   inversion reads correctly in both. */
 .explain-why {
   margin-top: var(--space-4);
   padding: var(--space-4);
@@ -6432,11 +5078,6 @@ button.nav-menu-item:hover {
   background: var(--bg);
 }
 
-/* A mono caption and no longer a heading. `show_why` output is an
-   artifact the check emitted, exactly as the two panes above it are, and
-   on this screen mono eyebrows label artifacts. It also takes a level
-   out of the outline: a task with three capturing checks was announcing
-   six headings for two ideas. */
 .explain-why-title {
   margin: 0 0 var(--space-2);
   font-family: var(--font-mono);
@@ -6447,9 +5088,6 @@ button.nav-menu-item:hover {
   color: var(--text-muted);
 }
 
-/* pre-line: show_why takes free text and a bank author may well write two
-   sentences on two lines. Their line breaks are kept; their indentation
-   is not, because the string arrives out of a shell heredoc. */
 .explain-why-body {
   margin: 0;
   max-width: var(--explain-measure);
@@ -6459,46 +5097,14 @@ button.nav-menu-item:hover {
   white-space: pre-line;
 }
 
-/* ---- the reference solution ----
-   The screen's destination, and since the verdict row's duplicate
-   disclosure went away, the only place in the product that says how the
-   task should have been done. It is given the extra vertical room the
-   other sections do not get: the sections above are things you check,
-   this is a thing you read, and uniform bands would say they are all the
-   same kind of object. */
 .explain-solution {
   padding-block: var(--space-6);
 }
 
-/* A floor under the region, not a height on it. The fetch resolves after
-   first paint, so without this the section is one line of "Loading the
-   reference solution…" and then forty lines of markdown, and the reader
-   loses the place they had just found. 10rem is about the shortest
-   solution in the CKAD bank, so short answers land inside the reserved
-   room and long ones grow from a box that already looked like content.
-
-   No skeleton beside the note: DESIGN.md allows exactly one mechanism
-   per wait, and the sentence is already the non-motion channel. */
 .explain-solution-body {
   min-height: 10rem;
 }
 
-/* THE MEASURE APPLIES TO PROSE AND NOT TO LISTINGS. A paragraph set
-   across the full 960px card is ~115 characters a line, well past where
-   the eye stops finding the next line reliably; a `kubectl create ... `
-   invocation or a three-column table wants every pixel the card has.
-   Capping the sentences and letting the code run full width is what the
-   width is actually good for once the panes are done with it.
-
-   Left-aligned, not centred: the section heading, the panes above and
-   every note on this screen share one left edge, and a centred column
-   would be the one element that does not.
-
-   Written as a child selector list rather than as a grid on purpose. A
-   grid would stop the `.md` scale's top and bottom margins collapsing
-   into each other and silently loosen a rhythm that is tuned in the
-   question-and-solution-prose block far above — which this section
-   borrows and must not fight. */
 .explain-solution .md > p,
 .explain-solution .md > ul,
 .explain-solution .md > ol,
@@ -6512,12 +5118,6 @@ button.nav-menu-item:hover {
   max-width: var(--explain-measure);
 }
 
-/* base.css sets the document to 1.55 and `.md` never overrode it, so the
-   longest read on the screen ran tighter than the two short ones beside
-   it — .explain-note is authored at 1.65 and .explain-why-body at 1.75.
-   Scoped to the sentences for the same reason the measure is: a fenced
-   listing at 1.7 is airy rather than readable, and its own line-height
-   belongs to the block it shares with the question panel. */
 .explain-solution .md > p,
 .explain-solution .md > ul,
 .explain-solution .md > ol,
@@ -6525,10 +5125,6 @@ button.nav-menu-item:hover {
   line-height: 1.7;
 }
 
-/* ---- upstream documentation ----
-   The solution's footer, drawn only when the bank shipped links. There
-   is no empty state and no reserved rail: most questions carry none, and
-   a placeholder would announce a gap that is not there. */
 .explain-docs {
   margin-top: var(--space-5);
   padding-top: var(--space-4);
@@ -6554,10 +5150,6 @@ button.nav-menu-item:hover {
   list-style: none;
 }
 
-/* A link, which is the fourth of the Rare Accent Rule's four permitted
-   uses of blue and the only other one on this screen. flex-wrap so a
-   long label and its host stack rather than the host being pushed off
-   the measure. */
 .explain-doc {
   display: inline-flex;
   align-items: baseline;
@@ -6578,13 +5170,6 @@ button.nav-menu-item:hover {
   font-weight: 600;
 }
 
-/* The visible "this leaves the app" channel, and the reason no arrow
-   glyph is typed here: ↗ is outside both bundled faces' unicode-range
-   and would fall through to whatever the OS has, which is the failure
-   Icon.tsx was written to end. A host is better than an arrow anyway —
-   it says WHERE the link goes, not merely that it goes somewhere. Mono
-   because it is a destination a candidate could type into their own
-   browser, which is what the Mono-For-Truth Rule is for. */
 .explain-doc-host {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -6595,12 +5180,6 @@ button.nav-menu-item:hover {
   padding: var(--space-6) var(--space-5);
 }
 
-/* Two dark panes side by side stop being a comparison and start being two
-   columns of scrollbars somewhere around here: at 1100px the card is at
-   its 960px maximum and each pane is ~450px, which is about 55 columns of
-   mono at --text-xs. Below that they stack, in reading order — your
-   state, then what was expected — and each keeps the title that says
-   which it is, so nothing is carried by position alone. */
 @media (max-width: 1100px) {
   .explain-panes {
     grid-template-columns: minmax(0, 1fr);
@@ -6613,52 +5192,19 @@ button.nav-menu-item:hover {
     padding: var(--space-4);
   }
 
-  /* Explicitly, and not as a side effect of the shorthand above: the
-     solution keeps MORE room than its neighbours at every width, because
-     that difference is what says it is the thing to read rather than one
-     more band. It just keeps less of it on a phone, where vertical space
-     is the scarce axis. */
   .explain-solution {
     padding-block: var(--space-5);
   }
 
-  /* The steppers stop competing with the title for the top-right corner
-     and take a row of their own under it. */
   .explain-nav {
     margin-left: 0;
   }
 }
 
-/* ---------------------------------------------------------------------
-   Hosted mode
-
-   Nothing below renders in the local product. The whole surface — sign
-   in, the lobby, the queue, the boot screen, the header chip — exists
-   only when the SPA is served by the hub, and `./sim up` never reaches
-   any of these selectors.
-
-   It borrows the page vocabulary rather than inventing one: the same
-   card, the same border, the same spacing scale as the exam selector.
-   A hosted deployment is the same product with a door in front of it,
-   and a lobby that looked like a different application would say
-   otherwise. */
-
 .hosted-screen {
   max-width: 56rem;
 }
 
-/* ---- the sign-in screen ----
-
-   The only screen in the product with no header, which is why it is the
-   only one that draws its own mark, wordmark and theme control. It is
-   also the first thing anyone sees, so it is a centred door rather than
-   a page with its heading in the top-left corner of an empty viewport.
-
-   Centred with `margin: auto` on the child rather than `place-items:
-   center` on the parent: a flex/grid centre whose content outgrows the
-   viewport pushes the top edge out of reach, and this screen grows —
-   the unavailable copy is four lines, and 320px at 200% text zoom is a
-   size it must survive. auto margins collapse instead of overflowing. */
 .signin {
   min-height: 100dvh;
   display: flex;
@@ -6688,8 +5234,6 @@ button.nav-menu-item:hover {
   box-shadow: var(--shadow-2);
 }
 
-/* The header's lockup, at the one scale in the product where it is the
-   subject rather than the chrome. */
 .signin-brand {
   display: flex;
   align-items: center;
@@ -6725,11 +5269,6 @@ button.nav-menu-item:hover {
   line-height: 1.6;
 }
 
-/* Full width, because it is the only thing on this screen to do and a
-   button that fills its card cannot be missed or mis-tapped. The anchor
-   needs the flex line box explicitly: anchors do not inherit the
-   button's, so the mark and the label would otherwise sit off each
-   other's baseline. */
 .signin-github {
   display: flex;
   align-items: center;
@@ -6752,8 +5291,6 @@ button.nav-menu-item:hover {
   line-height: 1.55;
 }
 
-/* Live capacity, so it reads as a reading off a meter rather than as
-   copy: a dot, then the figure. */
 .signin-seats {
   display: flex;
   align-items: flex-start;
@@ -6775,8 +5312,6 @@ button.nav-menu-item:hover {
   flex-shrink: 0;
 }
 
-/* A full pool is not an error — the queue is the answer to it — so this
-   is the waiting colour and never the failure one. */
 .signin-seats-dot[data-full] {
   background: var(--warn);
 }
@@ -6799,10 +5334,6 @@ button.nav-menu-item:hover {
   line-height: 1.55;
 }
 
-/* Two cards, side by side where there is room and stacked where there
-   is not. auto-fit rather than a breakpoint: the second card appears
-   only when a deployment sells that flavour, so the count is not known
-   here. */
 .hosted-flavours {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
@@ -6812,11 +5343,6 @@ button.nav-menu-item:hover {
   list-style: none;
 }
 
-/* Deliberately .exam-card's shape, token for token: this lobby is the
-   exam selector one step earlier — same choice, same furniture — and a
-   card that agreed with it in words while disagreeing in radius, shadow
-   and tile size is what made the hosted screens read as a different
-   application bolted on the front. */
 .hosted-flavour {
   height: 100%;
   display: flex;
@@ -6829,9 +5355,6 @@ button.nav-menu-item:hover {
   box-shadow: var(--shadow-1);
 }
 
-/* A full pool is not an error and not a disabled card: the button still
-   works, it says "Join the queue", and that is what it does. Dashed and
-   flat, the same language a not-yet-available exam speaks. */
 .hosted-flavour[data-full] {
   background: var(--bg);
   border-style: dashed;
@@ -6844,8 +5367,6 @@ button.nav-menu-item:hover {
   gap: var(--space-3);
 }
 
-/* The exam avatar's tile, carrying a glyph instead of a certification
-   mark — there is no certification to name yet at this step. */
 .hosted-flavour-tile {
   font-size: var(--text-xl);
 }
@@ -6874,12 +5395,6 @@ button.nav-menu-item:hover {
   line-height: 1.4;
 }
 
-/* "Needs a desktop", in the slot the seat count occupies on a card that
-   can be started. It is a STATE the card is in, not a count, so it takes
-   the same flat pill the catalog's own refusals wear rather than a
-   figure's plain text. Muted, not danger: nothing has gone wrong, and
-   colouring it red would say the exam is broken rather than that the
-   device is the wrong shape for it. */
 .hosted-flavour-badge {
   display: inline-block;
   padding: 0.15em 0.6em;
@@ -6893,16 +5408,11 @@ button.nav-menu-item:hover {
   text-transform: uppercase;
 }
 
-/* The same explanation on the failed-boot screen, where Try again is
-   the control it stands in for. Prose rather than a pill: this one is
-   answering "why is there no retry button", which is a sentence. */
 .hosted-boot-blocked {
   max-width: 44ch;
   color: var(--text-muted);
 }
 
-/* Pinned, so both cards' buttons sit on one line whatever the pitch
-   above them runs to — .exam-card-actions, for the same reason. */
 .hosted-flavour-actions {
   margin-top: auto;
   display: flex;
@@ -6912,9 +5422,6 @@ button.nav-menu-item:hover {
   flex: 1;
 }
 
-/* Standing state rather than an interruption, so it reads as part of
-   the page: the warn palette, which is the product's "you are waiting
-   on something outside your control" colour. */
 .hosted-queue {
   display: flex;
   flex-direction: column;
@@ -6946,27 +5453,18 @@ button.nav-menu-item:hover {
   gap: var(--space-4);
 }
 
-/* The line that changes as the wait goes on, under the one that does
-   not. Muted because it is the secondary of the two: the paragraph above
-   says what is being built, this says how it is going. */
 .hosted-boot-reassure {
   margin: 0;
   max-width: 64ch;
   color: var(--text-muted);
 }
 
-/* Identity, the lease, and the two ways out, as one group. The chip and
-   the actions are separate components — the actions have to survive
-   being raised from inside a popover that unmounts them on Task 10's
-   narrow viewport — but without this wrapper they fall back to being
-   plain siblings in .app-header-tail and inherit its wider gap. */
 .session-cluster {
   display: flex;
   align-items: center;
   gap: var(--space-2);
 }
 
-/* The header chip: identity and the lease. */
 .session-chip {
   display: flex;
   align-items: center;
@@ -6978,8 +5476,6 @@ button.nav-menu-item:hover {
   font-size: var(--text-s);
 }
 
-/* Tabular, so a countdown does not reflow the row it sits in every
-   second. */
 .session-chip-clock {
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-pill);
@@ -6990,16 +5486,11 @@ button.nav-menu-item:hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* The word already changed from "left" to "Ends in" — this is the
-   second channel, never the only one. */
 .session-chip-clock[data-soon] {
   background: var(--warn-soft);
   color: var(--warn-strong);
 }
 
-/* A button that carries no weight of its own: it lives in the header
-   beside a theme toggle, and two filled buttons up there would compete
-   with the page's own primary action. */
 .btn-quiet {
   padding: var(--space-1) var(--space-2);
   background: transparent;
@@ -7013,9 +5504,6 @@ button.nav-menu-item:hover {
   border-color: var(--border);
 }
 
-/* A history row that opens. Underlined rather than coloured alone: the
-   table's other cells are text, and a link that differs only by hue is
-   not a link to everyone. */
 .history-open {
   color: var(--text);
   text-decoration: underline;
@@ -7026,8 +5514,6 @@ button.nav-menu-item:hover {
   color: var(--accent-strong);
 }
 
-/* Said before the banner, because everything under it is pixel-identical
-   to the screen shown at the end of a live exam and is not one. */
 .review-note {
   margin: 0 0 var(--space-4);
   padding: var(--space-3) var(--space-4);
@@ -7037,39 +5523,6 @@ button.nav-menu-item:hover {
   font-size: var(--text-s);
 }
 
-/* ---- header menu ----
-   Everything in the header that is not time-critical, on a viewport too
-   narrow to hold it. See HeaderMenu.tsx for why this is a popover and not
-   a sheet. */
-
-
-
-/* ---- touch input ----
-
-   Cross-cutting, and last in the file on purpose: these are overrides of
-   component rules above, and the cascade is what makes them win without
-   a single !important.
-
-   Two media features, and they answer different questions. `any-pointer:
-   coarse` asks "could a finger be used here" and governs SIZE — a
-   touchscreen laptop gets the bigger targets and keeps every hover
-   affordance. `hover: none` asks "is there a pointer that can rest on
-   something without pressing it" and governs STATE; it is false on a
-   phone and true on that same laptop. Conflating them is how a laptop
-   loses its hover styling for having a touchscreen. */
-
-/* The 300ms wait a mobile browser used to hold every tap for, in case a
-   second one arrived and meant "zoom". `touch-action: manipulation`
-   opts out of double-tap zoom on these controls only — pinch zoom is
-   untouched, which matters: WCAG 1.4.4 is not negotiable and disabling
-   page zoom to win a third of a second would be a poor trade.
-
-   The tap highlight goes with it. It is a translucent grey rectangle the
-   OS paints over the element's own box, so it ignores the border radius
-   and squares off every rounded control at the moment of contact. What
-   replaces it is not nothing — the :active rules below are the feedback,
-   and they are the same fill step hover uses, so the vocabulary is one
-   thing rather than two. */
 .btn,
 .mcq-option,
 .navigator-tile,
@@ -7082,13 +5535,6 @@ button.nav-menu-item:hover {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* The keyboard hints, keyed to the pointer rather than to the width.
-   A `kbd` badge reading F beside "Mark for review" is instruction on a
-   laptop and decoration on a phone — there is no key to press, and it
-   takes space from the label it is annotating. A touchscreen laptop
-   keeps them, because it has the keyboard they describe.
-   These are aria-hidden already, so nothing leaves the accessible name
-   with them. */
 @media (any-pointer: coarse) and (not (any-pointer: fine)) {
   .key-hint,
   .navigator-keys {
@@ -7096,18 +5542,6 @@ button.nav-menu-item:hover {
   }
 }
 
-/* Sticky hover, which is the defect this block mainly exists for.
- *
- * A phone has no hover, so a browser fakes one: it applies :hover on
- * touch and LEAVES IT THERE until something else is touched. On a screen
- * where hover means "the control under your pointer", that reads as a
- * selection — and on the mcq options, where selection is drawn with a
- * fill step of its own, it reads as the wrong answer being chosen.
- *
- * Reset to the resting state rather than restyled. There is nothing a
- * hover state can usefully say on a device that cannot hover, and the
- * :active rules below carry the press.
- */
 @media (hover: none) {
   .btn:hover:not(:disabled) {
     background: var(--surface-raised);
@@ -7130,19 +5564,6 @@ button.nav-menu-item:hover {
 
 }
 
-/* The press, on a device where it is the only feedback there is.
- *
- * A fill step and nothing else — no scale, no spring, no shadow. The
- * design forbids those and is right to: this is an instrument panel for
- * someone about to sit a proctored exam, and a button that bounces reads
- * as unserious. A fill step is also the vocabulary the whole system
- * already uses for "reached for", so a press and a hover say the same
- * thing in the same way.
- *
- * Outside a reduced-motion guard deliberately: there is no motion here
- * to reduce. It is a colour change on an event, which is what the
- * Non-Motion Channel Rule asks every state to have.
- */
 @media (any-pointer: coarse) {
   .mcq-option:active {
     background: var(--raised-hover);
@@ -7152,30 +5573,12 @@ button.nav-menu-item:hover {
     background: var(--raised-hover);
   }
 
-  /* The label and the flag, which are .btn-sized but not .btn. */
   .question-mark:active,
   .info-button:active {
     background: var(--raised-hover);
   }
 }
 
-/* The header's brand lockup and theme toggle, on a phone.
- *
- * At 390px the row carries a mark, the wordmark, the hosted lease
- * countdown, About, the theme toggle and the menu — and the wordmark is
- * the item that gives way, ellipsing to "kube…". Three characters of a
- * brand is worse than none: the mark beside it already IS the brand, and
- * it is the same mark as the favicon.
- *
- * Clipped rather than `display: none`, and that is load-bearing.
- * BrandMark is aria-hidden, so this span is the home link's ONLY
- * accessible name — removing it from the tree leaves an unnamed link.
- * The .sr-only idiom keeps the name and takes the pixels.
- *
- * The theme toggle drops its word for the same reason and by a different
- * rule: it has an explicit aria-label, which replaces its contents for a
- * screen reader, so hiding the visible text costs nothing and cannot
- * produce the double-name the Move-Don't-Hide rule warns about. */
 @media (max-width: 640px) {
   .app-header-wordmark {
     position: absolute;
@@ -7201,30 +5604,6 @@ button.nav-menu-item:hover {
   }
 }
 
-/* The About drawer, on a phone.
- *
- * It is a side drawer at min(480px, 92vw), which on a 390px screen is
- * 359px — a panel that covers all but a 31px sliver of scrim. That is
- * neither a drawer (there is nothing left beside it to see) nor a
- * screen, and the sliver is too narrow to be the dismiss target it looks
- * like. Full width, and the 32px side padding closes a step: it was
- * chosen against a 480px panel and costs a phone a fifth of its
- * measure.
- *
- * The comparison table inside it is the real defect. Three columns —
- * Aspect, This simulator, Real exam — want 307px in a 279px content box,
- * so the third one was CLIPPED at the drawer's edge: "REAL EXAI", with
- * every value under it cut in half. It scrolled sideways inside its own
- * wrapper, which is the Scroll-Inside rule working exactly as written
- * and still the wrong answer here, because nothing about a clipped
- * heading says "this scrolls".
- *
- * So it stacks, the same treatment .tv-row already takes at 640px: one
- * block per row, the aspect as its heading, and each value carrying the
- * column label it lost. `display: block` on table elements would take
- * the table semantics with it, so the cells become grid rows and the
- * labels come from data attributes on a wrapper — see the Table-Cell
- * rule. */
 @media (max-width: 640px) {
   .info-drawer {
     width: 100%;
@@ -7233,18 +5612,12 @@ button.nav-menu-item:hover {
     padding-bottom: calc(var(--space-6) + var(--safe-b));
   }
 
-  /* Nothing left to scroll: the table below is no longer wider than its
-     box, and a scroll container that never scrolls is a scrollbar
-     gutter for nothing. */
   .compare-table-scroll {
     overflow-x: visible;
   }
 
   .compare-table thead {
-    /* Not display:none — the column labels are still what each value
-       means, and they are re-announced per cell below. This hides them
-       visually while keeping them for a screen reader reading the table
-       the ordinary way. */
+
     position: absolute;
     width: 1px;
     height: 1px;
@@ -7274,9 +5647,6 @@ button.nav-menu-item:hover {
     margin-bottom: var(--space-2);
   }
 
-  /* The label each value lost when its column heading was hidden.
-     Content from a data attribute the markup sets, so the words live in
-     strings.ts with every other piece of copy. */
   .compare-table tbody td::before {
     content: attr(data-label);
     display: block;
@@ -7293,43 +5663,13 @@ button.nav-menu-item:hover {
   }
 }
 
-/* ---- the hub and its chrome, on a phone ----
-
-   Last in the file with the touch layer, and for the same reason: these
-   are overrides of components defined far above. */
-
 @media (max-width: 640px) {
-  /* The header menu becomes a sheet.
-   *
-   * It is an absolutely-positioned popover hanging off the top-right
-   * corner, which is where the button that opens it is — and on a phone
-   * that corner is the single hardest place on the screen to reach. The
-   * menu holds the nav, the login and Sign out: things you deliberately
-   * go to, arriving in the one region a thumb cannot get to without
-   * shifting grip.
-   *
-   * The scrim it already renders is doing the dismissal, so this is a
-   * position change and nothing else. It is not `role="dialog"` — it is
-   * a `role="group"` disclosure and stays one, because HeaderMenu's own
-   * comment records why, and moving it down the screen does not change
-   * what it is. */
 
-
-  /* The page's own bottom edge. Every screen that is a PAGE now reaches
-     the physical bottom of the display, so the last thing on it — a
-     Start button, an Erase history button, the tips list — would
-     otherwise sit under the home indicator. The exam screens do not need
-     this: their action bars pay the inset themselves, because they are
-     pinned rather than scrolled to. */
   .page,
   .score-screen {
     padding-bottom: calc(var(--space-6) + var(--safe-b));
   }
 
-  /* A control on a card is aimed at; a control that ENDS a card is
-     reached for. The lobby's Start, the boot screen's Give up and the
-     score screen's actions are all the last thing on a column the reader
-     has just scrolled through. */
   .hosted-flavour-actions .btn,
   .hosted-booting > .btn,
   .score-actions .btn,
@@ -7339,29 +5679,15 @@ button.nav-menu-item:hover {
     min-height: var(--tap-comfortable);
   }
 
-  /* The sign-in screen is the product's front door and the one screen
-     with no header, so it carries its own edges. */
   .signin {
     padding-top: calc(var(--space-4) + var(--safe-t));
     padding-bottom: calc(var(--space-4) + var(--safe-b));
   }
 
-  /* The dashboard's history controls: three buttons that were sized for
-     a toolbar and are now a stack. */
   .progress-actions .btn {
     min-height: var(--tap-comfortable);
   }
 
-  /* The attempt history keeps its table and keeps scrolling inside its
-     own box — the Scroll-Inside rule, and the right answer for five
-     columns of mono that do not compress. What it drops is the one
-     column that is not part of identifying an attempt: how long it took.
-     Exam, mode, date and score are what a row is FOR, and four of them
-     fit a phone where five did not.
-     display: none on both the header cell and the data cell, not a
-     width of zero: a table cell that is still in the layout is still in
-     the accessibility tree, and a screen reader would read a header with
-     nothing under it. */
   .history-table .history-time,
   .history-table thead th:nth-child(4) {
     display: none;

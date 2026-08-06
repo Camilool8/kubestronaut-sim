@@ -1,49 +1,9 @@
-/* The landing page's own layout and components.
-   ============================================================================
-
-   Every colour, size, radius, shadow, duration and spacing step below is a
-   var() into tokens.css — the app's stylesheet, mirrored here verbatim by
-   site/build.sh. There is not one literal colour in this file, and there
-   must never be: a landing page with its own hex values is a second source
-   of truth that diverges the first time a token changes.
-
-   The three rules from DESIGN.md this page leans on hardest:
-
-   THE MACHINE IS NOT THE APP. `.term` is the quickstart terminal, and it is
-   literally a computer, so it takes --machine-* — a dark palette that
-   appears in BOTH themes and never follows the app's. It keeps its own
-   titlebar, border and mono type so the boundary survives dark mode, where
-   the page around it is also dark but visibly blue where the machine is
-   near-neutral. --ink is NOT that palette: --ink is this product raising
-   its voice (`.limits`), and in dark mode it inverts into a raised band.
-
-   RARE ACCENT. Blue arrives for four things only: focus, currency, the one
-   filled primary button per screen, and links. `.btn-primary` is that one
-   button. Hover is a step of TONE, never the accent. The orbit figure is
-   the one addition: its rings are CURRENCY — they carry which exams exist
-   — and they borrow the same --exam-tint alias the cards below use, so a
-   ring and its card cannot disagree about an engine's hue.
-
-   TWO-TIER HAIRLINE. --border-strong for an edge that identifies a
-   control's hit area (buttons); --border for structure (cards, rules).
-
-   Motion is written additively inside prefers-reduced-motion:
-   no-preference, animating only compositor properties, so a reduced-motion
-   reader never depends on an animation being correctly cancelled. There is
-   exactly one authored animation on this page — the orbit — and every
-   other moving thing is feedback on a control the reader just touched. */
-
-/* ------------------------------------------------------------------ base */
-
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
 
-/* The header is sticky, so an in-page anchor would otherwise land its
-   target underneath it. Declared on the scroll container rather than as a
-   scroll-margin on each target, so a new section needs no extra rule. */
 html {
   scroll-padding-top: calc(56px + var(--space-5));
 }
@@ -53,9 +13,7 @@ body {
   background: var(--bg);
   color: var(--text-body);
   font-family: var(--font-sans);
-  /* A reading surface, not a working one. The app's base is --text-m
-     because the task panel shares a screen with a terminal; this page
-     shares a screen with nothing, so it takes the next step up. */
+
   font-size: var(--text-l);
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
@@ -98,14 +56,6 @@ a:hover {
   color: var(--accent-strong);
 }
 
-/* An inline code chip. --radius-xs and not --radius-s: a box sized to a
-   few characters needs a corner proportional to itself.
-
-   The horizontal padding is the app's own value and stays, which carries
-   one authoring constraint with it: a chip must never END a sentence,
-   because its trailing padding pushes the full stop a clear space away
-   and the punctuation reads as detached. Word the sentence so something
-   follows the chip. Three places on this page used to get this wrong. */
 code {
   font-family: var(--font-mono);
   font-size: 0.92em;
@@ -116,10 +66,6 @@ code {
   overflow-wrap: anywhere;
 }
 
-/* Inside a <pre> the chip treatment is wrong twice over: the fill would
-   paint an app surface on top of a machine one, and the padding would
-   break the line grid. The block owns the styling; the code element only
-   carries the semantics. */
 pre code {
   padding: 0;
   border-radius: 0;
@@ -134,15 +80,11 @@ img {
   height: auto;
 }
 
-/* Keyboard focus is visible on every interactive element in both themes.
-   No border-radius here: the outline already follows the element's own. */
 :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
-/* Visually hidden, still announced. The clip idiom rather than a
-   transform, so a keyboard-reachable element is never moved off-screen. */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -164,8 +106,6 @@ img {
   white-space: nowrap;
 }
 
-/* Fixed, not absolute: the visible state is anchored to the viewport
-   rather than to whatever box the link happens to live in. */
 .skip-link:focus {
   position: fixed;
   z-index: var(--z-panel);
@@ -185,7 +125,6 @@ img {
   box-shadow: var(--shadow-2);
 }
 
-/* The one measure the whole page is built on. */
 .shell {
   width: 100%;
   max-width: var(--page-max);
@@ -193,30 +132,6 @@ img {
   padding-inline: var(--space-5);
 }
 
-/* --------------------------------------------------------------- header */
-
-/* z-index: 1, and the exact value is the point.
-   ----------------------------------------------------------------------
-   This rule carried NO z-index for most of its life, and the reasoning
-   was sound at the time: sticky already paints above static content, and
-   claiming --z-panel here put the header level with the focused skip
-   link, which is on that layer by design — same layer, later in the DOM,
-   so the header covered the one control a keyboard user needs before
-   anything else.
-
-   The scroll-driven reveals broke the first half of that. An element
-   animating opacity or transform is promoted to its own compositor
-   layer, and a promoted layer paints above a positioned element that has
-   only z-index: auto — so the sections below began painting over the
-   header, and hit-testing a point inside the header band returned the
-   page content behind it.
-
-   1 is therefore the whole fix: above every section that the animations
-   promote, and still an order of magnitude below --z-panel, so the skip
-   link keeps winning exactly as the original note required. It is a bare
-   number rather than a token because the four --z-* tokens all sit at 10
-   or above, and the header's whole requirement is to be underneath the
-   lowest of them. */
 .site-header {
   position: sticky;
   top: 0;
@@ -254,7 +169,6 @@ img {
   white-space: nowrap;
 }
 
-/* The product is "kubestronaut"; "-sim" says this is the rehearsal. */
 .brand-word-tail {
   color: var(--text-secondary);
 }
@@ -277,16 +191,13 @@ img {
   color: var(--text);
 }
 
-/* -------------------------------------------------------------- buttons */
-
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* em padding, so the control scales with its own type. */
+
   padding: 0.6em 1.2em;
-  /* 44px minimum on a coarse pointer is handled by the media query at the
-     foot of this file; 2.75rem is the floor everywhere. */
+
   min-height: 2.75rem;
   border-radius: var(--radius-s);
   border: 1px solid var(--border-strong);
@@ -298,8 +209,6 @@ img {
   white-space: nowrap;
 }
 
-/* The fill steps and the label goes accent; the BORDER does not move, so a
-   hovered button is never mistaken for a selected one. */
 .btn:hover {
   background: var(--raised-hover);
   color: var(--accent-strong);
@@ -317,21 +226,12 @@ img {
   color: var(--accent-contrast);
 }
 
-/* ----------------------------------------------------------------- hero */
-
 .hero {
   display: grid;
   gap: var(--space-7);
   padding-block: var(--space-8) var(--space-7);
 }
 
-/* --text-hero has exactly one site in the system and this is it. It
-   clamps DOWN to --text-4xl on a narrow viewport rather than to an
-   invented value, so the ramp stays inside the scale.
-
-   20ch, not 16ch: the sentence is two phrases of seventeen characters and
-   the tighter measure broke it across three lines, which is one more than
-   a headline gets. balance keeps the two lines even as the clamp moves. */
 .hero-copy h1 {
   font-size: clamp(var(--text-4xl), 5.2vw, var(--text-hero));
   line-height: 1.12;
@@ -354,17 +254,6 @@ img {
   gap: var(--space-3);
   margin-top: var(--space-6);
 }
-
-/* ---------------------------------------------------------- the orbit */
-/* The Kubestronaut path as an instrument: five orbits, one per
-   certification, and a body on each. The two with a bank are drawn solid
-   with a filled body; the three without are dashed with a hollow one, and
-   the caption names which is which — three channels, so the state never
-   rests on hue alone.
-
-   Colour comes from --exam-tint, the same alias the exam cards use, and
-   [data-engine="soon"] in tokens.css is already the system's answer for
-   "advertised, not runnable". Nothing here invents a value. */
 
 .orbit {
   margin: 0;
@@ -390,9 +279,6 @@ img {
   height: auto;
 }
 
-/* The path is static. A rotating ring is a loading spinner, which is the
-   one thing this figure must never be mistaken for; the body travels and
-   the orbit stays put, which is also what actually happens. */
 .orbit-path {
   fill: none;
   stroke: var(--exam-tint);
@@ -405,9 +291,6 @@ img {
   stroke-linecap: round;
 }
 
-/* The --bg stroke is a knockout, not an outline: it punches the body
-   through its own orbit line so the two read as one object at a crossing
-   rather than as a dot resting ambiguously on a wire. */
 .orbit-body {
   fill: var(--exam-tint);
   stroke: var(--bg);
@@ -420,15 +303,6 @@ img {
   stroke-width: 1.5;
 }
 
-/* Each label is centred ON its own ring, at an angle no other label
-   uses. That is what ties a name to a circle when five of them are
-   concentric: the label breaks the line it belongs to, the way a scale
-   is labelled. paint-order draws the --bg stroke first, so it knocks a
-   clean gap rather than colliding with the ring, and with every ring
-   outside it that the word happens to cross.
-
-   Ranged around the clock rather than stacked along one radius: five
-   names on a diagonal read as a caption in the corner, not as labels. */
 .orbit-label {
   fill: var(--exam-tint);
   font-family: var(--font-mono);
@@ -442,9 +316,6 @@ img {
   stroke-linejoin: round;
 }
 
-/* The destination. --ink is this product's raised voice and in dark mode
-   it steps UP to stay visible against the page, so the anchor holds in
-   both themes without a second rule. */
 .orbit-core {
   fill: var(--ink);
   stroke: var(--ink-border);
@@ -458,8 +329,6 @@ img {
   color: var(--text-muted);
 }
 
-/* ----------------------------------------------------------- quickstart */
-
 .quickstart-run {
   display: grid;
   gap: var(--space-5);
@@ -472,11 +341,6 @@ img {
   color: var(--text-muted);
 }
 
-/* -------------------------------------------------------- the terminal */
-/* A MACHINE surface. Identical in both themes on purpose: a terminal does
-   not have a light mode, and the whole point of this family is that it
-   does not follow the app. */
-
 .term {
   margin: 0;
   border: 1px solid var(--machine-border);
@@ -486,9 +350,6 @@ img {
   box-shadow: var(--shadow-2);
 }
 
-/* Its own titlebar. In dark mode this, the border and the mono type are
-   what separate the machine from the page behind it, since lightness no
-   longer can. */
 .term-bar {
   display: flex;
   align-items: center;
@@ -515,8 +376,6 @@ img {
   color: var(--machine-faint);
 }
 
-/* Scroll-Inside: a long command line scrolls in its own box, never the
-   page. */
 .term-body {
   margin: 0;
   padding: var(--space-4);
@@ -528,16 +387,11 @@ img {
   tab-size: 2;
 }
 
-/* aria-hidden in the markup and unselectable here, so copying the block
-   yields runnable commands rather than three stray dollar signs. */
 .term-prompt {
   color: var(--machine-green);
   user-select: none;
 }
 
-/* --machine-muted, not --machine-comment. The comment token is decorative
-   (2.7:1) and exists for renders where dimmed text is a PICTURE of output;
-   these comments are instructions someone reads, so they clear 4.5:1. */
 .term-note {
   color: var(--machine-muted);
 }
@@ -545,8 +399,6 @@ img {
 .term-url {
   color: var(--machine-blue);
 }
-
-/* ---------------------------------------------------------------- stats */
 
 .stats {
   padding-block: var(--space-7);
@@ -565,14 +417,11 @@ img {
   font-weight: 600;
   line-height: 1.1;
   letter-spacing: var(--tracking-tight);
-  /* Mono-For-Truth: these are measurements, so they are set in mono and
-     tabular, the same as the results figure they borrow their step from. */
+
   font-variant-numeric: tabular-nums;
   color: var(--text);
 }
 
-/* The quieter half of a compound figure — real information a reader would
-   miss, so --text-muted and not --text-decorative. */
 .stat-figure-of {
   font-size: var(--text-2xl);
   font-weight: 400;
@@ -589,8 +438,6 @@ img {
   font-size: var(--text-m);
   color: var(--text-secondary);
 }
-
-/* -------------------------------------------------------------- sections */
 
 .section {
   padding-block: var(--space-8);
@@ -623,13 +470,9 @@ img {
   font-size: var(--text-2xl);
 }
 
-/* The first of the two list headings follows the section head, which
-   already supplies the gap. */
 .subhead-first {
   margin-top: 0;
 }
-
-/* ------------------------------------------------------------ exam cards */
 
 .exam-grid {
   display: grid;
@@ -637,7 +480,6 @@ img {
   gap: var(--space-4);
 }
 
-/* Denser: these carry a name and a reason, not a stat strip. */
 .exam-grid-soon {
   grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
 }
@@ -648,8 +490,7 @@ img {
   gap: var(--space-4);
   padding: var(--space-5);
   background: var(--surface);
-  /* A card is not a control, so its edge is structural and takes the
-     weaker tier. What lifts it off the page is the shadow. */
+
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-1);
@@ -661,8 +502,6 @@ img {
   gap: var(--space-3);
 }
 
-/* --exam-tint on --exam-tint-soft: the one alias pair in the system,
-   repointed by data-engine on the card itself. */
 .exam-avatar {
   flex: none;
   display: flex;
@@ -673,17 +512,12 @@ img {
   border-radius: var(--radius-l);
   background: var(--exam-tint-soft);
   color: var(--exam-tint);
-  /* Fallback path only: a certification with no drawn mark still sets
-     its acronym here, the same way ExamAvatar does in the app. */
+
   font-family: var(--font-mono);
   font-size: var(--text-s);
   font-weight: 600;
 }
 
-/* The certification marks. Geometry is mirrored from
-   ui/src/components/CertMark.tsx and held equal to it by
-   site/build.sh --check — 24 of the tile's 44, which is the proportion
-   they were drawn and checked at. */
 .cert-mark {
   width: 24px;
   height: 24px;
@@ -705,8 +539,6 @@ img {
   color: var(--text-muted);
 }
 
-/* A live and a coming-soon card must be told apart by a WORD, never only
-   by a hue. */
 .exam-badge {
   flex: none;
   font-family: var(--font-mono);
@@ -733,18 +565,12 @@ img {
   border-bottom: 1px solid var(--border);
 }
 
-/* column-reverse, not a reordered DOM: <dl> requires dt before dd, and a
-   screen reader wants to hear "Duration, 2h" in that order. Drawing the
-   figure above its label is a visual arrangement only. */
 .exam-stats > div {
   flex: 1 1 7rem;
   min-width: 0;
   display: flex;
   flex-direction: column-reverse;
-  /* flex-start is the BOTTOM in column-reverse, so every cell's label
-     lands on one line and a value that wraps grows upward. Packing to
-     flex-end instead hangs the wrapped cell's label below its
-     neighbours', which is the misalignment this strip exists to avoid. */
+
   justify-content: flex-start;
   gap: 3px;
   padding: var(--space-3) 0;
@@ -762,8 +588,6 @@ img {
   color: var(--text);
 }
 
-/* The pool half of "65 / 97". Quieter than the drawn count, but a real
-   number a reader would miss. */
 .exam-stat-of {
   font-weight: 400;
   color: var(--text-muted);
@@ -798,9 +622,6 @@ img {
   gap: var(--space-2);
 }
 
-/* Tags, not chips. Nothing filters anything here, so nothing wears a
-   control's border, hover or cursor — a tag that looks clickable and is
-   not is worse than a plain one. */
 .tag {
   display: inline-flex;
   align-items: baseline;
@@ -820,9 +641,6 @@ img {
   font-variant-numeric: tabular-nums;
 }
 
-/* A coming-soon card drops the shadow, dashes the border and sits on the
-   page fill — an inversion that reads correctly in both themes, because
-   --bg is darker than --surface in light and lighter in dark. */
 .exam-card-soon {
   gap: var(--space-3);
   background: var(--bg);
@@ -847,31 +665,11 @@ img {
   color: var(--text-secondary);
 }
 
-/* The reason is the entire point of listing an exam nobody can sit, so it
-   is never dimmed below the body floor and never clamped. Unavailability
-   is carried by a dashed edge, a SOON badge and the absence of any action
-   — never by opacity. */
 .exam-note {
   font-size: var(--text-m);
   color: var(--text-muted);
 }
 
-/* --------------------------------------------------------- mode matrix */
-/* Four properties the three modes answer differently. A table, because
-   comparing them is the whole job, and three prose blocks make the reader
-   hold six answers in their head to do it. */
-
-/* This used to be Scroll-Inside: a 44rem min-width in a box that scrolled
-   sideways, with a focusable region so the box could be reached from the
-   keyboard. That is a legitimate pattern and it was the wrong one here.
-   Four columns of prose on a phone is not a wide FIGURE that wants
-   panning, like a terminal line or a diagram; it is a comparison whose
-   axes can be re-drawn. So below 780px it is re-drawn (see the stacked
-   block in the responsive section), and above it the columns fit without
-   a minimum at all.
-
-   Two things went with the wrapper: the sideways scroll, and a tab stop
-   that would have led to a region with nothing left to scroll. */
 .mode-table {
   width: 100%;
   border-collapse: collapse;
@@ -885,18 +683,12 @@ img {
   border-top: 1px solid var(--border);
 }
 
-/* The column heads are the three mode names and carry the section's
-   weight; nothing rules above them because the section head already
-   separates this block from what precedes it. */
 .mode-table thead th,
 .mode-table thead td {
   border-top: 0;
   padding-top: 0;
 }
 
-/* Equal thirds. Left to content the Training column took half the table,
-   because its cells say the most — and three columns of different widths
-   stop reading as three peers being compared. */
 .mode-table thead th {
   width: 26%;
   font-size: var(--text-xl);
@@ -904,8 +696,6 @@ img {
   letter-spacing: var(--tracking-tight);
 }
 
-/* The row labels are the axis, not content: quieter than the cells they
-   introduce, and fixed-width so the four rows align. */
 .mode-table tbody th {
   width: 12rem;
   font-size: var(--text-s);
@@ -918,8 +708,6 @@ img {
   color: var(--text-secondary);
 }
 
-/* The concrete minutes under a relative rule. Mono because they are
-   measurements, and tabular so the two columns' figures line up. */
 .mode-sub {
   display: block;
   margin-top: var(--space-1);
@@ -941,17 +729,6 @@ img {
   font-size: var(--text-m);
   color: var(--text-muted);
 }
-
-/* --------------------------------------------------------- run it */
-/* Two shapes of the same simulator. Peers, not tiers: the two cards are
-   identical in weight, neither carries a price, a badge or a call to
-   action, and the local one is first because it is the reference the
-   other is described against.
-
-   Deliberately NOT the .exam-card treatment. Those advertise something
-   you can sit and carry a Live/Soon badge; these describe how the whole
-   product is deployed, and reusing the exam card would file them as two
-   more exams. */
 
 .run-grid {
   display: grid;
@@ -981,9 +758,6 @@ img {
   color: var(--text-muted);
 }
 
-/* The label/value pairs. A hairline between rows and nothing above the
-   first or below the last: the block is already inside a card, so ruling
-   its outer edges would draw a box inside a box. */
 .run-facts > div {
   display: flex;
   flex-wrap: wrap;
@@ -1002,8 +776,6 @@ img {
   color: var(--text-muted);
 }
 
-/* Mono-For-Truth: these are the deployment's own settings, read off the
-   chart's defaults, so they are set as values rather than as prose. */
 .run-facts dd {
   font-family: var(--font-mono);
   font-size: var(--text-s);
@@ -1012,21 +784,11 @@ img {
   text-align: right;
 }
 
-/* No margin-top: auto here. Pinning the note to the card's bottom edge
-   aligned the two cards' last lines, and paid for it with a hole in the
-   middle of the shorter one — between a value and the sentence explaining
-   it, which is the worst place on the card to put a gap. The two cards
-   still match in height because they are grid items; the slack now
-   collects under the last line, where it reads as margin. */
 .run-note {
   font-size: var(--text-m);
   color: var(--text-secondary);
 }
 
-/* A terminal that lives inside a card. It keeps the machine palette and
-   the mono type, because it is still literally a computer, and drops the
-   titlebar and the lifted shadow, because a window chrome nested inside
-   a card reads as a second window rather than as a command. */
 .term-inline {
   border-radius: var(--radius-m);
   box-shadow: none;
@@ -1037,16 +799,9 @@ img {
   line-height: 1.7;
 }
 
-/* The shell's line-continuation backslash. Not --machine-muted: this is
-   syntax the reader must retype, not a comment they only read. */
 .term-cont {
   color: var(--machine-text);
 }
-
-/* --------------------------------------------------- what a seat costs */
-/* Operating figures, and quieter than .stat on purpose. Those are the
-   product's headline numbers; these are what the hardware is asked for,
-   which is a thing you check rather than a thing you are told. */
 
 .run-sizing {
   margin-top: var(--space-7);
@@ -1087,8 +842,6 @@ img {
   color: var(--text-secondary);
 }
 
-/* The measurement inside the sentence. Mono and tabular, the same as
-   every other figure on the page that came off an instrument. */
 .run-spec dd b {
   font-family: var(--font-mono);
   font-weight: 600;
@@ -1101,21 +854,6 @@ img {
   margin-top: var(--space-1);
   color: var(--text-muted);
 }
-
-/* ------------------------------------------------------- the warning */
-/* --warn, because this is a real consequence of deploying the thing and
-   not an aside. --warn-strong is the text tier of the family; --warn on
-   its own is measured for graphics, not for labels.
-
-   Geometry is the app's, not this page's invention: a tinted fill, an
-   even 1px --warn-border and --radius-m are exactly `.hosted-queue-note`
-   in ui/src/theme.css, which is the same component doing the same job in
-   the same hosted flow. This first carried a 3px left edge as well. That
-   is a side-tab, it appeared nowhere else in this repository, and the
-   product had already answered the question — an even border and the
-   tint carry it, and the heading in --warn-strong is the third channel.
-   The one --ink band on the page stays the only place it raises its
-   voice; two shouting blocks would cancel each other out. */
 
 .run-warning {
   margin-top: var(--space-6);
@@ -1141,16 +879,8 @@ img {
   color: var(--warn-strong);
 }
 
-/* ----------------------------------------------------------- ink band */
-/* --ink is not the machine palette. It is a near-black band used INSIDE
-   light mode to frame a headline — this product raising its voice. In dark
-   mode it inverts role and becomes a RAISED surface, so the band still
-   reads as a band against the page rather than disappearing into it. */
-
 .limits {
-  /* Rebinding the token rather than overriding the rule: --accent on --ink
-     is too close to read as a focus indicator, and --ink-accent is the
-     token measured against this exact fill (7.38:1 light, 7.01:1 dark). */
+
   --focus-ring: var(--ink-accent);
   margin-top: var(--space-8);
   padding-block: var(--space-8);
@@ -1199,11 +929,6 @@ img {
   color: var(--ink-muted);
 }
 
-/* -------------------------------------------------------- evidence rows */
-/* Four pieces of evidence for one claim, not four features. A row list
-   puts the component beside what it buys the score; a card grid would
-   have said "features" and lost the argument the section is making. */
-
 .evidence-row {
   display: grid;
   gap: var(--space-2) var(--space-6);
@@ -1223,11 +948,6 @@ img {
   font-size: var(--text-m);
   color: var(--text-secondary);
 }
-
-/* ------------------------------------------------------------ docs index */
-/* The page is a front door and the repository is what is behind it. Three
-   groups, matching the split docs/README.md already makes for itself, so
-   the two cannot drift into different taxonomies. */
 
 .docs-index {
   display: grid;
@@ -1252,9 +972,6 @@ img {
   font-weight: 600;
 }
 
-/* The link is the heading, so it carries no underline at rest — the
-   weight and the accent already say it is one. The underline arrives on
-   hover, where it confirms the target rather than decorating the list. */
 .docs-entry dt a {
   text-decoration: none;
 }
@@ -1269,8 +986,6 @@ img {
   font-size: var(--text-m);
   color: var(--text-secondary);
 }
-
-/* --------------------------------------------------------------- footer */
 
 .site-footer {
   padding-block: var(--space-7);
@@ -1307,10 +1022,6 @@ img {
   font-size: var(--text-m);
 }
 
-/* The non-affiliation notice. Binding on every surface that names a
-   certification, and this page names all five. It sits in the footer here
-   for the same reason it does in the app: the notice is a permanent
-   property of the product, not a message about the page you are on. */
 .disclaimer {
   margin-top: var(--space-6);
   padding-top: var(--space-5);
@@ -1331,19 +1042,13 @@ img {
   max-width: 90ch;
 }
 
-/* ---------------------------------------------------------- responsive */
-/* Three breakpoints, each changing structure rather than scale, plus one
-   keyed to pointer type. */
-
 @media (min-width: 760px) {
-  /* The component beside what it buys, rather than above it. */
+
   .evidence-row {
     grid-template-columns: 18rem 1fr;
     align-items: baseline;
   }
 
-  /* The same shape, one column narrower: these labels are two words where
-     the evidence rows' are a component name. */
   .run-spec-row {
     grid-template-columns: 16rem 1fr;
     align-items: baseline;
@@ -1351,10 +1056,7 @@ img {
 }
 
 @media (min-width: 900px) {
-  /* The claim on the left, the figure that qualifies it on the right.
-     Centred rather than start-aligned: the figure is a disc, so its
-     optical centre is its geometric one and hanging it from the top
-     leaves the column bottom-heavy. */
+
   .hero {
     grid-template-columns: 1fr minmax(0, 21rem);
     gap: var(--space-8);
@@ -1368,30 +1070,6 @@ img {
   }
 }
 
-/* The mode matrix, re-drawn as three stacked groups.
-   ----------------------------------------------------------------------
-   780px is where the four columns stop fitting the shell without a
-   minimum width. Below it the table is laid out as a GRID and the cells
-   are placed explicitly, which transposes it: the reading order on a
-   phone becomes one mode at a time, all four of its properties together,
-   which is the order someone choosing a mode actually wants. Reading it
-   the other way — one property, three answers — is a comparison, and a
-   comparison is what the desktop table already is.
-
-   The placement is arithmetic, not magic. Three groups of five rows: a
-   heading, then its four values. A cell in tbody column C (2, 3, 4) and
-   row R (1 to 4) goes to grid row (C - 2) * 5 + 1 + R. Fifteen rows, and
-   they are spelled out because grid line numbers cannot be computed with
-   calc().
-
-   One thing is genuinely given up here: a grid container is no longer
-   exposed as a table, so the row/column semantics do not survive this
-   breakpoint. What replaces them is a linear reading order that matches
-   the screen exactly — the mode name, then each property named by its
-   own data-label beside its value — plus the caption, which still says
-   what the whole block is. That trade is worth it. A table nobody can
-   read without dragging it sideways has already lost the reader it was
-   built for. */
 @media (max-width: 779px) {
   .mode-table {
     display: grid;
@@ -1404,10 +1082,6 @@ img {
     display: contents;
   }
 
-  /* The empty corner, and the row headers. Both are structure the stacked
-     form re-expresses: the corner never had anything to say, and each
-     property name now travels beside its own value instead of standing at
-     the head of a row that no longer exists. */
   .mode-table thead td,
   .mode-table tbody th {
     display: none;
@@ -1420,7 +1094,6 @@ img {
     font-size: var(--text-xl);
   }
 
-  /* The section head already supplies the gap above the first group. */
   .mode-table thead th:nth-child(2) {
     grid-row: 1;
     border-top: 0;
@@ -1449,9 +1122,6 @@ img {
     color: var(--text-muted);
   }
 
-  /* The value is an anonymous grid item and lands in column two by
-     auto-placement. The minutes underneath are a real element, so they
-     have to be told, or they wrap back under the label. */
   .mode-table tbody td .mode-sub {
     grid-column: 2;
     margin-top: 0;
@@ -1495,22 +1165,6 @@ img {
   }
 }
 
-/* The wordmark gives way to the mark, exactly as it does in the app.
-   ----------------------------------------------------------------------
-   640px and the clip idiom are both taken from `.navbar-wordmark` in
-   ui/src/theme.css rather than chosen again here: this page's header and
-   the product's header solve the same problem, and two different answers
-   to it would be the drift the rest of this directory works to prevent.
-
-   It is hidden rather than dropped, so the accessible name of the header
-   is unchanged and a screen reader still hears the product's name. The
-   mark stays, and it is what the app leaves as well.
-
-   Nav went from four items to five when "Run it" was added, and at 390px
-   the wordmark and the nav were drawn on top of each other. Nothing
-   overflowed, which is why the sideways-scroll sweep did not catch it and
-   a screenshot did: both boxes stayed inside the header, and the text
-   inside them did not. */
 @media (max-width: 640px) {
   .brand-word {
     position: absolute;
@@ -1524,22 +1178,17 @@ img {
     border: 0;
   }
 
-  /* With the wordmark gone the row is the nav, so it takes the width it
-     needs and the gap closes to match the tighter gutters below. */
   .site-nav {
     gap: var(--space-4);
   }
 }
 
 @media (max-width: 600px) {
-  /* Page gutters close a step. */
+
   .shell {
     padding-inline: var(--space-4);
   }
 
-  /* A label and its value stop sharing a line: at this width the pair was
-     wrapping anyway, and a right-aligned value under a left-aligned label
-     reads as two unrelated things. */
   .run-facts > div {
     flex-direction: column;
     gap: var(--space-1);
@@ -1559,8 +1208,6 @@ img {
     font-size: var(--text-xs);
   }
 
-  /* The stat strip's four cells become two rows of two rather than four
-     unreadable columns. */
   .exam-stats > div {
     flex-basis: 45%;
   }
@@ -1570,8 +1217,6 @@ img {
   }
 }
 
-/* Keyed to pointer type, not to width: a touch screen at any size needs
-   the 44px minimum. */
 @media (any-pointer: coarse) {
   .btn {
     min-height: 44px;
@@ -1582,16 +1227,8 @@ img {
   }
 }
 
-/* -------------------------------------------------------------- motion */
-/* Additive, never a default that a reduce-guard later neutralises. Layout
-   is identical either way, and the orbit's bodies are placed at their
-   authored angles in the markup — so with motion off the figure is a
-   composed diagram rather than five dots stacked at twelve o'clock. */
-
 @media (prefers-reduced-motion: no-preference) {
-  /* The header is sticky and every nav item is an in-page anchor, so a
-     jump gives no sense of where the page went. scroll-padding-top at the
-     top of this file already keeps the target clear of the header. */
+
   html {
     scroll-behavior: smooth;
   }
@@ -1610,22 +1247,11 @@ img {
     transition-duration: 50ms;
   }
 
-  /* The page's one authored animation.
-     transform-box: view-box puts the origin in the SVG's own coordinate
-     space, so every ring turns about the figure's centre rather than
-     about its own dot. Where that is unsupported the dot spins in place,
-     which is wrong but harmless.
-
-     Periods rise with radius, the way real ones do. They are also
-     mutually prime enough that the five never resolve into a pattern, so
-     the figure never looks like it is counting something. */
   .orbit-track {
     transform-box: view-box;
     transform-origin: 160px 160px;
     animation: orbit-turn linear infinite;
-    /* linear on purpose. An orbit that eases is a widget, not an orbit,
-       and this is the one place on the page where the literal reading is
-       also the correct one. */
+
   }
 
   [data-ring="kcna"] .orbit-track {
@@ -1644,39 +1270,12 @@ img {
     animation-duration: 158s;
   }
 
-  /* Set by the observer at the foot of index.html once the hero has
-     scrolled away. Five orbits turning behind the reader is battery spent
-     on something nobody is looking at. */
   .orbit-svg[data-idle] .orbit-track {
     animation-play-state: paused;
   }
 
-  /* ---------------------------------------------- scroll-driven layer */
-  /* Everything below is tied to the SCROLLER rather than to a clock, and
-     none of it needs a line of JavaScript. That is the whole reason it is
-     written this way: this directory holds exactly one script, its job is
-     to pause the orbit, and a second one would have made the page's
-     appearance depend on JS having run.
-
-     Nested inside @supports so the fallback is the finished page rather
-     than a blank one. Where view() is unsupported — Firefox today, any
-     older engine — not one of these rules applies, no keyframe holds an
-     element at opacity 0, and the reader gets the same page without the
-     entrances. That is also why every keyframe animates FROM a hidden
-     state TO the element's own real style, and why no rule here sets
-     opacity or translate outside a keyframe.
-
-     Each of these earns its place or it would not be here:
-       scroll-depth   how far through a long page you are
-       reveal         a section arriving rather than being already there
-       term typing    three commands that run in sequence, in sequence
-       orbit drift    parallax, which gives the hero figure depth */
   @supports (animation-timeline: view()) {
-    /* Scroll depth, painted along the header's bottom edge. --progress is
-       the token family for exactly this — bars, tracks and dots — and it
-       is deliberately NOT --accent: blue on this page means focus,
-       currency, links and the one primary button, and a hairline that
-       tracks the scrollbar is none of those. */
+
     .scroll-depth {
       position: absolute;
       left: 0;
@@ -1689,14 +1288,6 @@ img {
       animation-timeline: scroll(root);
     }
 
-    /* The entrance. 8px and a fade, which is the app's own screen
-       transition (DESIGN.md: "screens fade up 4px") one step larger,
-       because a landing page section is a bigger object than a screen.
-
-       The range ends inside `cover`, so a section has finished arriving
-       well before it reaches the middle of the viewport. A reveal still
-       animating under the reader's eyes is the thing that makes scroll
-       animation feel cheap. */
     .section-head,
     .stat,
     .exam-card,
@@ -1714,11 +1305,6 @@ img {
       animation-range: entry 10% cover 30%;
     }
 
-    /* Siblings that enter on the same line share a timeline and would
-       otherwise arrive as one block. A small offset per column is enough
-       to read as a sequence; it is done with the RANGE rather than a
-       delay, because a delay on a scroll timeline is measured in scroll
-       distance and reads as a stall. */
     .stat:nth-child(2),
     .exam-card:nth-child(2),
     .run-card:nth-child(2),
@@ -1732,19 +1318,6 @@ img {
       animation-range: entry 22% cover 38%;
     }
 
-    /* The quickstart's three commands arrive one after another, which is
-       the order they are run in. Scrubbed rather than played once: the
-       reader controls it, it cannot run while they are looking somewhere
-       else, and scrolling back is the only honest way to replay it.
-
-       This was a character-by-character type at first, in steps() of each
-       line's own length. It came out well and it is not here, because a
-       half-typed line is a half-true line. Caught mid-reveal, line three
-       read `http://localhost:80` — not obviously unfinished, the way
-       `./sim doct` is, but a different and completely plausible port. A
-       page that will not round a question count up must not animate
-       through a command nobody can run. Opacity says the same thing about
-       sequence and is never wrong in between. */
     .quickstart .term-line {
       display: inline-block;
       animation: term-line-in linear both;
@@ -1763,10 +1336,6 @@ img {
       animation-range: cover 20% cover 32%;
     }
 
-    /* Parallax on the hero figure. It drifts against the page rather than
-       with it, which is what gives the orbit the sense of sitting behind
-       the headline instead of beside it. 24px total over the whole pass:
-       small enough that it never separates the figure from its caption. */
     .orbit {
       animation: orbit-drift linear both;
       animation-timeline: view();
@@ -1790,9 +1359,6 @@ img {
   }
 }
 
-/* Both keyframes end at the element's REAL style, so the finished state is
-   exactly the page as it is authored. Nothing here is a "final" class that
-   something has to add. */
 @keyframes reveal-rise {
   from {
     opacity: 0;
@@ -1804,8 +1370,6 @@ img {
   }
 }
 
-/* Opacity only. A line inside a <pre> sits on a fixed baseline grid, and
-   sliding one would drag the block's line spacing with it. */
 @keyframes term-line-in {
   from {
     opacity: 0;
@@ -1824,10 +1388,6 @@ img {
   }
 }
 
-/* Print gets the page, not a snapshot of an animation that never ran. A
-   scroll timeline has no progress on paper, so every scroll-driven rule
-   above is switched off and each element falls back to its own style —
-   which is the finished one, by the construction described above. */
 @media print {
   .section-head,
   .stat,
@@ -1851,11 +1411,6 @@ img {
   }
 }
 
-/* Windows High Contrast drops box-shadow and overrides every colour we
-   set, which costs the live/soon distinction its fill. The badge word and
-   the dashed edge survive; this restores the card boundary that does not.
-   The orbit keeps its meaning there too: solid against dashed, and a
-   filled body against a hollow one, are both shape rather than colour. */
 @media (forced-colors: active) {
   .exam-card,
   .term {
