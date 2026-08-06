@@ -1,16 +1,3 @@
-<!-- The product mark: an orbit and two bodies on an ink field. Geometry
-     and colours are the design brief's, scaled from its 30px drawing to
-     a 32px viewBox. The four fills are the ink, machine-blue,
-     machine-green-soft and machine-amber tokens from
-     ui/src/styles/tokens.css — this file is one of that file's three
-     mirrors, so it moves when they do. No Kubernetes or CNCF mark is
-     used or implied.
-
-     Token names are written WITHOUT their leading dashes deliberately:
-     XML forbids a double hyphen inside a comment, so spelling them the
-     CSS way made this file fail to parse. It survived as a
-     `link rel=icon`, which is lenient, and broke only as an img source
-     — which is exactly the use a landing page has for it. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <rect width="32" height="32" rx="9" fill="#101728"/>
   <circle cx="16" cy="16" r="8.3" fill="none" stroke="#6f9cf8" stroke-width="1.6"/>

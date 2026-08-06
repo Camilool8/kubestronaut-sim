@@ -2,28 +2,9 @@
 <html lang="en" data-theme="dark">
   <head>
     <meta charset="utf-8" />
-    <!-- The SOURCE of og.png, not a page anyone is meant to land on.
-         Served from this directory only because Chrome needs an origin to
-         load the fonts from; noindex keeps it out of search results. -->
     <meta name="robots" content="noindex, nofollow" />
     <title>og.png source — kubestronaut-sim</title>
 
-    <!-- The card is the page's own dark theme, not a second palette.
-         data-theme="dark" is set on <html> above rather than left to the
-         OS, because a raster cannot follow a preference: it has to pick
-         one and carry it. Dark is the pick because a link preview is
-         drawn on somebody else's background — a dark card stays a
-         defined object on a light feed and on a dark one, where a light
-         card dissolves into the first and glares on the second. The
-         field it lands on, #101728, is --bg in dark and --ink in light,
-         and it is the favicon's own field, so the card and the mark
-         agree.
-
-         styles.css is loaded for one reason: the orbit is drawn by the
-         SAME rules as the hero. Ring geometry, the dashed "no bank yet"
-         treatment, the label knockouts and the --exam-tint aliasing all
-         come from there, so the card cannot drift from the page it
-         advertises. Everything below styles only this card. -->
     <link rel="stylesheet" href="tokens.css" />
     <link rel="stylesheet" href="fonts.css" />
     <link rel="stylesheet" href="styles.css" />

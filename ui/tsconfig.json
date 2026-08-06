@@ -2,12 +2,6 @@
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,
-    // ES2022.Error is for `new Error(msg, { cause })`, which api.ts uses to
-    // keep the original DOMException attached when it rewrites a fetch
-    // timeout into readable copy. Only that one ES2022 slice is added: the
-    // build already targets es2022 (see vite.config.ts), so runtime support
-    // is not in question, but widening the whole lib would quietly permit
-    // syntax the rest of the codebase has not adopted.
     "lib": ["ES2020", "ES2022.Error", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
