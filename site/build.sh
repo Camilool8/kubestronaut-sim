@@ -142,6 +142,99 @@ sys.exit(1 if fail else 0)
 PY
 }
 
+check_shots() {
+  python3 - "$repo" <<'PY'
+import pathlib, re, struct, sys
+
+repo = pathlib.Path(sys.argv[1])
+fail = []
+
+
+def webp_size(raw):
+    """Intrinsic size of a WebP, for the three chunk layouts Pillow emits."""
+    if raw[:4] != b"RIFF" or raw[8:12] != b"WEBP":
+        return None
+    tag = raw[12:16]
+    if tag == b"VP8X":
+        return (int.from_bytes(raw[24:27], "little") + 1,
+                int.from_bytes(raw[27:30], "little") + 1)
+    if tag == b"VP8 ":
+        if raw[23:26] != b"\x9d\x01\x2a":
+            return None
+        w, h = struct.unpack("<HH", raw[26:30])
+        return w & 0x3FFF, h & 0x3FFF
+    if tag == b"VP8L":
+        if raw[20] != 0x2F:
+            return None
+        n = int.from_bytes(raw[21:25], "little")
+        return (n & 0x3FFF) + 1, ((n >> 14) & 0x3FFF) + 1
+    return None
+
+
+# Every <img> that points into shots/, with the size the page declares for it.
+# README paths are repo-relative, the landing page's are site-relative.
+pages = {
+    "README.md": (repo / "README.md", "site/"),
+    "site/index.html": (repo / "site" / "index.html", "site/"),
+}
+
+seen = {}
+for label, (path, prefix) in pages.items():
+    text = path.read_text()
+    for kind, tag in re.findall(r"<(img|source)\b([^>]*)>", text):
+        m = re.search(r'(?:src|srcset)="([^"]+)"', tag)
+        if not m or "shots/" not in m.group(1):
+            continue
+        rel = m.group(1)
+        rel = rel[len("site/"):] if rel.startswith("site/") else rel
+        f = repo / "site" / rel
+        w = re.search(r'width="(\d+)"', tag)
+        h = re.search(r'height="(\d+)"', tag)
+        seen.setdefault(f, []).append((label, kind, int(w.group(1)) if w else None,
+                                       int(h.group(1)) if h else None))
+
+if not seen:
+    fail.append("no shot is referenced by README.md or index.html -- the parse is wrong")
+
+sizes = {}
+for f, uses in sorted(seen.items()):
+    where = ", ".join(sorted({u[0] for u in uses}))
+    if not f.exists():
+        fail.append(f"{f.relative_to(repo)} is referenced by {where} but does not exist")
+        continue
+    got = webp_size(f.read_bytes())
+    if got is None:
+        fail.append(f"{f.relative_to(repo)} is not a readable WebP")
+        continue
+    sizes[f.name] = got
+    for label, kind, w, h in uses:
+        # Only <img> reserves space. A <picture>'s <source> carries no
+        # width/height by design; its size is checked against its twin below.
+        if kind != "img":
+            continue
+        if w is None or h is None:
+            fail.append(f"{label} embeds {f.name} without width/height -- it will shift the page as it loads")
+            continue
+        # Captured at deviceScaleFactor 2, so the file is exactly twice the
+        # size the page reserves for it. A re-capture at another viewport or
+        # scale breaks this before it breaks the layout.
+        if got != (w * 2, h * 2):
+            fail.append(f"{label} declares {f.name} as {w}x{h} (expects a {w*2}x{h*2} file), got {got[0]}x{got[1]}")
+
+# A <picture> pair whose halves differ in size jumps when the theme changes.
+for name, got in sorted(sizes.items()):
+    if not name.endswith("-dark.webp"):
+        continue
+    twin = name.replace("-dark.webp", "-light.webp")
+    if twin in sizes and sizes[twin] != got:
+        fail.append(f"{name} is {got[0]}x{got[1]} but {twin} is {sizes[twin][0]}x{sizes[twin][1]} -- the theme swap would resize the page")
+
+for line in fail:
+    print(f"build.sh: {line}", file=sys.stderr)
+sys.exit(1 if fail else 0)
+PY
+}
+
 check_cert_marks() {
   python3 - "$repo" <<'PY'
 import pathlib, re, sys
@@ -207,6 +300,7 @@ if [ "${1:-}" = "--check" ]; then
   status=0
   check_figures || status=1
   check_og || status=1
+  check_shots || status=1
   check_cert_marks || status=1
   for f in tokens.css favicon.svg; do
     if ! diff -q "$tmp/$f" "$here/$f" >/dev/null 2>&1; then

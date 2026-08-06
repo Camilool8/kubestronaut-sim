@@ -400,6 +400,37 @@ img {
   color: var(--machine-blue);
 }
 
+/* Screenshots wear the same chrome as .term, so a picture of the software
+   sits in the page the way a picture of its shell already does. The bar
+   markup is shared with .term deliberately -- two frames that differ only
+   in their contents should not differ in their border. */
+.shot {
+  margin: 0;
+  border: 1px solid var(--machine-border);
+  border-radius: var(--radius-m);
+  background: var(--machine-surface);
+  overflow: hidden;
+  box-shadow: var(--shadow-2);
+}
+
+.shot-img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.shot-caption {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--machine-border);
+  font-size: var(--text-s);
+  line-height: 1.6;
+  color: var(--machine-muted);
+}
+
+.shot-wide {
+  margin-top: var(--space-6);
+}
+
 .stats {
   padding-block: var(--space-7);
   border-top: 1px solid var(--border);

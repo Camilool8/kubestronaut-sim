@@ -1,5 +1,8 @@
 # kubestronaut-sim
 
+<img src="site/og.png" width="1200" height="630"
+     alt="kubestronaut-sim. An exam simulator you run yourself. A timed rehearsal for the Kubernetes certifications, run locally." />
+
 An open-source exam simulator for the Kubestronaut certifications, run
 locally on your own machine.
 
@@ -7,6 +10,12 @@ locally on your own machine.
 - Retake it as many times as you need.
 - Every graded attempt is kept, so you can see which domains are weak.
 - Deliberately harder than the real exams.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="site/shots/progress-dark.webp" />
+  <img src="site/shots/progress-light.webp" width="1600" height="1040"
+       alt="The progress screen: a card per certification, a table of every attempt with its mode, date, time and score, and a weakest-domains list built from all attempts." />
+</picture>
 
 ## Quickstart
 
@@ -56,13 +65,33 @@ routes.
    - *Training* — untimed, two-tier hints, solutions on demand.
    - *Mastery* — half the clock, no help.
    - *Exam* — the bank's duration, no help.
+
+   <picture>
+     <source media="(prefers-color-scheme: dark)" srcset="site/shots/mode-dark.webp" />
+     <img src="site/shots/mode-light.webp" width="1600" height="1000"
+          alt="The mode screen: Training, Mastery and Exam side by side, each listing its clock and what help it allows, with chips below for narrowing the draw to particular domains." />
+   </picture>
+
 3. **Exam view** — timer bar, question panel, and the exam desktop in a
    built-in VNC client. The terminal is already open. Firefox is
    restricted to a documentation allowlist.
+
+   <picture>
+     <source media="(prefers-color-scheme: dark)" srcset="site/shots/exam-dark.webp" />
+     <img src="site/shots/exam-light.webp" width="1600" height="1000"
+          alt="The exam view: the task on the left, and on the right a Linux desktop where a terminal on instance-1 lists the namespaces the task asked for, with the Kubernetes documentation open behind it." />
+   </picture>
+
 4. **End** — submit early, or let the timer expire. The desktop locks
    and grading runs in the background.
 5. **Score** — percent, pass/fail, per-question checks, full solutions,
    and a New attempt button.
+
+   <picture>
+     <source media="(prefers-color-scheme: dark)" srcset="site/shots/score-dark.webp" />
+     <img src="site/shots/score-light.webp" width="1600" height="1000"
+          alt="The score screen: a pass against the threshold, a domain breakdown ordered weakest first with two domains flagged below threshold, and a table of per-task verdicts with the points each one earned." />
+   </picture>
 
 Press `?` in the app for the full shortcut list.
 
