@@ -30,9 +30,6 @@ func TestShellQuote(t *testing.T) {
 	}
 }
 
-// The commands the conductor actually sends are argv triples whose third
-// element is a whole shell script. Losing that grouping is the failure
-// this quoting exists to prevent.
 func TestRemoteCommandKeepsScriptAsOneWord(t *testing.T) {
 	got := remoteCommand(wipeLike())
 	want := `'sh' '-c' 'find /opt/course -mindepth 1 -delete; podman rm -af; podman rmi -af'`
@@ -60,7 +57,7 @@ func TestArgsCarryKeyUserHostAndCommand(t *testing.T) {
 			t.Errorf("args missing %q; got %v", want, args)
 		}
 	}
-	// Destination then command, in that order, as the last two arguments.
+
 	if got := args[len(args)-2]; got != "root@k8s-env" {
 		t.Errorf("destination = %q, want root@k8s-env (default user)", got)
 	}
@@ -78,8 +75,6 @@ func TestArgsOmitsKeyFlagWhenNoKey(t *testing.T) {
 	}
 }
 
-// FindContainer is the seam that makes a service name usable by Exec.
-// Over ssh that is identity — hostAliases does the real resolution.
 func TestFindContainerReturnsServiceName(t *testing.T) {
 	c := New("/k", "root")
 	got, err := c.FindContainer(context.Background(), "ignored-project", "k8s-env")
@@ -116,8 +111,6 @@ func TestLineWriterPublishesCompleteLinesAsTheyArrive(t *testing.T) {
 	var got []string
 	w := &lineWriter{onLine: func(s string) { got = append(got, s) }}
 
-	// Split mid-line on purpose: the Docker engine's stream does this too,
-	// and a writer that only split per Write call would emit fragments.
 	w.Write([]byte("first\nsec"))
 	if len(got) != 1 || got[0] != "first" {
 		t.Fatalf("after partial write, lines = %v, want [first]", got)
@@ -127,7 +120,6 @@ func TestLineWriterPublishesCompleteLinesAsTheyArrive(t *testing.T) {
 		t.Fatalf("lines = %v, want [first second]", got)
 	}
 
-	// "third" has no newline; only flush should release it.
 	w.flush()
 	if len(got) != 3 || got[2] != "third" {
 		t.Fatalf("after flush, lines = %v, want [first second third]", got)

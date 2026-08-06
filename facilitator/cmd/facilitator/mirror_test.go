@@ -13,8 +13,6 @@ import (
 	"kubestronaut-sim/facilitator/internal/session"
 )
 
-// quietMirror is a mirror pointed at url with the retry pause removed,
-// so a test of three attempts costs no seconds.
 func quietMirror(t *testing.T, url, token string) *mirror {
 	t.Helper()
 	m := newMirror(url, token, "", nil, func(string, ...any) {})
@@ -26,10 +24,6 @@ func historyRecord() history.Record {
 	return history.Record{ID: "tok-1", Bank: "ckad-mock-01", Mode: session.ModeExam}
 }
 
-// The whole point of the mirror: the hub receives the record AND the
-// full results document. A record alone would give a hosted candidate a
-// score in their history with nothing behind it, because the review
-// screen renders from the results' per-check artifacts.
 func TestMirrorPostsTheRecordAndTheFullResults(t *testing.T) {
 	var gotAuth, gotType string
 	var body struct {
@@ -64,9 +58,7 @@ func TestMirrorPostsTheRecordAndTheFullResults(t *testing.T) {
 	if _, ok := body.Results["questions"]; !ok {
 		t.Errorf("results carry no questions: %v", body.Results)
 	}
-	// Nothing in the body names a user. The ticket does, and only the
-	// ticket may — a Pod that could name its own user could write into
-	// anyone's history.
+
 	raw, _ := json.Marshal(body)
 	for _, forbidden := range []string{"user", "uid", "login"} {
 		if strings.Contains(strings.ToLower(string(raw)), `"`+forbidden+`"`) {
@@ -75,10 +67,6 @@ func TestMirrorPostsTheRecordAndTheFullResults(t *testing.T) {
 	}
 }
 
-// The wiring, end to end: what leaves this process is the SELF-CONTAINED
-// document. The bank goes away with the Pod, so a stored attempt that
-// pointed at it for the reference solution would be a review that can
-// only ever say what went wrong.
 func TestMirrorPostsTheReferenceSolutionsWithTheAttempt(t *testing.T) {
 	var body struct {
 		Results struct {
@@ -110,9 +98,6 @@ func TestMirrorPostsTheReferenceSolutionsWithTheAttempt(t *testing.T) {
 	}
 }
 
-// A hub that is down must not also cost the candidate the copy on their
-// own disk. The local write comes first and its success is not
-// conditional on the remote one.
 func TestMirrorFailureStillLeavesTheLocalRecord(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "down", http.StatusBadGateway)
@@ -165,10 +150,6 @@ func TestMirrorRetryRecoversFromARestartingHub(t *testing.T) {
 	}
 }
 
-// A rejected ticket is this build disagreeing with that hub. Retrying
-// sends identical bytes to an identical answer, and in a hosted session
-// that is three times the delay before the candidate's own log says
-// what is wrong.
 func TestMirrorDoesNotRetryARejectedTicket(t *testing.T) {
 	var calls atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -186,8 +167,6 @@ func TestMirrorDoesNotRetryARejectedTicket(t *testing.T) {
 	}
 }
 
-// Unset is what `./sim up` runs, and it must produce no mirror at all —
-// not a mirror that posts nowhere.
 func TestNoWebhookURLMeansNoMirror(t *testing.T) {
 	if m := newMirror("", "tok", "", nil, nil); m != nil {
 		t.Errorf("newMirror with no URL returned %+v", m)

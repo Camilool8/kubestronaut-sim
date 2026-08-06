@@ -1,25 +1,3 @@
-// Package catalog is the hub's list of exams, read once at startup from
-// the bank index the banks image ships.
-//
-// It exists because of a timing problem that has no other answer: a
-// candidate in the lobby is choosing which certification to sit, and
-// until they have chosen there is no session Pod, so there is nothing
-// running that could be asked what exams exist. The hub has to know by
-// itself.
-//
-// It is a deliberate second implementation of the conductor's scan
-// (conductor/internal/catalog), on the same precedent already recorded
-// in docs/follow-ups.md for the hub re-implementing the facilitator's
-// attempt rollup: the four Go modules never import one another, and the
-// alternative — copying every bank's title, engine and question count
-// into values.yaml — puts the same facts in two places, one of which
-// nobody updates. This reads the bank itself, so it cannot say something
-// the bank does not.
-//
-// What it deliberately does NOT do is the conductor's job. There is no
-// Switchable, no question-id validation and no hidden-bank plumbing:
-// nothing here ever reaches a shell command, and admission is the only
-// decision made from it.
 package catalog
 
 import (
@@ -33,22 +11,10 @@ import (
 	"time"
 )
 
-// bankIDPattern is the only shape a bank id may take. The hub stamps a
-// bank into a Pod spec and into a label value, so a name that is not a
-// slug is rejected before either.
 var bankIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 
-// allowedInstances is the fixed session topology every runnable hands-on
-// bank must fit (see docs/bank-spec.md). Two shells, named, in every
-// deployment: the compose file, the session Pod's hostAliases and its
-// per-instance volumes all agree on it.
 var allowedInstances = map[string]bool{"instance-1": true, "instance-2": true}
 
-// Entry is one exam as the hosted lobby renders it.
-//
-// The JSON names match the local exam selector's `BankEntry` exactly,
-// because the two screens show the same cards and the SPA reads them
-// with one type. A field this hub cannot know is simply absent.
 type Entry struct {
 	ID                string `json:"id"`
 	Title             string `json:"title"`
@@ -58,37 +24,22 @@ type Entry struct {
 	DurationSeconds   int    `json:"durationSeconds,omitempty"`
 	PassingScore      int    `json:"passingScore,omitempty"`
 	KubernetesVersion string `json:"kubernetesVersion,omitempty"`
-	// QuestionCount is what one attempt asks; PoolCount is what the bank
-	// authors. They differ only for a pooled bank, and the card prints
-	// the pair only when they do.
+
 	QuestionCount int `json:"questionCount,omitempty"`
 	PoolCount     int `json:"poolCount,omitempty"`
-	// Nodes is spec.environment.nodes: how big this exam's cluster is,
-	// and the same number bootstrap.sh generates the kind config from.
-	//
-	// Carried so the hosted boot screen can describe the environment it
-	// is actually building. It used to assert two nodes at everybody,
-	// which was true only because CKAD was the only hands-on exam. Zero
-	// means the bank declared none — every mcq bank, which has no
-	// cluster — and the copy has to survive not knowing.
+
 	Nodes      int    `json:"nodes,omitempty"`
 	Available  bool   `json:"available"`
 	ComingSoon bool   `json:"comingSoon,omitempty"`
 	Note       string `json:"note,omitempty"`
 
-	// Hidden keeps a bank out of the lobby without removing it from the
-	// catalog. tests/smoke.sh's fixture bank sets it.
 	Hidden bool `json:"-"`
 }
 
-// Catalog is an immutable set of entries. The banks are an image layer;
-// a new bank is a new image and therefore a new hub Pod.
 type Catalog struct {
 	entries map[string]Entry
 }
 
-// bankDoc mirrors the fields this package needs out of a bank's
-// yq-converted exam.yaml.
 type bankDoc struct {
 	Metadata struct {
 		Name          string `json:"name"`
@@ -115,8 +66,6 @@ type bankDoc struct {
 	} `json:"spec"`
 }
 
-// comingSoonDoc mirrors _catalog.json: certifications advertised on the
-// path whose bank is not written yet.
 type comingSoonDoc struct {
 	ComingSoon []struct {
 		ID            string `json:"id"`
@@ -127,14 +76,6 @@ type comingSoonDoc struct {
 	} `json:"comingSoon"`
 }
 
-// Load reads every *.json in dir plus the optional _catalog.json.
-//
-// A single unreadable or malformed bank is skipped with a note on
-// stderr rather than failing the load: this runs at hub startup, and one
-// bad bank must not take down the front door of the whole deployment.
-// An empty or missing directory is an empty catalog, not an error — a
-// deployment that has not staged the index yet still serves identity,
-// history and its already-running sessions.
 func Load(dir string) (*Catalog, error) {
 	c := &Catalog{entries: map[string]Entry{}}
 	if dir == "" {
@@ -172,9 +113,7 @@ func (c *Catalog) mergeComingSoon(path string, raw []byte) {
 		return
 	}
 	for _, cs := range doc.ComingSoon {
-		// A real bank directory with this id wins: the entry here is a
-		// placeholder for something that does not exist yet, and the
-		// moment it does exist the placeholder is stale.
+
 		if _, exists := c.entries[cs.ID]; exists {
 			continue
 		}
@@ -190,8 +129,6 @@ func (c *Catalog) mergeComingSoon(path string, raw []byte) {
 	}
 }
 
-// List returns every non-hidden entry, available ones first and then by
-// title, which is the order the lobby renders.
 func (c *Catalog) List() []Entry {
 	out := make([]Entry, 0, len(c.entries))
 	for _, e := range c.entries {
@@ -209,18 +146,13 @@ func (c *Catalog) List() []Entry {
 	return out
 }
 
-// Get returns the entry for a bank id, hidden ones included: the smoke
-// fixture is startable by name even though it is not offered.
 func (c *Catalog) Get(id string) (Entry, bool) {
 	e, ok := c.entries[id]
 	return e, ok
 }
 
-// Len reports how many exams were loaded, for the startup log.
 func (c *Catalog) Len() int { return len(c.entries) }
 
-// declaredQuestionCount mirrors the facilitator's own: a pooled bank's
-// card shows its draw size, not the authored pool behind it.
 func declaredQuestionCount(examLength, poolSize int) int {
 	if examLength > 0 && examLength < poolSize {
 		return examLength
@@ -239,7 +171,7 @@ func buildEntry(id string, raw []byte) (Entry, error) {
 
 	examType := doc.Spec.ExamType
 	if examType == "" {
-		examType = "hands-on" // the facilitator's own default
+		examType = "hands-on"
 	}
 
 	entry := Entry{
@@ -260,9 +192,6 @@ func buildEntry(id string, raw []byte) (Entry, error) {
 		entry.DurationSeconds = int(d.Seconds())
 	}
 
-	// Everything below marks a bank unavailable rather than dropping it.
-	// A candidate who can see that CKS exists and why it cannot be sat
-	// has learnt something; a card that silently vanished has not.
 	if !bankIDPattern.MatchString(id) {
 		entry.Available = false
 		entry.Note = "bank id is not a valid slug"

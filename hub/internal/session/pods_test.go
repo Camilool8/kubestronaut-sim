@@ -10,14 +10,6 @@ import (
 	"kubestronaut-sim/hub/internal/kube"
 )
 
-// The adapter's only real job, and the one that fails silently.
-//
-// The manager decides "already gone, carry on" and "name taken, wait for
-// it" with errors.Is against its own sentinels. A kube.ErrNotFound that
-// arrives untranslated is just an unknown error, and the visible symptom
-// is a reset that waits out its whole timeout for a Pod that vanished
-// instantly — twenty minutes of a progress bar that was finished before
-// it started.
 func TestKubePodsTranslatesEveryStatusTheManagerBranchesOn(t *testing.T) {
 	for name, tc := range map[string]struct {
 		code int
@@ -50,9 +42,6 @@ func TestKubePodsTranslatesEveryStatusTheManagerBranchesOn(t *testing.T) {
 	}
 }
 
-// Readiness is per-container: the hub proxies to the facilitator, and a
-// desktop still coming up is a normal moment during boot rather than a
-// reason to withhold a working session.
 func TestKubePodsConvertsWhatTheManagerReads(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -76,10 +65,7 @@ func TestKubePodsConvertsWhatTheManagerReads(t *testing.T) {
 	if pod.IP != "10.42.0.9" || pod.Labels["kubestronaut-sim/user"] != "583231" {
 		t.Errorf("pod = %+v", pod)
 	}
-	// A deletionTimestamp is set the moment a delete is accepted, and Get
-	// keeps succeeding for the whole grace period. Treating a
-	// terminating Pod as live is how a seat stays occupied by something
-	// already dying.
+
 	if !pod.Terminating {
 		t.Error("a pod with a deletionTimestamp is not live")
 	}
@@ -88,10 +74,6 @@ func TestKubePodsConvertsWhatTheManagerReads(t *testing.T) {
 	}
 }
 
-// Static is what makes the hub runnable on a laptop, and its value
-// depends on the lifecycle being real rather than always-succeeds — a
-// Delete that does not delete leaves the recycle path waiting forever
-// for a Pod that never goes away.
 func TestStaticTracksExistenceSoRecycleTerminates(t *testing.T) {
 	s := &Static{Host: "127.0.0.1"}
 	ctx := context.Background()

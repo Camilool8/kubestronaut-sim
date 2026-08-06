@@ -68,14 +68,13 @@ func TestJobLifecyclePhasesAndCompletion(t *testing.T) {
 	if snap.LastJob == nil || snap.LastJob.Error != "" {
 		t.Fatalf("LastJob = %+v, want completed without error", snap.LastJob)
 	}
-	// every phase of a completed job reads done
+
 	for _, p := range snap.LastJob.Phases {
 		if p.State != PhaseDone {
 			t.Fatalf("phase %s state = %q, want done", p.ID, p.State)
 		}
 	}
 
-	// a new job may begin after completion
 	if _, err := s.Begin("reset", "", testPhases()); err != nil {
 		t.Fatalf("Begin after Complete: %v", err)
 	}
@@ -102,7 +101,6 @@ func TestFailMarksCurrentPhaseAndRecordsError(t *testing.T) {
 		t.Fatalf("unreached phase state = %q, want pending", got)
 	}
 
-	// the store accepts a fresh job after a failure
 	if _, err := s.Begin("reset", "", testPhases()); err != nil {
 		t.Fatalf("Begin after Fail: %v", err)
 	}
@@ -115,7 +113,6 @@ func TestStaleJobIDsAreIgnored(t *testing.T) {
 	j2, _ := s.Begin("reset", "", testPhases())
 	s.StartPhase(j2.ID, "end-session")
 
-	// calls referencing the finished job must not disturb the live one
 	s.StartPhase(j1.ID, "verify")
 	s.Fail(j1.ID, "stale")
 	snap := s.Status()
@@ -127,8 +124,6 @@ func TestStaleJobIDsAreIgnored(t *testing.T) {
 	}
 }
 
-// stepClock advances one second per call, so timing assertions can tell
-// "stamped" from "not stamped" and one phase's stamps from the next's.
 func stepClock() func() time.Time {
 	t0 := time.Date(2026, 7, 24, 12, 0, 0, 0, time.UTC)
 	n := 0
@@ -165,7 +160,6 @@ func TestPhasesRecordStartAndFinishTimes(t *testing.T) {
 		t.Errorf("an unreached phase must not record startedAt, got %q", pending.StartedAt)
 	}
 
-	// Stamps must be parseable and ordered — the UI subtracts them.
 	startedAt := mustParse(t, second.StartedAt)
 	if firstFinished := mustParse(t, first.FinishedAt); startedAt.Before(firstFinished) {
 		t.Errorf("phase 2 started %v before phase 1 finished %v", startedAt, firstFinished)
@@ -217,13 +211,11 @@ func TestSetPhaseDetailTracksTheRunningPhase(t *testing.T) {
 		t.Fatalf("detail = %q, want %q", got, "Preparing nodes")
 	}
 
-	// The newest line replaces the previous one — this is a tail, not a log.
 	s.SetPhaseDetail(j.ID, "end-session", "Installing CNI")
 	if got := phase(t, s.Status().Job, "end-session").Detail; got != "Installing CNI" {
 		t.Fatalf("detail = %q, want the newest line", got)
 	}
 
-	// A stale job id must not write into the live job.
 	s.SetPhaseDetail("job-999", "end-session", "from a dead goroutine")
 	if got := phase(t, s.Status().Job, "end-session").Detail; got != "Installing CNI" {
 		t.Fatalf("stale SetPhaseDetail overwrote the live phase: %q", got)
@@ -237,8 +229,6 @@ func TestCompletedPhaseKeepsNoStaleDetail(t *testing.T) {
 	s.SetPhaseDetail(j.ID, "end-session", "Installing CNI")
 	s.StartPhase(j.ID, "wipe-instances")
 
-	// A settled row shows its duration, not the last thing it happened to
-	// print — a frozen half-finished log line reads as a stuck phase.
 	if got := phase(t, s.Status().Job, "end-session").Detail; got != "" {
 		t.Fatalf("finished phase kept detail %q, want it cleared", got)
 	}
@@ -302,12 +292,10 @@ func TestLogSurvivesSettlementButNotTheNextJob(t *testing.T) {
 	s.AppendLog(j.ID, "kept")
 	s.Fail(j.ID, "boom")
 
-	// A failed job's log is exactly the one worth reading.
 	if _, lines := s.Log(); len(lines) != 1 || lines[0] != "kept" {
 		t.Fatalf("log after Fail = %v, want [kept]", lines)
 	}
-	// Settled means no more writes: a goroutine still draining the dead
-	// job's output must not grow its log.
+
 	s.AppendLog(j.ID, "stale")
 	if _, lines := s.Log(); len(lines) != 1 {
 		t.Fatalf("log grew after settlement: %v", lines)

@@ -23,37 +23,22 @@ const (
 
 var epoch = time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 
-// fakeClock returns a clock func() time.Time backed by a mutable
-// variable, matching the pattern the session package's own tests use.
 func fakeClock(start time.Time) (clock func() time.Time, set func(time.Time)) {
 	now := start
 	return func() time.Time { return now }, func(t time.Time) { now = t }
 }
 
-// fakeGrader is the api.Grader test double: it just counts invocations
-// so tests can assert exactly when the API layer kicks grading, without
-// running any real evaluate.Grade / ssh machinery.
 type fakeGrader struct {
 	calls int
 }
 
 func (g *fakeGrader) Grade() { g.calls++ }
 
-// fakeDesktop proves that api.New mounts the desktop handler so it
-// still sees the ORIGINAL, unstripped request path (api.New must not
-// strip "/desktop" itself — that's the desktop package's own job) by
-// echoing the path back with a status code (418) no other handler in
-// this package ever uses.
 var fakeDesktop = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTeapot)
 	w.Write([]byte("desktop:" + r.URL.Path))
 })
 
-// testServer bundles a freshly constructed api.New handler with the
-// pieces tests need to drive it: the session manager (to force state
-// transitions the HTTP surface can't reach directly, like SetResults),
-// the fake grader (to assert grading was kicked), and the fake clock's
-// setter (for tests that care about elapsed time).
 type testServer struct {
 	handler http.Handler
 	mgr     *session.Manager
@@ -81,15 +66,10 @@ func newTestServer(t *testing.T) *testServer {
 		"assets/app.js": &fstest.MapFile{Data: []byte("console.log('hi');")},
 	}
 
-	// nil boot reader == "assume ready", which is what every test below
-	// other than the boot-gate ones wants.
 	h := api.New(ex, bankDir, mgr, grader.Grade, fakeDesktop, fakeControl, ui, nil, nil)
 	return &testServer{handler: h, mgr: mgr, grader: grader, setNow: setNow}
 }
 
-// newBootingTestServer is newTestServer with a boot reader pointed at
-// paths that do not exist, i.e. an environment that has not finished
-// starting.
 func newBootingTestServer(t *testing.T) *testServer {
 	t.Helper()
 
@@ -110,8 +90,6 @@ func newBootingTestServer(t *testing.T) *testServer {
 	return &testServer{handler: h, mgr: mgr, grader: grader, setNow: setNow}
 }
 
-// fakeControl proves that api.New mounts the conductor proxy under
-// /api/control/ with unstripped paths.
 var fakeControl = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 	w.Write([]byte("control:" + r.URL.Path))
@@ -189,8 +167,7 @@ func TestExam(t *testing.T) {
 	if got.Title != "Test Exam" {
 		t.Errorf("Title = %q, want %q", got.Title, "Test Exam")
 	}
-	// Distinct from Title, and the mode screen's header reads it: a bank
-	// names both the certification it rehearses and its own edition.
+
 	if got.Certification != "TEST" {
 		t.Errorf("Certification = %q, want %q", got.Certification, "TEST")
 	}
@@ -203,12 +180,7 @@ func TestExam(t *testing.T) {
 	if got.KubernetesVersion != "1.30" {
 		t.Errorf("KubernetesVersion = %q, want %q", got.KubernetesVersion, "1.30")
 	}
-	// The shape of the cluster this bank is sat in — the same
-	// spec.environment.nodes bootstrap.sh generates the kind config from.
-	// It is here so the screens that describe an environment while it is
-	// being built can describe THIS one instead of asserting CKAD's two
-	// nodes at a candidate sitting something else. The fixture says three
-	// precisely so a hardcoded default cannot pass.
+
 	if got.Environment == nil {
 		t.Errorf("Environment absent; the bank declares one")
 	} else if got.Environment.Provider != "kind" || got.Environment.Nodes != 3 {
@@ -307,10 +279,7 @@ func TestSolutionGatedWhileRunning(t *testing.T) {
 }
 
 func TestSolutionGatingPrecedesUnknownID(t *testing.T) {
-	// While idle, even a nonexistent question id must 403, not 404 —
-	// the gate is checked before any question lookup, so an
-	// unauthenticated client can't use the solution endpoint to probe
-	// which question ids exist before the session ends.
+
 	ts := newTestServer(t)
 	rec := ts.do(t, http.MethodGet, "/api/questions/q99/solution")
 
@@ -341,17 +310,12 @@ func TestSolutionAvailableAfterEnd(t *testing.T) {
 		t.Errorf("Markdown = %q, want %q (raw solution.md round-trip)", got.Markdown, wantMD)
 	}
 
-	// Unknown id after ended: now that the gate is open, the lookup
-	// falls through to the ordinary 404.
 	rec2 := ts.do(t, http.MethodGet, "/api/questions/q99/solution")
 	if rec2.Code != http.StatusNotFound {
 		t.Errorf("unknown id after ended: status = %d, want 404, body=%s", rec2.Code, rec2.Body.String())
 	}
 }
 
-// The deep dive's footer reading. The fixture's q01 declares two links,
-// one of them unusable, so this covers the whole path at once: the bank
-// loaded despite the bad entry, and only the good one reaches the wire.
 func TestSolutionCarriesDocs(t *testing.T) {
 	ts := newTestServer(t)
 	if _, err := ts.mgr.Start(session.ModeExam, time.Hour); err != nil {
@@ -377,9 +341,6 @@ func TestSolutionCarriesDocs(t *testing.T) {
 	}
 }
 
-// A question with no docs must omit the key entirely rather than send an
-// empty array: the client's field is optional, and `docs: []` would make
-// "no reading" a thing it has to measure the length of.
 func TestSolutionOmitsDocsWhenThereAreNone(t *testing.T) {
 	ts := newTestServer(t)
 	if _, err := ts.mgr.Start(session.ModeExam, time.Hour); err != nil {
@@ -439,7 +400,6 @@ func TestSessionStartThenConflict(t *testing.T) {
 func TestSessionEndLifecycle(t *testing.T) {
 	ts := newTestServer(t)
 
-	// idle -> end: 409.
 	rec := ts.do(t, http.MethodPost, "/api/session/end")
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("end while idle status = %d, want 409, body=%s", rec.Code, rec.Body.String())
@@ -452,7 +412,6 @@ func TestSessionEndLifecycle(t *testing.T) {
 		t.Fatalf("Start: %v", err)
 	}
 
-	// running -> end: 202, grade kicked.
 	rec = ts.do(t, http.MethodPost, "/api/session/end")
 	if rec.Code != http.StatusAccepted {
 		t.Fatalf("end while running status = %d, want 202, body=%s", rec.Code, rec.Body.String())
@@ -465,7 +424,6 @@ func TestSessionEndLifecycle(t *testing.T) {
 		t.Errorf("state after end = %+v, want state=ended endReason=submitted", ended)
 	}
 
-	// ended, no results yet -> end again: 202 re-grade.
 	rec = ts.do(t, http.MethodPost, "/api/session/end")
 	if rec.Code != http.StatusAccepted {
 		t.Fatalf("re-grade end status = %d, want 202, body=%s", rec.Code, rec.Body.String())
@@ -474,7 +432,6 @@ func TestSessionEndLifecycle(t *testing.T) {
 		t.Errorf("grader.calls after re-grade end = %d, want 2", ts.grader.calls)
 	}
 
-	// once results are recorded, ended-with-results -> end: 409.
 	if err := ts.mgr.SetResults(ts.mgr.AttemptToken(), mustJSON(t, map[string]int{"earned": 1})); err != nil {
 		t.Fatalf("SetResults: %v", err)
 	}
@@ -499,7 +456,6 @@ func mustJSON(t *testing.T, v any) json.RawMessage {
 func TestResultsLifecycle(t *testing.T) {
 	ts := newTestServer(t)
 
-	// idle -> results: 409.
 	rec := ts.do(t, http.MethodGet, "/api/results")
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("results while idle status = %d, want 409, body=%s", rec.Code, rec.Body.String())
@@ -509,7 +465,6 @@ func TestResultsLifecycle(t *testing.T) {
 		t.Fatalf("Start: %v", err)
 	}
 
-	// running -> results: 409.
 	rec = ts.do(t, http.MethodGet, "/api/results")
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("results while running status = %d, want 409, body=%s", rec.Code, rec.Body.String())
@@ -519,7 +474,6 @@ func TestResultsLifecycle(t *testing.T) {
 		t.Fatalf("End: %v", err)
 	}
 
-	// ended, not graded yet: 202 grading.
 	rec = ts.do(t, http.MethodGet, "/api/results")
 	if rec.Code != http.StatusAccepted {
 		t.Fatalf("results while grading status = %d, want 202, body=%s", rec.Code, rec.Body.String())
@@ -534,7 +488,6 @@ func TestResultsLifecycle(t *testing.T) {
 		t.Errorf("grading body state = %q, want grading", grading.State)
 	}
 
-	// gradeError set: 500 with the error message.
 	if err := ts.mgr.SetGradeError(ts.mgr.AttemptToken(), "ssh unreachable"); err != nil {
 		t.Fatalf("SetGradeError: %v", err)
 	}
@@ -552,8 +505,6 @@ func TestResultsLifecycle(t *testing.T) {
 		t.Errorf("error body = %q, want %q", errBody.Error, "ssh unreachable")
 	}
 
-	// results recorded: 200 with the raw results JSON, superseding the
-	// earlier gradeError.
 	want := mustJSON(t, map[string]any{"earned": 9, "total": 9, "percent": 100})
 	if err := ts.mgr.SetResults(ts.mgr.AttemptToken(), want); err != nil {
 		t.Fatalf("SetResults: %v", err)
@@ -696,7 +647,6 @@ func TestControlProxyMounted(t *testing.T) {
 		t.Errorf("control body = %q — the proxy must see the full unstripped path", got)
 	}
 
-	// The /api/* JSON-404 guard for unknown endpoints must be unaffected.
 	rec = ts.do(t, http.MethodGet, "/api/nonexistent")
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("unknown api path = %d, want 404", rec.Code)
@@ -719,10 +669,6 @@ func TestBootEndpointReportsReadyWithoutAReader(t *testing.T) {
 	}
 }
 
-// A booting environment must still answer /api/boot — that endpoint is
-// what the progress screen polls, so returning an error there would
-// leave the candidate with nothing to look at during the exact window
-// the endpoint exists to cover.
 func TestBootEndpointReportsBooting(t *testing.T) {
 	ts := newBootingTestServer(t)
 
@@ -742,8 +688,6 @@ func TestBootEndpointReportsBooting(t *testing.T) {
 	}
 }
 
-// Starting an attempt against a half-built cluster burns real exam time
-// on questions whose seed data does not exist yet.
 func TestSessionStartRefusedWhileBooting(t *testing.T) {
 	ts := newBootingTestServer(t)
 
@@ -756,10 +700,6 @@ func TestSessionStartRefusedWhileBooting(t *testing.T) {
 	}
 }
 
-// The compose healthcheck points at /healthz. It must keep reporting the
-// process's own health and must not start depending on cluster
-// readiness, or the facilitator would be marked unhealthy for the whole
-// of a boot it is deliberately meant to serve through.
 func TestHealthzIndependentOfBootState(t *testing.T) {
 	ts := newBootingTestServer(t)
 
@@ -769,8 +709,6 @@ func TestHealthzIndependentOfBootState(t *testing.T) {
 	}
 }
 
-// examModes is the "modes" slice of GET /api/exam, decoded on its own so
-// this test does not have to widen the examResponse fixture above.
 type examModesResponse struct {
 	Modes []struct {
 		ID              string `json:"id"`
@@ -788,7 +726,6 @@ func TestExamModes(t *testing.T) {
 	rec := ts.do(t, http.MethodGet, "/api/exam")
 	got := decodeJSON[examModesResponse](t, rec).Modes
 
-	// Order is the order the mode screen offers them: gentlest first.
 	want := []string{session.ModeTraining, session.ModeSpeed, session.ModeExam}
 	if len(got) != len(want) {
 		t.Fatalf("len(Modes) = %d, want %d", len(got), len(want))
@@ -799,8 +736,6 @@ func TestExamModes(t *testing.T) {
 		}
 	}
 
-	// The clocks come from the bank: 600s duration, so a speed run is
-	// half of it, and training has no clock at all.
 	if got[0].DurationSeconds != 0 || !got[0].Untimed {
 		t.Errorf("training = %+v, want durationSeconds=0 untimed=true", got[0])
 	}
@@ -811,7 +746,6 @@ func TestExamModes(t *testing.T) {
 		t.Errorf("exam = %+v, want durationSeconds=600 untimed=false", got[2])
 	}
 
-	// Exactly one card is accented, and it is not the untimed one.
 	accented := ""
 	for _, m := range got {
 		if m.Recommended {
@@ -825,7 +759,6 @@ func TestExamModes(t *testing.T) {
 		t.Errorf("recommended mode = %q, want %q", accented, session.ModeSpeed)
 	}
 
-	// Training is practice, not a sitting.
 	if got[0].Recorded {
 		t.Error("training.Recorded = true, want false")
 	}
@@ -834,25 +767,18 @@ func TestExamModes(t *testing.T) {
 	}
 }
 
-// TestExamModesMatchEnforcement is the point of describing modes on the
-// server: a card must not be able to promise something the handlers then
-// refuse. It starts an attempt in each advertised mode and checks the
-// two gated endpoints against that mode's own flags.
 func TestExamModesMatchEnforcement(t *testing.T) {
 	ts := newTestServer(t)
 	modes := decodeJSON[examModesResponse](t, ts.do(t, http.MethodGet, "/api/exam")).Modes
 
 	for _, m := range modes {
 		t.Run(m.ID, func(t *testing.T) {
-			// A fresh manager per subtest: Start is a one-way transition.
+
 			ts := newTestServer(t)
 			if _, err := ts.mgr.Start(m.ID, time.Hour); err != nil {
 				t.Fatalf("Start(%q): %v", m.ID, err)
 			}
 
-			// 403 is the gate's answer specifically. A hintless question
-			// (404) or an absent practice grader (501) means the request
-			// got past the gate, which is what these assert.
 			hint := ts.do(t, http.MethodGet, "/api/questions/q01/hints/1")
 			if forbidden := hint.Code == http.StatusForbidden; forbidden == m.HelpAllowed {
 				t.Errorf("hints: status %d with helpAllowed=%v", hint.Code, m.HelpAllowed)

@@ -12,21 +12,8 @@ import (
 	"kubestronaut-sim/facilitator/internal/api"
 )
 
-// seedTimeout bounds one call to the conductor's seed endpoints.
-//
-// Both calls are fast: POST /api/control/seed registers a job and
-// returns, and GET /api/control/status reads an in-memory snapshot.
-// Neither ever waits for the seeding itself — that is the entire point
-// of the job, and a timeout sized for setup.sh here would hide a
-// conductor that had stopped answering behind minutes of patience.
 const seedTimeout = 10 * time.Second
 
-// conductorSeeder is api.Seeder over the conductor's HTTP control API.
-//
-// It reaches for exactly two routes and cannot be talked into another,
-// for the same reason newBanksFetcher reaches for one: the conductor's
-// endpoints rebuild clusters, and this client is constructed from a base
-// URL rather than handed a path by anything upstream.
 type conductorSeeder struct {
 	client    *http.Client
 	seedURL   string
@@ -62,10 +49,7 @@ func (c *conductorSeeder) Start(ctx context.Context, questions []string) (string
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusAccepted {
-		// The conductor's own words, not a status code restated: it knows
-		// whether this was a control job in flight, a session it can see
-		// running, or a question id it does not recognise, and the
-		// candidate is about to be told why nothing happened.
+
 		var errBody struct {
 			Error string `json:"error"`
 		}
@@ -90,13 +74,6 @@ func (c *conductorSeeder) Start(ctx context.Context, questions []string) (string
 	return ok.Job.ID, nil
 }
 
-// Status maps the conductor's single-job snapshot onto the four
-// outcomes the facilitator distinguishes.
-//
-// The conductor keeps exactly one in-flight job and one settled one, so
-// a jobID that matches neither is genuinely gone — the conductor
-// restarted, or another operation displaced it — and that is reported as
-// unknown rather than guessed at in either direction.
 func (c *conductorSeeder) Status(ctx context.Context, jobID string) (api.SeedStatus, error) {
 	ctx, cancel := context.WithTimeout(ctx, seedTimeout)
 	defer cancel()

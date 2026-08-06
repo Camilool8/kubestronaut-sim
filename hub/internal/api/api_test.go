@@ -50,10 +50,6 @@ func do(s *Server, r *http.Request) *httptest.ResponseRecorder {
 	return w
 }
 
-// /api/me answers 200 even when nobody is logged in. That is the whole
-// mechanism the SPA uses to tell a hub from a local facilitator, which
-// JSON-404s any /api/* it does not know — a 401 here would conflate
-// "hosted, logged out" with "not hosted".
 func TestMeAnswers200WhenLoggedOut(t *testing.T) {
 	s, _ := newServer(t, auth.ModeGitHub)
 
@@ -99,8 +95,6 @@ func TestHistoryRequiresASession(t *testing.T) {
 	}
 }
 
-// The stored record comes back byte-identical, because the UI renders it
-// with the same components it uses against a local facilitator.
 func TestHistoryReturnsTheStoredRecordUnchanged(t *testing.T) {
 	s, st := newServer(t, auth.ModeGitHub)
 	rec := json.RawMessage(`{"id":"a1","gradedAt":"2026-08-03T10:00:00Z","earned":170,"total":180,"aNewField":true}`)
@@ -126,12 +120,6 @@ func TestHistoryReturnsTheStoredRecordUnchanged(t *testing.T) {
 	}
 }
 
-// The dashboard shape, not the interchange one.
-//
-// Progress.tsx reads `summary.weakDomains` without checking and lists
-// attempts newest first. Serving store.Document here — versioned,
-// oldest first, no summary — renders a blank dashboard rather than a
-// visibly wrong one, which is the failure mode worth a test.
 func TestHistoryIsTheDashboardShapeNotTheExportShape(t *testing.T) {
 	s, st := newServer(t, auth.ModeGitHub)
 	for _, rec := range []string{
@@ -180,9 +168,6 @@ func TestHistoryIsTheDashboardShapeNotTheExportShape(t *testing.T) {
 	}
 }
 
-// Export stays the interchange document: versioned, oldest first, and
-// importable by a local `./sim`. That is the whole reason hosted export
-// exists while hosted import is refused.
 func TestExportIsStillTheInterchangeDocument(t *testing.T) {
 	s, st := newServer(t, auth.ModeGitHub)
 	if _, err := st.Add("583231", json.RawMessage(`{"id":"a1","gradedAt":"2026-08-03T10:00:00Z"}`), nil); err != nil {
@@ -201,8 +186,6 @@ func TestExportIsStillTheInterchangeDocument(t *testing.T) {
 	}
 }
 
-// The sharpest property in this package: one user must never be able to
-// read another's attempt, even knowing its ID exactly.
 func TestOneUserCannotReadAnothersAttempt(t *testing.T) {
 	s, st := newServer(t, auth.ModeGitHub)
 	rec := json.RawMessage(`{"id":"secret1","gradedAt":"2026-08-03T10:00:00Z"}`)
@@ -211,14 +194,12 @@ func TestOneUserCannotReadAnothersAttempt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The owner can read it.
 	own := httptest.NewRequest(http.MethodGet, "/api/history/secret1", nil)
 	own.AddCookie(login(t, s, "583231", "octocat"))
 	if w := do(s, own); w.Code != http.StatusOK {
 		t.Fatalf("owner got %d, want 200", w.Code)
 	}
 
-	// Someone else, with the exact ID, does not.
 	other := httptest.NewRequest(http.MethodGet, "/api/history/secret1", nil)
 	other.AddCookie(login(t, s, "999999", "attacker"))
 	w := do(s, other)
@@ -272,8 +253,6 @@ func TestLoginSetsStateAndRedirectsToGitHub(t *testing.T) {
 	}
 }
 
-// Without this check an attacker can complete a login flow in someone
-// else's browser and leave them signed in as the attacker.
 func TestCallbackRejectsAMismatchedState(t *testing.T) {
 	s, _ := newServer(t, auth.ModeGitHub)
 	s.Auth.GitHub = auth.NewGitHub("cid", "csecret", "https://hub.example/hub/auth/callback")
@@ -327,7 +306,7 @@ func TestCallbackCompletesTheLogin(t *testing.T) {
 	if session == nil {
 		t.Fatal("callback issued no session cookie")
 	}
-	// And that cookie really identifies the GitHub user.
+
 	check := httptest.NewRequest(http.MethodGet, "/api/me", nil)
 	check.AddCookie(session)
 	var body me
@@ -337,8 +316,6 @@ func TestCallbackCompletesTheLogin(t *testing.T) {
 	}
 }
 
-// Header mode is for a deployment that already terminates auth upstream;
-// GitHub's routes must not pretend to work there.
 func TestLoginRoutesAreAbsentOutsideGitHubMode(t *testing.T) {
 	s, _ := newServer(t, auth.ModeHeader)
 	for _, path := range []string{"/hub/auth/login", "/hub/auth/callback"} {

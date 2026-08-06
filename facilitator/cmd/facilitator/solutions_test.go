@@ -8,8 +8,6 @@ import (
 	"kubestronaut-sim/facilitator/internal/exam"
 )
 
-// bankWithSolutions writes a bank directory holding a solution.md for
-// each id given, and returns its path.
 func bankWithSolutions(t *testing.T, ids ...string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -27,9 +25,6 @@ func bankWithSolutions(t *testing.T, ids ...string) string {
 
 func quiet(string, ...any) {}
 
-// The reason this exists at all: a stored attempt is read back after the
-// Pod that held the bank is gone, so the reference solution has to
-// travel with it or the review screen can only ever say what went wrong.
 func TestStoredAttemptsCarryTheReferenceSolution(t *testing.T) {
 	dir := bankWithSolutions(t, "q01", "q02")
 
@@ -46,10 +41,6 @@ func TestStoredAttemptsCarryTheReferenceSolution(t *testing.T) {
 	}
 }
 
-// The live document is what GET /api/results serves, including a
-// training-mode practice grade taken MID-session — which is exactly
-// where the solution endpoint answers 403. Writing a solution into it
-// would hand one out through the door that is meant to be shut.
 func TestEnrichingLeavesTheLiveDocumentAlone(t *testing.T) {
 	dir := bankWithSolutions(t, "q01", "q02")
 	live := gradedResults()
@@ -69,8 +60,6 @@ func TestEnrichingLeavesTheLiveDocumentAlone(t *testing.T) {
 	}
 }
 
-// A bank author attached upstream reading to a question; it is served
-// with the solution live, so it has to be stored with the solution too.
 func TestStoredAttemptsCarryTheQuestionDocs(t *testing.T) {
 	dir := bankWithSolutions(t, "q01", "q02")
 	ex := recorderExam()
@@ -90,10 +79,6 @@ func TestStoredAttemptsCarryTheQuestionDocs(t *testing.T) {
 	}
 }
 
-// One unreadable file must not cost the candidate the attempt. The
-// question simply stores without a solution, which is what every attempt
-// recorded before this existed looks like — and the review screen
-// already renders that.
 func TestAMissingSolutionFileDoesNotLoseTheAttempt(t *testing.T) {
 	dir := bankWithSolutions(t, "q01")
 
@@ -110,8 +95,6 @@ func TestAMissingSolutionFileDoesNotLoseTheAttempt(t *testing.T) {
 	}
 }
 
-// `./sim up` sets no BANK_DIR in some direct/dev runs, and a nil results
-// document reaches here from a grade that produced nothing.
 func TestEnrichingIsANoOpWithoutABank(t *testing.T) {
 	live := gradedResults()
 	if got := withSolutions(live, recorderExam(), "", quiet); got != live {

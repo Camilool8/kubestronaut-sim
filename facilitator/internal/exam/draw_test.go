@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-// drawFixture is poolFixture's kcna-shaped default: four domains with
-// pools deep enough for a 65-question draw to have real choices to make.
 func drawFixture(t *testing.T, examLength int) *Exam {
 	t.Helper()
 	return poolFixture(t, kcnaDomainOrder, kcnaWeights, map[string]int{
@@ -29,10 +27,6 @@ func equalIDs(a, b []string) bool {
 	return true
 }
 
-// The whole promise of a seed: the same seed against the same pool draws
-// the same questions, in the same order, every time. Without this a
-// candidate cannot re-sit the exam they just failed, and two people
-// cannot sit the same one.
 func TestDrawSameSeedSamePoolIsIdentical(t *testing.T) {
 	e := drawFixture(t, 65)
 
@@ -56,9 +50,6 @@ func TestDrawSameSeedSamePoolIsIdentical(t *testing.T) {
 	}
 }
 
-// A seed only reproduces a draw WITHIN one pool. Edit the bank and the
-// same seed is a different exam — which is exactly why the digest
-// travels beside the seed rather than the seed being trusted alone.
 func TestDrawSameSeedChangedPoolDiffers(t *testing.T) {
 	e := drawFixture(t, 65)
 	before, err := Draw(e, DrawOptions{Seed: "a1b2c3"})
@@ -66,7 +57,6 @@ func TestDrawSameSeedChangedPoolDiffers(t *testing.T) {
 		t.Fatalf("Draw (before): %v", err)
 	}
 
-	// One question retired out of the Fundamentals pool.
 	trimmed := *e
 	trimmed.Questions = nil
 	for _, q := range e.Questions {
@@ -91,10 +81,6 @@ func TestDrawSameSeedChangedPoolDiffers(t *testing.T) {
 	}
 }
 
-// The digest must be blind to everything a draw does not depend on. A
-// reworded stem, a fixed typo in an option, a new hint tier: none of
-// them changes which questions exist, so none may invalidate a seed
-// somebody wrote down.
 func TestPoolDigestIgnoresUnrelatedEdits(t *testing.T) {
 	e := drawFixture(t, 65)
 	before := PoolDigest(e)
@@ -110,7 +96,6 @@ func TestPoolDigestIgnoresUnrelatedEdits(t *testing.T) {
 		t.Errorf("digest changed on an edit that changes no question's identity: %q -> %q", before, got)
 	}
 
-	// Re-domaining one, by contrast, changes what every draw produces.
 	moved := *e
 	moved.Questions = append([]Question(nil), e.Questions...)
 	moved.Questions[3].Domain = "Cloud Native Architecture"
@@ -119,17 +104,13 @@ func TestPoolDigestIgnoresUnrelatedEdits(t *testing.T) {
 	}
 }
 
-// CheckPool is the guard on Subset's deliberate id-skipping: grading a
-// session whose pool has moved on must fail loudly rather than score the
-// intersection and report a confident, wrong total.
 func TestCheckPool(t *testing.T) {
 	e := drawFixture(t, 65)
 
 	if err := CheckPool(e, PoolDigest(e)); err != nil {
 		t.Errorf("CheckPool with the matching digest: %v, want nil", err)
 	}
-	// An attempt from before digests existed carries none, and is not
-	// second-guessed.
+
 	if err := CheckPool(e, ""); err != nil {
 		t.Errorf("CheckPool with no digest: %v, want nil", err)
 	}
@@ -146,9 +127,6 @@ func TestCheckPool(t *testing.T) {
 	}
 }
 
-// A malformed seed is refused, not silently replaced: a candidate who
-// mistypes the seed they wanted to replay must be told, not handed a
-// different exam that looks like the one they asked for.
 func TestDrawRejectsMalformedSeed(t *testing.T) {
 	e := drawFixture(t, 65)
 	for _, seed := range []string{"A1B2C3", "abc", "a1b2c3d", "zzzzzz", "a1b2c 3", "0x1234"} {
@@ -163,9 +141,6 @@ func TestDrawRejectsMalformedSeed(t *testing.T) {
 	}
 }
 
-// Every attempt has a seed whether or not anyone asked for one, so every
-// attempt is replayable after the fact rather than only if the candidate
-// thought to plan for it.
 func TestDrawMintsASeedWhenNoneGiven(t *testing.T) {
 	e := drawFixture(t, 65)
 	res, err := Draw(e, DrawOptions{})
@@ -175,7 +150,7 @@ func TestDrawMintsASeedWhenNoneGiven(t *testing.T) {
 	if !seedPattern.MatchString(res.Seed) {
 		t.Errorf("minted seed = %q, want six lowercase hex digits", res.Seed)
 	}
-	// And it is the seed that was actually used.
+
 	replay, err := Draw(e, DrawOptions{Seed: res.Seed})
 	if err != nil {
 		t.Fatalf("Draw (replay): %v", err)
@@ -185,10 +160,6 @@ func TestDrawMintsASeedWhenNoneGiven(t *testing.T) {
 	}
 }
 
-// A domain filter narrows an MCQ draw to those domains and nothing else,
-// and the questions inside them still divide by the curriculum's
-// published ratios — renormalized over the domains that remain, since
-// two of four weights do not sum to 100.
 func TestDrawDomainFilterNarrowsMCQ(t *testing.T) {
 	e := drawFixture(t, 10)
 	res, err := Draw(e, DrawOptions{
@@ -214,8 +185,7 @@ func TestDrawDomainFilterNarrowsMCQ(t *testing.T) {
 		}
 		counts[q.Domain]++
 	}
-	// 44 and 28 renormalized over 72: 6.11 and 3.89 of 10, so 6 and 4
-	// after the leftover slot goes to the larger remainder.
+
 	if counts["Kubernetes Fundamentals"] != 6 || counts["Container Orchestration"] != 4 {
 		t.Errorf("domain counts = %v, want 6 Fundamentals and 4 Orchestration", counts)
 	}
@@ -223,17 +193,12 @@ func TestDrawDomainFilterNarrowsMCQ(t *testing.T) {
 		t.Errorf("drew from %d domains, want exactly the 2 requested", len(counts))
 	}
 
-	// Normalized back into bank order, whatever order it was asked for.
 	want := []string{"Kubernetes Fundamentals", "Container Orchestration"}
 	if !equalIDs(res.Domains, want) {
 		t.Errorf("Domains = %v, want %v (bank order)", res.Domains, want)
 	}
 }
 
-// The filter applies to the hands-on engine too. There is no draw to
-// speak of there — every in-scope question is included, in bank order —
-// but which questions are in scope is exactly what the filter decides,
-// and bootstrap.sh has seeded all of them into the cluster regardless.
 func TestDrawDomainFilterNarrowsHandsOn(t *testing.T) {
 	e := &Exam{
 		Type:          TypeHandsOn,
@@ -267,9 +232,6 @@ func TestDrawDomainFilterNarrowsHandsOn(t *testing.T) {
 	}
 }
 
-// A domain the bank does not have is a mistake worth naming. Drawing
-// zero questions from it and starting the attempt anyway would look like
-// a working exam right up until the score.
 func TestDrawUnknownDomainIsARequestError(t *testing.T) {
 	e := drawFixture(t, 65)
 	_, err := Draw(e, DrawOptions{Domains: []string{"Kubernetes Fundamentals", "Networking"}})
@@ -284,10 +246,6 @@ func TestDrawUnknownDomainIsARequestError(t *testing.T) {
 	}
 }
 
-// Naming every domain is the whole curriculum said the long way.
-// Recording it as a filter would make a full-coverage attempt — the only
-// kind a "passed" claim rests on — look narrowed for the rest of its
-// life.
 func TestDrawFilterNamingEveryDomainIsNoFilter(t *testing.T) {
 	e := drawFixture(t, 65)
 	res, err := Draw(e, DrawOptions{Seed: "abc123", Domains: kcnaDomainOrder})
@@ -306,16 +264,13 @@ func TestDrawFilterNamingEveryDomainIsNoFilter(t *testing.T) {
 	}
 }
 
-// An authored targetSeconds is the author's judgement and is reported
-// as such; a derived one is arithmetic over the question's share of the
-// exam clock, and must say so.
 func TestTargetSecondsAuthoredAndDerived(t *testing.T) {
-	// ckad-mock-01's shape: 22 questions, 180 points, a 120-minute clock.
+
 	handsOn := &Exam{Type: TypeHandsOn, Duration: 2 * time.Hour}
 	for i := 0; i < 20; i++ {
 		handsOn.Questions = append(handsOn.Questions, Question{ID: "q", Domain: "d", Weight: 9})
 	}
-	// 20 * 9 = 180 points over 7200s, so a 9-point question is worth 360s.
+
 	got, derived := TargetSeconds(handsOn, handsOn.Questions[0])
 	if got != 360 || !derived {
 		t.Errorf("derived hands-on target = %ds (derived=%v), want 360s derived", got, derived)
@@ -329,10 +284,6 @@ func TestTargetSecondsAuthoredAndDerived(t *testing.T) {
 	}
 }
 
-// The divisor is the weight ONE ATTEMPT carries, not the pool's. kcna's
-// 90 minutes are spread across the 65 questions a candidate gets, not
-// across the 97 the bank authored — dividing by the pool would advertise
-// 56 seconds a question for an exam that gives 83.
 func TestTargetSecondsDividesTheDrawNotThePool(t *testing.T) {
 	pooled := &Exam{Type: TypeMCQ, Duration: 90 * time.Minute, ExamLength: 65}
 	for i := 0; i < 97; i++ {
@@ -347,27 +298,18 @@ func TestTargetSecondsDividesTheDrawNotThePool(t *testing.T) {
 	}
 }
 
-// An untimed attempt has no clock to divide, so the budget comes from
-// the bank's declared duration — the exam this practice is practice for
-// — rather than collapsing to zero.
 func TestTargetSecondsUsesTheBankClockNotTheAttempts(t *testing.T) {
 	e := &Exam{Type: TypeMCQ, Duration: 90 * time.Minute, ExamLength: 65}
 	for i := 0; i < 97; i++ {
 		e.Questions = append(e.Questions, Question{ID: "q", Domain: "d", Weight: 1})
 	}
-	// TargetSeconds never sees an attempt at all, which is the point:
-	// there is no parameter through which a training attempt's zero
-	// clock could reach it.
+
 	got, _ := TargetSeconds(e, e.Questions[0])
 	if got != 83 {
 		t.Errorf("target = %ds, want 83s from the bank's own duration", got)
 	}
 }
 
-// The keyed stream must produce a uniform shuffle, not a plausible-
-// looking one. A biased intn is invisible in any single draw and shows
-// up only as certain questions appearing more often than others across a
-// candidate's whole practice history.
 func TestDrawStreamIntnCoversItsRange(t *testing.T) {
 	counts := make([]int, 7)
 	s := newDrawStream("abc123", "label")
@@ -381,17 +323,13 @@ func TestDrawStreamIntnCoversItsRange(t *testing.T) {
 	}
 	want := rounds / len(counts)
 	for v, n := range counts {
-		// Deterministic input, so this threshold cannot flake: it either
-		// holds for this stream or the test fails on every run.
+
 		if n < want*9/10 || n > want*11/10 {
 			t.Errorf("value %d came up %d times, want within 10%% of %d", v, n, want)
 		}
 	}
 }
 
-// Two different labels under one seed must not be the same stream —
-// otherwise every domain would shuffle identically, and a pool laid out
-// the same way in two domains would draw the same positions from both.
 func TestDrawStreamLabelsAreIndependent(t *testing.T) {
 	ids := []string{"1", "2", "3", "4", "5", "6", "7", "8"}
 	a := shuffle(ids, "abc123", "Domain A")

@@ -89,11 +89,6 @@ func TestLoadBuildsEntriesFromBankJSON(t *testing.T) {
 	}
 }
 
-// The two counts are separate numbers and the exam card prints them as a
-// pair, so a bank that draws a subset must report both. Getting this
-// wrong in the direction that matters — PoolCount collapsing to the draw
-// size — would make a 97-question pool advertise itself as 65 with no
-// visible symptom anywhere.
 func TestPooledBankReportsDrawSizeAndPoolSeparately(t *testing.T) {
 	dir := t.TempDir()
 	pooled := `{
@@ -124,8 +119,6 @@ func TestPooledBankReportsDrawSizeAndPoolSeparately(t *testing.T) {
 	}
 }
 
-// Banks whose instances fall outside the fixed instance-1/instance-2
-// topology cannot run on this stack; they must be listed but disabled.
 func TestNonConformingInstanceNamesAreUnavailable(t *testing.T) {
 	c, err := Load(writeFixtures(t))
 	if err != nil {
@@ -184,8 +177,6 @@ func TestSwitchableRejectsUnavailableAndUnknown(t *testing.T) {
 	}
 }
 
-// A real mcq bank is runnable now that the engine exists: available,
-// switchable, and it shadows any coming-soon entry of the same id.
 func TestMCQBankIsAvailableAndSwitchable(t *testing.T) {
 	dir := writeFixtures(t)
 	mcq := `{
@@ -222,9 +213,6 @@ func TestMCQBankIsAvailableAndSwitchable(t *testing.T) {
 	}
 }
 
-// Declaring instances in an mcq bank is an authoring mistake: nothing
-// would ever ssh to them, so the bank is listed but disabled with a
-// reason rather than silently accepted.
 func TestMCQBankWithInstancesIsUnavailable(t *testing.T) {
 	dir := t.TempDir()
 	mcq := `{
@@ -255,7 +243,6 @@ func TestMCQBankWithInstancesIsUnavailable(t *testing.T) {
 	}
 }
 
-// Exam types neither engine implements stay advertised-but-disabled.
 func TestUnknownExamTypeStaysUnavailable(t *testing.T) {
 	dir := t.TempDir()
 	doc := `{
@@ -278,11 +265,6 @@ func TestUnknownExamTypeStaysUnavailable(t *testing.T) {
 	}
 }
 
-// A hidden bank is the mechanism that lets tests/smoke.sh keep covering
-// the whole bank-switch path now that the CKA bank is gone. It has to be
-// invisible in the lobby and simultaneously a legal switch target — if
-// either half breaks, the fixture is either an exam candidates can pick
-// or a switch test that cannot run.
 func TestHiddenBankIsSwitchableButNotListed(t *testing.T) {
 	dir := t.TempDir()
 	hidden := `{
@@ -334,8 +316,6 @@ func TestHiddenBankIsSwitchableButNotListed(t *testing.T) {
 	}
 }
 
-// Hidden must never reach the wire: the UI has no use for it and no
-// business learning the fixture exists.
 func TestHiddenIsNotSerialised(t *testing.T) {
 	e := Entry{ID: "smoke-01", Hidden: true, Available: true}
 	raw, err := json.Marshal(e)

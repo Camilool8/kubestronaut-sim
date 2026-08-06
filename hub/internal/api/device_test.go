@@ -10,8 +10,6 @@ import (
 	"kubestronaut-sim/hub/internal/session"
 )
 
-// coarse is a request from a client that measured itself and found no
-// precise pointer — a phone or a tablet.
 func coarse(r *http.Request) *http.Request {
 	r.Header.Set(pointerHeader, "coarse")
 	return r
@@ -28,11 +26,6 @@ func codeOf(t *testing.T, w *httptest.ResponseRecorder) string {
 	return body.Code
 }
 
-// The whole point of putting the guard in the hub rather than only in
-// the facilitator: a hands-on seat granted to a phone is a Pod boot
-// nobody benefits from, and — when the pool is full — a place in the
-// queue taken from a candidate who could have sat the exam. Refusing
-// after admission would cost both.
 func TestAPhoneIsRefusedAHandsOnSeatBeforeItIsSpent(t *testing.T) {
 	s, mgr := hosted(t, 1, nil)
 	c := login(t, s, "583231", "octocat")
@@ -47,9 +40,7 @@ func TestAPhoneIsRefusedAHandsOnSeatBeforeItIsSpent(t *testing.T) {
 	if got := codeOf(t, w); got != codeDesktopRequired {
 		t.Errorf("code = %q, want %q — the SPA answers this with a screen", got, codeDesktopRequired)
 	}
-	// The assertion that makes this test worth having. A refusal that
-	// still claimed the seat would leave the pool one short with nothing
-	// running in it.
+
 	if used := mgr.Seats()[session.Practical][0]; used != 0 {
 		t.Errorf("seats used = %d, want 0: the seat must not be claimed and then refused", used)
 	}
@@ -58,9 +49,6 @@ func TestAPhoneIsRefusedAHandsOnSeatBeforeItIsSpent(t *testing.T) {
 	}
 }
 
-// The other half of the same rule, and the one that would be easy to
-// break by gating the endpoint instead of the kind. Multiple choice
-// needs no cluster, no terminal and no keyboard.
 func TestAPhoneMayStillTakeAnMcqSeat(t *testing.T) {
 	s, c := hostedWithExams(t, okHandler())
 
@@ -71,9 +59,6 @@ func TestAPhoneMayStillTakeAnMcqSeat(t *testing.T) {
 	}
 }
 
-// A named hands-on exam is refused on the exam's own engine, not on the
-// `kind` the client happened to send — the same direction the rest of
-// this handler resolves the two.
 func TestANamedHandsOnExamIsRefusedOnAPhone(t *testing.T) {
 	s, c := hostedWithExams(t, okHandler())
 
@@ -86,10 +71,6 @@ func TestANamedHandsOnExamIsRefusedOnAPhone(t *testing.T) {
 	}
 }
 
-// `./sim`, tests/smoke.sh and every curl POST send no header at all, and
-// an older SPA sends none either. They must keep working unchanged: this
-// is UX fidelity, not security, and a missing header means "could not
-// tell" rather than "coarse".
 func TestAClientThatSaysNothingIsStillAdmitted(t *testing.T) {
 	s, _ := hosted(t, 1, nil)
 	r := httptest.NewRequest(http.MethodPost, "/api/session/start", nil)
@@ -100,9 +81,6 @@ func TestAClientThatSaysNothingIsStillAdmitted(t *testing.T) {
 	}
 }
 
-// A laptop declares itself too. The positive answer has to be admitted
-// as readily as the absent one, or the guard would turn away every
-// client that cooperates with it.
 func TestAFinePointerIsAdmitted(t *testing.T) {
 	s, _ := hosted(t, 1, nil)
 	r := httptest.NewRequest(http.MethodPost, "/api/session/start", nil)
@@ -114,10 +92,6 @@ func TestAFinePointerIsAdmitted(t *testing.T) {
 	}
 }
 
-// A switch is two to four destructive minutes of rebuilding. The seat
-// behind it was granted to a client that could use it, so this only
-// catches a device that changed under the session — a laptop closed and
-// the tab reopened on a phone.
 func TestASwitchToAHandsOnExamIsRefusedOnAPhone(t *testing.T) {
 	s, c := hostedWithExams(t, okHandler())
 	if w := ready(t, s, c, `{"bank":"ckad-mock-01"}`); w.Code != http.StatusOK {

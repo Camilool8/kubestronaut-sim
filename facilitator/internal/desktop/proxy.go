@@ -1,19 +1,3 @@
-// Package desktop reverse-proxies the noVNC desktop container so the exam
-// UI can iframe it same-origin, gating all access behind the exam
-// session's running state.
-//
-// The returned handler is mounted at the "/desktop/" prefix (and "GET
-// /desktop" is routed to it separately for the bare-path redirect) by the
-// API layer; it works from the request's original, unstripped path,
-// stripping the "/desktop" prefix itself before deciding whether to lock
-// or proxy.
-//
-// While locked, every request is rejected with 403 and the backend is
-// never dialed at all — not even to check its health. WebSocket Upgrade
-// requests (noVNC's own websockify endpoint) pass straight through the
-// stdlib httputil.ReverseProxy's built-in 101 Switching Protocols
-// handling while unlocked, since it hijacks the client connection itself;
-// this package adds nothing special for them.
 package desktop
 
 import (
@@ -22,24 +6,8 @@ import (
 	"strings"
 )
 
-// prefix is the path this handler is mounted under. It is stripped from
-// the request path before proxying or deciding whether a locked response
-// should look like an HTML page or plain text.
 const prefix = "/desktop"
 
-// New returns a handler that reverse-proxies to target (a "host:port"
-// address, e.g. "desktop:6080") every request whose path is "/desktop" or
-// begins with "/desktop/".
-//
-// unlocked reports whether the desktop may currently be used (i.e.
-// whether an exam session is running); it is called once per request.
-// While it returns false, the handler responds 403 without dialing
-// target at all: requests whose stripped path ends in ".html" or is
-// exactly "/" get a small dark HTML page saying the desktop is locked and
-// to use the exam UI; every other request gets a plain-text 403.
-//
-// "GET /desktop" (no trailing slash) always 308-redirects to "/desktop/",
-// preserving any query string, regardless of lock state.
 func New(target string, unlocked func() bool) http.Handler {
 	proxy := &httputil.ReverseProxy{
 		FlushInterval: -1,
@@ -48,7 +16,7 @@ func New(target string, unlocked func() bool) http.Handler {
 			pr.Out.URL.Host = target
 			pr.Out.URL.Path = stripPrefix(pr.In.URL.Path)
 			pr.Out.URL.RawPath = ""
-			pr.Out.Host = "" // use pr.Out.URL.Host as the outbound Host header
+			pr.Out.Host = ""
 		},
 	}
 
@@ -67,10 +35,6 @@ func New(target string, unlocked func() bool) http.Handler {
 	})
 }
 
-// stripPrefix removes the "/desktop" mount prefix from p, the request's
-// original path, returning "/" for exactly "/desktop/". If p does not
-// have the prefix at all (which the handler above never actually passes
-// in), it is returned unchanged.
 func stripPrefix(p string) string {
 	if rest, ok := strings.CutPrefix(p, prefix+"/"); ok {
 		return "/" + rest
@@ -78,8 +42,6 @@ func stripPrefix(p string) string {
 	return p
 }
 
-// redirectToSlash sends a 308 permanent redirect from "/desktop" to
-// "/desktop/", preserving any query string.
 func redirectToSlash(w http.ResponseWriter, r *http.Request) {
 	target := prefix + "/"
 	if r.URL.RawQuery != "" {
@@ -88,12 +50,6 @@ func redirectToSlash(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, target, http.StatusPermanentRedirect)
 }
 
-// writeLocked writes the 403 response served while the desktop is locked.
-// strippedPath is the request path with the "/desktop" prefix already
-// removed. Paths that render as a browser navigation — the desktop root
-// "/" or anything ending in ".html" — get a small dark HTML page; every
-// other path (e.g. noVNC's own asset or websocket requests) gets a
-// plain-text body, since nothing renders those for a human to read.
 func writeLocked(w http.ResponseWriter, strippedPath string) {
 	if strippedPath == "/" || strings.HasSuffix(strippedPath, ".html") {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -106,14 +62,8 @@ func writeLocked(w http.ResponseWriter, strippedPath string) {
 	w.Write([]byte(lockedText))
 }
 
-// lockedText is the plain-text body for non-navigational locked requests.
 const lockedText = "desktop locked: no exam session is running\n"
 
-// lockedHTML is the small self-contained locked page shown for
-// navigational locked requests (the desktop root or any *.html asset).
-// It mirrors the SPA's design tokens (ui/src/styles/tokens.css) and
-// reads the SAME localStorage theme key the React app writes — same
-// origin, so a candidate's theme choice carries over seamlessly.
 const lockedHTML = `<!doctype html>
 <html>
 <head>

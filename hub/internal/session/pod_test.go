@@ -50,16 +50,12 @@ func TestRenderNamesAndLabelsThePod(t *testing.T) {
 	if labels["kubestronaut-sim/user"] != "583231" {
 		t.Errorf("user label = %v", labels["kubestronaut-sim/user"])
 	}
-	// Patching labels must add to the template's, not replace them.
+
 	if labels["app.kubernetes.io/name"] != "kubestronaut-sim" {
 		t.Error("the template's own labels were dropped")
 	}
 }
 
-// The sharp one. BANK appears in four containers plus the init
-// container, and a render that sets it in three of them gives the
-// candidate a docs proxy allowing one exam's sites while the facilitator
-// serves another's questions — a session that looks fine and is wrong.
 func TestRenderSetsBankInEveryContainerThatTakesOne(t *testing.T) {
 	pod := render(t, twoContainers, patch{Name: "p", Bank: "ckad-mock-02"})
 	spec := pod["spec"].(map[string]any)
@@ -84,8 +80,7 @@ func TestRenderSetsBankInEveryContainerThatTakesOne(t *testing.T) {
 	if seen != 3 {
 		t.Errorf("set BANK in %d places, want 3", seen)
 	}
-	// A container with no BANK does not acquire one: the hub patches the
-	// manifest, it does not invent spec the manifest never declared.
+
 	for _, c := range spec["containers"].([]any) {
 		container := c.(map[string]any)
 		if container["name"] == "registry" {
@@ -96,10 +91,6 @@ func TestRenderSetsBankInEveryContainerThatTakesOne(t *testing.T) {
 	}
 }
 
-// The reason the template is decoded to map[string]any rather than to a
-// typed PodSpec: a field this package has never heard of must reach the
-// API server. Into a struct, encoding/json discards it silently, and the
-// symptom would be a session missing a volume rather than a build error.
 func TestRenderPreservesFieldsThisPackageDoesNotKnow(t *testing.T) {
 	out, err := Template(twoContainers).render(patch{Name: "p", Bank: "b"})
 	if err != nil {
@@ -162,9 +153,7 @@ func TestRenderSetsTheWebhookOnTheContainerThatDeclaresIt(t *testing.T) {
 	if env["HISTORY_WEBHOOK_TOKEN"] != "tkt" {
 		t.Errorf("token = %v", env["HISTORY_WEBHOOK_TOKEN"])
 	}
-	// The conductor declares neither and must not acquire them: a ticket
-	// is a credential, and it belongs in the one container that has a
-	// use for it.
+
 	for _, e := range containers[1].(map[string]any)["env"].([]any) {
 		if name := e.(map[string]any)["name"]; name != "BANK" {
 			t.Errorf("conductor gained %v", name)
@@ -172,9 +161,6 @@ func TestRenderSetsTheWebhookOnTheContainerThatDeclaresIt(t *testing.T) {
 	}
 }
 
-// A hub told to collect history against a template with nowhere to put
-// the endpoint would run perfectly and record nothing, and the
-// candidate would find out after their exam.
 func TestRenderRefusesAWebhookTheTemplateCannotTake(t *testing.T) {
 	_, err := Template(twoContainers).render(patch{
 		Name:       "p",
@@ -185,8 +171,6 @@ func TestRenderRefusesAWebhookTheTemplateCannotTake(t *testing.T) {
 	}
 }
 
-// No webhook configured is a real deployment, not a broken one: a
-// self-hoster keeping seats and a proxy without a durable history.
 func TestRenderWithNoWebhookLeavesTheTemplateAlone(t *testing.T) {
 	pod := render(t, withWebhook, patch{Name: "p", Bank: "b"})
 	for _, e := range pod["spec"].(map[string]any)["containers"].([]any)[0].(map[string]any)["env"].([]any) {
@@ -197,9 +181,6 @@ func TestRenderWithNoWebhookLeavesTheTemplateAlone(t *testing.T) {
 	}
 }
 
-// generateName wins over name at the API server, so a template carrying
-// both would produce Pods the hub cannot address by the name it thinks
-// it gave them.
 func TestRenderDropsGenerateName(t *testing.T) {
 	pod := render(t, `{"kind":"Pod","metadata":{"generateName":"sim-"},"spec":{"containers":[]}}`,
 		patch{Name: "sim-session-mcq-1"})

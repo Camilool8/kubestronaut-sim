@@ -10,9 +10,6 @@ import (
 	"kubestronaut-sim/conductor/internal/job"
 )
 
-// Unlike reseed, seeding hands back a job to poll: it is minutes of work
-// and the caller has to be able to watch it rather than hold a request
-// open across it.
 func TestSeedReturnsAJobToPoll(t *testing.T) {
 	ops, h := newTestAPI(t)
 
@@ -37,9 +34,6 @@ func TestSeedReturnsAJobToPoll(t *testing.T) {
 	}
 }
 
-// The list reaches the controller exactly as sent, including empty and
-// absent — those are the controller's to reject, because it is the one
-// that knows the bank.
 func TestSeedPassesTheListThrough(t *testing.T) {
 	for _, c := range []struct {
 		name string

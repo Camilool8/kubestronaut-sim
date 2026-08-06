@@ -20,11 +20,6 @@ func record(id, gradedAt string, extra string) json.RawMessage {
 	return json.RawMessage(`{"id":"` + id + `","gradedAt":"` + gradedAt + `"` + extra + `}`)
 }
 
-// The reason attempts are stored as raw JSON rather than as a struct
-// mirroring the facilitator's history.Record: a field this module has
-// never heard of must survive the round trip. A mirrored struct would
-// drop it silently, and the candidate would lose data the facilitator
-// thought it had saved.
 func TestAnUnknownFieldSurvivesVerbatim(t *testing.T) {
 	s := newStore(t)
 	in := record("a1", "2026-08-03T10:00:00Z", `,"aFieldAddedLater":{"nested":[1,2,3]},"percent":91`)
@@ -53,8 +48,6 @@ func TestAnUnknownFieldSurvivesVerbatim(t *testing.T) {
 	}
 }
 
-// Recording is idempotent on the attempt ID: a retried webhook, a
-// duplicate delivery or a recovery re-grade must not double-count.
 func TestAddIsIdempotentOnAttemptID(t *testing.T) {
 	s := newStore(t)
 	first := record("a1", "2026-08-03T10:00:00Z", `,"earned":10`)
@@ -99,8 +92,6 @@ func TestAttemptsComeBackOldestFirst(t *testing.T) {
 	}
 }
 
-// The store turns identifiers into path elements, so an identifier that
-// is not plainly a name is refused rather than escaped.
 func TestTraversalAndOddNamesAreRefused(t *testing.T) {
 	s := newStore(t)
 	good := record("a1", "2026-08-03T10:00:00Z", "")
@@ -121,8 +112,7 @@ func TestTraversalAndOddNamesAreRefused(t *testing.T) {
 			t.Errorf("Results(attempt=%q) error = %v, want ErrBadName", bad, err)
 		}
 	}
-	// And an attempt ID inside the record is an identifier too — it
-	// reaches the filesystem as the results filename.
+
 	evil := record("../../escape", "2026-08-03T10:00:00Z", "")
 	if _, err := s.Add("1234", evil, json.RawMessage(`{"x":1}`)); !errors.Is(err, ErrBadName) {
 		t.Errorf("Add with a traversing attempt id = %v, want ErrBadName", err)
@@ -161,7 +151,7 @@ func TestUsersAreIsolatedAndNewUsersAreEmptyNotAnError(t *testing.T) {
 	if len(doc.Attempts) != 0 {
 		t.Errorf("new user saw %d attempts, want 0", len(doc.Attempts))
 	}
-	// Empty, not null: the UI iterates this without a nil check.
+
 	b, _ := json.Marshal(doc)
 	if !strings.Contains(string(b), `"attempts":[]`) {
 		t.Errorf("empty document marshalled as %s, want an empty array", b)

@@ -1,8 +1,3 @@
-// Package docker is a deliberately tiny Docker Engine API client — just
-// the three calls the conductor needs (find a compose service's
-// container, exec inside it, restart it), stdlib-only, over the mounted
-// unix socket. It exists so the conductor does not need the full docker
-// SDK or a docker CLI binary in its image.
 package docker
 
 import (
@@ -19,16 +14,12 @@ import (
 	"strings"
 )
 
-// apiVersion is the minimum Engine API version carrying everything this
-// client uses; negotiated-down daemons older than this are not supported.
 const apiVersion = "v1.43"
 
-// Client talks to one Docker daemon over its unix socket.
 type Client struct {
 	http *http.Client
 }
 
-// New returns a Client for the daemon behind socketPath.
 func New(socketPath string) *Client {
 	return &Client{
 		http: &http.Client{
@@ -42,8 +33,6 @@ func New(socketPath string) *Client {
 	}
 }
 
-// FindContainer resolves the running container of one compose service by
-// the labels compose stamps on everything it creates.
 func (c *Client) FindContainer(ctx context.Context, project, service string) (string, error) {
 	filters, err := json.Marshal(map[string][]string{
 		"label": {
@@ -68,14 +57,6 @@ func (c *Client) FindContainer(ctx context.Context, project, service string) (st
 	return containers[0].ID, nil
 }
 
-// Exec runs cmd inside containerID, waiting for completion, and returns
-// the exit code plus the combined stdout+stderr output.
-//
-// onLine (may be nil) receives each complete output line as it arrives,
-// not when the command exits. The conductor uses it to surface live
-// progress from multi-minute commands — a kind cluster rebuild prints
-// its own checklist, and without this the UI has nothing to show for
-// minutes at a time.
 func (c *Client) Exec(ctx context.Context, containerID string, cmd []string, onLine func(string)) (int, string, error) {
 	var created struct {
 		ID string `json:"Id"`
@@ -89,9 +70,6 @@ func (c *Client) Exec(ctx context.Context, containerID string, cmd []string, onL
 		return 0, "", fmt.Errorf("docker: create exec: %w", err)
 	}
 
-	// Starting a non-detached exec streams the command's multiplexed
-	// output as the response body; reading it to EOF is what "waits" for
-	// the command to finish.
 	resp, err := c.do(ctx, http.MethodPost, "/exec/"+created.ID+"/start",
 		strings.NewReader(`{"Detach":false,"Tty":false}`), "application/json")
 	if err != nil {
@@ -112,7 +90,6 @@ func (c *Client) Exec(ctx context.Context, containerID string, cmd []string, onL
 	return inspect.ExitCode, output, nil
 }
 
-// Restart restarts containerID, giving it timeoutSec to stop gracefully.
 func (c *Client) Restart(ctx context.Context, containerID string, timeoutSec int) error {
 	resp, err := c.do(ctx, http.MethodPost,
 		fmt.Sprintf("/containers/%s/restart?t=%d", containerID, timeoutSec), nil, "")
@@ -124,8 +101,6 @@ func (c *Client) Restart(ctx context.Context, containerID string, timeoutSec int
 	return nil
 }
 
-// do performs one API request and returns the response, converting any
-// non-2xx status into an error carrying the daemon's message.
 func (c *Client) do(ctx context.Context, method, path string, body io.Reader, contentType string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, method, "http://docker/"+apiVersion+path, body)
 	if err != nil {
@@ -178,22 +153,11 @@ func (c *Client) postJSON(ctx context.Context, path string, in, out any) error {
 	return json.NewDecoder(resp.Body).Decode(out)
 }
 
-// drainExec reads docker's multiplexed exec stream to EOF and returns
-// the combined stdout+stderr output, passing each complete line to
-// onLine (may be nil) as soon as it arrives.
-//
-// The wire format is an 8-byte header — stream byte, 3 zero bytes,
-// big-endian payload length — followed by the payload. Frames arrive
-// split across reads and a single line may span several frames, so both
-// the frame boundary and the line boundary are tracked incrementally.
-// Input that isn't multiplexed (or is truncated mid-frame) is passed
-// through rather than dropped, matching what the daemon does when the
-// exec was allocated a TTY.
 func drainExec(r io.Reader, onLine func(string)) (string, error) {
 	var out bytes.Buffer
 	var line []byte
 	var pending []byte
-	plain := false // the stream turned out not to be stdcopy-framed
+	plain := false
 
 	emit := func(payload []byte) {
 		out.Write(payload)
@@ -225,7 +189,7 @@ func drainExec(r io.Reader, onLine func(string)) (string, error) {
 				}
 				frameEnd := 8 + int(binary.BigEndian.Uint32(pending[4:8]))
 				if frameEnd > len(pending) {
-					break // wait for the rest of this frame
+					break
 				}
 				emit(pending[8:frameEnd])
 				pending = pending[frameEnd:]
@@ -243,8 +207,6 @@ func drainExec(r io.Reader, onLine func(string)) (string, error) {
 		}
 	}
 
-	// Flush a truncated trailing frame, then any final line the command
-	// left without a newline.
 	if len(pending) > 0 {
 		if !plain && len(pending) > 8 {
 			emit(pending[8:])

@@ -11,20 +11,8 @@ import (
 	"kubestronaut-sim/facilitator/internal/exam"
 )
 
-// legacyMessage is the ENTIRE body of gradeCheck's default branch before
-// the artifact protocol existed, copied verbatim:
-//
-//	cr.Message = strings.TrimRight(out, "\n")
-//
-// Every test below that asserts "byte-identical to today" compares
-// against this and nothing else, so the claim cannot drift as
-// splitArtifacts changes.
 func legacyMessage(out string) string { return strings.TrimRight(out, "\n") }
 
-// sampleCheckOutputs is what the 75 shipped CKAD checks actually print,
-// in shape: one short line, a line with quoted values, the multi-line
-// case, the empty case, and the near-misses that must NOT be read as a
-// sentinel. None of them may parse to anything but their own text.
 var sampleCheckOutputs = []string{
 	"",
 	"\n",
@@ -61,11 +49,6 @@ func TestSplitArtifactsLeavesTodaysMessageByteIdentical(t *testing.T) {
 	}
 }
 
-// TestGradeCheckIsUnchangedForChecksWithoutArtifacts is the zero-edit
-// claim at the level that matters: not the parser in isolation, but the
-// CheckResult a real Grade run builds. All 75 shipped CKAD checks emit no
-// sentinel, so every field of their result must be what it was before the
-// protocol existed.
 func TestGradeCheckIsUnchangedForChecksWithoutArtifacts(t *testing.T) {
 	q := exam.Question{ID: "q19", Instance: "instance-1"}
 	c := exam.Check{Name: "10_service.sh", Desc: "the Service selects the Pods", Points: 3}
@@ -86,17 +69,13 @@ func TestGradeCheckIsUnchangedForChecksWithoutArtifacts(t *testing.T) {
 	}
 }
 
-// FuzzSplitArtifactsPreservesMessage generalises the claim past the
-// corpus: for ANY output with no sentinel at column 0, the message is
-// exactly strings.TrimRight(out, "\n") and there are no artifacts. This
-// is the property the 75 unedited checks rely on.
 func FuzzSplitArtifactsPreservesMessage(f *testing.F) {
 	for _, out := range sampleCheckOutputs {
 		f.Add(out)
 	}
 	f.Fuzz(func(t *testing.T, out string) {
 		if sentinelStart(out) >= 0 {
-			return // carries a sentinel; a different contract applies
+			return
 		}
 		msg, arts := splitArtifacts(out)
 		if want := legacyMessage(out); msg != want {
@@ -133,8 +112,7 @@ func TestSplitArtifacts(t *testing.T) {
 }
 
 func TestSplitArtifactsAtStartOfOutput(t *testing.T) {
-	// A check that prints no message at all still parses: the message is
-	// empty, which is what it would have been before the protocol too.
+
 	msg, arts := splitArtifacts("---8<--- sim:artifact why text\nnothing to say first\n")
 	if msg != "" {
 		t.Errorf("message = %q, want empty", msg)
@@ -163,8 +141,6 @@ func TestSplitArtifactsMalformedSentinel(t *testing.T) {
 			out := "the real message\n" + tc.line + "\nkind: Service\napiVersion: v1\n"
 			msg, arts := splitArtifacts(out)
 
-			// A bank typo must never cost the candidate their message,
-			// and must never spill a YAML document into it either.
 			if msg != "the real message" {
 				t.Errorf("message = %q, want %q", msg, "the real message")
 			}
@@ -201,7 +177,7 @@ func TestSplitArtifactsDropsEmptyBodies(t *testing.T) {
 }
 
 func TestSplitArtifactsTruncatesOneOversizedDocument(t *testing.T) {
-	huge := strings.Repeat("a: 0123456789abcdef\n", 2000) // ~40k, well past the per-artifact cap
+	huge := strings.Repeat("a: 0123456789abcdef\n", 2000)
 	msg, arts := splitArtifacts("msg\n---8<--- sim:artifact actual yaml\n" + huge)
 
 	if msg != "msg" {
@@ -231,13 +207,11 @@ func TestSplitArtifactsCapsTheWholeCheck(t *testing.T) {
 	for _, a := range arts {
 		total += len(a.Body)
 	}
-	// Every artifact carries its own marker, so the budget is exceeded by
-	// at most one marker each — never by another document.
+
 	if total > maxCheckArtifactBytes+len(arts)*128 {
 		t.Errorf("kept %d bytes across %d artifacts, want at most the %d-byte budget", total, len(arts), maxCheckArtifactBytes)
 	}
-	// The starved ones are still visible: the explanation screen should
-	// say "expected was too big", not quietly omit the pane.
+
 	last := arts[len(arts)-1]
 	if !strings.Contains(last.Body, "[truncated by the grader:") {
 		t.Errorf("last artifact hides its truncation: %q", last.Body)
@@ -264,10 +238,8 @@ func TestSplitArtifactsCapsTheArtifactCount(t *testing.T) {
 }
 
 func TestSplitArtifactsTruncatesOnARuneBoundary(t *testing.T) {
-	// One line of multi-byte runes, long enough that the cut lands inside
-	// one of them. Invalid UTF-8 would reach the client as U+FFFD with
-	// nothing to say it came from truncation.
-	line := strings.Repeat("日", maxArtifactBytes) // 3 bytes each
+
+	line := strings.Repeat("日", maxArtifactBytes)
 	_, arts := splitArtifacts("msg\n---8<--- sim:artifact actual text\n" + line + "\n")
 
 	if len(arts) != 1 {
@@ -287,7 +259,7 @@ func TestGradeCheckDropsArtifactsFromAPassingCheck(t *testing.T) {
 	if pass.Artifacts != nil {
 		t.Errorf("a passing check kept %d artifacts; a correct answer has nothing to explain", len(pass.Artifacts))
 	}
-	// The trailer is still stripped from the message either way.
+
 	if pass.Message != "service fixed" {
 		t.Errorf("passing message = %q, want %q", pass.Message, "service fixed")
 	}
@@ -302,8 +274,6 @@ func TestGradeCheckErrorPathsCarryNoArtifacts(t *testing.T) {
 	q := exam.Question{ID: "q19", Instance: "instance-1"}
 	c := exam.Check{Name: "10_service.sh", Desc: "svc", Points: 3}
 
-	// A timeout never reads out at all, even when the partial stdout
-	// happens to hold a well-formed trailer.
 	timedOut := gradeCheck(blockingRunner{}, "b", q, c, time.Millisecond)
 	if timedOut.Message != "check timed out" || timedOut.Artifacts != nil {
 		t.Errorf("timeout = %#v, want message %q and no artifacts", timedOut, "check timed out")
@@ -323,9 +293,7 @@ func TestGradeCheckErrorPathsCarryNoArtifacts(t *testing.T) {
 }
 
 func TestScoreboardShowsNoTrailer(t *testing.T) {
-	// The plain-text scoreboard tests/smoke.sh greps has never carried
-	// evidence and must not start: Message is already the head of the
-	// output, so this asserts the trailer cannot leak in through it.
+
 	r := &Results{Bank: "b", Questions: []QuestionResult{{
 		ID: "q19", Instance: "instance-1", Checks: []CheckResult{{
 			Name: "10_service.sh", Desc: "svc", Points: 3,

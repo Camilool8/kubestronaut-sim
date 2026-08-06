@@ -14,8 +14,6 @@ import (
 	"kubestronaut-sim/conductor/internal/catalog"
 )
 
-// reseedFixture wires a controller over a bank file, a one-question
-// catalog, and a facilitator stub reporting the given session mode.
 func reseedFixture(t *testing.T, eng Engine, mode string) *Controller {
 	t.Helper()
 
@@ -77,19 +75,16 @@ func TestReseedRunsTheQuestionsSetup(t *testing.T) {
 	}
 }
 
-// The question id arrives from the browser and ends up inside a shell
-// command. Both gates — the pattern and the catalog allowlist — have to
-// hold, and neither may let anything reach the engine.
 func TestReseedRejectsAnythingNotInTheBank(t *testing.T) {
 	for _, qid := range []string{
 		"../../etc/passwd",
 		"q07; rm -rf /",
 		"q07 && curl evil",
 		"$(whoami)",
-		"q99",     // well-formed, but not in this bank
-		"Q07",     // wrong case
-		"q0007",   // too long
-		"",        // empty
+		"q99",
+		"Q07",
+		"q0007",
+		"",
 	} {
 		t.Run(qid, func(t *testing.T) {
 			eng := &fakeEngine{}
@@ -108,8 +103,6 @@ func TestReseedRejectsAnythingNotInTheBank(t *testing.T) {
 	}
 }
 
-// An mcq bank has no setup.sh: the refusal must come before anything
-// shells out, even in training mode.
 func TestReseedRefusedForMCQBank(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"state": "running", "mode": "training"})
@@ -152,8 +145,6 @@ func TestReseedRefusedForMCQBank(t *testing.T) {
 	}
 }
 
-// Re-running setup.sh destroys that question's work. Fine while
-// practising; hostile during an exam.
 func TestReseedRefusedOutsideTraining(t *testing.T) {
 	for _, mode := range []string{"exam", "speed", ""} {
 		t.Run("mode="+mode, func(t *testing.T) {
@@ -172,8 +163,6 @@ func TestReseedRefusedOutsideTraining(t *testing.T) {
 	}
 }
 
-// A reset is rebuilding the very cluster this would seed into, so the
-// re-seed defers rather than racing it.
 func TestReseedDefersToARunningJob(t *testing.T) {
 	eng := &fakeEngine{}
 	c := reseedFixture(t, eng, "training")

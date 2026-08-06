@@ -11,9 +11,6 @@ import (
 	"kubestronaut-sim/hub/internal/auth"
 )
 
-// cookieKey is the same secret newServer signs cookies with. The ingest
-// signer is derived from it, which is the property several of these
-// tests are about.
 const cookieKey = "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"
 
 func withIngest(t *testing.T, s *Server) *auth.Signer {
@@ -62,9 +59,7 @@ func TestIngestStoresTheAttemptAgainstTheTicketsUser(t *testing.T) {
 	if len(doc.Attempts) != 1 {
 		t.Fatalf("stored %d attempts, want 1", len(doc.Attempts))
 	}
-	// The hub does not model the facilitator's record — it has no struct
-	// for it — so a field this build has never heard of has to survive
-	// the round trip. `percent` stands in for all of them.
+
 	var stored map[string]any
 	if err := json.Unmarshal(doc.Attempts[0], &stored); err != nil {
 		t.Fatal(err)
@@ -81,10 +76,6 @@ func TestIngestStoresTheAttemptAgainstTheTicketsUser(t *testing.T) {
 	}
 }
 
-// The one that must never regress. A session Pod holds a ticket for one
-// user; if the body could name a different one, any candidate could
-// write into anyone's history — and in a hosted tier the history is the
-// product.
 func TestIngestIgnoresAUserNamedInTheBody(t *testing.T) {
 	s, st := newServer(t, auth.ModeGitHub)
 	signer := withIngest(t, s)
@@ -107,9 +98,6 @@ func TestIngestIgnoresAUserNamedInTheBody(t *testing.T) {
 	}
 }
 
-// A ticket lifted out of a Pod spec must not be a login, and a stolen
-// cookie must not be able to post attempts. Both directions, because
-// domain separation that only works one way is not separation.
 func TestATicketIsNotACookieAndACookieIsNotATicket(t *testing.T) {
 	s, _ := newServer(t, auth.ModeGitHub)
 	signer := withIngest(t, s)
@@ -151,8 +139,6 @@ func TestIngestRefusesWhatItCannotTrust(t *testing.T) {
 	}
 }
 
-// Idempotent, because the facilitator retries: a hub restarting between
-// the write and the response gets the same attempt twice.
 func TestIngestIsIdempotentOnTheAttemptID(t *testing.T) {
 	s, st := newServer(t, auth.ModeGitHub)
 	signer := withIngest(t, s)
@@ -177,9 +163,6 @@ func TestIngestIsIdempotentOnTheAttemptID(t *testing.T) {
 	}
 }
 
-// No signer, no route. A hub with nothing minting tickets must not
-// answer here at all rather than answer 401 — an unregistered route is
-// the difference between "no" and "not here".
 func TestIngestIsNotRegisteredWithoutASigner(t *testing.T) {
 	s, _ := newServer(t, auth.ModeGitHub)
 	if w := ingest(s, "anything", oneAttempt); w.Code != http.StatusNotFound {

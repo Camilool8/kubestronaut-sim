@@ -10,18 +10,13 @@ import (
 	"time"
 )
 
-// fakePods is an in-memory cluster. It exists so the manager's rules —
-// seats, queue, holds, reaping — are tested without an API server, and
-// so a test can hold a Pod un-ready for as long as it likes.
 type fakePods struct {
 	mu      sync.Mutex
 	pods    map[string]*Pod
 	created []string
-	// specs are the manifests as they were actually submitted, which is
-	// the only place the rendered template can be observed.
+
 	specs [][]byte
-	// notReady names Pods that never become ready, to exercise the
-	// waiting paths.
+
 	notReady   map[string]bool
 	failCreate error
 }
@@ -114,7 +109,6 @@ func newManager(t *testing.T, seats int, tweak func(*Config)) (*Manager, *fakePo
 	return New(pods, cfg), pods
 }
 
-// waitReady polls the manager the way the SPA does.
 func waitReady(t *testing.T, m *Manager, user string) Session {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -142,10 +136,6 @@ func (f *fakePods) lastSpec() string {
 	return string(f.specs[len(f.specs)-1])
 }
 
-// The exam a candidate chooses is what gets stamped into their Pod. It
-// used to be a deployment value they never saw — `sessions.practical.bank`
-// — and the flavour's setting is now the DEFAULT for a request that
-// names none, not the answer.
 func TestTheChosenExamIsWhatTheSessionSits(t *testing.T) {
 	m, pods := newManager(t, 1, nil)
 
@@ -156,16 +146,12 @@ func TestTheChosenExamIsWhatTheSessionSits(t *testing.T) {
 	if live.Bank != "cka-mock-01" {
 		t.Errorf("bank = %q, want the exam that was chosen", live.Bank)
 	}
-	// Not just recorded on the session: it has to reach the Pod, which is
-	// the only thing the facilitator inside it ever reads.
+
 	if spec := pods.lastSpec(); !strings.Contains(spec, `"cka-mock-01"`) {
 		t.Errorf("the chosen exam never reached the Pod spec: %s", spec)
 	}
 }
 
-// One seat pool, but not one Pod shape. An exam whose cluster is a
-// different size cannot be sized by what another exam measured, and the
-// chart writes it its own manifest.
 func TestAnExamWithItsOwnPodSpecGetsIt(t *testing.T) {
 	special := `{"kind":"Pod","metadata":{},"spec":{"containers":[` +
 		`{"name":"facilitator","env":[{"name":"BANK","value":"x"}]},` +
@@ -185,8 +171,6 @@ func TestAnExamWithItsOwnPodSpecGetsIt(t *testing.T) {
 	}
 }
 
-// A bank with no manifest of its own gets the flavour's, which is every
-// bank today. The lookup must not be a requirement.
 func TestAnExamWithNoPodSpecOfItsOwnUsesTheFlavours(t *testing.T) {
 	m, pods := newManager(t, 1, func(cfg *Config) {
 		fl := cfg.Flavours[Practical]
@@ -211,8 +195,7 @@ func TestStartCreatesAPodAndBecomesReady(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Admission returns immediately: the boot takes minutes and the
-	// browser polls.
+
 	if s.State != Pending {
 		t.Errorf("state = %q, want pending", s.State)
 	}
@@ -223,8 +206,7 @@ func TestStartCreatesAPodAndBecomesReady(t *testing.T) {
 	if pods.count() != 1 {
 		t.Errorf("%d pods exist, want 1", pods.count())
 	}
-	// Idempotent: a second start returns the same session, not a second
-	// Pod and not a queue position.
+
 	if _, err := m.Start(ctx, "583231", Practical, ""); err != nil {
 		t.Fatal(err)
 	}
@@ -233,9 +215,6 @@ func TestStartCreatesAPodAndBecomesReady(t *testing.T) {
 	}
 }
 
-// A seat is held from admission, not from readiness. Counting only ready
-// sessions would admit a second candidate while the first is still
-// booting, and hand both of them a half-built cluster.
 func TestASeatIsHeldWhileTheSessionIsStillBooting(t *testing.T) {
 	m, pods := newManager(t, 1, nil)
 	pods.notReady["sim-session-practical-first"] = true
@@ -254,8 +233,6 @@ func TestASeatIsHeldWhileTheSessionIsStillBooting(t *testing.T) {
 	}
 }
 
-// The queue hands the head a time-boxed hold, not a seat. A browser that
-// closed an hour ago must not keep one warm.
 func TestTheQueueHeadGetsAHoldAndOnlyTheyCanClaimIt(t *testing.T) {
 	now := time.Now()
 	m, _ := newManager(t, 1, func(c *Config) {
@@ -269,7 +246,6 @@ func TestTheQueueHeadGetsAHoldAndOnlyTheyCanClaimIt(t *testing.T) {
 	}
 	waitReady(t, m, "holder")
 
-	// Two candidates queue, in order.
 	for _, u := range []string{"queued-1", "queued-2"} {
 		if _, err := m.Start(ctx, u, Practical, ""); err == nil {
 			t.Fatalf("%s was admitted with no free seat", u)
@@ -279,7 +255,6 @@ func TestTheQueueHeadGetsAHoldAndOnlyTheyCanClaimIt(t *testing.T) {
 		t.Errorf("queued-1 position = %d, want 1", got)
 	}
 
-	// The seat frees. The head — and only the head — may take it.
 	if err := m.End(ctx, "holder"); err != nil {
 		t.Fatal(err)
 	}
@@ -295,8 +270,6 @@ func TestTheQueueHeadGetsAHoldAndOnlyTheyCanClaimIt(t *testing.T) {
 	}
 }
 
-// A hold nobody claims must lapse, or one vanished browser costs a seat
-// for as long as the deployment runs.
 func TestAnUnclaimedHoldLapsesAndThePersonBehindGetsTheSeat(t *testing.T) {
 	now := time.Now()
 	clock := func() time.Time { return now }
@@ -316,7 +289,6 @@ func TestAnUnclaimedHoldLapsesAndThePersonBehindGetsTheSeat(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The ghost never comes back.
 	now = now.Add(2 * time.Minute)
 	m.Reap(ctx)
 
@@ -328,9 +300,6 @@ func TestAnUnclaimedHoldLapsesAndThePersonBehindGetsTheSeat(t *testing.T) {
 	}
 }
 
-// Boot is CPU-bound: one booting session took a 4-core node to 77% CPU.
-// Two at once do not take turns, they both crawl — so the manager must
-// not have two Pods booting simultaneously.
 func TestPodCreationIsSerialised(t *testing.T) {
 	m, pods := newManager(t, 3, func(c *Config) { c.BootConcurrency = 1 })
 	ctx := context.Background()
@@ -343,8 +312,7 @@ func TestPodCreationIsSerialised(t *testing.T) {
 			t.Fatalf("%s: %v", u, err)
 		}
 	}
-	// All three hold seats; only one Pod may exist, because the other two
-	// are still waiting for the boot slot.
+
 	deadline := time.Now().Add(time.Second)
 	for time.Now().Before(deadline) && pods.count() == 0 {
 		time.Sleep(5 * time.Millisecond)
@@ -386,7 +354,6 @@ func TestIdleAndAgedSessionsAreReaped(t *testing.T) {
 		t.Errorf("%d pods left, want 2", pods.count())
 	}
 
-	// The hard cap ignores activity entirely: that is what makes it a cap.
 	now = now.Add(2 * time.Hour)
 	m.Touch("active")
 	m.Touch("old")
@@ -398,8 +365,6 @@ func TestIdleAndAgedSessionsAreReaped(t *testing.T) {
 	}
 }
 
-// A Pod lost with its node, evicted, or deleted by an operator leaves a
-// session record holding a seat for something that no longer exists.
 func TestAVanishedPodFreesItsSeat(t *testing.T) {
 	m, pods := newManager(t, 1, nil)
 	ctx := context.Background()
@@ -421,10 +386,6 @@ func TestAVanishedPodFreesItsSeat(t *testing.T) {
 	}
 }
 
-// Sessions live in the cluster, not in the hub's memory. A hub
-// redeployed mid-exam that forgot them would put every candidate behind
-// a queue for seats that are already taken, with their own Pods running
-// and unreachable.
 func TestAdoptReattachesToRunningSessions(t *testing.T) {
 	m, pods := newManager(t, 2, nil)
 	ctx := context.Background()
@@ -433,7 +394,6 @@ func TestAdoptReattachesToRunningSessions(t *testing.T) {
 	}
 	waitReady(t, m, "583231")
 
-	// A brand new Manager over the same cluster: the process restarted.
 	fresh := New(pods, Config{
 		Flavours: map[Kind]Flavour{Practical: {Seats: 2, Template: Template(miniTemplate)}},
 		Logf:     func(string, ...any) {},
@@ -453,8 +413,6 @@ func TestAdoptReattachesToRunningSessions(t *testing.T) {
 	}
 }
 
-// A reset is a Pod replacement here, reported in the conductor's job
-// shape so ControlProgress renders it with no hosted branch.
 func TestRecycleReplacesThePodAndReportsPhases(t *testing.T) {
 	m, pods := newManager(t, 1, nil)
 	ctx := context.Background()
@@ -475,8 +433,6 @@ func TestRecycleReplacesThePodAndReportsPhases(t *testing.T) {
 		t.Errorf("%d phases, want 3", len(job.Phases))
 	}
 
-	// A second control operation while one is in flight is a 409, as it
-	// is on the conductor.
 	if _, err := m.Recycle("583231", ""); !errors.Is(err, ErrBusy) {
 		t.Errorf("a concurrent recycle gave %v, want ErrBusy", err)
 	}
@@ -506,14 +462,10 @@ func TestRecycleReplacesThePodAndReportsPhases(t *testing.T) {
 	t.Fatal("the recycle job never finished")
 }
 
-// Reachable, not theoretical: a reaped session deletes its Pod, the
-// candidate presses start again, and the old Pod still owns the name for
-// the length of its grace period.
 func TestStartWaitsOutAPodStillTerminating(t *testing.T) {
 	m, pods := newManager(t, 1, nil)
 	ctx := context.Background()
 
-	// A Pod under the name the next session will want.
 	name := "sim-session-practical-583231"
 	if err := pods.Create(ctx, []byte(`{"metadata":{"name":"`+name+`"}}`)); err != nil {
 		t.Fatal(err)
@@ -522,7 +474,6 @@ func TestStartWaitsOutAPodStillTerminating(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// It is stuck until the name frees, and then it proceeds.
 	time.Sleep(30 * time.Millisecond)
 	if s, _ := m.Get("583231"); s.State == Ready {
 		t.Fatal("it adopted the pod that was on its way out")
@@ -540,11 +491,6 @@ func TestUnknownKindIsRefused(t *testing.T) {
 	}
 }
 
-// A rebuild is a Pod replacement, and the screen shown while it runs has
-// to be able to say so. Without this the only signal is "not ready",
-// which is also exactly what a first boot looks like — so the candidate
-// who pressed "New attempt" got a screen welcoming them to a new
-// environment and offering to give their seat up.
 func TestGetReportsTheControlOpWhileARebuildRuns(t *testing.T) {
 	m, pods := newManager(t, 1, nil)
 	if _, err := m.Start(context.Background(), "583231", Practical, ""); err != nil {
@@ -556,8 +502,6 @@ func TestGetReportsTheControlOpWhileARebuildRuns(t *testing.T) {
 		t.Errorf("op = %q on a settled session, want empty", s.Op)
 	}
 
-	// Hold the replacement un-ready so the recycle stays in flight for the
-	// length of this test rather than racing it.
 	name := pods.created[0]
 	pods.mu.Lock()
 	pods.notReady[name] = true
@@ -581,15 +525,6 @@ func TestGetReportsTheControlOpWhileARebuildRuns(t *testing.T) {
 	t.Fatal("Get never reported the reset in flight")
 }
 
-// The boot screen's elapsed counter is (now - StartedAt), and a rebuild
-// shows that screen. Restamping only once the old Pod had drained meant
-// the first phase of every rebuild counted from the session's original
-// start — hours, on a long seat.
-//
-// No polling and no Pod fixture, deliberately: the property under test is
-// that the restamp happens before Recycle returns. Left in the goroutine
-// it would be a race against the caller, which is the bug itself, so a
-// test that waited for the goroutine would pass either way.
 func TestRecycleRestampsTheClockWhenItBeginsNotWhenThePodIsRecreated(t *testing.T) {
 	m, _ := newManager(t, 1, nil)
 	if _, err := m.Start(context.Background(), "583231", Practical, ""); err != nil {

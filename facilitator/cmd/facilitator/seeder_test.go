@@ -9,8 +9,6 @@ import (
 	"kubestronaut-sim/facilitator/internal/api"
 )
 
-// newConductorSeeder must reach exactly two conductor routes, POST the
-// drawn ids to the first and read the job id back.
 func TestConductorSeederStart(t *testing.T) {
 	var gotPath, gotBody string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -39,8 +37,6 @@ func TestConductorSeederStart(t *testing.T) {
 	}
 }
 
-// The conductor's own refusal reaches the candidate. "409" tells them
-// nothing; "another control operation is in flight" tells them to wait.
 func TestConductorSeederStartSurfacesTheConductorsReason(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusConflict)
@@ -58,11 +54,6 @@ func TestConductorSeederStartSurfacesTheConductorsReason(t *testing.T) {
 	}
 }
 
-// The four outcomes the watcher branches on, read off the conductor's
-// single-job snapshot. The last one — a job the conductor has never
-// heard of — is the one that matters most: it must be neither "done"
-// (which would start an exam against an unprepared cluster) nor
-// "running" (which would hang the candidate forever).
 func TestConductorSeederStatus(t *testing.T) {
 	cases := []struct {
 		name  string

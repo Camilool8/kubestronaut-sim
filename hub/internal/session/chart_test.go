@@ -7,25 +7,6 @@ import (
 	"testing"
 )
 
-// The gate between the chart and this package.
-//
-// Everything else in pod_test.go exercises render() against templates
-// written for the test. This one runs it against the real thing: the
-// JSON `helm template` actually produces from
-// deploy/helm/kubestronaut-sim/files/*.yaml. Without it the two halves
-// are only checked separately — helm proves the manifest is valid YAML,
-// the tests prove render() handles a Pod, and nobody proves the hub can
-// stamp out the specific Pod this chart ships.
-//
-// The failure it exists to catch is quiet and late: a manifest that
-// stops declaring HISTORY_WEBHOOK_URL, or a chart change that renames a
-// container, produces a hub that starts, serves, admits a candidate, and
-// then returns 500 the moment they press start.
-//
-// Fed by SESSION_POD_JSON, a colon-separated list of rendered files, and
-// skipped when it is unset — the module must stay testable with nothing
-// but `go test`, and helm is not a Go dependency. CI renders the chart
-// and sets it; see the chart step in .github/workflows/ci.yml.
 func TestTheChartRendersSomethingThisPackageCanStampOut(t *testing.T) {
 	paths := os.Getenv("SESSION_POD_JSON")
 	if paths == "" {
@@ -56,17 +37,11 @@ func TestTheChartRendersSomethingThisPackageCanStampOut(t *testing.T) {
 			if meta["name"] != "sim-session-practical-583231" {
 				t.Errorf("name = %v", meta["name"])
 			}
-			// The chart sets a namespace and the hub must not lose it: a
-			// create whose body names a different namespace from the URL
-			// is a 400 from the API server, and an empty one is worse —
-			// it defaults, silently, to whichever namespace the hub is in.
+
 			if meta["namespace"] == nil || meta["namespace"] == "" {
 				t.Error("the chart's namespace did not survive rendering")
 			}
 
-			// Every value the hub is responsible for filling in reached
-			// every container that declares it. A miss here is a session
-			// that boots and is wrong rather than one that fails.
 			spec := pod["spec"].(map[string]any)
 			want := map[string]string{
 				"BANK":                  "a-bank-that-is-not-the-default",
@@ -99,10 +74,6 @@ func TestTheChartRendersSomethingThisPackageCanStampOut(t *testing.T) {
 				}
 			}
 
-			// Nothing left pointing at a tag the release workflow does not
-			// publish. `:dev` is what the manifest carries so it can be
-			// applied by hand; a chart render that still says it means the
-			// image rewrite silently matched nothing.
 			if strings.Contains(string(out), ":dev\"") {
 				t.Error("a rendered image still points at :dev — images.tag did not reach it")
 			}

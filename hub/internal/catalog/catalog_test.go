@@ -6,9 +6,6 @@ import (
 	"testing"
 )
 
-// writeIndex builds the directory the banks image stages: one JSON
-// document per bank, named for its directory, exactly as the image's
-// index stage emits them.
 func writeIndex(t *testing.T, files map[string]string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -60,32 +57,27 @@ func TestLoadReadsEveryBank(t *testing.T) {
 	if ck.DurationSeconds != 7200 {
 		t.Errorf("DurationSeconds = %d, want 7200", ck.DurationSeconds)
 	}
-	// Not pooled: both counts are the authored pool, and the card must
-	// not print "3 / 3" as though a draw were happening.
+
 	if ck.QuestionCount != 3 || ck.PoolCount != 3 {
 		t.Errorf("counts = %d/%d, want 3/3", ck.QuestionCount, ck.PoolCount)
 	}
 
-	// Pooled: the card shows the draw size, never the pool behind it.
 	kc := entryByID(t, c, "kcna-mock")
 	if kc.QuestionCount != 2 || kc.PoolCount != 4 {
 		t.Errorf("kcna counts = %d/%d, want 2/4", kc.QuestionCount, kc.PoolCount)
 	}
 }
 
-// A bank that cannot be sat is listed and explained, not dropped. A
-// candidate who can see that CKS exists and why it is not ready has
-// learnt something; a card that silently vanished has not.
 func TestUnrunnableBanksAreListedWithTheReason(t *testing.T) {
 	c, err := Load(writeIndex(t, map[string]string{
-		// Outside the fixed two-instance topology every session has.
+
 		"odd-mock.json": `{"metadata":{"name":"odd-mock","title":"Odd"},
 		  "spec":{"examType":"hands-on","duration":"60m",
 		          "instances":[{"name":"instance-9"}],"questions":[{"id":"q01"}]}}`,
-		// An engine that does not exist.
+
 		"weird-mock.json": `{"metadata":{"name":"weird-mock","title":"Weird"},
 		  "spec":{"examType":"oral","duration":"60m","questions":[{"id":"q01"}]}}`,
-		// mcq banks grade in the facilitator and have no shells at all.
+
 		"chatty-mock.json": `{"metadata":{"name":"chatty-mock","title":"Chatty"},
 		  "spec":{"examType":"mcq","duration":"60m",
 		          "instances":[{"name":"instance-1"}],"questions":[{"id":"q01"}]}}`,
@@ -104,14 +96,11 @@ func TestUnrunnableBanksAreListedWithTheReason(t *testing.T) {
 	}
 }
 
-// One broken bank must not take the front door of the deployment down
-// with it: this runs at hub startup, before anyone can sign in.
 func TestOneBrokenBankDoesNotFailTheLoad(t *testing.T) {
 	c, err := Load(writeIndex(t, map[string]string{
 		"ckad-mock-01.json": ckad,
 		"broken.json":       `{"metadata": {`,
-		// metadata.name disagreeing with the directory is how a copied
-		// bank ends up shadowing the one it was copied from.
+
 		"misnamed.json": `{"metadata":{"name":"something-else","title":"X"},"spec":{"duration":"1m"}}`,
 	}))
 	if err != nil {
@@ -127,8 +116,6 @@ func TestOneBrokenBankDoesNotFailTheLoad(t *testing.T) {
 	}
 }
 
-// The coming-soon list is how a certification on the path appears before
-// its bank exists — and it must never shadow the real thing once it does.
 func TestComingSoonFillsGapsButNeverShadowsARealBank(t *testing.T) {
 	c, err := Load(writeIndex(t, map[string]string{
 		"ckad-mock-01.json": ckad,
@@ -150,8 +137,6 @@ func TestComingSoonFillsGapsButNeverShadowsARealBank(t *testing.T) {
 	}
 }
 
-// Hidden keeps the smoke fixture out of the lobby without making it
-// unstartable by name — the same split the conductor's catalog draws.
 func TestHiddenBanksAreNotOfferedButAreStillFound(t *testing.T) {
 	c, err := Load(writeIndex(t, map[string]string{
 		"ckad-mock-01.json": ckad,
@@ -172,8 +157,6 @@ func TestHiddenBanksAreNotOfferedButAreStillFound(t *testing.T) {
 	}
 }
 
-// A deployment that staged no index is a hub that serves identity,
-// history and its running sessions. It is not a failure to start.
 func TestNoIndexIsAnEmptyCatalogNotAnError(t *testing.T) {
 	for _, dir := range []string{"", filepath.Join(t.TempDir(), "absent")} {
 		c, err := Load(dir)

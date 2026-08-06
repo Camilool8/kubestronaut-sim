@@ -33,9 +33,6 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
-// A short key is refused at construction rather than stretched, because
-// a hub running on COOKIE_KEY=secret looks identical from the outside to
-// one that is safe.
 func TestShortKeysAreRefused(t *testing.T) {
 	for _, k := range []string{"", "secret", strings.Repeat("k", 31)} {
 		if _, err := NewSigner([]byte(k)); err == nil {
@@ -55,8 +52,6 @@ func TestTamperingIsRejected(t *testing.T) {
 	}
 	body, sig, _ := strings.Cut(good, ".")
 
-	// The payload of a different user, with the original signature: the
-	// forgery this whole mechanism exists to stop.
 	other, _ := s.Encode(Session{UserID: "99999", Login: "attacker"})
 	otherBody, _, _ := strings.Cut(other, ".")
 
@@ -75,8 +70,6 @@ func TestTamperingIsRejected(t *testing.T) {
 	}
 }
 
-// A cookie signed with a different key must be indistinguishable from
-// any other forgery — including to a caller trying to be helpful.
 func TestAnotherKeysCookieIsInvalid(t *testing.T) {
 	mine := testSigner(t)
 	theirs, err := NewSigner([]byte(strings.Repeat("z", 32)))
@@ -101,9 +94,7 @@ func TestExpiryIsEnforcedAndDistinguishable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Expired is its own error: it is the one failure that is normal, and
-	// the caller answers it by asking the user to log in again rather
-	// than by treating them as an attacker.
+
 	if _, err := s.Decode(v); !errors.Is(err, ErrExpired) {
 		t.Errorf("Decode of an expired cookie = %v, want ErrExpired", err)
 	}
@@ -114,7 +105,6 @@ func TestExpiryIsEnforcedAndDistinguishable(t *testing.T) {
 	}
 }
 
-// A session with no user is not a session, however well signed.
 func TestSessionWithoutAUserIsInvalid(t *testing.T) {
 	s := testSigner(t)
 	v, err := s.Encode(Session{Login: "octocat", Expires: time.Now().Add(time.Hour).Unix()})

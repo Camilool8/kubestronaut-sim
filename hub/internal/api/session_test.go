@@ -20,7 +20,6 @@ import (
 
 const podTemplate = `{"kind":"Pod","metadata":{},"spec":{"containers":[{"name":"facilitator","env":[{"name":"BANK","value":"x"}]}]}}`
 
-// hosted builds a hub with seats in front of a stand-in facilitator.
 func hosted(t *testing.T, seats int, upstream http.Handler) (*Server, *session.Manager) {
 	t.Helper()
 	s, _ := newServer(t, auth.ModeGitHub)
@@ -61,10 +60,6 @@ func atoi(s string) int {
 	return n
 }
 
-// ready polls start the way the SPA does, until the seat's Pod answers,
-// sending the same body every time — which is what the browser does, and
-// what makes the "did my options survive admission" assertion meaningful
-// on the request that finally lands.
 func ready(t *testing.T, s *Server, c *http.Cookie, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -81,9 +76,6 @@ func ready(t *testing.T, s *Server, c *http.Cookie, body string) *httptest.Respo
 	return nil
 }
 
-// Admission and the attempt are separate events minutes apart. The first
-// answer is "yours is starting"; only once the Pod answers does the
-// facilitator's own start run.
 func TestStartAdmitsThenForwardsToTheFacilitator(t *testing.T) {
 	var forwarded string
 	s, _ := hosted(t, 1, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -106,8 +98,7 @@ func TestStartAdmitsThenForwardsToTheFacilitator(t *testing.T) {
 	if !strings.Contains(w.Body.String(), "running") {
 		t.Errorf("the facilitator's answer did not reach the browser: %s", w.Body)
 	}
-	// The body has to survive admission: a start whose options were
-	// eaten by the hub begins the wrong kind of attempt.
+
 	if !strings.Contains(forwarded, `{"mode":"exam"}`) {
 		t.Errorf("forwarded %q, want the original body", forwarded)
 	}
@@ -137,8 +128,6 @@ func TestStartQueuesWhenEverySeatIsTaken(t *testing.T) {
 	}
 }
 
-// The catch-all. Everything the hub does not answer is the candidate's
-// own Pod, and it must not be reachable without a session.
 func TestProxyRequiresBothALoginAndASession(t *testing.T) {
 	s, _ := hosted(t, 1, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("upstream"))
@@ -170,16 +159,10 @@ func TestProxyReachesTheSessionPodOnceItIsReady(t *testing.T) {
 	}
 }
 
-// The desktop is a WebSocket, and it is the single most fragile thing to
-// put behind a proxy: a 101 that is not hijacked and spliced leaves the
-// candidate looking at a blank screen with no error anywhere.
-//
-// httptest.NewRecorder cannot hijack, so this runs the hub over a real
-// listener and speaks the handshake by hand.
 func TestTheDesktopWebSocketUpgradeSurvivesTheProxy(t *testing.T) {
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/desktop/websockify" {
-			return // the admission poll, which shares this upstream
+			return
 		}
 		if !strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
 			t.Errorf("upgrade header did not reach the pod: %v", r.Header)
@@ -194,8 +177,7 @@ func TestTheDesktopWebSocketUpgradeSurvivesTheProxy(t *testing.T) {
 		defer conn.Close()
 		buf.WriteString("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n")
 		buf.Flush()
-		// Echo one frame's worth of bytes, which is what proves the
-		// connection is spliced rather than merely opened.
+
 		line, _ := buf.ReadString('\n')
 		buf.WriteString("echo:" + line)
 		buf.Flush()
@@ -241,8 +223,6 @@ func TestTheDesktopWebSocketUpgradeSurvivesTheProxy(t *testing.T) {
 	}
 }
 
-// A reset in hosted mode replaces the Pod, and says so in the
-// conductor's shape so ControlProgress renders it unchanged.
 func TestResetReturnsAJobInTheConductorsShape(t *testing.T) {
 	s, _ := hosted(t, 1, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	c := login(t, s, "583231", "octocat")
@@ -268,9 +248,6 @@ func TestResetReturnsAJobInTheConductorsShape(t *testing.T) {
 	}
 }
 
-// The SPA polls control status on load to decide whether an operation is
-// in flight. "You have no session" is a true answer to that, and a 404
-// would read to the UI as a broken control plane.
 func TestControlStatusAnswersBeforeAnySessionExists(t *testing.T) {
 	s, _ := hosted(t, 1, nil)
 	r := httptest.NewRequest(http.MethodGet, "/api/control/status", nil)
@@ -286,9 +263,6 @@ func TestControlStatusAnswersBeforeAnySessionExists(t *testing.T) {
 	}
 }
 
-// Every /api/history route is the hub's. One left to the catch-all would
-// answer from the Pod's own /state volume — the copy that is about to be
-// destroyed — so "clear my history" would clear nothing that lasts.
 func TestHistoryRoutesNeverReachThePod(t *testing.T) {
 	var reached []string
 	s, _ := hosted(t, 1, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -339,10 +313,6 @@ func TestClearingHistoryReallyRemovesIt(t *testing.T) {
 	}
 }
 
-// The header chip and the queue dialog render from /api/me, so it has to
-// carry seat state — and the counts are visible logged out, because
-// someone deciding whether to sign in is entitled to know whether there
-// is anywhere to sit.
 func TestMeCarriesSeatAndSessionState(t *testing.T) {
 	s, _ := hosted(t, 2, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 
@@ -364,9 +334,7 @@ func TestMeCarriesSeatAndSessionState(t *testing.T) {
 	if out.Seats["practical"].Used != 1 {
 		t.Errorf("used seats = %d, want 1", out.Seats["practical"].Used)
 	}
-	// The Pod's address is the candidate's own, but publishing an
-	// in-cluster address in a JSON response tells every user something
-	// about the infrastructure they have no use for.
+
 	if strings.Contains(do(s, r).Body.String(), "127.0.0.1:") {
 		t.Error("/api/me leaked the pod address")
 	}
@@ -390,11 +358,6 @@ func TestEndingASessionFreesTheSeat(t *testing.T) {
 	}
 }
 
-// stalledPods creates Pods that never become ready. That is exactly the
-// state the proxy's 503 branch exists for — a session admitted, holding a
-// seat, with nowhere to send traffic yet — and it is the state a hosted
-// "New attempt" spends its first minutes in, because a reset here is Pod
-// replacement.
 type stalledPods struct {
 	mu   sync.Mutex
 	live map[string]bool
@@ -444,9 +407,6 @@ func (p *stalledPods) List(context.Context, string) ([]session.Pod, error) {
 	return nil, nil
 }
 
-// The SPA has to tell an expected wait from an outage, and the sentence
-// in the body is copy — the next person to reword it would silently
-// break whatever was matching on it.
 func TestProxySaysWhetherAWaitIsAWaitOrAFault(t *testing.T) {
 	s, _ := newServer(t, auth.ModeGitHub)
 	s.Sessions = session.New(&stalledPods{}, session.Config{

@@ -15,9 +15,6 @@ import (
 	"kubestronaut-sim/conductor/internal/job"
 )
 
-// seedFixture wires a controller over a four-question hands-on bank (or
-// an mcq one), a bank file, and a facilitator stub reporting the given
-// session state.
 func seedFixture(t *testing.T, eng Engine, state, examType string) *Controller {
 	t.Helper()
 
@@ -65,8 +62,6 @@ func seedFixture(t *testing.T, eng Engine, state, examType string) *Controller {
 	return c
 }
 
-// execs returns the k8s-env exec commands the engine was given, in
-// order.
 func execs(eng *fakeEngine) []string {
 	var out []string
 	for _, call := range eng.recorded() {
@@ -77,8 +72,6 @@ func execs(eng *fakeEngine) []string {
 	return out
 }
 
-// The core of it: one setup.sh per drawn question, in the order the draw
-// produced them, and the job completes.
 func TestStartSeedRunsEachQuestionsSetupInDrawOrder(t *testing.T) {
 	eng := &fakeEngine{}
 	c := seedFixture(t, eng, "idle", "hands-on")
@@ -114,24 +107,19 @@ func TestStartSeedRunsEachQuestionsSetupInDrawOrder(t *testing.T) {
 	}
 }
 
-// Every question id here arrives from a browser one hop upstream and
-// ends up inside a shell command. Both gates — the pattern and the
-// catalog allowlist — have to hold for EVERY id in the list, and nothing
-// may reach the engine when one of them does not.
 func TestStartSeedRejectsAnythingNotInTheBank(t *testing.T) {
 	for _, qid := range []string{
 		"../../etc/passwd",
 		"q01; rm -rf /",
 		"q01 && curl evil",
 		"$(whoami)",
-		"q99", // well-formed, but not in this bank
-		"Q01", // wrong case
+		"q99",
+		"Q01",
 		"",
 	} {
 		eng := &fakeEngine{}
 		c := seedFixture(t, eng, "idle", "hands-on")
 
-		// Buried among valid ids: a list is only as safe as its worst entry.
 		if _, err := c.StartSeed([]string{"q01", qid, "q02"}); !errors.Is(err, ErrUnknownQuestion) {
 			t.Errorf("StartSeed(%q) error = %v, want ErrUnknownQuestion", qid, err)
 		}
@@ -144,9 +132,6 @@ func TestStartSeedRejectsAnythingNotInTheBank(t *testing.T) {
 	}
 }
 
-// A repeated id is a caller bug, not something to quietly collapse:
-// running one question's setup.sh twice re-seeds a question the loop has
-// already prepared.
 func TestStartSeedRejectsDuplicates(t *testing.T) {
 	eng := &fakeEngine{}
 	c := seedFixture(t, eng, "idle", "hands-on")
@@ -176,8 +161,6 @@ func TestStartSeedRejectsAnEmptyList(t *testing.T) {
 	}
 }
 
-// Seeding re-runs setup.sh, which discards whatever the candidate did to
-// those questions. Fine before an attempt; hostile during one.
 func TestStartSeedRefusesWhileASessionIsRunning(t *testing.T) {
 	eng := &fakeEngine{}
 	c := seedFixture(t, eng, "running", "hands-on")
@@ -190,8 +173,6 @@ func TestStartSeedRefusesWhileASessionIsRunning(t *testing.T) {
 	}
 }
 
-// An mcq bank has no setup.sh at all, so every exec would be the same
-// confusing bash error. Refuse before anything shells out.
 func TestStartSeedRefusesOnAnMCQBank(t *testing.T) {
 	eng := &fakeEngine{}
 	c := seedFixture(t, eng, "idle", "mcq")
@@ -204,10 +185,6 @@ func TestStartSeedRefusesOnAnMCQBank(t *testing.T) {
 	}
 }
 
-// A setup.sh that fails must fail the JOB, naming the question, and must
-// not go on to the rest of the list: a cluster prepared for two of four
-// questions is not an exam, and the candidate has to be told rather than
-// dropped into it.
 func TestStartSeedFailsAtTheFirstBadSetup(t *testing.T) {
 	eng := &fakeEngine{
 		execExit: map[string]int{"k8s-env": 1},
@@ -237,10 +214,6 @@ func TestStartSeedFailsAtTheFirstBadSetup(t *testing.T) {
 	}
 }
 
-// The progress a candidate watches: the phase's detail counts through
-// the list rather than echoing setup.sh's last line, and the retained
-// build log keeps every line so someone who looked away can still read
-// the minutes they missed.
 func TestStartSeedReportsProgress(t *testing.T) {
 	var mu sync.Mutex
 	var details []string
@@ -249,8 +222,7 @@ func TestStartSeedReportsProgress(t *testing.T) {
 		execLines: map[string][]string{"k8s-env": {"namespace/x created", "deployment.apps/y created"}},
 	}
 	c := seedFixture(t, eng, "idle", "hands-on")
-	// Sampled from inside the exec, which is the only moment the running
-	// phase's detail exists — StartPhase clears it the instant it settles.
+
 	eng.afterLine = func() {
 		if snap := c.Store.Status(); snap.Job != nil && len(snap.Job.Phases) > 0 {
 			mu.Lock()
@@ -288,8 +260,6 @@ func TestStartSeedReportsProgress(t *testing.T) {
 	}
 }
 
-// The single-job lock is not optional here: a reset is rebuilding the
-// very cluster this would seed into.
 func TestStartSeedYieldsToAnotherJob(t *testing.T) {
 	eng := &fakeEngine{}
 	c := seedFixture(t, eng, "idle", "hands-on")

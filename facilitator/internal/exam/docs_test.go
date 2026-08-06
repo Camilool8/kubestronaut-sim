@@ -5,14 +5,11 @@ import (
 	"testing"
 )
 
-// docsQuestion renders one spec.questions entry carrying a docs list.
 func docsQuestion(id, docs string) string {
 	return fmt.Sprintf(`{"id": %q, "domain": "d", "multi": false,
 		"options": ["A", "B", "C"], "correct": [0], "docs": [%s]}`, id, docs)
 }
 
-// The field itself: a question may name upstream reading, and Load
-// carries it through in bank order.
 func TestLoadDocs(t *testing.T) {
 	e, err := loadMCQDoc(t, `"examType": "mcq",`, docsQuestion("q01",
 		`{"label": "Ingress path types", "url": "https://kubernetes.io/docs/concepts/services-networking/ingress/"},
@@ -36,9 +33,6 @@ func TestLoadDocs(t *testing.T) {
 	}
 }
 
-// The rule that matters most on a study tool: a bad link is dropped and
-// the bank still loads. A candidate must never be unable to sit an exam
-// because someone mistyped a URL in a footer.
 func TestLoadDocsDropsUnusableEntries(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -65,8 +59,6 @@ func TestLoadDocsDropsUnusableEntries(t *testing.T) {
 	}
 }
 
-// A bad entry costs its own link and nothing else: the good ones beside
-// it still arrive.
 func TestLoadDocsKeepsTheGoodOnesBesideABadOne(t *testing.T) {
 	e, err := loadMCQDoc(t, `"examType": "mcq",`, docsQuestion("q01",
 		`{"label": "Broken", "url": "ftp://example.com/x"},
@@ -80,10 +72,6 @@ func TestLoadDocsKeepsTheGoodOnesBesideABadOne(t *testing.T) {
 	}
 }
 
-// The overwhelmingly common case, and the one every shipped bank is in
-// today: no docs at all, which must be nil rather than an empty slice —
-// the API omits the field on nil, and "declared nothing usable" must
-// reach the client as the same absence as "declared nothing".
 func TestLoadDocsAbsentIsNil(t *testing.T) {
 	e, err := loadMCQDoc(t, `"examType": "mcq",`, mcqQuestion("q01", false, 3, []int{0}))
 	if err != nil {
@@ -93,8 +81,6 @@ func TestLoadDocsAbsentIsNil(t *testing.T) {
 		t.Errorf("Docs = %+v, want nil for a question that declares none", got)
 	}
 
-	// And a docs key that is present but entirely unusable lands in the
-	// same place, not on an empty non-nil slice.
 	e, err = loadMCQDoc(t, `"examType": "mcq",`, docsQuestion("q01", `{"label": "x", "url": "nope"}`))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -104,14 +90,12 @@ func TestLoadDocsAbsentIsNil(t *testing.T) {
 	}
 }
 
-// Both engines read the same key. The hands-on fixture proves the load
-// happens before the engine switch rather than inside the mcq branch.
 func TestLoadDocsOnAHandsOnBank(t *testing.T) {
 	e, err := Load(handsOnPoolExamJSON, handsOnPoolBankDir)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	// The fixture declares one on q01 and none anywhere else.
+
 	if got := e.Questions[0].Docs; len(got) != 1 || got[0].Label != "Persistent volumes" {
 		t.Fatalf("q01 Docs = %+v, want the single declared entry", got)
 	}

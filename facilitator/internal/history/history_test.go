@@ -1,7 +1,3 @@
-// These tests live in package history rather than history_test so the
-// frozen-store case can be reached directly. Every other way of making
-// os.Rename fail (a read-only parent directory, an unwritable file)
-// relies on not being root, and the container these tests run in is.
 package history
 
 import (
@@ -19,7 +15,6 @@ func tempPath(t *testing.T) string {
 	return filepath.Join(t.TempDir(), "history.json")
 }
 
-// rec builds a minimal counted, passing record.
 func rec(id, bank, cert string, gradedAt time.Time, percent int) Record {
 	return Record{
 		ID:            id,
@@ -93,8 +88,7 @@ func TestAddIsIdempotentByID(t *testing.T) {
 
 func TestAllIsMostRecentFirst(t *testing.T) {
 	s, _ := Open(tempPath(t))
-	// Added out of order on purpose: the store orders by gradedAt, not by
-	// the order things happened to arrive.
+
 	s.Add(rec("mid", "b", "CKAD", epoch.Add(time.Hour), 60))
 	s.Add(rec("old", "b", "CKAD", epoch, 50))
 	s.Add(rec("new", "b", "CKAD", epoch.Add(2*time.Hour), 80))
@@ -111,9 +105,6 @@ func TestAllIsMostRecentFirst(t *testing.T) {
 	}
 }
 
-// TestCorruptFileIsRescuedNotDiscarded is the single most important test
-// in this package. Discarding a session costs one attempt; discarding
-// history is everything the candidate has ever done.
 func TestCorruptFileIsRescuedNotDiscarded(t *testing.T) {
 	path := tempPath(t)
 	garbage := []byte(`{"version":1,"attempts":[{"id":"a1",`)
@@ -137,7 +128,7 @@ func TestCorruptFileIsRescuedNotDiscarded(t *testing.T) {
 	if string(saved) != string(garbage) {
 		t.Errorf("rescued file = %q, want the original bytes verbatim", saved)
 	}
-	// And the store is usable: a rescue is not a failure mode.
+
 	if _, err := s.Add(rec("a1", "b", "CKAD", epoch, 70)); err != nil {
 		t.Fatalf("Add after rescue: %v", err)
 	}
@@ -188,9 +179,6 @@ func TestFutureVersionIsRescuedNotDiscarded(t *testing.T) {
 	}
 }
 
-// A document with no version field is a /api/history body someone saved,
-// or one written before the field existed. It is readable, so it is
-// read — refusing it would report data loss that has not happened.
 func TestVersionZeroDocumentIsRead(t *testing.T) {
 	path := tempPath(t)
 	os.WriteFile(path, []byte(`{"attempts":[{"id":"a1","bank":"b","percent":70}]}`), 0o644)
@@ -207,9 +195,6 @@ func TestVersionZeroDocumentIsRead(t *testing.T) {
 	}
 }
 
-// A frozen store is what happens when the file could neither be read nor
-// moved aside. It must refuse to write rather than clobber bytes nobody
-// has managed to look at yet.
 func TestFrozenStoreRefusesToWrite(t *testing.T) {
 	path := tempPath(t)
 	original := []byte("bytes nobody has rescued")
@@ -232,9 +217,9 @@ func TestMergeSkipsRecordsAlreadyPresent(t *testing.T) {
 	s.Add(rec("a1", "b", "CKAD", epoch, 70))
 
 	in := []Record{
-		rec("a1", "b", "CKAD", epoch, 70),                // already here
-		rec("a2", "b", "CKAD", epoch.Add(time.Hour), 80), // new
-		rec("", "b", "CKAD", epoch.Add(2*time.Hour), 90), // no id, undedupable
+		rec("a1", "b", "CKAD", epoch, 70),
+		rec("a2", "b", "CKAD", epoch.Add(time.Hour), 80),
+		rec("", "b", "CKAD", epoch.Add(2*time.Hour), 90),
 	}
 	imported, skipped, err := s.Merge(in)
 	if err != nil {
@@ -247,7 +232,6 @@ func TestMergeSkipsRecordsAlreadyPresent(t *testing.T) {
 		t.Fatalf("All() = %d records, want 2", got)
 	}
 
-	// Importing the same document again must be a complete no-op.
 	imported, skipped, err = s.Merge(in)
 	if err != nil {
 		t.Fatalf("Merge again: %v", err)
@@ -257,8 +241,6 @@ func TestMergeSkipsRecordsAlreadyPresent(t *testing.T) {
 	}
 }
 
-// Importing a backup must never lose the attempts made since it was
-// taken — the whole reason import merges rather than replaces.
 func TestMergeKeepsAttemptsNewerThanTheBackup(t *testing.T) {
 	s, _ := Open(tempPath(t))
 	s.Add(rec("since", "b", "CKAD", epoch.Add(48*time.Hour), 95))
@@ -309,8 +291,6 @@ func TestDocumentRoundTripsThroughJSON(t *testing.T) {
 		t.Fatalf("round trip = %#v", back)
 	}
 
-	// The wire contract types these as strings; a Go time.Time that ever
-	// stopped marshalling as RFC3339 would break the client silently.
 	var wire struct {
 		Attempts []map[string]any `json:"attempts"`
 	}

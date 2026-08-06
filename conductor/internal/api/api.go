@@ -1,7 +1,3 @@
-// Package api exposes the conductor's control endpoints. Only the
-// facilitator can reach them (the conductor lives alone with it on the
-// internal control network), and the facilitator re-exposes them to the
-// browser under the same single :8080 origin as everything else.
 package api
 
 import (
@@ -14,26 +10,17 @@ import (
 	"kubestronaut-sim/conductor/internal/job"
 )
 
-// Ops is the slice of the controller the HTTP layer invokes.
 type Ops interface {
 	StartReset() (job.Job, error)
 	StartSwitch(bank string) (job.Job, error)
-	// Banks returns the catalog response body: {active, banks:[...]}.
+
 	Banks() any
-	// Reseed re-runs one question's setup.sh. Synchronous, unlike the
-	// two above — it returns when the work is done rather than handing
-	// back a job to poll, because it takes seconds and must not take the
-	// single-job lock a cluster rebuild needs.
+
 	Reseed(ctx context.Context, qid string) error
-	// StartSeed runs setup.sh for each of a pooled bank's drawn
-	// questions, preparing the cluster for one attempt. Asynchronous, and
-	// deliberately unlike Reseed: this is minutes of work, it is exactly
-	// the kind of thing the single-job lock exists to serialise, and the
-	// candidate must be able to watch it.
+
 	StartSeed(questions []string) (job.Job, error)
 }
 
-// New returns the conductor's HTTP handler.
 func New(ops Ops, store *job.Store) http.Handler {
 	mux := http.NewServeMux()
 
@@ -45,9 +32,6 @@ func New(ops Ops, store *job.Store) http.Handler {
 		writeJSON(w, http.StatusOK, store.Status())
 	})
 
-	// The bounded build log for the in-flight job (or the last one — a
-	// failed job's log is exactly the one worth reading). Its own route,
-	// polled only while the pane is open, so status responses stay small.
 	mux.HandleFunc("GET /api/control/log", func(w http.ResponseWriter, r *http.Request) {
 		jobID, lines := store.Log()
 		if lines == nil {
@@ -80,12 +64,6 @@ func New(ops Ops, store *job.Store) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	})
 
-	// Seeding a pooled bank's drawn questions. Called by the FACILITATOR,
-	// not by the browser: it is the facilitator that draws, so it is the
-	// facilitator that knows which questions a cluster must be prepared
-	// for, and the attempt it then starts must not be startable by anyone
-	// who can name a list of ids. Every id is still gated here as if it
-	// came from the browser — it did, one hop earlier.
 	mux.HandleFunc("POST /api/control/seed", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Questions []string `json:"questions"`
@@ -125,7 +103,6 @@ func New(ops Ops, store *job.Store) http.Handler {
 	return mux
 }
 
-// writeOpError maps controller sentinels onto HTTP statuses.
 func writeOpError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, job.ErrBusy):
@@ -135,8 +112,7 @@ func writeOpError(w http.ResponseWriter, err error) {
 	case errors.Is(err, control.ErrInvalidBank):
 		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, control.ErrRestartUnavailable):
-		// 501, not 403: the operation is understood and legitimate, this
-		// deployment just has no way to carry it out.
+
 		writeError(w, http.StatusNotImplemented, err.Error())
 	case errors.Is(err, control.ErrUnknownQuestion):
 		writeError(w, http.StatusBadRequest, err.Error())

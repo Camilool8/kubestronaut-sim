@@ -11,14 +11,6 @@ import (
 	"kubestronaut-sim/hub/internal/kube"
 )
 
-// KubePods adapts the Kubernetes client to what the manager needs.
-//
-// The whole reason this is a separate type is the sentinel translation.
-// The manager decides "already gone, carry on" and "name taken, wait for
-// it" by errors.Is against its own sentinels; a kube.ErrNotFound that
-// reaches it untranslated reads as an unknown failure, and the visible
-// symptom is a reset that waits out its entire timeout for a Pod that
-// vanished immediately. One adapter, one test.
 type KubePods struct {
 	Client         *kube.Client
 	ReadyContainer string
@@ -77,20 +69,7 @@ func (k *KubePods) convert(p kube.Pod) Pod {
 	}
 }
 
-// Static is a Pods implementation with no Kubernetes behind it: every
-// session it hands out resolves to one fixed host.
-//
-// It exists so the hub — auth, seats, the queue, holds, reaping, the
-// proxy and the recycle job protocol — can be run against a local
-// `./sim up`, which is the only place the whole simulator runs without a
-// cluster. It really does track existence, so a recycle deletes, waits,
-// and creates exactly as it would against an API server; what it cannot
-// do is rebuild anything, so the facilitator on the other side is the
-// same one as before. That difference is the point of saying "static"
-// rather than "fake": the lifecycle is real, the teardown is not.
 type Static struct {
-	// Host is where every session's traffic goes. The manager appends
-	// the configured port.
 	Host string
 
 	mu   sync.Mutex
@@ -143,6 +122,4 @@ func (s *Static) Delete(_ context.Context, name string) error {
 	return nil
 }
 
-// List returns nothing: a hub restart has nothing to adopt here, because
-// the Pods only ever existed in this process's memory.
 func (s *Static) List(context.Context, string) ([]Pod, error) { return nil, nil }

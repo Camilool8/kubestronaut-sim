@@ -1,22 +1,3 @@
-// Command hub is the front door of the hosted tier: identity, attempt
-// history, seats, and the proxy to each candidate's own session Pod.
-//
-// It exists so the simulator does not have to change. The facilitator
-// still has no authentication of any kind — it is simply never reachable
-// except through this process. That is what keeps `./sim up`
-// byte-identical, with no accounts and no new required configuration.
-//
-// Two ways to run it:
-//
-//	AUTH_MODE=github  ... SESSION_POD_TEMPLATE=/etc/hub/session-pod.json
-//	AUTH_MODE=none    ... SESSION_UPSTREAM=127.0.0.1:8080
-//
-// The second needs no Kubernetes at all: it puts the whole hub —
-// admission, seats, the queue, the recycle protocol, the proxy — in
-// front of a local `./sim up`, which is the only place the whole
-// simulator runs without a cluster. What it cannot do is rebuild
-// anything, so a reset there completes the protocol over the same
-// facilitator rather than a fresh one.
 package main
 
 import (
@@ -71,17 +52,10 @@ func run() error {
 		TTL:        ttl,
 	}
 
-	// Configuration is validated before anything is created. Both a
-	// missing client secret and an unwritable state directory stop the
-	// process, but only one of them is reported first, and the useful
-	// one to report is the configuration: a hub run with no environment
-	// at all should say what it needs, not what it could not mkdir.
 	baseURL := strings.TrimSuffix(os.Getenv("HUB_BASE_URL"), "/")
 	var ingest *auth.Signer
 	if mode == auth.ModeGitHub {
-		// Every one of these is required, and a hub that starts without
-		// them would look healthy and fail at the first login. Checked
-		// here, once, with a message that names what is missing.
+
 		key := os.Getenv("COOKIE_KEY")
 		id, secret := os.Getenv("GITHUB_CLIENT_ID"), os.Getenv("GITHUB_CLIENT_SECRET")
 		var missing []string
@@ -105,16 +79,6 @@ func run() error {
 		a.GitHub = auth.NewGitHub(id, secret, baseURL+"/hub/auth/callback")
 	}
 
-	// Follows COOKIE_KEY rather than the auth mode, deliberately.
-	//
-	// AUTH_MODE=header issues no cookie and so needs no key of its own —
-	// but it is the self-hosting path, and a deployment there with seats
-	// and a proxy and silently no durable history would be the one thing
-	// a hosted tier is for, missing. Setting COOKIE_KEY is what turns
-	// attempt collection on; github mode requires it anyway.
-	//
-	// Derived, not the same key: see auth.Derive. A ticket read out of a
-	// Pod spec must not be spendable as that candidate's login.
 	if key := os.Getenv("COOKIE_KEY"); key != "" {
 		ingest, err = auth.NewSigner(auth.Derive([]byte(key), auth.PurposeIngest))
 		if err != nil {
@@ -123,9 +87,7 @@ func run() error {
 	}
 
 	if mode == auth.ModeHeader {
-		// Said out loud at boot because the failure is silent: a hub
-		// reachable directly in this mode lets anyone claim any identity
-		// by setting one header.
+
 		log.Printf("hub: AUTH_MODE=header trusts %q — this process MUST NOT be reachable except through the proxy that sets it", a.HeaderName)
 	}
 
@@ -133,13 +95,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	// The exam list, read once. Banks are an image layer staged by an
-	// init container, so a new bank is a new image and therefore a new
-	// hub Pod — there is nothing to reload.
-	//
-	// A deployment with no index is not a failure: it serves identity,
-	// history and seats exactly as it did before exams were choosable,
-	// and its lobby offers a flavour instead.
+
 	banks, err := catalog.Load(os.Getenv("BANKS_INDEX_DIR"))
 	if err != nil {
 		return err
@@ -163,9 +119,7 @@ func run() error {
 		if err != nil {
 			return err
 		}
-		// Adopt before serving: a hub redeployed mid-exam that forgot its
-		// sessions would put every candidate behind a queue for seats
-		// that are already taken, with their own Pods running.
+
 		if err := mgr.Adopt(ctx); err != nil {
 			log.Printf("hub: %v (starting anyway with no adopted sessions)", err)
 		}
@@ -173,9 +127,7 @@ func run() error {
 	}
 
 	log.Printf("hub listening on %s (auth %s, state %s, sessions %v)", addr, mode, stateDir, mgr != nil)
-	// Timeouts, because this is an internet-facing process. No write
-	// timeout: the session proxy carries the desktop's WebSocket, which
-	// is long-lived by design.
+
 	s := &http.Server{
 		Addr:              addr,
 		Handler:           srv.Handler(),
@@ -195,20 +147,8 @@ func run() error {
 	return nil
 }
 
-// ticketGrace is how long a Pod's history ticket stays good past the
-// hard session cap.
-//
-// It is not a second lease. The Pod is already gone by then; this only
-// covers an attempt graded in the last minutes of a session whose POST
-// is retrying while the hub restarts. A ticket that expired exactly at
-// the cap would lose precisely the attempt that ran the full length.
 const ticketGrace = time.Hour
 
-// newTicketer returns the session.Config.Webhook for this deployment,
-// or nil when nothing here can collect attempts — no signer (so no
-// AUTH_MODE=github) or no base URL for the Pod to post back to. Nil is
-// not a failure: it is a hub keeping seats and a proxy without a
-// durable history, which is exactly what AUTH_MODE=none is.
 func newTicketer(signer *auth.Signer, baseURL string, maxAge time.Duration) func(string) (string, string, error) {
 	if signer == nil || baseURL == "" {
 		return nil
@@ -226,10 +166,6 @@ func newTicketer(signer *auth.Signer, baseURL string, maxAge time.Duration) func
 	}
 }
 
-// buildManager returns nil when this deployment serves identity and
-// history only — which is a real configuration, not a degraded one: it
-// is what the auth and store halves can be run and proved with before a
-// cluster exists.
 func buildManager(webhook func(string) (string, string, error), banks *catalog.Catalog) (*session.Manager, error) {
 	upstream := os.Getenv("SESSION_UPSTREAM")
 	practical := os.Getenv("SESSION_POD_TEMPLATE")
@@ -260,8 +196,7 @@ func buildManager(webhook func(string) (string, string, error), banks *catalog.C
 
 	var pods session.Pods
 	if upstream != "" {
-		// The local path. One fixed address, a real Pod lifecycle on top
-		// of it, and no cluster.
+
 		host, port, err := net.SplitHostPort(upstream)
 		if err != nil {
 			return nil, fmt.Errorf("SESSION_UPSTREAM must be host:port: %w", err)
@@ -304,14 +239,7 @@ func buildManager(webhook func(string) (string, string, error), banks *catalog.C
 			}
 			tmpl = b
 		} else {
-			// SESSION_UPSTREAM has no Pod to create, but the manager
-			// still renders a manifest to name and label the thing it is
-			// tracking. A minimal one keeps that path identical to the
-			// real one rather than special-cased — including declaring
-			// the webhook vars, so a render that would fail against the
-			// real template fails here too rather than only in the
-			// cluster. Nothing reads them: the upstream is a `./sim up`
-			// this process did not start and cannot configure.
+
 			tmpl = session.Template(`{"kind":"Pod","metadata":{},"spec":{"containers":[{"name":"facilitator","env":[` +
 				`{"name":"BANK","value":""},` +
 				`{"name":"HISTORY_WEBHOOK_URL","value":""},` +
@@ -329,19 +257,6 @@ func buildManager(webhook func(string) (string, string, error), banks *catalog.C
 	return session.New(pods, cfg), nil
 }
 
-// bankTemplates finds the per-exam Pod manifests beside the flavour's
-// base one: <dir>/session-bank-<id>.json, written by the chart for every
-// bank given resource overrides under sessions.<kind>.banks.
-//
-// Discovered rather than configured, because the alternative is a second
-// list of bank ids in the environment that has to agree with the first.
-// A bank with no file simply gets the flavour's base manifest, which is
-// every bank today.
-//
-// The catalog decides which flavour a file belongs to, so a bank is
-// never registered against the wrong one: an exam's engine is declared
-// by the bank itself, in exactly one place, and the same mapping decides
-// which seat pool admits it.
 func bankTemplates(basePath string, kind session.Kind, banks *catalog.Catalog) map[string]session.Template {
 	if basePath == "" || banks == nil {
 		return nil
@@ -358,9 +273,7 @@ func bankTemplates(basePath string, kind session.Kind, banks *catalog.Catalog) m
 			continue
 		}
 		if err != nil {
-			// Not fatal: the base manifest still works, and refusing to
-			// start the whole hub over one unreadable override would take
-			// every other exam down with it.
+
 			log.Printf("hub: read %s: %v (using the default session Pod for %s)", path, err, entry.ID)
 			continue
 		}

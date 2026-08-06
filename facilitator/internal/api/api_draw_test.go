@@ -6,8 +6,6 @@ import (
 	"time"
 )
 
-// sessionBody is the shared session shape plus the draw fields every
-// endpoint that reports session state now carries.
 type sessionBody struct {
 	State            string   `json:"state"`
 	Mode             string   `json:"mode"`
@@ -19,14 +17,11 @@ type sessionBody struct {
 	PoolDigest       string   `json:"poolDigest"`
 	DomainFilter     []string `json:"domainFilter"`
 	PoolChanged      bool     `json:"poolChanged"`
-	// The preparation fields GET /api/session carries for a pooled
-	// hands-on bank, whose cluster is seeded between the draw and the
-	// clock. Absent on every other bank — see api_handson_pool_test.go.
+
 	PrepareError string         `json:"prepareError"`
 	Preparing    *preparingBody `json:"preparing"`
 }
 
-// preparingBody is the `preparing` object on GET /api/session.
 type preparingBody struct {
 	JobID         string `json:"jobId"`
 	Mode          string `json:"mode"`
@@ -39,13 +34,9 @@ type errorBody struct {
 	Error string `json:"error"`
 }
 
-// `./sim` and tests/smoke.sh POST here with no body at all — no JSON, no
-// Content-Type — and must keep working exactly as they did. This is the
-// regression test for the request shape growing four optional fields.
 func TestStartWithNoBodyStillWorks(t *testing.T) {
 	ts := newTestServer(t)
 
-	// do() sends a nil body, which is what curl -X POST with no -d does.
 	rec := ts.do(t, http.MethodPost, "/api/session/start")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
@@ -58,8 +49,7 @@ func TestStartWithNoBodyStillWorks(t *testing.T) {
 	if got.Mode != "exam" {
 		t.Errorf("mode = %q, want exam (the default an empty body means)", got.Mode)
 	}
-	// Every attempt has a seed whether or not the caller asked for one,
-	// so every attempt is replayable after the fact.
+
 	if len(got.Seed) != 6 {
 		t.Errorf("seed = %q, want six hex digits minted for a body-less start", got.Seed)
 	}
@@ -74,8 +64,6 @@ func TestStartWithNoBodyStillWorks(t *testing.T) {
 	}
 }
 
-// A supplied seed is echoed back, and the same seed against an unchanged
-// pool draws the same questions in the same order.
 func TestStartSeedReplaysTheSameDraw(t *testing.T) {
 	drawFor := func(seed string) []string {
 		ts := newMCQPoolTestServer(t)
@@ -119,11 +107,6 @@ func TestStartSeedReplaysTheSameDraw(t *testing.T) {
 	}
 }
 
-// A candidate replaying a seed against a bank that has since changed is
-// not refused: the draw is still deterministic, it is simply no longer
-// the same set, and starting the attempt with a warning beats handing
-// them nothing at all. poolChanged is a fact about the REQUEST, so it
-// appears on the start response and nowhere else.
 func TestStartReportsPoolChangedWithoutRefusing(t *testing.T) {
 	ts := newMCQPoolTestServer(t)
 	rec := ts.doJSON(t, http.MethodPost, "/api/session/start",
@@ -142,17 +125,12 @@ func TestStartReportsPoolChangedWithoutRefusing(t *testing.T) {
 		t.Error("poolDigest echoed the stale value back; it must report the pool actually drawn from")
 	}
 
-	// And the attempt itself records nothing about the mismatch: it is an
-	// ordinary attempt that simply is not the set the seed produced last
-	// time.
 	after := decodeJSON[sessionBody](t, ts.do(t, http.MethodGet, "/api/session"))
 	if after.PoolChanged {
 		t.Error("GET /api/session reports poolChanged; it belongs to the start request only")
 	}
 }
 
-// The matching digest is the ordinary replay, and says so by staying
-// quiet.
 func TestStartWithMatchingDigestIsNotAChange(t *testing.T) {
 	ts := newMCQPoolTestServer(t)
 	first := decodeJSON[sessionBody](t, ts.doJSON(t, http.MethodPost, "/api/session/start", `{"mode":"exam"}`))
@@ -173,9 +151,6 @@ func TestStartWithMatchingDigestIsNotAChange(t *testing.T) {
 	}
 }
 
-// A domain the bank does not have is the caller's mistake and gets a
-// 400 naming it — never a silently empty attempt that looks like a
-// working exam right up until the score.
 func TestStartUnknownDomainIs400(t *testing.T) {
 	ts := newMCQPoolTestServer(t)
 	rec := ts.doJSON(t, http.MethodPost, "/api/session/start",
@@ -187,7 +162,6 @@ func TestStartUnknownDomainIs400(t *testing.T) {
 		t.Error("400 body carried no error message")
 	}
 
-	// And nothing was started.
 	if got := decodeJSON[sessionBody](t, ts.do(t, http.MethodGet, "/api/session")).State; got != "idle" {
 		t.Errorf("state = %q after a rejected start, want idle", got)
 	}
@@ -201,9 +175,6 @@ func TestStartMalformedSeedIs400(t *testing.T) {
 	}
 }
 
-// A domain filter narrows an mcq draw to the named domains, and the
-// attempt is scoped to it everywhere: /api/exam lists only those
-// questions, and a question from the excluded domain is a 404.
 func TestStartDomainFilterNarrowsMCQ(t *testing.T) {
 	ts := newMCQPoolTestServer(t)
 	rec := ts.doJSON(t, http.MethodPost, "/api/session/start",
@@ -217,8 +188,7 @@ func TestStartDomainFilterNarrowsMCQ(t *testing.T) {
 	}
 
 	list := decodeJSON[examResponse](t, ts.do(t, http.MethodGet, "/api/exam"))
-	// Domain B holds 4 of the 9 pool questions, and 4 < the declared
-	// length of 5, so the filtered attempt is all of them.
+
 	if len(list.Questions) != 4 {
 		t.Fatalf("len(questions) = %d, want Domain B's 4", len(list.Questions))
 	}
@@ -232,10 +202,6 @@ func TestStartDomainFilterNarrowsMCQ(t *testing.T) {
 	}
 }
 
-// The filter reaches the hands-on engine too. Narrowing which questions
-// an attempt contains is free there — bootstrap.sh seeds every question
-// in the bank into the cluster at boot whatever the draw is — so the
-// cluster a filtered attempt sees is identical to an unfiltered one's.
 func TestStartDomainFilterNarrowsHandsOn(t *testing.T) {
 	ts := newTestServer(t)
 	rec := ts.doJSON(t, http.MethodPost, "/api/session/start",
@@ -256,11 +222,6 @@ func TestStartDomainFilterNarrowsHandsOn(t *testing.T) {
 	}
 }
 
-// GET /api/exam publishes the curriculum a draw configurator picks from.
-// It must be computed from the FULL pool even once an attempt has
-// narrowed `questions` to its drawn subset — otherwise the configurator
-// would show the questions already drawn as if they were the whole
-// curriculum.
 func TestExamDomainsComeFromTheFullPool(t *testing.T) {
 	ts := newMCQPoolTestServer(t)
 
@@ -292,17 +253,13 @@ func TestExamDomainsComeFromTheFullPool(t *testing.T) {
 	}
 }
 
-// A derived target must be labelled as derived: it is arithmetic about
-// weights, not anyone's judgement of how long the work takes, and a
-// display that cannot tell them apart states the second with the first's
-// confidence.
 func TestExamTargetSecondsAreDerivedAndLabelled(t *testing.T) {
 	ts := newTestServer(t)
 	got := decodeJSON[examResponse](t, ts.do(t, http.MethodGet, "/api/exam"))
 	if len(got.Questions) != 2 {
 		t.Fatalf("len(questions) = %d, want 2", len(got.Questions))
 	}
-	// The fixture is a 10-minute exam over 8 points: q01's 5 are 375s.
+
 	q01 := got.Questions[0]
 	if q01.TargetSeconds != 375 || !q01.TargetDerived {
 		t.Errorf("q01 target = %ds (derived=%v), want 375s derived", q01.TargetSeconds, q01.TargetDerived)
@@ -313,9 +270,6 @@ func TestExamTargetSecondsAreDerivedAndLabelled(t *testing.T) {
 	}
 }
 
-// The whole reason elapsedSeconds exists: an untimed attempt reports
-// durationSeconds and remainingSeconds as 0, so their difference says
-// nothing about how long the candidate has been going.
 func TestSessionElapsedSecondsOnUntimedAttempt(t *testing.T) {
 	ts := newTestServer(t)
 	if rec := ts.doJSON(t, http.MethodPost, "/api/session/start", `{"mode":"training"}`); rec.Code != http.StatusOK {
@@ -336,13 +290,9 @@ func TestSessionElapsedSecondsOnUntimedAttempt(t *testing.T) {
 	}
 }
 
-// PUT /api/session/focus is the client saying which task is on screen.
-// The server owns the clock: the request carries a question id and
-// nothing else.
 func TestFocusAccruesTimeAndIsScopedToTheDraw(t *testing.T) {
 	ts := newMCQPoolTestServer(t)
 
-	// 409 before there is an attempt to spend time inside.
 	if rec := ts.doJSON(t, http.MethodPut, "/api/session/focus", `{"question":"a1"}`); rec.Code != http.StatusConflict {
 		t.Errorf("focus while idle: status = %d, want 409", rec.Code)
 	}
@@ -369,9 +319,7 @@ func TestFocusAccruesTimeAndIsScopedToTheDraw(t *testing.T) {
 	if rec := ts.doJSON(t, http.MethodPut, "/api/session/focus", `{"question":"`+inDraw+`"}`); rec.Code != http.StatusOK {
 		t.Fatalf("focus a drawn question: status = %d, body=%s", rec.Code, rec.Body.String())
 	}
-	// A pool question this attempt never contained is a 404, exactly as
-	// it is on every other single-question endpoint: time cannot have
-	// been spent on a question that was never on screen.
+
 	if rec := ts.doJSON(t, http.MethodPut, "/api/session/focus", `{"question":"`+outOfDraw+`"}`); rec.Code != http.StatusNotFound {
 		t.Errorf("focus a question outside the draw: status = %d, want 404", rec.Code)
 	}
@@ -388,15 +336,6 @@ func TestFocusAccruesTimeAndIsScopedToTheDraw(t *testing.T) {
 	}
 }
 
-// GET /api/exam's questionCount is what every count display reads — the
-// lobby stat, the exam cards, "Question 1 of N" in both engines — so it
-// has to describe the attempt a candidate is actually sitting, not the
-// bank it came from.
-//
-// A domain filter is where the two diverge. It can leave a pool too
-// shallow to draw the declared length from, and a filtered hands-on
-// attempt has no declared length at all; before this was pinned, both
-// reported the whole bank's size while serving a narrower subset.
 func TestQuestionCountFollowsTheDraw(t *testing.T) {
 	t.Run("handsOn", func(t *testing.T) {
 		ts := newTestServer(t)
@@ -414,8 +353,6 @@ func TestQuestionCountFollowsTheDraw(t *testing.T) {
 		}
 	})
 
-	// Idle keeps the old meaning: there is no draw yet, so a pooled bank
-	// must advertise the length an attempt WILL be, never its pool size.
 	t.Run("idlePooledBankStillAdvertisesItsLength", func(t *testing.T) {
 		ts := newMCQPoolTestServer(t)
 		list := decodeJSON[examResponse](t, ts.do(t, http.MethodGet, "/api/exam"))

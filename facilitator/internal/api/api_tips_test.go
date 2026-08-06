@@ -15,9 +15,6 @@ import (
 
 const tipsBody = "# Exam tips\n\nGenerate the manifest, do not type it.\n"
 
-// bankWithTips copies the standard test bank into a temp directory and
-// drops a tips.md beside its exam definition, so the tips tests exercise
-// the same exam every other test here does.
 func bankWithTips(t *testing.T, body string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -61,11 +58,6 @@ func TestTipsAreServedVerbatimFromTheBank(t *testing.T) {
 	}
 }
 
-// The whole reason this endpoint is registered beside /api/exam rather
-// than beside the solution and hint routes. Technique is not answers: it
-// is how to alias kubectl and where to look when a Pod will not start,
-// which is the same advice whatever mode the attempt is in — and it is
-// most useful before the clock starts, when there is no attempt at all.
 func TestTipsAreUngatedInEveryAttemptState(t *testing.T) {
 	bank := bankWithTips(t, tipsBody)
 
@@ -95,8 +87,6 @@ func TestTipsAreUngatedInEveryAttemptState(t *testing.T) {
 	}
 }
 
-// The client is told once, on /api/exam, so it can decide whether the
-// control should exist at all rather than opening an empty sheet.
 func TestExamAdvertisesWhetherTheBankHasTips(t *testing.T) {
 	type examResp struct {
 		HasTips bool `json:"hasTips"`
@@ -122,8 +112,6 @@ func TestTipsAre404ForABankThatShipsNone(t *testing.T) {
 	}
 }
 
-// An empty file would open a sheet with nothing in it, which is worse
-// than no control — so it does not count as having tips.
 func TestAnEmptyTipsFileIsNoTips(t *testing.T) {
 	ts := newTipsServer(t, bankWithTips(t, ""))
 
@@ -135,8 +123,6 @@ func TestAnEmptyTipsFileIsNoTips(t *testing.T) {
 	}
 }
 
-// Read per request, exactly as question.md and solution.md are, so an
-// author editing the file does not have to restart the facilitator.
 func TestTipsAreReadPerRequestRatherThanCachedAtLoad(t *testing.T) {
 	bank := bankWithTips(t, tipsBody)
 	ts := newTipsServer(t, bank)

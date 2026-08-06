@@ -9,9 +9,6 @@ import (
 	"time"
 )
 
-// fakeClock returns a clock func() time.Time backed by a mutable variable,
-// plus a setter to move it forward — the "no time.Sleep" fake clock the
-// brief requires for every test except the dedicated real-timer test.
 func fakeClock(start time.Time) (clock func() time.Time, set func(time.Time)) {
 	now := start
 	return func() time.Time { return now }, func(t time.Time) { now = t }
@@ -115,7 +112,6 @@ func TestSnapshotLazyExpiryFiresOnExpireOnce(t *testing.T) {
 		t.Fatalf("onExpire fired %d times, want 1", fired)
 	}
 
-	// A second Snapshot after the same expiry must not re-fire onExpire.
 	snap2 := m.Snapshot()
 	if snap2.State != "ended" {
 		t.Errorf("second Snapshot State = %q, want ended", snap2.State)
@@ -336,16 +332,11 @@ func TestReloadRunningPastExpiryEndsImmediately(t *testing.T) {
 	if snap.EndReason != "expired" {
 		t.Errorf("reloaded EndReason = %q, want expired", snap.EndReason)
 	}
-	// New's load-time correction is not a live expiry the timer/Snapshot
-	// observed happening — it's fixing up stale state from a prior
-	// process's lifetime. onExpire (used to kick grading) intentionally
-	// does not fire here; see New's doc comment.
+
 	if fired != 0 {
 		t.Errorf("onExpire fired %d times from New, want 0", fired)
 	}
 
-	// The immediate end-on-load must itself be persisted (Persist BEFORE
-	// returning applies here too), independent of any later Snapshot call.
 	m3, err := New(path, testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New (m3): %v", err)
@@ -374,7 +365,7 @@ func TestCorruptFileStartsIdle(t *testing.T) {
 }
 
 func TestNewMissingFileStartsIdle(t *testing.T) {
-	path := sessionPath(t) // never written
+	path := sessionPath(t)
 	clock, _ := fakeClock(epoch)
 	m, err := New(path, testBank, testDur, clock, func() {})
 	if err != nil {
@@ -416,7 +407,6 @@ func TestSetResultsPersists(t *testing.T) {
 		t.Errorf("Results() graded = false, want true")
 	}
 
-	// Reload from disk on a fresh Manager to prove it was persisted.
 	m2, err := New(path, testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("New (reload): %v", err)
@@ -472,14 +462,6 @@ func TestSetGradeErrorPersists(t *testing.T) {
 	}
 }
 
-// TestSetResultsAndGradeErrorRejectedUnlessEnded is a regression test for
-// a stale-write race: a grading goroutine started against one attempt
-// (session ended, grading in flight) must not be able to stamp its
-// result onto a later attempt after the operator has Reset (or
-// Reset+Start'd) the session in the meantime. Both SetResults and
-// SetGradeError must reject with ErrConflict — and leave state/results
-// untouched, in memory and on disk — whenever the current state is not
-// "ended".
 func TestSetResultsAndGradeErrorRejectedUnlessEnded(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -555,7 +537,6 @@ func TestSetResultsAndGradeErrorRejectedUnlessEnded(t *testing.T) {
 					results, gradeErr, graded, beforeResults, beforeGradeErr, beforeGraded)
 			}
 
-			// Reload from disk to prove the rejected write persisted nothing.
 			m2, err := New(path, testBank, testDur, clock, func() {})
 			if err != nil {
 				t.Fatalf("New (reload): %v", err)
@@ -587,7 +568,6 @@ func TestSetResultsAndGradeErrorRejectedUnlessEnded(t *testing.T) {
 					results, gradeErr, graded, beforeResults, beforeGradeErr, beforeGraded)
 			}
 
-			// Reload from disk to prove the rejected write persisted nothing.
 			m2, err := New(path, testBank, testDur, clock, func() {})
 			if err != nil {
 				t.Fatalf("New (reload): %v", err)
@@ -601,15 +581,6 @@ func TestSetResultsAndGradeErrorRejectedUnlessEnded(t *testing.T) {
 	}
 }
 
-// TestReloadEndedWithoutResultsAllowsRegrade is a regression test for a
-// nil-vs-literal-"null" json.RawMessage round-trip bug: json.RawMessage(nil)
-// marshals to the JSON literal null, but unmarshaling null into a
-// json.RawMessage (whose UnmarshalJSON just copies the raw input bytes,
-// regardless of content) yields a non-nil 4-byte RawMessage("null"), not
-// nil. Before the fix, an ended-without-results session reloaded via New
-// therefore had len(m.results) > 0, so Results() wrongly reported
-// graded==true and End's recovery re-grade path wrongly returned
-// ErrConflict.
 func TestReloadEndedWithoutResultsAllowsRegrade(t *testing.T) {
 	path := sessionPath(t)
 	clock, _ := fakeClock(epoch)
@@ -661,11 +632,6 @@ func TestResultsNotGradedBeforeSet(t *testing.T) {
 	}
 }
 
-// TestStartPersistFailureRollsBack proves a failed persist doesn't leave
-// Start's in-memory mutation half-applied: a session directory whose
-// parent doesn't exist makes persistLocked's os.CreateTemp fail
-// deterministically (portable even when tests run as root, unlike
-// chmod-based permission tricks, which root ignores).
 func TestStartPersistFailureRollsBack(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "missing-subdir", "session.json")
 	clock, _ := fakeClock(epoch)
@@ -684,9 +650,6 @@ func TestStartPersistFailureRollsBack(t *testing.T) {
 	}
 }
 
-// TestEndPersistFailureRollsBack covers the same rollback contract for
-// transitionToEndedLocked, shared by End, the real timer, and Snapshot's
-// lazy expiry.
 func TestEndPersistFailureRollsBack(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "session.json")
@@ -716,11 +679,6 @@ func TestEndPersistFailureRollsBack(t *testing.T) {
 	}
 }
 
-// TestRealTimerFiresOnExpiry is the one test allowed a real timer wait: it
-// uses the real clock and a short real duration to prove the time.Timer
-// mechanism itself (not just the lazy Snapshot check) auto-ends a session
-// with no requests in flight. A generous buffered-channel wait replaces
-// time.Sleep-based assertions.
 func TestRealTimerFiresOnExpiry(t *testing.T) {
 	firedCh := make(chan struct{}, 1)
 	m, err := New(sessionPath(t), testBank, 50*time.Millisecond, time.Now, func() {
@@ -729,8 +687,7 @@ func TestRealTimerFiresOnExpiry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	// The attempt's own duration is what arms the timer, so this has to
-	// be the 50ms the manager was built with — not testDur.
+
 	if _, err := m.Start(ModeExam, 50*time.Millisecond); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -750,9 +707,6 @@ func TestRealTimerFiresOnExpiry(t *testing.T) {
 	}
 }
 
-// Untimed is the one thing in this package that can silently break for
-// everyone: remainingLocked on a zero duration is always 0, which is
-// indistinguishable from "expired" unless every path checks first.
 func TestTrainingAttemptIsUntimedAndNeverExpires(t *testing.T) {
 	clock, setNow := fakeClock(epoch)
 	m, err := New(sessionPath(t), testBank, testDur, clock, func() {})
@@ -774,8 +728,6 @@ func TestTrainingAttemptIsUntimedAndNeverExpires(t *testing.T) {
 		t.Errorf("RemainingSeconds = %d, want 0 (meaningless when untimed)", snap.RemainingSeconds)
 	}
 
-	// A year later it is still running. Without the untimedLocked guard
-	// in checkExpiryLocked, the very first Snapshot would have ended it.
 	setNow(clock().Add(365 * 24 * time.Hour))
 	if got := m.Snapshot(); got.State != "running" {
 		t.Errorf("State = %q after a year, want still running", got.State)
@@ -817,9 +769,6 @@ func TestStartRejectsAnUnknownMode(t *testing.T) {
 	}
 }
 
-// `./sim down` + `./sim up` mid-attempt must resume with the clock the
-// attempt was STARTED with. v2 wrote DurationSeconds and then ignored it
-// on load, so a resumed attempt silently inherited the process default.
 func TestResumeKeepsTheAttemptsOwnClockAndMode(t *testing.T) {
 	path := sessionPath(t)
 	clock, _ := fakeClock(epoch)
@@ -832,7 +781,6 @@ func TestResumeKeepsTheAttemptsOwnClockAndMode(t *testing.T) {
 		t.Fatalf("Start: %v", err)
 	}
 
-	// A second process, with a different default duration entirely.
 	m2, err := New(path, testBank, 30*time.Minute, clock, func() {})
 	if err != nil {
 		t.Fatalf("New (resume): %v", err)

@@ -22,10 +22,6 @@ const (
 	handsOnPoolBankDir  = "testdata/bank-handson-pool"
 )
 
-// fakeSeeder is the api.Seeder test double. It records what it was asked
-// to seed and answers Status with whatever the test has set, so the
-// whole preparation state machine runs without a conductor, a Docker
-// daemon or a cluster.
 type fakeSeeder struct {
 	mu sync.Mutex
 
@@ -33,7 +29,6 @@ type fakeSeeder struct {
 	asked     []string
 	startCall int
 
-	// state is what Status reports. Tests move it to drive the watcher.
 	state     api.SeedState
 	failMsg   string
 	statusErr error
@@ -81,20 +76,11 @@ func (f *fakeSeeder) starts() int {
 	return f.startCall
 }
 
-// newHandsOnPoolTestServer builds a server over the pooled hands-on
-// fixture: six questions, four in Domain A and two in Domain B weighted
-// 60/40, spec.examLength 3. Pass a nil seeder to get a build with no
-// route to the conductor.
 func newHandsOnPoolTestServer(t *testing.T, seeder api.Seeder) (*testServer, *exam.Exam) {
 	t.Helper()
 	return newHandsOnPoolServer(t, seeder, fakeControl, t.TempDir()+"/session.json")
 }
 
-// newHandsOnPoolServer is the same server with the two things a restart
-// or a conductor-state test has to control: which conductor it talks to,
-// and which session file it resumes from. Building a second one over the
-// same path is how a facilitator restart is written down here — the
-// process's memory goes, the session file stays.
 func newHandsOnPoolServer(t *testing.T, seeder api.Seeder, control http.Handler, sessionPath string) (*testServer, *exam.Exam) {
 	t.Helper()
 
@@ -117,37 +103,10 @@ func newHandsOnPoolServer(t *testing.T, seeder api.Seeder, control http.Handler,
 	h := api.New(ex, handsOnPoolBankDir, mgr, grader.Grade, fakeDesktop, control, fstest.MapFS{}, nil, nil, opts...)
 	ts := &testServer{handler: h, mgr: mgr, grader: grader, setNow: setNow}
 
-	// sessionPath is this function's ARGUMENT, so t.TempDir() has already
-	// run and registered its own cleanup. Cleanups run
-	// last-registered-first, so this one always gets there before the
-	// directory is removed.
 	t.Cleanup(func() { ts.cancelAnyPreparation(t) })
 	return ts, ex
 }
 
-// cancelAnyPreparation abandons a preparation the test left in flight, so
-// its watcher stops instead of outliving the test.
-//
-// A pooled start answers 202 and leaves a watcher goroutine behind it on
-// purpose (see api.watchPrepare): a candidate may reload the page while a
-// four-minute seed runs, so the watcher outlives the request that spawned
-// it and polls on context.Background. Several tests here park one
-// deliberately — the fake seeder stays SeedRunning, which is exactly the
-// state "a start does not start a clock" is about — and without this
-// those watchers poll every 500ms for the rest of the test binary's life.
-//
-// DELETE is what stops them: it clears the preparation, and the watcher's
-// next prepIsCurrent check returns false and it returns. A parked watcher
-// never writes anything, so cancelling is all this can usefully do.
-//
-// What it does NOT close: a preparation whose seed has already settled is
-// inside startPreparedAttempt, which writes the session file, and that
-// write can land after t.TempDir() has begun removing the directory it
-// lives in — surfacing far away as "TempDir RemoveAll cleanup: directory
-// not empty". Cancelling cannot help there, because the write is already
-// under way. A test that lets a preparation settle must therefore wait
-// for it (ts.waitSettled) before returning; every test here that settles
-// one now does.
 func (ts *testServer) cancelAnyPreparation(t *testing.T) {
 	t.Helper()
 	rec := ts.do(t, http.MethodGet, "/api/session")
@@ -161,10 +120,6 @@ func (ts *testServer) cancelAnyPreparation(t *testing.T) {
 	ts.do(t, http.MethodDelete, "/api/session")
 }
 
-// conductorStub answers GET /api/control/status with a fixed job
-// snapshot and 202s everything else, as the real conductor does for the
-// operations that start a job. It records the paths it was asked for, so
-// a test can also assert that a bank which must never ask, never asks.
 type conductorStub struct {
 	mu     sync.Mutex
 	status string
@@ -200,10 +155,6 @@ func (c *conductorStub) asked(path string) bool {
 	return false
 }
 
-// waitFor polls GET /api/session until cond holds, and fails with the
-// last body it saw if it never does. The probes under test settle on
-// their own goroutine, so there is nothing to synchronise on but the
-// response a client would be reading anyway.
 func (ts *testServer) waitFor(t *testing.T, what string, cond func(sessionBody) bool) sessionBody {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -219,7 +170,6 @@ func (ts *testServer) waitFor(t *testing.T, what string, cond func(sessionBody) 
 	return got
 }
 
-// prepareBody is POST /api/session/start's 202 shape.
 type prepareBody struct {
 	State         string   `json:"state"`
 	Bank          string   `json:"bank"`
@@ -241,9 +191,6 @@ func (ts *testServer) session(t *testing.T) sessionBody {
 	return decodeJSON[sessionBody](t, rec)
 }
 
-// waitSettled polls GET /api/session until no preparation is in flight —
-// the exact terminal condition the client contract names — and returns
-// the settled body.
 func (ts *testServer) waitSettled(t *testing.T) sessionBody {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -258,9 +205,6 @@ func (ts *testServer) waitSettled(t *testing.T) sessionBody {
 	return sessionBody{}
 }
 
-// The whole shape of the new path: a pooled hands-on start does not
-// start a clock. It draws, hands the drawn ids to the seeder, and
-// answers 202 with a job to watch — with the session still idle.
 func TestHandsOnPoolStartPreparesInsteadOfStarting(t *testing.T) {
 	seeder := newFakeSeeder()
 	ts, _ := newHandsOnPoolTestServer(t, seeder)
@@ -284,14 +228,11 @@ func TestHandsOnPoolStartPreparesInsteadOfStarting(t *testing.T) {
 		t.Errorf("Seed/PoolDigest = %q/%q, want both — the draw is already made", got.Seed, got.PoolDigest)
 	}
 
-	// The cluster is asked for exactly the questions that were drawn.
 	asked := seeder.askedFor()
 	if len(asked) != 3 {
 		t.Fatalf("seeder asked for %v, want the 3 drawn ids", asked)
 	}
 
-	// And nothing has started: the session is idle, with the preparation
-	// reported beside it rather than as a fourth state.
 	snap := ts.session(t)
 	if snap.State != "idle" {
 		t.Errorf("session state = %q, want idle while the cluster is being prepared", snap.State)
@@ -310,8 +251,6 @@ func TestHandsOnPoolStartPreparesInsteadOfStarting(t *testing.T) {
 	}
 }
 
-// The clock starts when — and only when — the seeding has succeeded, and
-// the attempt it starts is the draw that was seeded, not a fresh one.
 func TestHandsOnPoolAttemptStartsAfterSeedSucceeds(t *testing.T) {
 	seeder := newFakeSeeder()
 	ts, _ := newHandsOnPoolTestServer(t, seeder)
@@ -335,7 +274,6 @@ func TestHandsOnPoolAttemptStartsAfterSeedSucceeds(t *testing.T) {
 		t.Errorf("mode = %q, want exam", got.Mode)
 	}
 
-	// The attempt contains exactly the seeded questions, in draw order.
 	ids := ts.mgr.QuestionIDs()
 	asked := seeder.askedFor()
 	if len(ids) != len(asked) {
@@ -348,9 +286,6 @@ func TestHandsOnPoolAttemptStartsAfterSeedSucceeds(t *testing.T) {
 	}
 }
 
-// A failed seed leaves the session NOT started and says why. Dropping a
-// candidate into a timed exam against a half-prepared cluster is the
-// outcome this whole path exists to prevent.
 func TestHandsOnPoolFailedSeedLeavesSessionIdle(t *testing.T) {
 	seeder := newFakeSeeder()
 	ts, _ := newHandsOnPoolTestServer(t, seeder)
@@ -376,9 +311,6 @@ func TestHandsOnPoolFailedSeedLeavesSessionIdle(t *testing.T) {
 	}
 }
 
-// A conductor that has forgotten the job is neither success nor "still
-// going": it must fail, or a candidate waits on a progress screen
-// forever for a job nobody is running.
 func TestHandsOnPoolUnknownJobFails(t *testing.T) {
 	seeder := newFakeSeeder()
 	ts, _ := newHandsOnPoolTestServer(t, seeder)
@@ -395,8 +327,6 @@ func TestHandsOnPoolUnknownJobFails(t *testing.T) {
 	}
 }
 
-// One attempt at a time, on this path as on every other. The second
-// start must not queue a second seed job over the first one's cluster.
 func TestHandsOnPoolSecondStartWhilePreparingConflicts(t *testing.T) {
 	seeder := newFakeSeeder()
 	ts, _ := newHandsOnPoolTestServer(t, seeder)
@@ -413,9 +343,6 @@ func TestHandsOnPoolSecondStartWhilePreparingConflicts(t *testing.T) {
 	}
 }
 
-// DELETE /api/session during a preparation abandons it. Without this the
-// watcher would come back minutes later and start the very attempt the
-// reset cancelled — against a cluster the reset has since rebuilt.
 func TestHandsOnPoolDeleteCancelsPreparation(t *testing.T) {
 	seeder := newFakeSeeder()
 	ts, _ := newHandsOnPoolTestServer(t, seeder)
@@ -431,8 +358,6 @@ func TestHandsOnPoolDeleteCancelsPreparation(t *testing.T) {
 		t.Errorf("preparing survived the reset: %+v", got.Preparing)
 	}
 
-	// The seed job settles anyway — nothing can stop it — and must not
-	// start anything.
 	seeder.set(api.SeedDone, "")
 	time.Sleep(50 * time.Millisecond)
 
@@ -441,9 +366,6 @@ func TestHandsOnPoolDeleteCancelsPreparation(t *testing.T) {
 	}
 }
 
-// A build with no route to the conductor cannot prepare this bank's
-// cluster. 503 and an explanation beats starting a timed attempt against
-// questions that do not exist.
 func TestHandsOnPoolWithoutSeederRefuses(t *testing.T) {
 	ts, _ := newHandsOnPoolTestServer(t, nil)
 
@@ -456,9 +378,6 @@ func TestHandsOnPoolWithoutSeederRefuses(t *testing.T) {
 	}
 }
 
-// A seeder that refuses outright (a control job in flight, a session the
-// conductor can see running) is a synchronous failure: nothing to watch,
-// so the caller is told at once and no preparation is left behind.
 func TestHandsOnPoolSeederRefusalIsImmediate(t *testing.T) {
 	seeder := newFakeSeeder()
 	seeder.startErr = errors.New("another control operation is in flight")
@@ -473,8 +392,6 @@ func TestHandsOnPoolSeederRefusalIsImmediate(t *testing.T) {
 	}
 }
 
-// A malformed request is still rejected before any seeding is asked for
-// — the draw has to succeed before there is anything to seed.
 func TestHandsOnPoolRejectsBadSeedBeforeSeeding(t *testing.T) {
 	seeder := newFakeSeeder()
 	ts, _ := newHandsOnPoolTestServer(t, seeder)
@@ -488,10 +405,6 @@ func TestHandsOnPoolRejectsBadSeedBeforeSeeding(t *testing.T) {
 	}
 }
 
-// Once the attempt is running, everything downstream is the ordinary
-// pooled behaviour: /api/exam lists the drawn subset, and a pool
-// question this attempt did not draw is a 404 rather than a question the
-// candidate can open against a cluster that was never prepared for it.
 func TestHandsOnPoolScopesTheAttemptToTheSeededQuestions(t *testing.T) {
 	seeder := newFakeSeeder()
 	ts, _ := newHandsOnPoolTestServer(t, seeder)
@@ -526,14 +439,8 @@ func TestHandsOnPoolScopesTheAttemptToTheSeededQuestions(t *testing.T) {
 	}
 }
 
-// wantClusterHeld is the exact refusal a start gets when the cluster is
-// still prepared for something else. Written out here rather than
-// exported from the package under test: this string is the whole
-// interface — a candidate reads it in a toast and a script reads it in a
-// 409 body — and a test that imported it could not notice it changing.
 const wantClusterHeld = "the exam environment is still set up for an earlier attempt's questions; reset the environment before starting a different attempt"
 
-// startBody is the JSON POST /api/session/start takes.
 func startBody(seed string, domains ...string) string {
 	body := `{"mode":"exam"`
 	if seed != "" {
@@ -545,18 +452,10 @@ func startBody(seed string, domains ...string) string {
 	return body + `}`
 }
 
-// THE defect this wave closes. A pooled hands-on bank seeds when the
-// attempt starts, and nothing ever tears that seeding down — so DELETE
-// /api/session followed by a fresh start used to run draw B's setup
-// scripts over every object draw A's had created. Grading is scoped to
-// B, so the score stayed honest while the exam did not: a leftover
-// Service, an existing namespace, a Deployment already carrying the name
-// a task asks for.
 func TestHandsOnPoolSecondDrawIsRefusedUntilTheClusterIsRebuilt(t *testing.T) {
 	seeder := newFakeSeeder()
 	ts, _ := newHandsOnPoolTestServer(t, seeder)
 
-	// Draw A: the whole curriculum, so 2 from Domain A and 1 from Domain B.
 	if rec := ts.doJSON(t, http.MethodPost, "/api/session/start", startBody("")); rec.Code != http.StatusAccepted {
 		t.Fatalf("first start: status = %d, want 202", rec.Code)
 	}
@@ -568,9 +467,6 @@ func TestHandsOnPoolSecondDrawIsRefusedUntilTheClusterIsRebuilt(t *testing.T) {
 		t.Fatalf("DELETE: status = %d, want 204", rec.Code)
 	}
 
-	// Draw B: narrowed to Domain A, so 3 from Domain A and none from
-	// Domain B — guaranteed to be a different set from draw A, whatever
-	// either seed shuffled to.
 	rec := ts.doJSON(t, http.MethodPost, "/api/session/start", startBody("", "Domain A"))
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("second start: status = %d, want 409, body=%s", rec.Code, rec.Body.String())
@@ -586,11 +482,6 @@ func TestHandsOnPoolSecondDrawIsRefusedUntilTheClusterIsRebuilt(t *testing.T) {
 	}
 }
 
-// The other half of that rule, and the one that keeps the failure path
-// usable: the SAME draw is allowed straight through. Re-running the same
-// setup.sh scripts over their own output is the idempotent apply the
-// conductor's seed job already is, so "the seeding failed, start again
-// with the same seed" stays a retry rather than a second refusal.
 func TestHandsOnPoolIdenticalDrawMayBeSeededAgain(t *testing.T) {
 	seeder := newFakeSeeder()
 	ts, _ := newHandsOnPoolTestServer(t, seeder)
@@ -611,10 +502,6 @@ func TestHandsOnPoolIdenticalDrawMayBeSeededAgain(t *testing.T) {
 	}
 }
 
-// The way out, and the reason the refusal names it: a reset rebuilds the
-// cluster, and the facilitator learns that by watching its own conductor
-// proxy — the only route to the conductor this process has, and the one
-// both the UI's "New attempt" and `./sim reset` take.
 func TestHandsOnPoolResetLetsADifferentDrawThrough(t *testing.T) {
 	seeder := newFakeSeeder()
 	ts, _ := newHandsOnPoolTestServer(t, seeder)
@@ -639,18 +526,12 @@ func TestHandsOnPoolResetLetsADifferentDrawThrough(t *testing.T) {
 	if n := seeder.starts(); n != 2 {
 		t.Errorf("seeder started %d times, want 2", n)
 	}
-	// Through means through: the 202 says the guard stood down, and this
-	// says the attempt the guard was blocking actually ran. Waiting also
-	// keeps this test from racing the watcher it just started against its
-	// own temp directory — see drainPreparation.
+
 	if got := ts.waitSettled(t); got.State != "running" {
 		t.Fatalf("state after the second draw = %q, want running (prepareError=%q)", got.State, got.PrepareError)
 	}
 }
 
-// A reset the conductor REFUSED changed nothing about the cluster, so it
-// must not stand the guard down either. The proxy watches the status the
-// conductor actually returned, not the request that was attempted.
 func TestHandsOnPoolRefusedResetDoesNotClearTheGuard(t *testing.T) {
 	seeder := newFakeSeeder()
 	busy := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -676,17 +557,11 @@ func TestHandsOnPoolRefusedResetDoesNotClearTheGuard(t *testing.T) {
 	}
 }
 
-// writeConflict is the conductor's answer when another control job holds
-// the single-job lock.
 func writeConflict(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusConflict)
 	w.Write([]byte(`{"error":"another control operation is in flight"}`))
 }
 
-// The guard is in memory, but it is not lost with the process: an
-// attempt's drawn questions ARE what its seeding created, and the draw is
-// persisted with the session. So a facilitator that restarts mid-attempt
-// comes back still knowing what the cluster holds.
 func TestHandsOnPoolClusterRecordSurvivesARestart(t *testing.T) {
 	sessionPath := t.TempDir() + "/session.json"
 	seeder := newFakeSeeder()
@@ -700,7 +575,6 @@ func TestHandsOnPoolClusterRecordSurvivesARestart(t *testing.T) {
 		t.Fatalf("state = %q, want running", got.State)
 	}
 
-	// The restart: a new process over the same session file.
 	restarted, _ := newHandsOnPoolServer(t, newFakeSeeder(), fakeControl, sessionPath)
 	if got := restarted.session(t); got.State != "running" {
 		t.Fatalf("resumed state = %q, want the persisted running attempt", got.State)
@@ -713,12 +587,6 @@ func TestHandsOnPoolClusterRecordSurvivesARestart(t *testing.T) {
 	}
 }
 
-// A facilitator that restarts DURING a preparation loses it: the draw
-// lived in memory and there is nothing left to start. What it must not
-// do is lose it in silence, which is a candidate watching a poller that
-// will never change again. The conductor still knows a seed job was
-// running, so the situation is stated on the field the client already
-// renders.
 func TestHandsOnPoolLostPreparationIsAnnounced(t *testing.T) {
 	conductor := &conductorStub{status: `{"busy":true,"job":{"id":"job-7","op":"seed"}}`}
 	ts, _ := newHandsOnPoolServer(t, newFakeSeeder(), conductor, t.TempDir()+"/session.json")
@@ -733,8 +601,6 @@ func TestHandsOnPoolLostPreparationIsAnnounced(t *testing.T) {
 		t.Errorf("prepareError = %q, want it to say what happened", got.PrepareError)
 	}
 
-	// And the cluster it seeded is a draw nothing here can name, so the
-	// next start is refused for exactly the same reason a stale one is.
 	rec := ts.doJSON(t, http.MethodPost, "/api/session/start", startBody(""))
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("start after a lost preparation: status = %d, want 409, body=%s", rec.Code, rec.Body.String())
@@ -744,9 +610,6 @@ func TestHandsOnPoolLostPreparationIsAnnounced(t *testing.T) {
 	}
 }
 
-// A seed job that has already SETTLED counts the same way: the objects it
-// made are just as present, and an idle session means no attempt was ever
-// started from them.
 func TestHandsOnPoolSettledSeedJobCountsAsALostPreparation(t *testing.T) {
 	conductor := &conductorStub{status: `{"busy":false,"lastJob":{"id":"job-7","op":"seed"}}`}
 	ts, _ := newHandsOnPoolServer(t, newFakeSeeder(), conductor, t.TempDir()+"/session.json")
@@ -756,15 +619,10 @@ func TestHandsOnPoolSettledSeedJobCountsAsALostPreparation(t *testing.T) {
 	})
 }
 
-// The false alarm that would make the whole thing untrustworthy: after a
-// reset, the conductor's last job is the RESET, and there is nothing to
-// report. This is the ordinary state of every environment between
-// attempts.
 func TestHandsOnPoolNoAnnouncementAfterAReset(t *testing.T) {
 	conductor := &conductorStub{status: `{"busy":false,"lastJob":{"id":"job-7","op":"reset"}}`}
 	ts, _ := newHandsOnPoolServer(t, newFakeSeeder(), conductor, t.TempDir()+"/session.json")
 
-	// Ask enough times that the probe has certainly run and settled.
 	for i := 0; i < 50; i++ {
 		if got := ts.session(t); got.PrepareError != "" {
 			t.Fatalf("prepareError = %q after a reset, want nothing to report", got.PrepareError)
@@ -779,10 +637,6 @@ func TestHandsOnPoolNoAnnouncementAfterAReset(t *testing.T) {
 	}
 }
 
-// This process's own preparation is not something to reconcile against.
-// The probe stands down the moment a start has been made here, so a
-// candidate who presses Start on a freshly booted facilitator can never
-// be told their own in-flight attempt was lost.
 func TestHandsOnPoolProbeIgnoresThisProcessesOwnSeeding(t *testing.T) {
 	conductor := &conductorStub{status: `{"busy":true,"job":{"id":"job-7","op":"seed"}}`}
 	seeder := newFakeSeeder()
@@ -803,9 +657,6 @@ func TestHandsOnPoolProbeIgnoresThisProcessesOwnSeeding(t *testing.T) {
 	}
 }
 
-// The regression guard on the promise that made this opt-in: an
-// UNPOOLED hands-on bank never touches the seeder and never sees a 202.
-// Every bank in the tree is in that category and must stay there.
 func TestUnpooledHandsOnStartIsUnchanged(t *testing.T) {
 	ts := newTestServer(t)
 
@@ -818,11 +669,6 @@ func TestUnpooledHandsOnStartIsUnchanged(t *testing.T) {
 	}
 }
 
-// The guard added for pooled banks must be invisible on every bank in
-// the tree. An unpooled hands-on bank seeds its whole self at boot, so
-// attempt after attempt against the same cluster is not a defect — it is
-// the only thing that has ever happened, and the sequence this refuses
-// for a pooled bank must keep working here forever.
 func TestUnpooledHandsOnRepeatedAttemptsAreNotGated(t *testing.T) {
 	ts := newTestServer(t)
 
@@ -837,9 +683,6 @@ func TestUnpooledHandsOnRepeatedAttemptsAreNotGated(t *testing.T) {
 	}
 }
 
-// And the conductor is never asked anything on their behalf either: the
-// restart probe is a pooled-hands-on question, and a bank that seeds at
-// boot (or has no cluster at all) has nothing for it to reconcile.
 func TestOnlyAPooledHandsOnBankProbesTheConductor(t *testing.T) {
 	unpooled := &conductorStub{}
 	ex, err := exam.Load(examJSON, bankDir)

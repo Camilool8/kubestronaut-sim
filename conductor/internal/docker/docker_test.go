@@ -15,8 +15,6 @@ import (
 	"time"
 )
 
-// newFakeDaemon serves a minimal Docker Engine API on a unix socket and
-// returns a Client pointed at it.
 func newFakeDaemon(t *testing.T, handler http.Handler) *Client {
 	t.Helper()
 	sock := filepath.Join(t.TempDir(), "docker.sock")
@@ -31,7 +29,6 @@ func newFakeDaemon(t *testing.T, handler http.Handler) *Client {
 	return New(sock)
 }
 
-// stdcopyFrame encodes one docker multiplexed-stream frame.
 func stdcopyFrame(stream byte, payload string) []byte {
 	head := make([]byte, 8)
 	head[0] = stream
@@ -118,9 +115,6 @@ func TestExecRunsCommandAndReturnsExitAndOutput(t *testing.T) {
 	}
 }
 
-// The exam UI shows the running phase's most recent output line, so
-// lines must reach the caller as the command produces them rather than
-// only when it exits — a kind bootstrap runs for minutes.
 func TestExecStreamsCompleteLinesAsTheyArrive(t *testing.T) {
 	release := make(chan struct{})
 	c := newFakeDaemon(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -128,8 +122,7 @@ func TestExecStreamsCompleteLinesAsTheyArrive(t *testing.T) {
 		case strings.HasSuffix(r.URL.Path, "/containers/abc/exec"):
 			fmt.Fprint(w, `{"Id":"e1"}`)
 		case strings.HasSuffix(r.URL.Path, "/exec/e1/start"):
-			// A frame split across writes, plus a line split across two
-			// frames — both shapes the daemon really produces.
+
 			w.Write(stdcopyFrame(1, "Ensuring node image\nPreparing "))
 			w.(http.Flusher).Flush()
 			<-release
@@ -155,7 +148,6 @@ func TestExecStreamsCompleteLinesAsTheyArrive(t *testing.T) {
 		}
 	}()
 
-	// The first line must be delivered before the command finishes.
 	deadline := time.After(5 * time.Second)
 	for {
 		mu.Lock()

@@ -23,8 +23,6 @@ func newTestStore(t *testing.T) *history.Store {
 	return s
 }
 
-// gradedResults is a results value shaped like something evaluate.Grade
-// would produce for a full 2-question attempt of testExam().
 func gradedResults() *evaluate.Results {
 	return &evaluate.Results{
 		Bank:            "test-bank",
@@ -50,8 +48,6 @@ func gradedResults() *evaluate.Results {
 	}
 }
 
-// recorderExam is testExam() plus the metadata a record copies in, and a
-// second question so a full draw is 2 and a filtered one is 1.
 func recorderExam() *exam.Exam {
 	ex := testExam()
 	ex.Certification = "CKAD"
@@ -75,9 +71,7 @@ func TestRecordAttemptCopiesTheBankIn(t *testing.T) {
 		t.Fatalf("All() = %d records, want 1", len(got))
 	}
 	r := got[0]
-	// Self-contained: the dashboard shows five certifications while only
-	// one bank is loadable, so a record that pointed at its bank would
-	// render as blanks for the other four.
+
 	if r.Certification != "CKAD" || r.ExamTitle != "Test Exam" || r.ExamType != exam.TypeHandsOn {
 		t.Errorf("record = %+v, want the bank's identity copied in", r)
 	}
@@ -134,7 +128,7 @@ func TestRecordAttemptMarksAFilteredDrawUncounted(t *testing.T) {
 	if got[0].Counted {
 		t.Error("a 100%% single-domain drill was counted; the dashboard would claim a CKAD pass")
 	}
-	// And it must not reach bestPercent or passed.
+
 	p := history.Progress(got)
 	if p.BestPercent != nil || p.Passed {
 		t.Errorf("progress = %+v, want no best and not passed", p)
@@ -165,8 +159,6 @@ func TestRecordAttemptWithoutATokenRefuses(t *testing.T) {
 	}
 }
 
-// A nil store (no state volume, a dev run) is not an error: the exam
-// still runs, it just keeps no record.
 func TestRecordAttemptWithNoStore(t *testing.T) {
 	snap := session.Snapshot{State: "ended", Mode: session.ModeExam}
 	if err := recordAttempt(nil, nil, recorderExam(), "tok-1", snap, gradedResults()); err != nil {
@@ -174,8 +166,6 @@ func TestRecordAttemptWithNoStore(t *testing.T) {
 	}
 }
 
-// The grader must record only what SetResults accepted, and a history
-// failure must never turn a graded exam into a grading failure.
 func TestGradeRecordsTheAttempt(t *testing.T) {
 	mgr := newTestManager(t)
 	store := newTestStore(t)
@@ -205,7 +195,6 @@ func TestGradeSurvivesAHistoryWriteFailure(t *testing.T) {
 	}
 	g.Grade()
 
-	// The grade itself still lands: results set, no grade error.
 	waitFor(t, func() bool {
 		res, gradeErr, graded := mgr.Results()
 		return graded && gradeErr == "" && len(res) > 0
@@ -218,8 +207,6 @@ type errRecorderType string
 
 func (e errRecorderType) Error() string { return string(e) }
 
-// waitFor polls cond for up to a second. The grading run is a goroutine,
-// so there is no synchronous moment to assert at.
 func waitFor(t *testing.T, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(time.Second)
@@ -232,8 +219,6 @@ func waitFor(t *testing.T, cond func() bool) {
 	t.Fatal("condition never became true")
 }
 
-// newBanksFetcher must reach exactly one conductor route and treat
-// anything other than 200 as an outage — the catalog degrades on it.
 func TestNewBanksFetcher(t *testing.T) {
 	var gotPath string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

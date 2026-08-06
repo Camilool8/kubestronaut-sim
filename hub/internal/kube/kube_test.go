@@ -51,9 +51,7 @@ func TestCreateGetDeleteList(t *testing.T) {
 	if pod.Status.PodIP != "10.42.0.7" {
 		t.Errorf("podIP = %q", pod.Status.PodIP)
 	}
-	// Readiness is per-container: the hub proxies to the facilitator, and
-	// the desktop being unready is a normal moment during boot, not a
-	// reason to withhold the session.
+
 	if !pod.Ready("facilitator") {
 		t.Error("facilitator should be ready")
 	}
@@ -87,9 +85,6 @@ func TestCreateGetDeleteList(t *testing.T) {
 	}
 }
 
-// The three statuses the manager makes decisions from. A 409 that is not
-// distinguishable from a 500 turns "the name is still taken, wait" into
-// "something broke, give up".
 func TestStatusesMapToSentinels(t *testing.T) {
 	for _, tc := range []struct {
 		code int
@@ -110,8 +105,6 @@ func TestStatusesMapToSentinels(t *testing.T) {
 	}
 }
 
-// A refusal that loses the API server's sentence turns a one-line RBAC
-// fix into an investigation.
 func TestForbiddenKeepsTheAPIServersExplanation(t *testing.T) {
 	c := newClient(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
@@ -123,9 +116,6 @@ func TestForbiddenKeepsTheAPIServersExplanation(t *testing.T) {
 	}
 }
 
-// A projected token is rotated by the kubelet. A client that reads it
-// once at startup works until the first rotation and then 401s forever,
-// which is the kind of failure that shows up hours after a deploy.
 func TestTokenIsRereadAfterRotation(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "token")
@@ -142,7 +132,7 @@ func TestTokenIsRereadAfterRotation(t *testing.T) {
 	if _, err := c.GetPod(context.Background(), "a"); err != nil {
 		t.Fatal(err)
 	}
-	// Rotate, and defeat the short read cache the way the clock would.
+
 	if err := os.WriteFile(path, []byte("second\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}

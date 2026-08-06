@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// writeFixture drops a literal exam JSON document at path.
 func writeFixture(t *testing.T, path, doc string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(doc), 0o644); err != nil {
@@ -19,11 +18,6 @@ const (
 	handsOnPoolBankDir  = "testdata/bank-handson-pool"
 )
 
-// loadHandsOnPool loads the pooled hands-on fixture: six questions, four
-// in Domain A and two in Domain B, weighted 60/40, with
-// spec.examLength: 3. Small enough to hand-verify, and every draw leaves
-// half the pool out — which is the only interesting case, because a draw
-// that happens to be the whole pool proves nothing about pooling.
 func loadHandsOnPool(t *testing.T) *Exam {
 	t.Helper()
 	e, err := Load(handsOnPoolExamJSON, handsOnPoolBankDir)
@@ -33,9 +27,6 @@ func loadHandsOnPool(t *testing.T) *Exam {
 	return e
 }
 
-// The opt-in itself. A hands-on bank that declares spec.examLength is
-// pooled, and Load must carry the field through rather than treating it
-// as an mcq-only key it can ignore.
 func TestLoadHandsOnPoolIsPooled(t *testing.T) {
 	e := loadHandsOnPool(t)
 
@@ -53,9 +44,6 @@ func TestLoadHandsOnPoolIsPooled(t *testing.T) {
 	}
 }
 
-// The other half of the opt-in, and the one that keeps every shipped
-// bank byte-identically behaved: a hands-on bank with no
-// spec.examLength is not pooled, whatever else is true of it.
 func TestLoadHandsOnWithoutExamLengthIsNotPooled(t *testing.T) {
 	e, err := Load("testdata/exam.json", "testdata/bank")
 	if err != nil {
@@ -81,9 +69,6 @@ func TestLoadHandsOnWithoutExamLengthIsNotPooled(t *testing.T) {
 	}
 }
 
-// A pooled hands-on draw is stratified exactly as a pooled mcq one is:
-// 60/40 of three questions is two from Domain A and one from Domain B,
-// every time, not on average.
 func TestDrawHandsOnPoolIsStratified(t *testing.T) {
 	e := loadHandsOnPool(t)
 
@@ -92,7 +77,6 @@ func TestDrawHandsOnPoolIsStratified(t *testing.T) {
 		byDomain[q.ID] = q.Domain
 	}
 
-	// Every seed, not one: stratification is a promise about all of them.
 	for _, seed := range []string{"000000", "a1b2c3", "ffffff", "0f0f0f", "123456"} {
 		res, err := Draw(e, DrawOptions{Seed: seed})
 		if err != nil {
@@ -116,10 +100,6 @@ func TestDrawHandsOnPoolIsStratified(t *testing.T) {
 	}
 }
 
-// The replay contract, on the engine that never had one before: the same
-// seed against the same pool draws the same hands-on questions in the
-// same order. This is what makes a pooled hands-on attempt re-sittable —
-// and what a candidate comparing two attempts relies on.
 func TestDrawHandsOnPoolReplaysBySeed(t *testing.T) {
 	e := loadHandsOnPool(t)
 
@@ -140,10 +120,6 @@ func TestDrawHandsOnPoolReplaysBySeed(t *testing.T) {
 	}
 }
 
-// A pooled hands-on bank fingerprints its pool the same way a pooled mcq
-// one does — which is what makes the replay contract enforceable at
-// grading time (CheckPool). Retiring a question has to move the digest,
-// or a stale seed would silently grade an exam nobody sat.
 func TestPoolDigestHandsOnTracksThePool(t *testing.T) {
 	e := loadHandsOnPool(t)
 	before := PoolDigest(e)
@@ -164,11 +140,6 @@ func TestPoolDigestHandsOnTracksThePool(t *testing.T) {
 	}
 }
 
-// A domain filter narrows a pooled hands-on draw to that domain's own
-// pool, and the whole filtered set is drawn when the declared length no
-// longer fits inside it. The attempt is then shorter than the bank
-// advertises, which is correct and is exactly why declaredQuestionCount
-// prefers the draw over ex.ExamLength.
 func TestDrawHandsOnPoolWithDomainFilter(t *testing.T) {
 	e := loadHandsOnPool(t)
 
@@ -189,9 +160,6 @@ func TestDrawHandsOnPoolWithDomainFilter(t *testing.T) {
 	}
 }
 
-// A declared length its own pool cannot satisfy is an authoring bug, and
-// the check is no longer mcq-only: a hands-on bank must fail to load for
-// it too, at boot, rather than at the moment a candidate presses Start.
 func TestLoadRejectsExamLengthBeyondTheHandsOnPool(t *testing.T) {
 	dir := t.TempDir()
 	path := dir + "/exam.json"
@@ -216,9 +184,6 @@ func TestLoadRejectsExamLengthBeyondTheHandsOnPool(t *testing.T) {
 	}
 }
 
-// A negative length used to be silently ignored ("length <= 0" reads as
-// "no pooling"), which turned a typo into a bank that quietly stopped
-// pooling. Nobody writes -3 on purpose.
 func TestLoadRejectsNegativeExamLength(t *testing.T) {
 	dir := t.TempDir()
 	path := dir + "/exam.json"

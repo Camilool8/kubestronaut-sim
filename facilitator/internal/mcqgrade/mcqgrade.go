@@ -1,11 +1,3 @@
-// Package mcqgrade grades a multiple-choice attempt: the candidate's
-// stored selections against the exam's answer key.
-//
-// It deliberately emits the same Results shape as internal/evaluate — one
-// synthetic "answer" check per question — so session persistence,
-// /api/results, the score page's polling loop, and Scoreboard all work
-// unchanged for both engines. Unlike evaluate.Grade it is pure: no
-// cluster, no ssh, no timeouts — grading is a set comparison.
 package mcqgrade
 
 import (
@@ -17,25 +9,8 @@ import (
 	"kubestronaut-sim/facilitator/internal/exam"
 )
 
-// checkName is the synthetic check every mcq question reports. The score
-// page never shows it (it renders the answer review instead), but the
-// Scoreboard text and any JSON consumer see a stable name.
 const checkName = "answer"
 
-// Grade scores answers (qid → selected option indices, sorted, as
-// session.Manager.Answers returns them) against ex's key. Scoring is
-// all-or-nothing per question: earned = weight iff the selected set
-// equals the correct set. An unanswered question earns zero.
-//
-// questionIDs is the attempt's drawn subset (session.Manager.QuestionIDs)
-// — a pooled mcq attempt is graded on exactly those questions, in that
-// order, never the full pool. Empty means "no pooling": every question
-// in ex.Questions, exactly as this package graded before pooling existed.
-//
-// Percent is curriculum-weighted (evaluate.Results.Finalize), which for a
-// pooled bank is the difference between a domain counting for its
-// published share and it counting for however many of its questions the
-// draw happened to land on.
 func Grade(ex *exam.Exam, bank string, answers map[string][]int, questionIDs []string) *evaluate.Results {
 	res := &evaluate.Results{
 		Bank:         bank,
@@ -74,14 +49,10 @@ func Grade(ex *exam.Exam, bank string, answers map[string][]int, questionIDs []s
 		res.Questions = append(res.Questions, qr)
 	}
 
-	// Totals, verdicts, the domain rollup and the curriculum weighting
-	// all come from the one implementation in evaluate — the whole point
-	// of emitting its Results shape.
 	res.Finalize(ex.Domains)
 	return res
 }
 
-// equal reports whether two sorted index slices are the same set.
 func equal(a, b []int) bool {
 	if len(a) != len(b) {
 		return false
@@ -94,8 +65,6 @@ func equal(a, b []int) bool {
 	return true
 }
 
-// message renders the graded outcome in option letters — "selected A —
-// correct C" — the same language the review UI speaks.
 func message(selected, correct []int) string {
 	if len(selected) == 0 {
 		return fmt.Sprintf("no answer — correct %s", letters(correct))
@@ -103,7 +72,6 @@ func message(selected, correct []int) string {
 	return fmt.Sprintf("selected %s — correct %s", letters(selected), letters(correct))
 }
 
-// letters formats option indices as "A, C, D".
 func letters(indices []int) string {
 	out := make([]string, len(indices))
 	for i, n := range indices {

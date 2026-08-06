@@ -17,25 +17,19 @@ import (
 	"kubestronaut-sim/conductor/internal/job"
 )
 
-// The wipe commands as the fakeEngine renders them (argv joined by
-// spaces). Derived from the real values rather than retyped, so a change
-// to what a reset clears cannot pass this test by accident — the point of
-// the assertion is the *order and set* of calls, not their spelling.
 var (
 	wipeShell     = strings.Join(wipeCmd, " ")
 	registryShell = strings.Join(registryWipeCmd, " ")
 )
 
-// fakeEngine records every docker-side action and lets tests fail
-// specific steps.
 type fakeEngine struct {
-	mu       sync.Mutex
-	calls    []string
-	execErr   map[string]error    // keyed by service name
-	execExit  map[string]int      // keyed by service name, default 0
-	execOut   map[string]string   // keyed by service name
-	execLines map[string][]string // streamed output lines, keyed by service name
-	afterLine func()              // ran after each streamed line, to observe store state
+	mu        sync.Mutex
+	calls     []string
+	execErr   map[string]error
+	execExit  map[string]int
+	execOut   map[string]string
+	execLines map[string][]string
+	afterLine func()
 }
 
 func (f *fakeEngine) FindContainer(_ context.Context, project, service string) (string, error) {
@@ -90,15 +84,6 @@ func newTestController(t *testing.T, eng Engine, facilitator string) *Controller
 	}
 }
 
-// bankFileHolding returns a bank-file path that already names an active
-// exam — i.e. an environment somebody is already sitting in.
-//
-// This is what makes a switch a switch. StartSwitch reads the same file
-// to tell "replace the exam that is loaded" from "there has never been
-// one", and a test that only pointed BankFile at an empty temp dir was
-// silently exercising the second: no session to end and no candidate
-// work to wipe, so both of those phases were correctly skipped and the
-// assertions about them failed.
 func bankFileHolding(t *testing.T, bank string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "bank")
@@ -108,7 +93,6 @@ func bankFileHolding(t *testing.T, bank string) string {
 	return path
 }
 
-// waitIdle blocks until the store has no in-flight job.
 func waitIdle(t *testing.T, s *job.Store) job.Snapshot {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -222,7 +206,7 @@ func TestResetFailsWhenVerifyTimesOut(t *testing.T) {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		w.WriteHeader(http.StatusBadGateway) // healthz never healthy
+		w.WriteHeader(http.StatusBadGateway)
 	}))
 	defer facilitator.Close()
 
@@ -243,7 +227,7 @@ func TestStartResetRejectsConcurrentJobs(t *testing.T) {
 	block := make(chan struct{})
 	facilitator := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete {
-			<-block // hold the first job in its first phase
+			<-block
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -262,12 +246,6 @@ func TestStartResetRejectsConcurrentJobs(t *testing.T) {
 	waitIdle(t, c.Store)
 }
 
-// switchFacilitator fakes the facilitator for switch flows: reports the
-// given session state, accepts session deletes, is always healthy, and
-// serves /api/exam with the name in examName (a pointer so tests can
-// flip it mid-flow, mimicking the post-restart reload).
-// healthyFacilitator is the minimum a reset job needs to run clean:
-// DELETE /api/session succeeds and /healthz answers 200.
 func healthyFacilitator(t *testing.T) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -317,7 +295,7 @@ func testCatalogForSwitch(t *testing.T) *catalog.Catalog {
 }
 
 func TestSwitchRunsFullSequenceAndWritesBankFile(t *testing.T) {
-	examName := "cka-mock-01" // already reloaded by the time verify polls
+	examName := "cka-mock-01"
 	facilitator := switchFacilitator(t, "idle", &examName)
 	defer facilitator.Close()
 
@@ -346,14 +324,13 @@ func TestSwitchRunsFullSequenceAndWritesBankFile(t *testing.T) {
 			t.Errorf("engine calls missing %q:\n%s", needle, calls)
 		}
 	}
-	// bank file must be written before the cluster re-bootstrap reads it
+
 	clusterIdx := strings.Index(calls, "exec:k8s-env")
 	if clusterIdx < 0 {
 		t.Fatal("cluster recreate never ran")
 	}
 }
 
-// testCatalogWithMCQ is testCatalogForSwitch plus a runnable mcq bank.
 func testCatalogWithMCQ(t *testing.T) *catalog.Catalog {
 	t.Helper()
 	dir := t.TempDir()
@@ -374,11 +351,6 @@ func testCatalogWithMCQ(t *testing.T) *catalog.Catalog {
 	return c
 }
 
-// Switching TO an mcq bank must not rebuild the cluster or restart the
-// instances — the incoming exam touches neither, and the rebuild is the
-// whole 2-4 minute wait this fast path exists to remove. The wipe still
-// runs (leaving the outgoing bank's work behind is what every switch
-// cleans up), the bank file is written, and the facilitator restarts.
 func TestSwitchToMCQBankSkipsClusterRebuild(t *testing.T) {
 	examName := "kcna-mock"
 	facilitator := switchFacilitator(t, "idle", &examName)
@@ -424,19 +396,6 @@ func TestSwitchToMCQBankSkipsClusterRebuild(t *testing.T) {
 	}
 }
 
-// The first exam an environment is ever given.
-//
-// `./sim up` with no bank builds nothing: k8s-env rests after the two
-// phases that are not about any particular exam, and the bank file is
-// never written. Choosing an exam then runs this — the same sequence a
-// switch runs, minus the two phases that only mean something when there
-// is an outgoing exam to end and candidate work to wipe.
-//
-// The op label is load-bearing, not cosmetic: it is what the overlay and
-// the background chip title themselves from, and "Switching to CKA Mock
-// Exam 01" is a lie told to somebody who has chosen exactly one exam in
-// their life. The empty bank file is the whole trigger, so this test
-// deliberately does not create one.
 func TestFirstExamProvisionsRatherThanSwitches(t *testing.T) {
 	var deletes int
 	var mu sync.Mutex
@@ -462,7 +421,7 @@ func TestFirstExamProvisionsRatherThanSwitches(t *testing.T) {
 	eng := &fakeEngine{}
 	c := newTestController(t, eng, facilitator.URL)
 	c.Catalog = testCatalogForSwitch(t)
-	// Points at a path inside an empty dir: no exam has ever been chosen.
+
 	c.BankFile = filepath.Join(t.TempDir(), "bank")
 	c.RestartExtra = []string{"docs-proxy", "facilitator"}
 
@@ -483,10 +442,7 @@ func TestFirstExamProvisionsRatherThanSwitches(t *testing.T) {
 	if snap.LastJob == nil || snap.LastJob.Error != "" {
 		t.Fatalf("provision job = %+v, want clean completion", snap.LastJob)
 	}
-	// Every declared phase must have run. A phase left pending in a
-	// COMPLETED job is what happens when the checklist and the sequence
-	// disagree — StartPhase ignores an id the job never declared, and the
-	// reverse leaves a row on screen that never ticks.
+
 	for _, p := range snap.LastJob.Phases {
 		if p.State != job.PhaseDone {
 			t.Errorf("phase %q ended in state %q, want done", p.ID, p.State)
@@ -508,8 +464,7 @@ func TestFirstExamProvisionsRatherThanSwitches(t *testing.T) {
 	if strings.Contains(calls, wipeShell) || strings.Contains(calls, registryShell) {
 		t.Errorf("provision wiped state that cannot exist yet:\n%s", calls)
 	}
-	// It is still a full build: the cluster and everything that reads the
-	// bank. Only the teardown half is gone.
+
 	for _, needle := range []string{"exec:k8s-env:", "restart:instance-1", "restart:facilitator"} {
 		if !strings.Contains(calls, needle) {
 			t.Errorf("engine calls missing %q:\n%s", needle, calls)
@@ -517,8 +472,6 @@ func TestFirstExamProvisionsRatherThanSwitches(t *testing.T) {
 	}
 }
 
-// "New attempt" after a multiple-choice exam is a session deletion, not
-// an environment rebuild: the attempt's only state is the session file.
 func TestResetOnMCQBankSkipsEverythingButTheSession(t *testing.T) {
 	var deletes int
 	var mu sync.Mutex
@@ -567,8 +520,6 @@ func TestResetOnMCQBankSkipsEverythingButTheSession(t *testing.T) {
 	}
 }
 
-// A hands-on bank keeps the full reset sequence even when a catalog and
-// bank file are wired — the fast path must never leak past mcq.
 func TestResetOnHandsOnBankStillRebuilds(t *testing.T) {
 	facilitator := healthyFacilitator(t)
 	defer facilitator.Close()
@@ -593,9 +544,6 @@ func TestResetOnHandsOnBankStillRebuilds(t *testing.T) {
 	}
 }
 
-// The facilitator restart takes the browser's only server down for a
-// few seconds. It gets its own phase so the UI can say "reconnecting"
-// instead of appearing to freeze — and it must come after the instances.
 func TestSwitchSeparatesTheFacilitatorRestartIntoItsOwnPhase(t *testing.T) {
 	examName := "cka-mock-01"
 	facilitator := switchFacilitator(t, "idle", &examName)
@@ -627,16 +575,12 @@ func TestSwitchSeparatesTheFacilitatorRestartIntoItsOwnPhase(t *testing.T) {
 		t.Errorf("the combined restart-services phase should be gone, got %s", joined)
 	}
 
-	// Instances restart before the facilitator: taking the facilitator
-	// down first would blind the UI for the rest of the restarts.
 	calls := strings.Join(eng.recorded(), "\n")
 	if strings.Index(calls, "restart:instance-2") > strings.Index(calls, "restart:facilitator") {
 		t.Errorf("facilitator restarted before the instances:\n%s", calls)
 	}
 }
 
-// A multi-minute command must give the UI something that changes: its
-// output lines become the running phase's detail.
 func TestClusterRebuildPublishesItsOutputAsPhaseDetail(t *testing.T) {
 	facilitator := healthyFacilitator(t)
 	defer facilitator.Close()
@@ -646,8 +590,6 @@ func TestClusterRebuildPublishesItsOutputAsPhaseDetail(t *testing.T) {
 	}}
 	c := newTestController(t, eng, facilitator.URL)
 
-	// Sampled from inside the exec, right after each line is published —
-	// what a UI poll arriving at that instant would have seen.
 	var seen []string
 	eng.afterLine = func() {
 		for _, p := range c.Store.Status().Job.Phases {
@@ -672,7 +614,6 @@ func TestClusterRebuildPublishesItsOutputAsPhaseDetail(t *testing.T) {
 		}
 	}
 
-	// A settled phase must not keep a stale line.
 	snap := c.Store.Status()
 	for _, p := range snap.LastJob.Phases {
 		if p.Detail != "" {
@@ -717,7 +658,7 @@ func TestSwitchRejectsUnknownBank(t *testing.T) {
 }
 
 func TestSwitchVerifyFailsOnExamNameMismatch(t *testing.T) {
-	examName := "ckad-mock-01" // facilitator never picks up the new bank
+	examName := "ckad-mock-01"
 	facilitator := switchFacilitator(t, "idle", &examName)
 	defer facilitator.Close()
 

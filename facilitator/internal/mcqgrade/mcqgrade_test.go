@@ -73,15 +73,13 @@ func TestGradeBlankScoresZero(t *testing.T) {
 	if res.Passed {
 		t.Errorf("Passed = true, want false")
 	}
-	// An unanswered question must say so, not show an empty selection.
+
 	msg := res.Questions[0].Checks[0].Message
 	if !strings.Contains(msg, "no answer") {
 		t.Errorf("unanswered message = %q, want it to mention 'no answer'", msg)
 	}
 }
 
-// Multi-select is all-or-nothing: a subset, a superset, or a swap of the
-// correct set all earn zero.
 func TestGradeMultiAllOrNothing(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -129,7 +127,7 @@ func TestGradeResultShapeCarriesReviewFields(t *testing.T) {
 	if q01.Total != 1 || q01.Checks[0].Points != 1 {
 		t.Errorf("q01 totals = (%d, %d), want weight 1 on both", q01.Total, q01.Checks[0].Points)
 	}
-	// Messages speak in option letters, the language of the review UI.
+
 	msg := q01.Checks[0].Message
 	if !strings.Contains(msg, "A") || !strings.Contains(msg, "C") {
 		t.Errorf("message = %q, want selected letter A and correct letter C", msg)
@@ -142,7 +140,7 @@ func TestGradeResultShapeCarriesReviewFields(t *testing.T) {
 }
 
 func TestGradePercentMath(t *testing.T) {
-	// 3 of 4 points → 75%, exactly the passing score.
+
 	res := Grade(fixtureExam(), "b", map[string][]int{
 		"q02": {0, 3},
 		"q03": {1},
@@ -155,10 +153,6 @@ func TestGradePercentMath(t *testing.T) {
 	}
 }
 
-// A pooled attempt is graded on exactly its drawn subset: an answer to a
-// pool question outside that subset must not appear in the results or
-// count toward the total, and the subset's own order is what Questions
-// comes back in — not the pool's.
 func TestGradeScopesToQuestionIDs(t *testing.T) {
 	res := Grade(fixtureExam(), "b", map[string][]int{
 		"q01": {2},
@@ -173,8 +167,7 @@ func TestGradeScopesToQuestionIDs(t *testing.T) {
 		t.Errorf("Questions ids = [%s %s], want [q03 q01] (subset order preserved)",
 			res.Questions[0].ID, res.Questions[1].ID)
 	}
-	// q02 carried 2 of the 4 total points; excluded from the draw, it
-	// must not inflate Total either.
+
 	if res.Total != 2 {
 		t.Errorf("Total = %d, want 2 (q02's weight excluded)", res.Total)
 	}
@@ -183,10 +176,6 @@ func TestGradeScopesToQuestionIDs(t *testing.T) {
 	}
 }
 
-// The fixture's points do not sit in the curriculum's ratios —
-// Fundamentals holds 2 of 4 points but 75% of the curriculum — which is
-// exactly the shape a pooled draw produces, and exactly what weighting at
-// scoring time is for.
 func weightedFixture() *exam.Exam {
 	ex := fixtureExam()
 	ex.Domains = []exam.Domain{
@@ -197,7 +186,7 @@ func weightedFixture() *exam.Exam {
 }
 
 func TestGradeWeightsByCurriculumDomain(t *testing.T) {
-	// Both Fundamentals questions right, the Orchestration one wrong.
+
 	res := Grade(weightedFixture(), "b", map[string][]int{
 		"q01": {2},
 		"q03": {1},
@@ -228,15 +217,12 @@ func TestGradeDomainRollupAndVerdicts(t *testing.T) {
 		t.Errorf("Domains = %+v, want %+v", res.Domains, want)
 	}
 
-	// mcq is all-or-nothing, so a question is only ever correct or
-	// failed — never partial, even the 2-point multi-select.
 	for i, w := range []string{evaluate.VerdictCorrect, evaluate.VerdictFailed, evaluate.VerdictFailed} {
 		if got := res.Questions[i].Verdict; got != w {
 			t.Errorf("Questions[%d].Verdict = %q, want %q", i, got, w)
 		}
 	}
-	// Fundamentals' 75 points split evenly over its two 1-point
-	// questions; Orchestration's 25 all sit on its one question.
+
 	for i, w := range []float64{37.5, 25, 37.5} {
 		if got := res.Questions[i].WeightPct; got != w {
 			t.Errorf("Questions[%d].WeightPct = %v, want %v", i, got, w)
@@ -244,9 +230,6 @@ func TestGradeDomainRollupAndVerdicts(t *testing.T) {
 	}
 }
 
-// A draw that misses a domain entirely renormalizes over what it drew:
-// the missing domain's weight cannot be earned, so it must not be in the
-// denominator either — otherwise a 65-question draw would cap below 100%.
 func TestGradeRenormalizesOverTheDrawnDomains(t *testing.T) {
 	res := Grade(weightedFixture(), "b", map[string][]int{
 		"q02": {0, 3},

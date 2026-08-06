@@ -9,9 +9,6 @@ import (
 	"testing/fstest"
 )
 
-// shellFS stands in for the embedded Vite build: an index and one hashed
-// asset, which is enough to tell "served the app" from "served index.html
-// to everything" apart.
 func shellFS() fstest.MapFS {
 	return fstest.MapFS{
 		"index.html":         {Data: []byte("<!doctype html><div id=root></div>")},
@@ -19,9 +16,6 @@ func shellFS() fstest.MapFS {
 	}
 }
 
-// withShell builds a hub that has seats and a bundle but no running
-// session — the state every candidate is in before they start one, and
-// the state a first-time visitor is in forever.
 func withShell(t *testing.T) *Server {
 	t.Helper()
 	s, _ := hosted(t, 1, nil)
@@ -38,10 +32,6 @@ func body(t *testing.T, w *httptest.ResponseRecorder) string {
 	return string(b)
 }
 
-// The bug this file exists for. A visitor arriving at the hub for the
-// first time has no cookie and no session, and the screen that would
-// give them both is in the bundle — so a JSON 401 here is not a rude
-// error message, it is the entire product being unreachable.
 func TestTheRootServesTheAppWhenNobodyIsSignedIn(t *testing.T) {
 	s := withShell(t)
 
@@ -58,9 +48,6 @@ func TestTheRootServesTheAppWhenNobodyIsSignedIn(t *testing.T) {
 	}
 }
 
-// The assets are the other half: they are requested without an
-// Accept: text/html header, so a rule written around Accept would serve
-// index.html and then 401 every script tag inside it.
 func TestAssetsAreServedBeforeAnyoneSignsIn(t *testing.T) {
 	s := withShell(t)
 
@@ -74,8 +61,6 @@ func TestAssetsAreServedBeforeAnyoneSignsIn(t *testing.T) {
 	}
 }
 
-// A client-side route names no file. It must load the app, not 404,
-// or every hosted history link a candidate opens in a new tab breaks.
 func TestADeepLinkLoadsTheApp(t *testing.T) {
 	s := withShell(t)
 
@@ -89,9 +74,6 @@ func TestADeepLinkLoadsTheApp(t *testing.T) {
 	}
 }
 
-// The contract the shell must not break: /api/ and /hub/ are fetch()
-// surfaces. Handing them index.html turns a clear 401 into a JSON parse
-// error somewhere else entirely.
 func TestApiAndHubPathsKeepTheirJSONWhenNobodyIsSignedIn(t *testing.T) {
 	s := withShell(t)
 
@@ -107,8 +89,6 @@ func TestApiAndHubPathsKeepTheirJSONWhenNobodyIsSignedIn(t *testing.T) {
 	}
 }
 
-// Signed in, no seat claimed yet: this is the lobby, and the lobby is a
-// screen of the same bundle.
 func TestTheLobbyIsServedToASignedInUserWithNoSession(t *testing.T) {
 	s := withShell(t)
 	c := login(t, s, "u1", "candidate")
@@ -125,8 +105,6 @@ func TestTheLobbyIsServedToASignedInUserWithNoSession(t *testing.T) {
 	}
 }
 
-// ...while the API still says what it always said, because the SPA
-// polling for a session it does not have needs the 404 to know that.
 func TestApiStillSays404ForASignedInUserWithNoSession(t *testing.T) {
 	s := withShell(t)
 	c := login(t, s, "u1", "candidate")
@@ -143,10 +121,6 @@ func TestApiStillSays404ForASignedInUserWithNoSession(t *testing.T) {
 	}
 }
 
-// Once a Pod is up the proxy wins, so a candidate mid-exam is served by
-// their own session and not by whatever the hub happens to have embedded.
-// Both are the same build, but only one of them is the one their exam is
-// running against.
 func TestARunningSessionIsServedByItsPodNotTheHubsCopy(t *testing.T) {
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -168,8 +142,6 @@ func TestARunningSessionIsServedByItsPodNotTheHubsCopy(t *testing.T) {
 	}
 }
 
-// A hub built without a bundle answers exactly as it did before this
-// existed. Nothing silently degrades to a blank page.
 func TestNoBundleMeansTheOldJSONErrors(t *testing.T) {
 	s, _ := hosted(t, 1, nil)
 	s.UI = nil
@@ -184,10 +156,6 @@ func TestNoBundleMeansTheOldJSONErrors(t *testing.T) {
 	}
 }
 
-// A WebSocket handshake is a GET that is not under /api/, so the shell
-// would otherwise answer the desktop stream with an HTML page and the
-// browser would report code 1006 — an abnormal close with no reason,
-// while the Pod was merely still booting.
 func TestAWebSocketUpgradeIsNeverAnsweredWithHTML(t *testing.T) {
 	s := withShell(t)
 	c := login(t, s, "u1", "candidate")

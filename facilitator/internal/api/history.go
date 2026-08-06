@@ -12,50 +12,25 @@ import (
 	"kubestronaut-sim/facilitator/internal/history"
 )
 
-// maxImportBytes bounds POST /api/history/import. An export of a
-// thousand attempts is well under a megabyte; four is room to be wrong
-// about that without letting a stray upload become the facilitator's
-// memory ceiling.
 const maxImportBytes = 4 << 20
 
-// BanksFetcher returns the conductor's GET /api/control/banks response
-// body, or an error if the conductor could not be reached.
-//
-// A func rather than a URL so main owns the HTTP client (and its
-// timeout) and tests can answer without a socket. /api/catalog is the
-// only caller.
 type BanksFetcher func(ctx context.Context) ([]byte, error)
 
-// Option configures the optional dependencies of the handler New
-// returns. Optional because every one of them post-dates the tests and
-// dev runs that construct a server without them, and because the
-// endpoints they back must degrade rather than disappear.
 type Option func(*server)
 
-// WithHistory gives the server the durable attempt record. Without it
-// the /api/history endpoints answer 503 rather than 404: the route
-// exists in this build, it just has nowhere to write.
 func WithHistory(h *history.Store) Option {
 	return func(s *server) { s.hist = h }
 }
 
-// WithBanks gives /api/catalog its server-side route to the conductor's
-// bank list. Without it — or when the call fails — the catalog is served
-// from the active bank and attempt history alone. See handleCatalog.
 func WithBanks(f BanksFetcher) Option {
 	return func(s *server) { s.banks = f }
 }
 
-// historyResponse is the GET /api/history JSON shape.
 type historyResponse struct {
-	// Attempts is most recent first, and is an array even when empty:
-	// null here is a crash in every caller that maps over it.
 	Attempts []history.Record `json:"attempts"`
 	Summary  history.Summary  `json:"summary"`
 }
 
-// requireHistory answers 503 and reports false when this build has no
-// record to serve.
 func (s *server) requireHistory(w http.ResponseWriter) bool {
 	if s.hist == nil {
 		writeJSONError(w, http.StatusServiceUnavailable, "attempt history is not available in this configuration")
@@ -64,16 +39,6 @@ func (s *server) requireHistory(w http.ResponseWriter) bool {
 	return true
 }
 
-// requireExam answers 503 and reports false when no exam has been
-// chosen yet.
-//
-// Same shape as requireHistory above, and for a related reason: this is
-// a state the product legitimately has, not an error in it. An
-// environment starts with no exam loaded and stays that way until a
-// candidate picks one, so every route that reads the bank has to be able
-// to say so rather than dereference nil. GET /api/catalog deliberately
-// does NOT use this — the catalog is how an exam gets chosen, so it is
-// the one bank-reading route that must answer without a bank.
 func (s *server) requireExam(w http.ResponseWriter) bool {
 	if s.ex == nil {
 		writeJSONError(w, http.StatusServiceUnavailable, "no exam is loaded yet — choose one to build its environment")
@@ -99,9 +64,6 @@ func (s *server) handleHistorySummary(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.hist.Summary())
 }
 
-// handleHistoryDelete erases every attempt. There is no undo and no
-// server-side backup, so the confirmation belongs to the caller — this
-// handler does exactly what it is asked.
 func (s *server) handleHistoryDelete(w http.ResponseWriter, r *http.Request) {
 	if !s.requireHistory(w) {
 		return
@@ -113,11 +75,6 @@ func (s *server) handleHistoryDelete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// handleHistoryExport serves the record as a downloadable document.
-//
-// Content-Disposition, so a plain <a href> saves a named file instead of
-// rendering JSON in a tab. The date is in the name because the one thing
-// a candidate needs from a folder of these is which is newest.
 func (s *server) handleHistoryExport(w http.ResponseWriter, r *http.Request) {
 	if !s.requireHistory(w) {
 		return
@@ -135,18 +92,11 @@ func (s *server) handleHistoryExport(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-// importResponse is the POST /api/history/import JSON shape.
 type importResponse struct {
 	Imported int `json:"imported"`
 	Skipped  int `json:"skipped"`
 }
 
-// handleHistoryImport merges an exported document into the record.
-//
-// Merge, never replace. Importing a backup must not be a way to lose the
-// attempts made since it was taken, so records already present by id are
-// skipped and everything else is added — which also makes importing the
-// same file twice a no-op.
 func (s *server) handleHistoryImport(w http.ResponseWriter, r *http.Request) {
 	if !s.requireHistory(w) {
 		return
@@ -169,10 +119,6 @@ func (s *server) handleHistoryImport(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, importResponse{Imported: imported, Skipped: skipped})
 }
 
-// bankEntry is one row of the conductor's bank list on the wire. It
-// mirrors conductor/internal/catalog.Entry's exported JSON, and is
-// re-declared rather than shared because the two services are separate
-// Go modules that talk over HTTP.
 type bankEntry struct {
 	ID                string `json:"id"`
 	Title             string `json:"title"`
@@ -189,47 +135,24 @@ type bankEntry struct {
 	Note              string `json:"note,omitempty"`
 }
 
-// banksDoc is the conductor's GET /api/control/banks body.
 type banksDoc struct {
 	Active string      `json:"active"`
 	Banks  []bankEntry `json:"banks"`
 }
 
-// catalogExam is a bank row with how the candidate has gone on it. The
-// embedded entry flattens, so the row is a BankEntry plus one field —
-// exactly what the client's `CatalogExam extends BankEntry` says.
 type catalogExam struct {
 	bankEntry
 	Progress history.ExamProgress `json:"progress"`
 }
 
-// catalogResponse is the GET /api/catalog JSON shape.
 type catalogResponse struct {
 	Active  string          `json:"active"`
 	Exams   []catalogExam   `json:"exams"`
 	Summary history.Summary `json:"summary"`
 }
 
-// handleCatalog joins the conductor's bank list to attempt history.
-//
-// Facilitator-served rather than proxied to the conductor, for two
-// reasons: the conductor has no access to the state volume the history
-// lives in, and LOOKING at the exam list must never be able to trigger a
-// rebuild.
-//
-// A conductor that does not answer degrades rather than 500s. This is
-// the app's front door: a candidate who cannot reach the list cannot
-// reach anything, and "here is the exam you have loaded, plus everything
-// you have already sat" is a far better answer than an error page. The
-// degraded rows say so themselves — see degradedBanks.
 func (s *server) handleCatalog(w http.ResponseWriter, r *http.Request) {
-	// Deliberately no requireExam. This route is how an exam is chosen,
-	// so it is the one bank-reading endpoint that has to answer when
-	// there is no bank: with no exam loaded, `active` is empty and every
-	// row comes back unchosen, which is exactly what the selector should
-	// render on a fresh environment. The bank LIST never needed the
-	// active bank anyway — it is the conductor's startup scan of
-	// banks/*/exam.yaml.
+
 	active := s.mgr.Snapshot().Bank
 	if active == "" && s.ex != nil {
 		active = s.ex.Name
@@ -253,14 +176,13 @@ func (s *server) handleCatalog(w http.ResponseWriter, r *http.Request) {
 
 	resp := catalogResponse{
 		Active: active,
-		// Pre-sized, never nil: an empty catalog must marshal as [].
+
 		Exams:   make([]catalogExam, 0, len(banks.Banks)),
 		Summary: summary,
 	}
 	for _, b := range banks.Banks {
 		row := catalogExam{bankEntry: b, Progress: progress[b.ID]}
-		// A bank never sat still needs its weakDomains array present, for
-		// the same reason every other list here is pre-sized.
+
 		if row.Progress.WeakDomains == nil {
 			row.Progress.WeakDomains = []history.DomainSummary{}
 		}
@@ -269,7 +191,6 @@ func (s *server) handleCatalog(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// fetchBanks calls the conductor and decodes its bank list.
 func (s *server) fetchBanks(ctx context.Context) (banksDoc, error) {
 	if s.banks == nil {
 		return banksDoc{}, fmt.Errorf("no route to the bank list is configured")
@@ -285,22 +206,8 @@ func (s *server) fetchBanks(ctx context.Context) (banksDoc, error) {
 	return doc, nil
 }
 
-// degradedBanks is the catalog with no conductor: the bank this
-// facilitator has actually loaded, plus one row for every other bank the
-// attempt history remembers.
-//
-// The history-only rows are marked unavailable with a reason, because
-// this build genuinely does not know whether they can still be switched
-// to — the service that owns that answer is the one that did not reply.
-// Offering them as available would make the exam selector's one
-// destructive action (switch banks, which rebuilds the cluster) the
-// thing that discovers the outage.
 func (s *server) degradedBanks(active string, progress map[string]history.ExamProgress) []bankEntry {
-	// The loaded bank is the one row this build can vouch for — when
-	// there is one. With no exam chosen there is nothing to vouch for and
-	// no conductor to ask, so the list is whatever the attempt history
-	// remembers, all of it marked unavailable with its reason. An empty
-	// selector that explains itself beats a fabricated row.
+
 	var out []bankEntry
 	seen := map[string]bool{}
 	if s.ex != nil {
@@ -337,7 +244,6 @@ func (s *server) degradedBanks(active string, progress map[string]history.ExamPr
 	return out
 }
 
-// historyRows is All() on a possibly-nil store.
 func historyRows(h *history.Store) []history.Record {
 	if h == nil {
 		return nil
@@ -345,13 +251,6 @@ func historyRows(h *history.Store) []history.Record {
 	return h.All()
 }
 
-// bankLength is the loaded bank's DECLARED exam length: ExamLength for a
-// pooled bank, the whole pool otherwise.
-//
-// Deliberately not (*server).declaredQuestionCount, which answers a
-// different question — that one narrows to the current attempt's draw,
-// which is right for "Question 1 of N" and wrong for a catalog card
-// describing the bank itself.
 func bankLength(ex *exam.Exam) int {
 	if exam.Pooled(ex) {
 		return ex.ExamLength

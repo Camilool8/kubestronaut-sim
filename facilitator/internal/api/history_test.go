@@ -18,14 +18,11 @@ import (
 	"kubestronaut-sim/facilitator/internal/session"
 )
 
-// historyServer is newTestServer with a real history store and a
-// controllable stand-in for the conductor's bank list.
 type historyServer struct {
 	handler http.Handler
 	store   *history.Store
 }
 
-// banksFunc lets a test decide, per call, what the conductor "answers".
 type banksFunc func(ctx context.Context) ([]byte, error)
 
 func newHistoryServer(t *testing.T, banks banksFunc) *historyServer {
@@ -96,8 +93,6 @@ func TestHistoryGetEmpty(t *testing.T) {
 		t.Fatalf("status = %d, want 200", w.Code)
 	}
 
-	// The array must be [] on the wire, never null: the client maps over
-	// it unconditionally.
 	if !strings.Contains(w.Body.String(), `"attempts":[]`) {
 		t.Errorf("body = %s, want an empty attempts array", w.Body.String())
 	}
@@ -174,7 +169,6 @@ func TestHistoryExportNamesTheFile(t *testing.T) {
 		t.Errorf("Content-Disposition = %q, want a named attachment", cd)
 	}
 
-	// The export must be importable, which means it must be a Document.
 	var doc history.Document
 	if err := json.Unmarshal(w.Body.Bytes(), &doc); err != nil {
 		t.Fatalf("export is not a history document: %v", err)
@@ -186,7 +180,7 @@ func TestHistoryExportNamesTheFile(t *testing.T) {
 
 func TestHistoryImportMerges(t *testing.T) {
 	hs := newHistoryServer(t, nil)
-	// One attempt made AFTER the backup was taken.
+
 	hs.store.Add(attempt("since", "test-bank", "CKAD", epoch.Add(48*time.Hour), 90, true))
 
 	doc, _ := json.Marshal(history.Document{
@@ -209,7 +203,6 @@ func TestHistoryImportMerges(t *testing.T) {
 		t.Errorf("store holds %d records, want 2 — importing a backup must not lose newer attempts", n)
 	}
 
-	// Importing the same file again is a no-op.
 	w = hs.req(t, http.MethodPost, "/api/history/import", string(doc))
 	json.Unmarshal(w.Body.Bytes(), &got)
 	if got.Imported != 0 || got.Skipped != 1 {
@@ -231,8 +224,6 @@ func TestHistoryImportRejectsJunkAndFutureVersions(t *testing.T) {
 	}
 }
 
-// A build with no history store answers 503, not 404: the route exists,
-// it has nowhere to write, and the client can tell those apart.
 func TestHistoryWithoutAStoreIs503(t *testing.T) {
 	ts := newTestServer(t)
 	for _, tc := range []struct{ method, path string }{
@@ -248,8 +239,6 @@ func TestHistoryWithoutAStoreIs503(t *testing.T) {
 		}
 	}
 }
-
-// ---- /api/catalog ----
 
 const banksBody = `{"active":"test-bank","banks":[
   {"id":"test-bank","title":"Test Exam","certification":"TEST","examType":"hands-on","questionCount":2,"available":true},
@@ -285,8 +274,7 @@ func TestCatalogJoinsBanksToHistory(t *testing.T) {
 	if len(got.Exams) != 3 {
 		t.Fatalf("exams = %d, want 3", len(got.Exams))
 	}
-	// The embedded bank entry must flatten: `CatalogExam extends
-	// BankEntry` in the contract, not a nested object.
+
 	if got.Exams[0].ID != "test-bank" || got.Exams[0].Title != "Test Exam" {
 		t.Errorf("first row = %+v, want the flattened bank entry", got.Exams[0])
 	}
@@ -306,7 +294,7 @@ func TestCatalogJoinsBanksToHistory(t *testing.T) {
 	if !kcna.Passed {
 		t.Error("kcna passed = false, want true")
 	}
-	// A bank never sat still needs weakDomains present as an array.
+
 	for _, e := range got.Exams {
 		if e.ID == "cks-mock" && e.Progress.WeakDomains == nil {
 			t.Error("an unattempted exam has a null weakDomains")
@@ -317,9 +305,6 @@ func TestCatalogJoinsBanksToHistory(t *testing.T) {
 	}
 }
 
-// The exam list is the app's front door. A conductor that does not
-// answer must degrade, never 500 — a candidate who cannot reach the list
-// cannot reach anything.
 func TestCatalogDegradesWhenTheConductorIsUnreachable(t *testing.T) {
 	hs := newHistoryServer(t, func(context.Context) ([]byte, error) {
 		return nil, fmt.Errorf("dial conductor:9000: connection refused")
@@ -367,8 +352,6 @@ func TestCatalogDegradesWhenTheConductorIsUnreachable(t *testing.T) {
 	}
 }
 
-// Catalog must still answer with no history at all — a fresh machine,
-// or a build with no state volume.
 func TestCatalogWithoutHistory(t *testing.T) {
 	ts := newTestServer(t)
 	w := httptest.NewRecorder()

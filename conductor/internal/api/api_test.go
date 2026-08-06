@@ -13,7 +13,6 @@ import (
 	"kubestronaut-sim/conductor/internal/job"
 )
 
-// fakeOps implements Ops without any real orchestration.
 type fakeOps struct {
 	store     *job.Store
 	resetErr  error
@@ -46,7 +45,6 @@ func (f *fakeOps) StartReset() (job.Job, error) {
 	return f.store.Begin("reset", "", []job.PhaseSpec{{ID: "verify", Label: "Verify"}})
 }
 
-// post issues a JSON POST and returns the recorder.
 func post(t *testing.T, h http.Handler, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	rec := httptest.NewRecorder()
@@ -170,10 +168,10 @@ func TestBanksEndpoint(t *testing.T) {
 
 func TestSwitchEndpointStatusMapping(t *testing.T) {
 	cases := []struct {
-		name    string
-		body    string
-		err     error
-		want    int
+		name string
+		body string
+		err  error
+		want int
 	}{
 		{"accepted", `{"bank":"cka-mock-01"}`, nil, http.StatusAccepted},
 		{"invalid bank", `{"bank":"nope"}`, control.ErrInvalidBank, http.StatusBadRequest},
@@ -196,9 +194,6 @@ func TestSwitchEndpointStatusMapping(t *testing.T) {
 	}
 }
 
-// Re-seed is synchronous and returns a plain ok — unlike reset/switch,
-// which hand back a job to poll. Returning 202 + a job here would make
-// the UI wait on a job store that will never mention it.
 func TestReseedReturnsOKSynchronously(t *testing.T) {
 	ops, h := newTestAPI(t)
 
@@ -221,9 +216,6 @@ func TestReseedRequiresAQuestion(t *testing.T) {
 	}
 }
 
-// The three sentinels the browser can actually provoke must each land on
-// a status the UI can tell apart: a bad id is the caller's fault, a
-// running reset is temporary, and the wrong mode is a rule.
 func TestReseedErrorsMapToStatuses(t *testing.T) {
 	cases := []struct {
 		name string

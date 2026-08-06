@@ -1,6 +1,3 @@
-// Package server is a forward HTTP proxy that only relays to allowlisted
-// hosts: CONNECT tunnels for HTTPS, plain proxying for HTTP. No TLS
-// interception.
 package server
 
 import (
@@ -20,8 +17,6 @@ func New(list *allow.List) http.Handler {
 
 type proxy struct{ list *allow.List }
 
-// hopByHopHeaders are connection-scoped headers that must not be relayed
-// across a proxy hop, per RFC 7230 §6.1.
 var hopByHopHeaders = []string{
 	"Connection",
 	"Proxy-Connection",
@@ -34,8 +29,6 @@ var hopByHopHeaders = []string{
 	"Upgrade",
 }
 
-// stripHopByHop removes hop-by-hop headers from h in place, including any
-// headers named in the Connection header's value, per RFC 7230 §6.1.
 func stripHopByHop(h http.Header) {
 	for _, f := range h.Values("Connection") {
 		for _, name := range strings.Split(f, ",") {
@@ -50,7 +43,6 @@ func stripHopByHop(h http.Header) {
 	}
 }
 
-// deny logs and rejects a request to a host not on the allowlist.
 func (p *proxy) deny(w http.ResponseWriter, host string) {
 	log.Printf("blocked host=%s", host)
 	http.Error(w, "blocked by exam docs allowlist", http.StatusForbidden)
@@ -133,10 +125,6 @@ func (p *proxy) connect(w http.ResponseWriter, r *http.Request) {
 	<-done
 }
 
-// halfClose signals that no more data will be written to conn, without
-// closing the read side, so the peer can finish draining any in-flight
-// data before the connection is fully torn down. It falls back to a full
-// Close when conn doesn't support half-close (e.g. it isn't a *net.TCPConn).
 func halfClose(conn net.Conn) {
 	if cw, ok := conn.(interface{ CloseWrite() error }); ok {
 		cw.CloseWrite()

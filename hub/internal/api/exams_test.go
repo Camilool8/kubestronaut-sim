@@ -18,8 +18,6 @@ import (
 	"kubestronaut-sim/hub/internal/session"
 )
 
-// The bank index as the banks image stages it, with one exam of each
-// engine plus one that cannot be sat.
 func testBanks(t *testing.T) *catalog.Catalog {
 	t.Helper()
 	dir := t.TempDir()
@@ -43,35 +41,20 @@ func testBanks(t *testing.T) *catalog.Catalog {
 	return c
 }
 
-// heldPods is session.Pods with a hold on Delete, so a test can keep a
-// recycle job in flight for as long as it needs to look at something.
-//
-// It exists because the alternative is a race, and the race lost in CI.
-// Recycle registers its job synchronously and then runs it on a
-// goroutine; against fakes that whole run can finish inside the gap
-// between two calls in a test. A test asserting "the hub has a job in
-// flight" is then really asserting "the goroutine has not got there
-// yet" — true on a laptop, false often enough on a loaded runner.
-// Blocking the first thing the job does makes the precondition a fact.
 type heldPods struct {
 	session.Pods
 	mu      sync.Mutex
-	release chan struct{} // closed = not holding
+	release chan struct{}
 	entered chan struct{}
 	once    sync.Once
 }
 
-// Starts released, so a caller that never asks for the hold sees the
-// wrapped client's behaviour unchanged.
 func newHeldPods(inner session.Pods) *heldPods {
 	open := make(chan struct{})
 	close(open)
 	return &heldPods{Pods: inner, release: open, entered: make(chan struct{})}
 }
 
-// Hold makes the next Delete block until Release. Guarded, because the
-// goroutine running the job reads this while the test writes it — a bare
-// field swap here is a data race, and -race says so.
 func (h *heldPods) Hold() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -104,8 +87,6 @@ func (h *heldPods) Delete(ctx context.Context, name string) error {
 	return h.Pods.Delete(ctx, name)
 }
 
-// waitEntered blocks until the job under test has reached the hold, so
-// an assertion after it cannot run early either.
 func (h *heldPods) waitEntered(t *testing.T) {
 	t.Helper()
 	select {
@@ -115,17 +96,12 @@ func (h *heldPods) waitEntered(t *testing.T) {
 	}
 }
 
-// hostedWithExams is `hosted` plus a bank index and both flavours, which
-// is what a deployment that lets candidates choose actually looks like.
 func hostedWithExams(t *testing.T, upstream http.Handler) (*Server, *http.Cookie) {
 	t.Helper()
 	s, c, _ := hostedWithHeldPods(t, upstream)
 	return s, c
 }
 
-// hostedWithHeldPods is the same, and also hands back the hold. The hold
-// starts released, so every caller that ignores it behaves exactly as
-// before.
 func hostedWithHeldPods(t *testing.T, upstream http.Handler) (*Server, *http.Cookie, *heldPods) {
 	t.Helper()
 	s, _ := newServer(t, auth.ModeGitHub)
@@ -180,10 +156,6 @@ func getExams(t *testing.T, s *Server) []exameRow {
 	return payload.Exams
 }
 
-// The lobby's whole problem: the candidate is choosing a certification
-// and has no session Pod yet, so there is nothing running to ask. This
-// is the answer, and it must work signed out — somebody deciding whether
-// to sign in is entitled to see whether the exam they came for is here.
 func TestExamsAreListedWithoutASession(t *testing.T) {
 	s, _ := hostedWithExams(t, okHandler())
 
@@ -195,8 +167,7 @@ func TestExamsAreListedWithoutASession(t *testing.T) {
 	if len(byID) != 3 {
 		t.Fatalf("got %d exams, want 3: %+v", len(byID), exams)
 	}
-	// The seat pool each card competes for, derived by the hub from the
-	// bank's own engine rather than by the browser.
+
 	if byID["ckad-mock-01"].Kind != "practical" {
 		t.Errorf("ckad kind = %q, want practical", byID["ckad-mock-01"].Kind)
 	}
@@ -208,9 +179,6 @@ func TestExamsAreListedWithoutASession(t *testing.T) {
 	}
 }
 
-// A deployment that staged no index still answers, with nothing in it:
-// the lobby then falls back to offering a flavour, exactly as it did
-// before exams were choosable.
 func TestExamsAnswersEmptyWithNoIndex(t *testing.T) {
 	s, _ := newServer(t, auth.ModeGitHub)
 
@@ -218,16 +186,12 @@ func TestExamsAnswersEmptyWithNoIndex(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", w.Code)
 	}
-	// [] and never null: a lobby that renders `null.map` shows nothing at
-	// all, which is indistinguishable from a hub that is down.
+
 	if got := strings.TrimSpace(w.Body.String()); !strings.Contains(got, `"exams":[]`) {
 		t.Errorf("body = %s, want an empty exams array", got)
 	}
 }
 
-// The exam decides the seat. The candidate picked a certification, not a
-// flavour, and the flavour is derived from the bank's own engine — the
-// same mapping the seat guard enforces on a switch.
 func TestStartingAnMcqExamTakesAnMcqSeat(t *testing.T) {
 	s, c := hostedWithExams(t, okHandler())
 
@@ -247,10 +211,6 @@ func TestStartingAnMcqExamTakesAnMcqSeat(t *testing.T) {
 	}
 }
 
-// A `kind` that disagrees with the named exam loses. The exam is the
-// fact the candidate expressed; the flavour is derived from it, so
-// refusing over a field they should not have had to send would be a
-// refusal about the client's bookkeeping.
 func TestANamedExamOverridesADisagreeingKind(t *testing.T) {
 	s, c := hostedWithExams(t, okHandler())
 
@@ -263,10 +223,6 @@ func TestANamedExamOverridesADisagreeingKind(t *testing.T) {
 	}
 }
 
-// Refused before a seat is spent. An unknown bank stamped into a Pod is
-// twenty minutes of boot ending in a facilitator with no exam loaded,
-// and the candidate would have paid a seat and a place in the queue to
-// discover it.
 func TestAnUnknownExamIsRefusedBeforeAdmission(t *testing.T) {
 	s, c := hostedWithExams(t, okHandler())
 
@@ -282,8 +238,6 @@ func TestAnUnknownExamIsRefusedBeforeAdmission(t *testing.T) {
 	}
 }
 
-// A coming-soon certification has no bank behind it. It is listed so a
-// candidate can see it is on the path; it must not be startable.
 func TestAComingSoonExamCannotBeStarted(t *testing.T) {
 	s, c := hostedWithExams(t, okHandler())
 
@@ -296,11 +250,6 @@ func TestAComingSoonExamCannotBeStarted(t *testing.T) {
 	}
 }
 
-// The conductor inside a session still runs one job of its own: seeding
-// a pooled bank's drawn questions, triggered by the facilitator
-// server-to-server between Start and the clock beginning. The hub
-// answers control status from ITS store, so that job was invisible and
-// the candidate watched a blank hold.
 func TestAConductorJobInTheSessionIsReportedThrough(t *testing.T) {
 	s, c := hostedWithExams(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -332,9 +281,6 @@ func TestAConductorJobInTheSessionIsReportedThrough(t *testing.T) {
 	}
 }
 
-// The hub's own operations still win. A reset is Pod replacement: the
-// Pod is gone for most of it, so an answer from the Pod would be either
-// unreachable or about the Pod that is being thrown away.
 func TestTheHubsOwnJobWinsOverThePods(t *testing.T) {
 	s, c, pods := hostedWithHeldPods(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/control/status" {
@@ -347,11 +293,6 @@ func TestTheHubsOwnJobWinsOverThePods(t *testing.T) {
 		t.Fatalf("start: %d %s", w.Code, body(t, w))
 	}
 
-	// Take the hold BEFORE triggering the reset, so the job cannot run to
-	// completion before the assertion below. Without this the reset
-	// finishes against the fakes in microseconds, the hub's job settles,
-	// and the Pod's in-flight seed correctly wins — which is the right
-	// behaviour and the wrong thing for this test to be measuring.
 	pods.Hold()
 	reset := httptest.NewRequest(http.MethodPost, "/api/control/reset", strings.NewReader(`{}`))
 	reset.AddCookie(c)
@@ -372,9 +313,6 @@ func TestTheHubsOwnJobWinsOverThePods(t *testing.T) {
 	}
 }
 
-// The old client, and the old deployment: no bank in the body means the
-// flavour's configured default, which is what sessions.<kind>.bank has
-// always been. Nothing about this may have changed.
 func TestNoNamedExamFallsBackToTheFlavourDefault(t *testing.T) {
 	s, c := hostedWithExams(t, okHandler())
 

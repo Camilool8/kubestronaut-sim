@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-// newTestReader returns a Reader over a temp dir plus the two paths, with
-// caching disabled so each test sees the disk it just wrote.
 func newTestReader(t *testing.T) (*Reader, string, string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -16,9 +14,7 @@ func newTestReader(t *testing.T) (*Reader, string, string) {
 	marker := filepath.Join(dir, "ready")
 
 	r := New(bootFile, marker)
-	// Each Read gets a fresh "now" far enough ahead to defeat the 1s
-	// coalescing window; the cache is an optimisation, not behaviour
-	// under test.
+
 	base := time.Unix(0, 0)
 	var n int
 	r.now = func() time.Time {
@@ -35,9 +31,6 @@ func write(t *testing.T, path, body string) {
 	}
 }
 
-// The first seconds of every boot, and every environment built before
-// phase reporting existed. Must degrade to something renderable rather
-// than to an error.
 func TestNoFilesAtAllReportsBooting(t *testing.T) {
 	r, _, _ := newTestReader(t)
 
@@ -53,8 +46,6 @@ func TestNoFilesAtAllReportsBooting(t *testing.T) {
 	}
 }
 
-// A bank whose bootstrap predates phase reporting writes the marker and
-// nothing else. That environment is usable and must be reported so.
 func TestReadyMarkerAloneIsReady(t *testing.T) {
 	r, _, marker := newTestReader(t)
 	write(t, marker, "")
@@ -83,10 +74,6 @@ func TestPhaseFileIsReportedWhileBooting(t *testing.T) {
 	}
 }
 
-// The direction that actually bites: bootstrap.sh removes the ready
-// marker at the start of every run, so during a reset the phase file
-// still says "ready" from the previous boot. Believing it would show a
-// finished environment that is mid-rebuild.
 func TestStaleReadyPhaseFileIsDowngradedWithoutTheMarker(t *testing.T) {
 	r, bootFile, _ := newTestReader(t)
 	write(t, bootFile, `{"version":1,"state":"ready","phase":"ready","label":"Environment ready","step":8,"totalSteps":8}`)
@@ -97,8 +84,6 @@ func TestStaleReadyPhaseFileIsDowngradedWithoutTheMarker(t *testing.T) {
 	}
 }
 
-// And the other direction: a boot that completed between the phase
-// file's last write and this read is ready, whatever the file says.
 func TestMarkerWinsOverALaggingPhaseFile(t *testing.T) {
 	r, bootFile, marker := newTestReader(t)
 	write(t, bootFile, `{"version":1,"state":"booting","phase":"seed","label":"Setting up the exam questions"}`)
@@ -110,8 +95,6 @@ func TestMarkerWinsOverALaggingPhaseFile(t *testing.T) {
 	}
 }
 
-// A failed boot must survive as an error the UI can render, not decay
-// into a generic "still working".
 func TestFailedStateIsPreserved(t *testing.T) {
 	r, bootFile, _ := newTestReader(t)
 	write(t, bootFile, `{"version":1,"state":"failed","phase":"cni","label":"Installing the pod network","error":"step failed: kubectl apply -f /opt/sim/calico.yaml (exit 1)"}`)
@@ -125,8 +108,6 @@ func TestFailedStateIsPreserved(t *testing.T) {
 	}
 }
 
-// A ready environment must not keep reporting a stale failure from the
-// boot before the one that fixed it.
 func TestMarkerClearsAStaleFailure(t *testing.T) {
 	r, bootFile, marker := newTestReader(t)
 	write(t, bootFile, `{"version":1,"state":"failed","phase":"cni","error":"boom"}`)
@@ -141,8 +122,6 @@ func TestMarkerClearsAStaleFailure(t *testing.T) {
 	}
 }
 
-// A torn read is the whole reason phase.sh writes atomically; if one
-// ever does slip through, it must not take the endpoint down.
 func TestMalformedPhaseFileDegradesToBooting(t *testing.T) {
 	r, bootFile, _ := newTestReader(t)
 	write(t, bootFile, `{"version":1,"state":"boot`)

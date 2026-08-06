@@ -32,9 +32,6 @@ func TestHostEmptyList(t *testing.T) {
 	}
 }
 
-// The default list is a functional contract, not a preference: each
-// entry is there because something on the documentation sites breaks
-// without it, and the omissions are deliberate.
 func TestDefaultDomainsMakeTheDocsUsableWithoutOpeningTheWeb(t *testing.T) {
 	l := New(DefaultDomains)
 
@@ -66,11 +63,6 @@ func TestDefaultDomainsMakeTheDocsUsableWithoutOpeningTheWeb(t *testing.T) {
 		}
 	}
 
-	// Known and accepted: matching is host-granular and includes
-	// subdomains, so allowing kubernetes.io also allows
-	// discuss.kubernetes.io, which the real exam disallows. Excluding it
-	// would need a deny-override the proxy does not have. Asserted so
-	// the gap stays visible rather than being rediscovered later.
 	if !l.Host("discuss.kubernetes.io") {
 		t.Error("subdomain matching changed; the documented gap above is now fixable")
 	}

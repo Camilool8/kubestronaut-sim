@@ -11,9 +11,6 @@ import (
 	"kubestronaut-sim/facilitator/internal/session"
 )
 
-// countingRunner records how many times Run was invoked and always
-// reports a passing check, so grader tests can assert exactly how many
-// real grading attempts happened without any ssh/network involved.
 type countingRunner struct {
 	calls atomic.Int32
 }
@@ -23,9 +20,6 @@ func (r *countingRunner) Run(_ context.Context, _, _ string) (string, bool, erro
 	return "ok", true, nil
 }
 
-// panickingRunner records how many times Run was invoked and always
-// panics, simulating a bug or unexpected failure deep inside a
-// grading run (e.g. in evaluate.Grade or one of its dependencies).
 type panickingRunner struct {
 	calls atomic.Int32
 }
@@ -35,10 +29,6 @@ func (r *panickingRunner) Run(_ context.Context, _, _ string) (string, bool, err
 	panic("boom: simulated grading failure")
 }
 
-// testExam is a minimal hand-built *exam.Exam (no bank dir / JSON
-// fixture needed — evaluate.Grade only calls the Runner, it never
-// touches disk) with one question and one check, enough for grader
-// tests to exercise a real evaluate.Grade + SetResults round trip.
 func testExam() *exam.Exam {
 	return &exam.Exam{
 		Name:  "test-bank",
@@ -53,14 +43,6 @@ func testExam() *exam.Exam {
 	}
 }
 
-// newTestManager returns a Manager already Start()ed and End()ed, i.e.
-// in the "ended" state Grade's real callers always put it in before
-// invoking Grade (the end-session handler calls it only after
-// Manager.End succeeds; the expiry timer's onExpire fires after the
-// session has transitioned to ended too). SetResults/SetGradeError
-// reject writes unless the session is currently ended, so grader tests
-// that skip this setup would see every Grade() run's outcome silently
-// rejected as ErrConflict instead of recorded.
 func newTestManager(t *testing.T) *session.Manager {
 	t.Helper()
 	mgr, err := session.New(t.TempDir()+"/session.json", "test-bank", time.Hour, time.Now, func() {})
@@ -76,20 +58,12 @@ func newTestManager(t *testing.T) *session.Manager {
 	return mgr
 }
 
-// TestGradeNoOpWhileInFlight is the deterministic core of the
-// double-grading guard: it forces the in-flight flag on directly
-// (simulating a grade already running, however it got started —
-// end-endpoint or expiry timer) and asserts a subsequent Grade() call
-// never even reaches the Runner. Because the CAS check runs
-// synchronously before the grading goroutine is spawned, this needs no
-// waiting/polling to be exact: either the Runner was called or it
-// wasn't.
 func TestGradeNoOpWhileInFlight(t *testing.T) {
 	mgr := newTestManager(t)
 	runner := &countingRunner{}
 	g := newGrader(testExam(), mgr, runner, time.Second)
 
-	g.inFlight.Store(true) // simulate: a grade is already running
+	g.inFlight.Store(true)
 	g.Grade()
 
 	if got := runner.calls.Load(); got != 0 {
@@ -97,13 +71,6 @@ func TestGradeNoOpWhileInFlight(t *testing.T) {
 	}
 }
 
-// TestGradeSequentialRunsRecordResultsAndClearInFlight exercises the
-// full real path end to end: Grade() actually runs evaluate.Grade,
-// records the results on the Manager, and — critically for the
-// end-endpoint's re-grade recovery path — clears the in-flight flag
-// afterward so a later Grade() call (e.g. a second POST
-// /api/session/end after a first grading attempt failed) is not
-// permanently blocked.
 func TestGradeSequentialRunsRecordResultsAndClearInFlight(t *testing.T) {
 	mgr := newTestManager(t)
 	runner := &countingRunner{}
@@ -126,20 +93,10 @@ func TestGradeSequentialRunsRecordResultsAndClearInFlight(t *testing.T) {
 		t.Fatal("inFlight still true after grading completed, want false (a re-grade must not be permanently blocked)")
 	}
 
-	g.Grade() // sequential re-grade must actually run again, not no-op
+	g.Grade()
 	waitForCalls(t, &runner.calls, 2)
 }
 
-// TestGradePanicRecoveredAndAllowsRegrade is the panic-safety
-// counterpart to the double-grading guard tests above: the design doc
-// guarantees an evaluator failure never crashes the facilitator, so a
-// panic anywhere inside the async grading goroutine (here, simulated
-// via a Runner that panics) must be recovered, recorded as a
-// gradeError, and — just as importantly — must not leave the in-flight
-// flag stuck, so a client re-POSTing end can still trigger a working
-// re-grade. The test itself surviving to its final assertions is
-// itself proof the process didn't crash: an unrecovered panic in this
-// goroutine would take the whole test binary down with it.
 func TestGradePanicRecoveredAndAllowsRegrade(t *testing.T) {
 	mgr := newTestManager(t)
 	runner := &panickingRunner{}
@@ -163,17 +120,10 @@ func TestGradePanicRecoveredAndAllowsRegrade(t *testing.T) {
 		t.Fatal("inFlight still true after a panicking grade, want false (must allow a re-grade, not wedge forever)")
 	}
 
-	// Re-POST /api/session/end after a failed grade must actually
-	// re-run, not silently no-op because of a stuck in-flight flag.
 	g.Grade()
 	waitForCalls(t, &runner.calls, 2)
 }
 
-// waitForGraded polls Manager.Results until grading has reached a
-// terminal outcome, failing the test if it never does within a
-// generous bound. Grade() runs on its own goroutine, so some form of
-// wait is unavoidable; this polls rather than sleeping a fixed amount,
-// so it finishes as soon as the real work is done.
 func waitForGraded(t *testing.T, mgr *session.Manager) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
@@ -186,8 +136,6 @@ func waitForGraded(t *testing.T, mgr *session.Manager) {
 	t.Fatal("grading did not complete within 2s")
 }
 
-// waitForCalls polls until counter reaches at least want, failing if it
-// never does within a generous bound.
 func waitForCalls(t *testing.T, counter *atomic.Int32, want int32) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
@@ -200,8 +148,6 @@ func waitForCalls(t *testing.T, counter *atomic.Int32, want int32) {
 	t.Fatalf("Runner.Run calls = %d after 2s, want >= %d", counter.Load(), want)
 }
 
-// mcqTestExam is a minimal mcq exam for grader-branch tests: two
-// one-point questions.
 func mcqTestExam() *exam.Exam {
 	return &exam.Exam{
 		Name: "test-bank",
@@ -213,10 +159,6 @@ func mcqTestExam() *exam.Exam {
 	}
 }
 
-// TestGradeMCQUsesStoredAnswersAndNeverSSH pins the engine branch: an
-// mcq exam grades the session's stored answers purely — the ssh Runner
-// must never be consulted — and records the same Results schema the
-// hands-on path does.
 func TestGradeMCQUsesStoredAnswersAndNeverSSH(t *testing.T) {
 	mgr, err := session.New(t.TempDir()+"/session.json", "test-bank", time.Hour, time.Now, func() {})
 	if err != nil {
@@ -252,10 +194,6 @@ func TestGradeMCQUsesStoredAnswersAndNeverSSH(t *testing.T) {
 	}
 }
 
-// mcqPooledTestExam is mcqTestExam plus a third question — standing in
-// for a pooled bank whose session drew only some of its pool. Grading
-// must honor the session's drawn subset, not "every question this Exam
-// happens to hold".
 func mcqPooledTestExam() *exam.Exam {
 	return &exam.Exam{
 		Name: "test-bank",
@@ -268,10 +206,6 @@ func mcqPooledTestExam() *exam.Exam {
 	}
 }
 
-// TestGradeMCQPooledAttemptScoresOnlyItsDrawnSubset is the grading half
-// of the pooling feature: q02 is left out of this attempt's draw, so it
-// must not appear in — or add a point to — the graded results, even
-// though the Exam handed to newGrader still lists all three questions.
 func TestGradeMCQPooledAttemptScoresOnlyItsDrawnSubset(t *testing.T) {
 	mgr, err := session.New(t.TempDir()+"/session.json", "test-bank", time.Hour, time.Now, func() {})
 	if err != nil {
@@ -280,10 +214,10 @@ func TestGradeMCQPooledAttemptScoresOnlyItsDrawnSubset(t *testing.T) {
 	if _, err := mgr.StartDraw(session.ModeExam, time.Hour, session.Draw{QuestionIDs: []string{"q01", "q03"}}); err != nil {
 		t.Fatalf("StartDraw: %v", err)
 	}
-	if err := mgr.SetAnswer("q01", []int{1}); err != nil { // correct
+	if err := mgr.SetAnswer("q01", []int{1}); err != nil {
 		t.Fatalf("SetAnswer q01: %v", err)
 	}
-	if err := mgr.SetAnswer("q03", []int{2}); err != nil { // correct
+	if err := mgr.SetAnswer("q03", []int{2}); err != nil {
 		t.Fatalf("SetAnswer q03: %v", err)
 	}
 	if err := mgr.End("submitted"); err != nil {
@@ -310,8 +244,6 @@ func TestGradeMCQPooledAttemptScoresOnlyItsDrawnSubset(t *testing.T) {
 	}
 }
 
-// TestPracticeGradeMCQ pins training mode's "score my work": pure,
-// instant, never persisted, no ssh.
 func TestPracticeGradeMCQ(t *testing.T) {
 	mgr, err := session.New(t.TempDir()+"/session.json", "test-bank", time.Hour, time.Now, func() {})
 	if err != nil {

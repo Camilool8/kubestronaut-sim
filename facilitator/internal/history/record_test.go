@@ -44,8 +44,7 @@ func TestProgressUsesOnlyCountedAttemptsForBestAndPassed(t *testing.T) {
 	records := []Record{
 		rec("full", "ckad-mock-01", "CKAD", epoch, 62),
 		func() Record {
-			// A perfect single-domain drill. It is a good session and it is
-			// not a CKAD pass.
+
 			d := rec("drill", "ckad-mock-01", "CKAD", epoch.Add(time.Hour), 100)
 			d.Counted = false
 			d.DomainFilter = []string{"Storage"}
@@ -63,7 +62,7 @@ func TestProgressUsesOnlyCountedAttemptsForBestAndPassed(t *testing.T) {
 	if p.Passed {
 		t.Error("Passed = true; a 100% single-domain drill must not light up the certification")
 	}
-	// The drill is still the most recent thing the candidate did.
+
 	if p.LastAttemptAt != epoch.Add(time.Hour).Format(time.RFC3339) {
 		t.Errorf("LastAttemptAt = %q, want the drill's timestamp", p.LastAttemptAt)
 	}
@@ -90,7 +89,7 @@ func TestWeakDomainsRankWeakestFirstAcrossAttempts(t *testing.T) {
 		),
 		withDomains(rec("a2", "b", "CKAD", epoch.Add(time.Hour), 70),
 			DomainResult{Domain: "Storage", Earned: 4, Total: 10},
-			DomainResult{Domain: "Observability", Earned: 0, Total: 0}, // no points: not a signal
+			DomainResult{Domain: "Observability", Earned: 0, Total: 0},
 		),
 	}
 	got := weakDomains(records)
@@ -109,9 +108,6 @@ func TestWeakDomainsRankWeakestFirstAcrossAttempts(t *testing.T) {
 	}
 }
 
-// A drill is the most informative thing a candidate can do about a weak
-// domain, so the weakness rollup reads every attempt — unlike bestPercent
-// and passed, which read only counted ones.
 func TestWeakDomainsIncludeUncountedAttempts(t *testing.T) {
 	drill := withDomains(rec("drill", "b", "CKAD", epoch, 100),
 		DomainResult{Domain: "Storage", Earned: 10, Total: 10})
@@ -127,12 +123,12 @@ func TestSummarize(t *testing.T) {
 	uncounted := func(r Record) Record { r.Counted = false; return r }
 	records := []Record{
 		rec("a1", "ckad-mock-01", "CKAD", epoch, 90),
-		rec("a2", "ckad-mock-01", "CKAD", epoch.Add(time.Hour), 91), // same cert twice
+		rec("a2", "ckad-mock-01", "CKAD", epoch.Add(time.Hour), 91),
 		rec("a3", "kcna-mock", "KCNA", epoch.Add(2*time.Hour), 88),
-		rec("a4", "cks-mock", "CKS", epoch.Add(3*time.Hour), 10), // failed
+		rec("a4", "cks-mock", "CKS", epoch.Add(3*time.Hour), 10),
 		uncounted(rec("a5", "kcsa-mock", "KCSA", epoch.Add(4*time.Hour), 99)),
-		rec("a6", "smoke-01", "", epoch.Add(5*time.Hour), 100),           // no certification
-		rec("a7", "other-mock", "SOMETHING", epoch.Add(6*time.Hour), 95), // off the track
+		rec("a6", "smoke-01", "", epoch.Add(5*time.Hour), 100),
+		rec("a7", "other-mock", "SOMETHING", epoch.Add(6*time.Hour), 95),
 	}
 	sum := Summarize(records)
 
@@ -142,9 +138,7 @@ func TestSummarize(t *testing.T) {
 	if sum.TrackCount != 5 {
 		t.Errorf("TrackCount = %d, want 5 — the Kubestronaut path, not the banks that happen to exist", sum.TrackCount)
 	}
-	// CKAD (twice, counted once) and KCNA. Not CKS (failed), not KCSA
-	// (uncounted), not the bank with no certification, and not the one
-	// off the track.
+
 	if sum.PassedCount != 2 {
 		t.Errorf("PassedCount = %d, want 2", sum.PassedCount)
 	}
@@ -182,13 +176,10 @@ func TestCheckDocument(t *testing.T) {
 	}
 }
 
-// An imported record can claim anything — it came from a document this
-// build did not write. The rollups re-check the two clauses a record can
-// verify about itself rather than trusting its `counted` flag.
 func TestRollupsDistrustAnImportedCountedFlag(t *testing.T) {
 	training := rec("a1", "b", "CKAD", epoch, 100)
 	training.Mode = "training"
-	training.Counted = true // the document says so; it is still not a sitting
+	training.Counted = true
 
 	filtered := rec("a2", "b", "CKAD", epoch.Add(time.Hour), 100)
 	filtered.DomainFilter = []string{"Storage"}

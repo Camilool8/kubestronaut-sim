@@ -31,9 +31,7 @@ func TestListenOnASocketCreatesItPrivate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("socket was not created: %v", err)
 	}
-	// 0600 is the second lock on a boundary the mount already draws.
-	// Loosening it silently would put the control API back within reach
-	// of anything that later shares the volume.
+
 	if perm := info.Mode().Perm(); perm != 0o600 {
 		t.Errorf("mode = %v, want 0600", perm)
 	}
@@ -45,13 +43,6 @@ func TestListenOnASocketCreatesItPrivate(t *testing.T) {
 	}
 }
 
-// A socket file outlives a process that dies without closing it, and
-// net.Listen refuses to bind over one. Go unlinks on a clean Close, so
-// the case only arises when the conductor is killed — a SIGKILL, an
-// OOM, a `docker compose kill` — and then the volume still holds the
-// file the next start has to bind. SetUnlinkOnClose(false) is that
-// death, reproduced: without the unlink, every restart after a hard
-// kill fails against a file nothing is listening on.
 func TestListenReplacesASocketLeftByAKilledConductor(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "c.sock")
 	stale, err := net.Listen("unix", path)

@@ -6,11 +6,6 @@ import (
 	"testing"
 )
 
-// The mcq engine stores the candidate's selections in the session, which
-// makes them the first candidate input this product persists. These tests
-// pin the rules: writable only while running, sorted on write, cleared by
-// Start and Reset, and durable across a process restart.
-
 func TestSetAnswerRequiresRunning(t *testing.T) {
 	clock, _ := fakeClock(epoch)
 	m, err := New(sessionPath(t), testBank, testDur, clock, func() {})
@@ -59,7 +54,6 @@ func TestSetAnswerStoresSortedAndSurvivesReload(t *testing.T) {
 		t.Errorf("q03 = %v, want [1 3] (sorted on write)", a)
 	}
 
-	// A restart resumes the attempt with its answers intact.
 	m2, err := New(path, testBank, testDur, clock, func() {})
 	if err != nil {
 		t.Fatalf("reload New: %v", err)
@@ -140,7 +134,6 @@ func TestStartAndResetClearAnswers(t *testing.T) {
 		t.Errorf("Answers after Reset = %v, want empty", got)
 	}
 
-	// A new attempt must never inherit a previous attempt's selections.
 	if _, err := m.Start(ModeExam, testDur); err != nil {
 		t.Fatalf("second Start: %v", err)
 	}
@@ -149,10 +142,6 @@ func TestStartAndResetClearAnswers(t *testing.T) {
 	}
 }
 
-// Version 3 files predate answer storage; the version guard must discard
-// them (the standing migration strategy), not resume them answerless.
-// A drawn subset is what StartDraw adds over plain Start: it must
-// persist and survive a reload exactly like mode and answers already do.
 func TestStartDrawPersistsQuestionIDsAndReload(t *testing.T) {
 	path := sessionPath(t)
 	clock, _ := fakeClock(epoch)
@@ -178,8 +167,6 @@ func TestStartDrawPersistsQuestionIDsAndReload(t *testing.T) {
 	}
 }
 
-// Plain Start is StartDraw with a zero Draw — every attempt that draws
-// nothing must get no subset at all, not an empty-but-present one.
 func TestPlainStartHasNoQuestionIDs(t *testing.T) {
 	clock, _ := fakeClock(epoch)
 	m, err := New(sessionPath(t), testBank, testDur, clock, func() {})
@@ -194,9 +181,6 @@ func TestPlainStartHasNoQuestionIDs(t *testing.T) {
 	}
 }
 
-// Reset clears the drawn subset along with everything else an attempt
-// carries — the whole point is that the NEXT Start draws fresh, not that
-// it inherits the previous attempt's questions.
 func TestResetClearsQuestionIDs(t *testing.T) {
 	clock, _ := fakeClock(epoch)
 	m, err := New(sessionPath(t), testBank, testDur, clock, func() {})

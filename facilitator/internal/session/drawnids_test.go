@@ -9,10 +9,6 @@ import (
 	"kubestronaut-sim/facilitator/internal/session"
 )
 
-// DrawnIDs backs `facilitator grade`, which runs as a second process
-// beside the live server. Everything below is about it staying a READER:
-// it must never resume an attempt, arm a timer or write the file back.
-
 func TestDrawnIDsReadsARunningAttemptsSubset(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "session.json")
 	mgr, err := session.New(path, "ckad-mock-01", time.Hour, time.Now, func() {})
@@ -30,8 +26,7 @@ func TestDrawnIDsReadsARunningAttemptsSubset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DrawnIDs: %v", err)
 	}
-	// Draw order, not sorted: the attempt presents them in this order and
-	// the scoreboard should print them in it.
+
 	if len(got) != len(want) {
 		t.Fatalf("DrawnIDs = %v, want %v", got, want)
 	}
@@ -42,10 +37,6 @@ func TestDrawnIDsReadsARunningAttemptsSubset(t *testing.T) {
 	}
 }
 
-// An ended attempt still names its questions. This is what makes the
-// warm-restart check in tests/smoke.sh mean anything: the attempt is
-// graded again after `./sim down && ./sim up`, and it has to be graded
-// against the same 22 it was drawn with.
 func TestDrawnIDsSurvivesTheAttemptEnding(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "session.json")
 	mgr, err := session.New(path, "ckad-mock-01", time.Hour, time.Now, func() {})
@@ -70,8 +61,6 @@ func TestDrawnIDsSurvivesTheAttemptEnding(t *testing.T) {
 	}
 }
 
-// Three ways of meaning "there is no attempt to scope to", all of which
-// the caller turns into "grade the whole bank" rather than an error.
 func TestDrawnIDsIsEmptyWithNoAttempt(t *testing.T) {
 	t.Run("no file at all", func(t *testing.T) {
 		got, err := session.DrawnIDs(filepath.Join(t.TempDir(), "absent.json"))
@@ -117,10 +106,6 @@ func TestDrawnIDsRejectsAFileItCannotParse(t *testing.T) {
 	}
 }
 
-// The reason this is a plain reader rather than a second Manager. New
-// resumes, re-arms and can PERSIST an expiry correction; a scoreboard
-// running beside the live server must not write to the file it is
-// reading.
 func TestDrawnIDsDoesNotWriteToTheFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "session.json")
 	mgr, err := session.New(path, "ckad-mock-01", time.Minute, time.Now, func() {})

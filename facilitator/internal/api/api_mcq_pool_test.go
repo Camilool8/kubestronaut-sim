@@ -16,10 +16,6 @@ const (
 	mcqPoolBankDir  = "testdata/bank-mcq-pool"
 )
 
-// newMCQPoolTestServer is newMCQTestServer for the pooled fixture: 9
-// questions (5 in Domain A, 4 in Domain B, weighted 60/40) and
-// spec.examLength: 5 — small enough to hand-verify, large enough that a
-// draw always leaves at least one pool question out.
 func newMCQPoolTestServer(t *testing.T) *testServer {
 	t.Helper()
 
@@ -39,9 +35,6 @@ func newMCQPoolTestServer(t *testing.T) *testServer {
 	return &testServer{handler: h, mgr: mgr, grader: grader, setNow: setNow}
 }
 
-// Before any attempt exists there is nothing drawn to show, so /api/exam
-// still lists the full 9-question pool — but questionCount must already
-// say 5, the length a candidate will actually get, not the pool size.
 func TestMCQPoolQuestionCountBeforeStart(t *testing.T) {
 	ts := newMCQPoolTestServer(t)
 	rec := ts.do(t, http.MethodGet, "/api/exam")
@@ -58,10 +51,6 @@ func TestMCQPoolQuestionCountBeforeStart(t *testing.T) {
 	}
 }
 
-// Once an attempt starts, /api/exam must list exactly the drawn subset
-// — 5 unique pool ids, split 3 from Domain A and 2 from Domain B (60/40
-// of 5, largest-remainder rounded) — not the pool, and questionCount
-// keeps agreeing with the array length.
 func TestMCQPoolExamListsDrawnSubsetAfterStart(t *testing.T) {
 	ts := newMCQPoolTestServer(t)
 	startMCQ(t, ts)
@@ -96,10 +85,6 @@ func TestMCQPoolExamListsDrawnSubsetAfterStart(t *testing.T) {
 	}
 }
 
-// A pool question that exists in the bank but was not part of this
-// attempt's draw must be invisible through every single-question
-// endpoint: unreachable, not just ungraded. 9 pool ids and a 5-question
-// draw guarantee at least 4 are excluded.
 func TestMCQPoolQuestionOutsideDrawIs404(t *testing.T) {
 	ts := newMCQPoolTestServer(t)
 	startMCQ(t, ts)
@@ -130,7 +115,6 @@ func TestMCQPoolQuestionOutsideDrawIs404(t *testing.T) {
 		t.Errorf("PUT an answer outside the draw (%s): status = %d, want 404", excluded, rec.Code)
 	}
 
-	// A question INSIDE the draw must still work normally.
 	var included string
 	for id := range drawn {
 		included = id
@@ -141,12 +125,6 @@ func TestMCQPoolQuestionOutsideDrawIs404(t *testing.T) {
 	}
 }
 
-// Answering every drawn question, ending, and asking for results at
-// least proves the pooled attempt's whole lifecycle works end to end
-// through the HTTP surface (the real grading pipeline — and therefore
-// the "only the drawn subset is scored" assertion — lives in
-// cmd/facilitator/grader_test.go, which wires the real Grader instead of
-// this package's counting fake).
 func TestMCQPoolAnswerEndLifecycleReachesGrading(t *testing.T) {
 	ts := newMCQPoolTestServer(t)
 	startMCQ(t, ts)
@@ -177,11 +155,6 @@ func TestMCQPoolAnswerEndLifecycleReachesGrading(t *testing.T) {
 	}
 }
 
-// The mcq engine has no cluster, so nothing about seeding — the 202, the
-// preparation, the guard that refuses a second draw into a dirty
-// environment — may ever reach it. A pooled mcq bank draws a fresh
-// subset on every start, forever, with a seeder wired and a conductor
-// listening.
 func TestMCQPoolRepeatedAttemptsNeverSeedOrGate(t *testing.T) {
 	ex, err := exam.Load(mcqPoolExamJSON, mcqPoolBankDir)
 	if err != nil {

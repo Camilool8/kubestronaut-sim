@@ -14,7 +14,6 @@ import (
 	"kubestronaut-sim/proxy/internal/allow"
 )
 
-// startProxy returns the proxy's listen address.
 func startProxy(t *testing.T, domains string) string {
 	t.Helper()
 	srv := httptest.NewServer(New(allow.New(domains)))
@@ -62,7 +61,7 @@ func TestConnectAllowedTunnels(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("CONNECT to allowed host: got %d, want 200", resp.StatusCode)
 	}
-	// speak plain HTTP through the tunnel
+
 	fmt.Fprintf(conn, "GET / HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", bu.Host)
 	body, _ := io.ReadAll(br)
 	if !strings.Contains(string(body), "hello-tunnel") {

@@ -5,9 +5,6 @@ import (
 	"testing"
 )
 
-// attempts are written as JSON text, not as a struct literal, because
-// that is what the store actually holds: bytes the facilitator produced.
-// A struct literal here would only prove this file agrees with itself.
 func raw(t *testing.T, body string) json.RawMessage {
 	t.Helper()
 	if !json.Valid([]byte(body)) {
@@ -33,8 +30,6 @@ const kcnaPass = `{
   "domains": [{"domain": "Kubernetes Fundamentals", "earned": 9, "total": 10}]
 }`
 
-// Training is graded and shown, and it is not a sitting: the candidate
-// can read the solutions while they work.
 const ckadTraining = `{
   "id": "c3", "bank": "ckad-mock-01", "certification": "CKAD",
   "mode": "training", "gradedAt": "2026-01-04T10:00:00Z",
@@ -42,7 +37,6 @@ const ckadTraining = `{
   "domains": [{"domain": "Observability", "earned": 10, "total": 10}]
 }`
 
-// A drill over one domain. 100% here is a good session and not a pass.
 const ckadDrill = `{
   "id": "d4", "bank": "ckad-mock-01", "certification": "CKAD",
   "mode": "exam", "domainFilter": ["Observability"],
@@ -61,7 +55,7 @@ func TestSummaryCountsOnlyTrackCertificationsThatActuallyCount(t *testing.T) {
 	if sum.PassedCount != 2 {
 		t.Errorf("PassedCount = %d, want 2 (CKAD and KCNA)", sum.PassedCount)
 	}
-	// The denominator is the program, not the banks a deployment ships.
+
 	if sum.TrackCount != 5 {
 		t.Errorf("TrackCount = %d, want 5", sum.TrackCount)
 	}
@@ -70,10 +64,6 @@ func TestSummaryCountsOnlyTrackCertificationsThatActuallyCount(t *testing.T) {
 	}
 }
 
-// Neither a training run nor a domain drill is a sitting, and each is
-// excluded by a different clause. Asserted separately because a rollup
-// that dropped one of the two clauses would still pass a test that only
-// used the other.
 func TestNeitherTrainingNorADrillCanPassACertification(t *testing.T) {
 	for name, only := range map[string]string{
 		"training": ckadTraining,
@@ -87,8 +77,6 @@ func TestNeitherTrainingNorADrillCanPassACertification(t *testing.T) {
 	}
 }
 
-// A certification outside the Kubestronaut path can be attempted and
-// passed; it must not move the path figure.
 func TestAPassOutsideTheTrackDoesNotCount(t *testing.T) {
 	off := `{"id":"z9","bank":"other","certification":"CKX","mode":"exam",
 	         "gradedAt":"2026-02-01T10:00:00Z","percent":95,"passed":true,"counted":true,
@@ -102,9 +90,6 @@ func TestAPassOutsideTheTrackDoesNotCount(t *testing.T) {
 	}
 }
 
-// Weakest first, across every attempt including the ones that do not
-// count. A rollup that ignored drills would keep reporting the weakness
-// the candidate spent all week fixing.
 func TestWeakDomainsRankWeakestFirstAndIncludeDrills(t *testing.T) {
 	sum := summarize([]json.RawMessage{
 		raw(t, ckadPass), raw(t, ckadDrill),
@@ -112,9 +97,7 @@ func TestWeakDomainsRankWeakestFirstAndIncludeDrills(t *testing.T) {
 	if len(sum.WeakDomains) != 2 {
 		t.Fatalf("weak domains = %+v, want 2", sum.WeakDomains)
 	}
-	// Observability: 2/10 from the exam plus 10/10 from the drill = 60%.
-	// Application Design: 8/10 = 80%. So Observability ranks first, and
-	// it ranks first only because the drill was included.
+
 	if sum.WeakDomains[0].Domain != "Observability" {
 		t.Errorf("weakest = %q, want Observability", sum.WeakDomains[0].Domain)
 	}
@@ -129,8 +112,6 @@ func TestWeakDomainsRankWeakestFirstAndIncludeDrills(t *testing.T) {
 	}
 }
 
-// A domain worth no points is an authoring artefact — every check
-// skipped — not a candidate scoring zero.
 func TestADomainWorthNoPointsIsNotRanked(t *testing.T) {
 	empty := `{"id":"e5","certification":"CKAD","mode":"exam",
 	           "gradedAt":"2026-01-06T10:00:00Z","counted":true,
@@ -140,7 +121,6 @@ func TestADomainWorthNoPointsIsNotRanked(t *testing.T) {
 	}
 }
 
-// Never null. The UI maps over this array without checking.
 func TestWeakDomainsMarshalAsAnArrayWhenThereAreNone(t *testing.T) {
 	b, err := json.Marshal(summarize(nil))
 	if err != nil {
@@ -155,8 +135,6 @@ func TestWeakDomainsMarshalAsAnArrayWhenThereAreNone(t *testing.T) {
 	}
 }
 
-// One record written by a build this one has never met must not cost the
-// candidate the rest of their history.
 func TestARecordThatWillNotDecodeIsCountedAndSkipped(t *testing.T) {
 	sum := summarize([]json.RawMessage{
 		raw(t, ckadPass), json.RawMessage(`"not an object"`),

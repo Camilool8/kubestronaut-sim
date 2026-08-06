@@ -43,8 +43,6 @@ func TestLoad(t *testing.T) {
 		t.Fatalf("len(Questions) = %d, want 2", len(e.Questions))
 	}
 
-	// exam.json lists q02 before q01 — Questions must preserve that file
-	// order, not sort by ID.
 	q02, q01 := e.Questions[0], e.Questions[1]
 	if q02.ID != "q02" {
 		t.Errorf("Questions[0].ID = %q, want %q (file order not preserved)", q02.ID, "q02")
@@ -72,8 +70,6 @@ func TestLoad(t *testing.T) {
 		t.Errorf("q01.Domain = %q, want comma preserved verbatim, got %q", q01.Domain, q01.Domain)
 	}
 
-	// q01/validate.d has two scripts; checks must be in lexical filename
-	// order: 10_ok.sh before 20_bad-points.sh.
 	if len(q01.Checks) != 2 {
 		t.Fatalf("len(q01.Checks) = %d, want 2", len(q01.Checks))
 	}
@@ -106,7 +102,6 @@ func TestLoad(t *testing.T) {
 		t.Errorf("20_bad-points.sh Desc = %q, want %q (colons preserved verbatim)", bad.Desc, wantDesc)
 	}
 
-	// q02/validate.d has one script with no header at all.
 	if len(q02.Checks) != 1 {
 		t.Fatalf("len(q02.Checks) = %d, want 1", len(q02.Checks))
 	}
@@ -172,8 +167,6 @@ func TestCountAndSplitHints(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Text before the first heading is deliberately ignored, so an
-	// author can leave a note at the top of the file.
 	body := "some authoring note\n\n## Hint 1\n\nlook at the selector\n\n## Hint 2\n\ntry `kubectl get svc`\n"
 	if err := os.WriteFile(filepath.Join(qdir, "hints.md"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
@@ -196,8 +189,6 @@ func TestCountAndSplitHints(t *testing.T) {
 	}
 }
 
-// A bank with no hints must load, not error: hints are optional, and
-// smoke-01 has none.
 func TestCountHintsIsZeroWhenAbsent(t *testing.T) {
 	if got := countHints(t.TempDir(), "q01"); got != 0 {
 		t.Errorf("countHints on a bank with no hints.md = %d, want 0", got)
@@ -228,12 +219,11 @@ func TestLoadMCQ(t *testing.T) {
 	if len(q01.Correct) != 1 || q01.Correct[0] != 2 {
 		t.Errorf("q01.Correct = %v, want [2]", q01.Correct)
 	}
-	// weight is optional for mcq and defaults to 1, matching the real
-	// exam's uniform scoring.
+
 	if q01.Weight != 1 {
 		t.Errorf("q01.Weight = %d, want 1 (default)", q01.Weight)
 	}
-	// A declared weight is preserved verbatim.
+
 	if q02.Weight != 2 {
 		t.Errorf("q02.Weight = %d, want 2 (explicit)", q02.Weight)
 	}
@@ -243,14 +233,14 @@ func TestLoadMCQ(t *testing.T) {
 	if len(q02.Correct) != 2 || q02.Correct[0] != 0 || q02.Correct[1] != 3 {
 		t.Errorf("q02.Correct = %v, want [0 3]", q02.Correct)
 	}
-	// An mcq question has no checks, and never an instance.
+
 	if len(q01.Checks) != 0 {
 		t.Errorf("len(q01.Checks) = %d, want 0", len(q01.Checks))
 	}
 	if q01.Instance != "" {
 		t.Errorf("q01.Instance = %q, want empty", q01.Instance)
 	}
-	// Hints machinery is examType-agnostic: q01 has a hints.md fixture.
+
 	if q01.HintCount != 2 {
 		t.Errorf("q01.HintCount = %d, want 2", q01.HintCount)
 	}
@@ -259,8 +249,6 @@ func TestLoadMCQ(t *testing.T) {
 	}
 }
 
-// TestLoadDefaultsToHandsOn pins the v1alpha1 compatibility rule: a bank
-// with no spec.examType is a hands-on bank.
 func TestLoadDefaultsToHandsOn(t *testing.T) {
 	e, err := Load(examJSON, bankDir)
 	if err != nil {
@@ -311,8 +299,6 @@ func TestLoadMCQValidation(t *testing.T) {
 	}
 }
 
-// mcqQuestion renders one spec.questions entry with n options and the
-// given correct indices.
 func mcqQuestion(id string, multi bool, n int, correct []int) string {
 	opts := make([]string, n)
 	for i := range opts {
@@ -326,8 +312,6 @@ func mcqQuestion(id string, multi bool, n int, correct []int) string {
 		id, multi, strings.Join(opts, ", "), strings.Join(sel, ", "))
 }
 
-// loadMCQDoc writes a minimal exam.json with the given spec fragment and
-// question entries into a temp dir and loads it.
 func loadMCQDoc(t *testing.T, specExtra string, questions ...string) (*Exam, error) {
 	t.Helper()
 	doc := fmt.Sprintf(`{
@@ -347,11 +331,6 @@ func loadMCQDoc(t *testing.T, specExtra string, questions ...string) (*Exam, err
 	return Load(path, dir)
 }
 
-// poolFixture builds an Exam with the given domain weights and, for each
-// domain, a pool of poolSizes[domain] questions in "<domain-initial><n>"
-// ids (e.g. "F1".."F6" for "Fundamentals") — plenty for Draw to
-// sample from without colliding with real bank ids in any test failure
-// message.
 func poolFixture(t *testing.T, order []string, weights map[string]int, poolSizes map[string]int, examLength int) *Exam {
 	t.Helper()
 	e := &Exam{Type: TypeMCQ, DomainWeights: weights, ExamLength: examLength}
@@ -387,14 +366,12 @@ func TestDomainTargetsLargestRemainder(t *testing.T) {
 		n    int
 		want map[string]int
 	}{
-		// The shipped kcna-mock bank's own 65-question draw.
+
 		{65, map[string]int{
 			"Kubernetes Fundamentals": 29, "Container Orchestration": 18,
 			"Cloud Native Application Delivery": 10, "Cloud Native Architecture": 8,
 		}},
-		// A small n that exercises the tie-break: floors sum to 8,
-		// leftover 2 goes to the two largest fractional remainders
-		// (Orchestration .8, then Delivery .6).
+
 		{10, map[string]int{
 			"Kubernetes Fundamentals": 4, "Container Orchestration": 3,
 			"Cloud Native Application Delivery": 2, "Cloud Native Architecture": 1,
@@ -427,10 +404,6 @@ func TestDomainTargetsMissingDomainErrors(t *testing.T) {
 	}
 }
 
-// A draw with no pooling configured (the default every bank has until
-// it opts in) must return every question, unchanged, in bank order —
-// this is the backward-compatibility path every existing mcq bank and
-// the hidden smoke-mcq fixture rely on.
 func TestDrawNoPoolingReturnsFullBankInOrder(t *testing.T) {
 	e := poolFixture(t, kcnaDomainOrder, kcnaWeights,
 		map[string]int{
@@ -452,9 +425,6 @@ func TestDrawNoPoolingReturnsFullBankInOrder(t *testing.T) {
 	}
 }
 
-// A pooled draw must land exactly on domainTargets' per-domain counts —
-// not just approximately, every single time — and never repeat or
-// invent an id.
 func TestDrawStratifiesExactlyByDomain(t *testing.T) {
 	poolSizes := map[string]int{
 		"Kubernetes Fundamentals": 40, "Container Orchestration": 30,
@@ -500,10 +470,6 @@ func TestDrawStratifiesExactlyByDomain(t *testing.T) {
 	}
 }
 
-// Two UNSEEDED draws from the same pool must (almost always) differ —
-// otherwise this "random" draw is a fixed sample wearing a randomizer's
-// clothes. The pool here is large enough that a coincidental match is
-// astronomically unlikely, so a match is treated as a real failure.
 func TestDrawVariesBetweenAttempts(t *testing.T) {
 	poolSizes := map[string]int{
 		"Kubernetes Fundamentals": 40, "Container Orchestration": 30,
@@ -534,26 +500,19 @@ func TestDrawVariesBetweenAttempts(t *testing.T) {
 	}
 }
 
-// A domain whose authored pool is smaller than the draw needs is a bank
-// bug Draw must refuse rather than silently under-fill.
 func TestDrawErrorsWhenADomainPoolIsTooShallow(t *testing.T) {
-	// Every other domain's pool is generously oversized (so the total
-	// pool safely exceeds the 65-question draw and this actually
-	// exercises the per-domain check, not the "pool <= examLength, skip
-	// pooling entirely" backward-compat path) while Architecture alone
-	// falls one short of its target of 8.
+
 	poolSizes := map[string]int{
 		"Kubernetes Fundamentals": 35, "Container Orchestration": 25,
 		"Cloud Native Application Delivery": 15,
-		"Cloud Native Architecture":         7, // needs 8, only 7 authored
+		"Cloud Native Architecture":         7,
 	}
 	e := poolFixture(t, kcnaDomainOrder, kcnaWeights, poolSizes, 65)
 	_, err := Draw(e, DrawOptions{})
 	if err == nil {
 		t.Fatal("Draw with a shallow Architecture pool: got nil error, want one naming the shortfall")
 	}
-	// A bank that cannot satisfy its own weights is an authoring bug, not
-	// a bad request, and the HTTP layer tells the two apart by this.
+
 	if errors.Is(err, ErrDrawRequest) {
 		t.Errorf("err = %v, want it NOT wrapped in ErrDrawRequest", err)
 	}
@@ -579,17 +538,13 @@ func TestSpeedDurationDefaultsToHalf(t *testing.T) {
 	}
 }
 
-// Domains is the ordered form of spec.domainWeights the graders weight
-// with: question order, never map order, and one entry per domain the
-// questions actually use.
 func TestLoadDomains(t *testing.T) {
 	ex, err := Load("testdata/exam-mcq.json", "testdata/bank-mcq")
 	if err != nil {
 		t.Fatalf("Load mcq fixture: %v", err)
 	}
 	want := []Domain{
-		// q01 is Fundamentals and comes first in the file; the weights map
-		// lists Orchestration first, and must not decide the order.
+
 		{Name: "Kubernetes Fundamentals", WeightPct: 60},
 		{Name: "Container Orchestration", WeightPct: 40},
 	}
@@ -598,9 +553,6 @@ func TestLoadDomains(t *testing.T) {
 	}
 }
 
-// A bank with no spec.domainWeights still gets its domains listed, at
-// weight 0 — "this bank publishes no curriculum split", which is what
-// makes the graders fall back to weighting by points.
 func TestLoadDomainsWithoutWeights(t *testing.T) {
 	ex, err := Load(examJSON, bankDir)
 	if err != nil {
@@ -618,13 +570,10 @@ func TestLoadDomainsWithoutWeights(t *testing.T) {
 func TestSubset(t *testing.T) {
 	ex := &Exam{Questions: []Question{{ID: "q01"}, {ID: "q02"}, {ID: "q03"}}}
 
-	// Empty ids means "no subset was drawn": the whole bank, in order.
 	if got := Subset(ex, nil); len(got) != 3 || got[0].ID != "q01" || got[2].ID != "q03" {
 		t.Errorf("Subset(nil) = %+v, want all three in bank order", got)
 	}
 
-	// Draw order wins over bank order, and an id the bank does not
-	// declare is skipped rather than faked into an empty question.
 	got := Subset(ex, []string{"q03", "q99", "q01"})
 	if len(got) != 2 || got[0].ID != "q03" || got[1].ID != "q01" {
 		t.Errorf("Subset([q03 q99 q01]) = %+v, want [q03 q01]", got)

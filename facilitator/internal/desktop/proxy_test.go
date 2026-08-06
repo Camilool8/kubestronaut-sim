@@ -13,8 +13,6 @@ import (
 	"kubestronaut-sim/facilitator/internal/desktop"
 )
 
-// hostPort strips the "http://" scheme from an httptest.Server URL,
-// yielding the "host:port" form New expects.
 func hostPort(s *httptest.Server) string {
 	return strings.TrimPrefix(s.URL, "http://")
 }
@@ -150,9 +148,6 @@ func TestBareDesktopRedirectPreservesQuery(t *testing.T) {
 	}
 }
 
-// hijackEchoHandler simulates noVNC's websockify endpoint: it hijacks the
-// connection, hand-writes a 101 Switching Protocols response, then echoes
-// whatever bytes the client sends.
 func hijackEchoHandler(w http.ResponseWriter, r *http.Request) {
 	hj, ok := w.(http.Hijacker)
 	if !ok {
@@ -172,9 +167,6 @@ func hijackEchoHandler(w http.ResponseWriter, r *http.Request) {
 	io.Copy(conn, buf)
 }
 
-// readStatusLineAndHeaders reads a raw HTTP response's status line and
-// headers off br, returning the status line with its trailing CRLF
-// trimmed.
 func readStatusLineAndHeaders(t *testing.T, br *bufio.Reader) string {
 	t.Helper()
 	statusLine, err := br.ReadString('\n')

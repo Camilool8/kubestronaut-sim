@@ -12,23 +12,17 @@ import (
 	"kubestronaut-sim/facilitator/internal/exam"
 )
 
-// call records one Runner.Run invocation, so tests can assert exactly
-// which instance/cmd Grade composed.
 type call struct {
 	instance string
 	cmd      string
 }
 
-// resp is a canned Runner.Run return value.
 type resp struct {
 	out string
 	ok  bool
 	err error
 }
 
-// fakeRunner resolves each call by matching the trailing path segment of
-// cmd (the check script's basename) against byName, and records every
-// call it receives.
 type fakeRunner struct {
 	byName map[string]resp
 	calls  []call
@@ -44,10 +38,6 @@ func (f *fakeRunner) Run(_ context.Context, instance, cmd string) (string, bool,
 	return "", false, fmt.Errorf("fakeRunner: no response configured for cmd %q", cmd)
 }
 
-// blockingRunner never returns until ctx is done, simulating an
-// unreachable/hung instance so Grade's per-check timeout can be
-// exercised without any real sleep beyond the tiny checkTimeout the test
-// supplies.
 type blockingRunner struct{}
 
 func (blockingRunner) Run(ctx context.Context, _, _ string) (string, bool, error) {
@@ -126,7 +116,7 @@ func TestGrade(t *testing.T) {
 			wantEarned:  5,
 			wantTotal:   17,
 			wantPercent: 29,
-			wantPassed:  false, // 29 < 30
+			wantPassed:  false,
 			wantCalls:   2,
 		},
 		{
@@ -168,7 +158,7 @@ func TestGrade(t *testing.T) {
 			wantTotal:   5,
 			wantPercent: 100,
 			wantPassed:  true,
-			wantCalls:   1, // the SKIP check must never reach the Runner
+			wantCalls:   1,
 		},
 		{
 			name: "all checks skipped: total 0 -> RESULT 0 0 0",
@@ -184,7 +174,7 @@ func TestGrade(t *testing.T) {
 			wantEarned:  0,
 			wantTotal:   0,
 			wantPercent: 0,
-			wantPassed:  true, // 0 >= passingScore 0
+			wantPassed:  true,
 			wantCalls:   0,
 		},
 	}
@@ -217,7 +207,7 @@ func TestGradeCheckResultFields(t *testing.T) {
 		},
 	}
 	runner := &fakeRunner{byName: map[string]resp{
-		// grade.sh's msg=$(...) strips ALL trailing newlines.
+
 		"10_pass.sh": {out: "all good\n\n", ok: true},
 		"20_fail.sh": {out: "broke\n", ok: false},
 	}}
@@ -364,9 +354,6 @@ func TestScoreboardGolden(t *testing.T) {
 	}
 }
 
-// A pooled/filtered attempt is graded on exactly its drawn subset: a
-// question outside it is never even ssh'd for, and cannot appear in the
-// results or inflate the total. The bank is not the exam.
 func TestGradeScopesToQuestionIDs(t *testing.T) {
 	ex := &exam.Exam{
 		PassingScore: 50,
@@ -400,8 +387,7 @@ func TestGradeScopesToQuestionIDs(t *testing.T) {
 	if res.Total != 9 || res.Earned != 9 {
 		t.Errorf("totals = %d/%d, want 9/9 (q02's 6 points excluded)", res.Earned, res.Total)
 	}
-	// The undrawn question must not be graded — checking work the
-	// candidate was never shown is the bug this scoping exists for.
+
 	for _, c := range runner.calls {
 		if strings.Contains(c.cmd, "10_b.sh") {
 			t.Errorf("Runner ran %q, want no check from the undrawn q02", c.cmd)
@@ -412,10 +398,6 @@ func TestGradeScopesToQuestionIDs(t *testing.T) {
 	}
 }
 
-// The curriculum weights decide the score, not the points the drawn
-// questions happen to carry: here Storage holds 3 of 13 points but 50% of
-// the curriculum, so a candidate who aced it and failed everything else
-// scores 50, not 23.
 func TestGradeWeightsByCurriculumDomain(t *testing.T) {
 	ex := &exam.Exam{
 		PassingScore: 50,
@@ -450,8 +432,6 @@ func TestGradeWeightsByCurriculumDomain(t *testing.T) {
 	}
 }
 
-// Finalize is where every derived field comes from, so it is tested
-// directly: the graders only fill in Earned/Total per question.
 func TestFinalizeDomainRollup(t *testing.T) {
 	res := &Results{
 		PassingScore: 60,
@@ -465,8 +445,7 @@ func TestFinalizeDomainRollup(t *testing.T) {
 	res.Finalize([]exam.Domain{
 		{Name: "Storage", WeightPct: 30},
 		{Name: "Networking", WeightPct: 70},
-		// Declared but undrawn: it is not part of what was graded, so it
-		// must neither appear in the rollup nor dilute the weighting.
+
 		{Name: "Observability", WeightPct: 0},
 	})
 
@@ -480,15 +459,14 @@ func TestFinalizeDomainRollup(t *testing.T) {
 	if res.Earned != 5 || res.Total != 14 {
 		t.Errorf("totals = %d/%d, want 5/14", res.Earned, res.Total)
 	}
-	// 30% * 4/8 + 70% * 1/6 = 15 + 11.67 = 26.67, floored.
+
 	if res.Percent != 26 {
 		t.Errorf("Percent = %d, want 26", res.Percent)
 	}
 	if res.PointsPercent != 35 {
 		t.Errorf("PointsPercent = %d, want 35 (5 of 14 points)", res.PointsPercent)
 	}
-	// Each question's share is its domain's, split by points: Storage's
-	// 30 points over two 4-point questions is 15 each.
+
 	for i, want := range []float64{15, 70, 15} {
 		if got := res.Questions[i].WeightPct; got != want {
 			t.Errorf("Questions[%d].WeightPct = %v, want %v", i, got, want)
@@ -496,8 +474,6 @@ func TestFinalizeDomainRollup(t *testing.T) {
 	}
 }
 
-// Every question's share of the exam must add up to the whole exam, or
-// "worth 4.5% of the exam" is not a statement anyone can trust.
 func TestFinalizeWeightPctSumsTo100(t *testing.T) {
 	res := &Results{
 		Questions: []QuestionResult{
@@ -527,8 +503,6 @@ func TestFinalizeWeightPctSumsTo100(t *testing.T) {
 	}
 }
 
-// Only some domains carry a weight → the whole attempt falls back to
-// points, rather than inventing a curriculum share for the rest.
 func TestFinalizeFallsBackToPointsWithoutFullWeights(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -559,10 +533,6 @@ func TestFinalizeFallsBackToPointsWithoutFullWeights(t *testing.T) {
 	}
 }
 
-// A weighted score that lands exactly on the pass mark must pass. In
-// float64 this exam computes as 49.99999999999999 and would fail a
-// candidate who scored exactly 50, which is why the weighting is done in
-// exact rationals.
 func TestFinalizeWeightedPercentIsExact(t *testing.T) {
 	res := &Results{
 		PassingScore: 50,
@@ -581,13 +551,6 @@ func TestFinalizeWeightedPercentIsExact(t *testing.T) {
 	}
 }
 
-// The shipped ckad-mock-01 shape: five domains whose point budgets
-// already sit exactly in the curriculum's ratios, which is what
-// tests/bank-weights.sh holds them to. On a full-bank attempt weighting
-// must therefore be a no-op — same number, whatever the candidate
-// scored. That parity is what keeps the smoke suite's RESULT line, the
-// fresh-environment-scores-0 gate and the solutions-score-100% gate
-// talking about the same score after this change.
 func TestFinalizeIsANoOpOnAFullCKADBank(t *testing.T) {
 	domains := []exam.Domain{
 		{Name: "Application Environment, Configuration and Security", WeightPct: 25},
@@ -596,7 +559,7 @@ func TestFinalizeIsANoOpOnAFullCKADBank(t *testing.T) {
 		{Name: "Application Design and Build", WeightPct: 20},
 		{Name: "Application Observability and Maintenance", WeightPct: 15},
 	}
-	// Points per domain in the real bank: 5x9, 4x9, 4x9, 6x6, 3x9 = 180.
+
 	shape := []struct {
 		domain string
 		count  int
@@ -605,13 +568,11 @@ func TestFinalizeIsANoOpOnAFullCKADBank(t *testing.T) {
 		{domains[0].Name, 5, 9}, {domains[1].Name, 4, 9}, {domains[2].Name, 4, 9},
 		{domains[3].Name, 6, 6}, {domains[4].Name, 3, 9},
 	}
-	// Earned points per domain, chosen to be lopsided: a candidate who is
-	// strong in one domain and weak in another is exactly the case where
-	// a mis-weighted score would show up.
+
 	for _, earned := range [][]int{
-		{45, 36, 36, 36, 27}, // everything
-		{0, 0, 0, 0, 0},      // a fresh environment
-		{45, 0, 0, 0, 0},     // one domain only
+		{45, 36, 36, 36, 27},
+		{0, 0, 0, 0, 0},
+		{45, 0, 0, 0, 0},
 		{31, 22, 9, 30, 4},
 		{9, 36, 36, 6, 27},
 	} {
@@ -641,8 +602,7 @@ func TestFinalizeVerdicts(t *testing.T) {
 			{ID: "q01", Domain: "A", Earned: 4, Total: 4},
 			{ID: "q02", Domain: "A", Earned: 1, Total: 4},
 			{ID: "q03", Domain: "A", Earned: 0, Total: 4},
-			// Every check's "# points:" header was malformed, so nothing
-			// was scorable. That is a broken bank, not a free pass.
+
 			{ID: "q04", Domain: "A", Earned: 0, Total: 0},
 		},
 	}
@@ -657,8 +617,6 @@ func TestFinalizeVerdicts(t *testing.T) {
 	}
 }
 
-// Finalize derives everything from Earned/Total, so calling it twice must
-// change nothing — no double-counted totals, no rollup appended to itself.
 func TestFinalizeIsIdempotent(t *testing.T) {
 	res := &Results{
 		PassingScore: 60,
@@ -708,5 +666,4 @@ func TestSSHArgs(t *testing.T) {
 	}
 }
 
-// NewSSHRunner must satisfy Runner; compile-time check.
 var _ Runner = NewSSHRunner("/shared/ssh/id_ed25519")

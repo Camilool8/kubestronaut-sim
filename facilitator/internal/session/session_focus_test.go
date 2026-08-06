@@ -6,13 +6,6 @@ import (
 	"time"
 )
 
-// Per-task timing is server-measured: the client reports which question
-// is on screen and nothing else, and the manager decides how long that
-// was worth. These tests pin the rules — accrual to the PREVIOUS
-// question, the 90-second cap on any one gap, the deliberate refusal to
-// bill downtime across a restart, and the final interval being closed
-// when the attempt ends.
-
 func TestFocusAccruesToThePreviousQuestion(t *testing.T) {
 	clock, setNow := fakeClock(epoch)
 	m, err := New(sessionPath(t), testBank, testDur, clock, func() {})
@@ -23,8 +16,6 @@ func TestFocusAccruesToThePreviousQuestion(t *testing.T) {
 		t.Fatalf("Start: %v", err)
 	}
 
-	// The first report opens an interval and credits nothing: there is no
-	// previous question for the time before it to belong to.
 	if err := m.Focus("q01"); err != nil {
 		t.Fatalf("Focus q01: %v", err)
 	}
@@ -46,7 +37,7 @@ func TestFocusAccruesToThePreviousQuestion(t *testing.T) {
 	}
 
 	got := m.TimeSpent()
-	// q01 held the screen 0-30, 30-50 and then q02 held it 50-65.
+
 	if got["q01"] != 50 {
 		t.Errorf("q01 = %ds, want 50s", got["q01"])
 	}
@@ -55,17 +46,13 @@ func TestFocusAccruesToThePreviousQuestion(t *testing.T) {
 	}
 }
 
-// A candidate who closes the tab overnight and comes back must be
-// credited with a minute and a half, not nine hours. The cap is what
-// keeps "time this question was open" from degenerating into "time
-// between two page loads".
 func TestFocusCapsALongGap(t *testing.T) {
 	clock, setNow := fakeClock(epoch)
 	m, err := New(sessionPath(t), testBank, 0, clock, func() {})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	// Untimed, so a five-hour gap does not simply expire the attempt.
+
 	if _, err := m.Start(ModeTraining, 0); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -83,9 +70,6 @@ func TestFocusCapsALongGap(t *testing.T) {
 	}
 }
 
-// The last question a candidate looked at is usually the one they
-// submitted from, so its final interval is the only one it ever had.
-// Ending the attempt has to close it.
 func TestEndClosesTheOpenFocusInterval(t *testing.T) {
 	clock, setNow := fakeClock(epoch)
 	m, err := New(sessionPath(t), testBank, testDur, clock, func() {})
@@ -108,10 +92,6 @@ func TestEndClosesTheOpenFocusInterval(t *testing.T) {
 	}
 }
 
-// The accrual survives a restart; the OPEN interval deliberately does
-// not. Persisting focusSince would bill a candidate for however long the
-// facilitator was down, which is the one stretch of time they certainly
-// were not looking at the question.
 func TestFocusSurvivesReloadButTheOpenIntervalDoesNot(t *testing.T) {
 	path := sessionPath(t)
 	clock, setNow := fakeClock(epoch)
@@ -130,7 +110,6 @@ func TestFocusSurvivesReloadButTheOpenIntervalDoesNot(t *testing.T) {
 		t.Fatalf("Focus q02: %v", err)
 	}
 
-	// The process goes away for an hour with q02 still open.
 	setNow(epoch.Add(time.Hour))
 	m2, err := New(path, testBank, 0, clock, func() {})
 	if err != nil {
@@ -145,7 +124,6 @@ func TestFocusSurvivesReloadButTheOpenIntervalDoesNot(t *testing.T) {
 		t.Errorf("q02 = %ds after a restart, want nothing: the downtime is not time on the question", got["q02"])
 	}
 
-	// And the next report opens a fresh interval rather than back-billing.
 	setNow(epoch.Add(time.Hour + 10*time.Second))
 	if err := m2.Focus("q02"); err != nil {
 		t.Fatalf("Focus after reload: %v", err)
@@ -155,7 +133,6 @@ func TestFocusSurvivesReloadButTheOpenIntervalDoesNot(t *testing.T) {
 	}
 }
 
-// Time can only be spent inside a running attempt.
 func TestFocusRequiresRunning(t *testing.T) {
 	clock, _ := fakeClock(epoch)
 	m, err := New(sessionPath(t), testBank, testDur, clock, func() {})
@@ -176,8 +153,6 @@ func TestFocusRequiresRunning(t *testing.T) {
 	}
 }
 
-// Start and Reset both clear the accrual: a new attempt starts at zero,
-// and an abandoned one leaves nothing behind for the next.
 func TestStartAndResetClearTimeSpent(t *testing.T) {
 	clock, setNow := fakeClock(epoch)
 	m, err := New(sessionPath(t), testBank, testDur, clock, func() {})
@@ -213,9 +188,6 @@ func TestStartAndResetClearTimeSpent(t *testing.T) {
 	}
 }
 
-// ElapsedSeconds exists because durationSeconds - remainingSeconds is
-// the elapsed time of a TIMED attempt only: training reports both as 0,
-// and this is the only thing that can say how long it has been going.
 func TestSnapshotElapsedSeconds(t *testing.T) {
 	clock, setNow := fakeClock(epoch)
 	m, err := New(sessionPath(t), testBank, 0, clock, func() {})
@@ -242,8 +214,6 @@ func TestSnapshotElapsedSeconds(t *testing.T) {
 		t.Errorf("running ElapsedSeconds = %d, want 1500", snap.ElapsedSeconds)
 	}
 
-	// Once ended it freezes at the length of the attempt, rather than
-	// counting on for as long as the score page is left open.
 	if err := m.End("submitted"); err != nil {
 		t.Fatalf("End: %v", err)
 	}
@@ -253,9 +223,6 @@ func TestSnapshotElapsedSeconds(t *testing.T) {
 	}
 }
 
-// The draw's parameters ride with the attempt: persisted at Start,
-// reported on every snapshot, and still there after a restart — which is
-// what lets grading refuse when the pool has moved on.
 func TestStartDrawPersistsSeedAndDigest(t *testing.T) {
 	path := sessionPath(t)
 	clock, _ := fakeClock(epoch)
@@ -297,7 +264,6 @@ func TestStartDrawPersistsSeedAndDigest(t *testing.T) {
 		t.Errorf("reloaded QuestionIDs = %v, want [q02 q01]", got)
 	}
 
-	// And Reset clears every part of it, so the next attempt draws fresh.
 	if err := m2.Reset(); err != nil {
 		t.Fatalf("Reset: %v", err)
 	}

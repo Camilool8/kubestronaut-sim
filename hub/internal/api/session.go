@@ -14,29 +14,18 @@ import (
 	"kubestronaut-sim/hub/internal/session"
 )
 
-// maxBody bounds a control request body. These are a few dozen bytes of
-// JSON; anything larger is not a client this hub has.
 const maxBody = 1 << 20
 
 func withTarget(r *http.Request, target *url.URL) context.Context {
 	return context.WithValue(r.Context(), targetKey{}, target)
 }
 
-// handleSessionStart is admission, and then the facilitator's own start.
-//
-// The two are separate events separated by minutes: admission grants a
-// seat and begins a Pod boot, and only once that Pod answers can the
-// attempt itself begin. The SPA already polls this endpoint, so the
-// intermediate answers are 202 (yours is starting) and 409 (nobody's
-// is), and the final one is whatever the facilitator says.
 func (s *Server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 	user, ok := s.requireUser(w, r)
 	if !ok {
 		return
 	}
-	// Read it before doing anything else: on the ready path this exact
-	// body has to reach the facilitator, and a proxied request whose
-	// body was already consumed starts an attempt with no options set.
+
 	body, err := io.ReadAll(io.LimitReader(r.Body, maxBody))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "could not read the request body")
@@ -47,7 +36,7 @@ func (s *Server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 		Kind string `json:"kind"`
 		Bank string `json:"bank"`
 	}
-	// A body is optional here, exactly as it is for the facilitator.
+
 	_ = json.Unmarshal(body, &wanted)
 	kind := s.DefaultKind
 	if wanted.Kind != "" {
@@ -59,18 +48,6 @@ func (s *Server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 		kind = k
 	}
 
-	// A named exam decides the seat, rather than being checked against
-	// one the caller also sent. The seat is a Pod template and the exam
-	// is what has to run in it, so the exam is the fact and the flavour
-	// is derived from it — the same direction seatCanRun enforces for a
-	// switch. A client that sends both and disagrees gets the exam it
-	// asked for, not a refusal about a field it should not have needed
-	// to send.
-	//
-	// Validated against the hub's own catalog BEFORE a seat is granted:
-	// an unknown bank stamped into a Pod is twenty minutes of boot
-	// ending in a facilitator with no exam loaded, and the candidate
-	// would have spent a seat and a place in the queue to find out.
 	bank := wanted.Bank
 	if bank != "" {
 		entry, ok := s.bank(bank)
@@ -85,11 +62,6 @@ func (s *Server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 		kind = session.KindOf(entry.ExamType)
 	}
 
-	// Before Start, and that placement is the whole point: Start claims a
-	// seat, and where the pool is full it takes a place in the queue. A
-	// refusal after either of those has already cost the candidate — and
-	// everyone behind them — something this request was never going to
-	// use. See device.go.
 	if refuseTouchOnlyPractical(w, r, kind) {
 		return
 	}
@@ -139,14 +111,6 @@ func (s *Server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 	s.proxy.ServeHTTP(w, r.WithContext(withTarget(r, &url.URL{Scheme: "http", Host: live.Addr()})))
 }
 
-// handleSessionEnd gives up the seat and the Pod.
-//
-// Deliberately not POST /api/session/end: that is the facilitator's, and
-// it ends the *attempt* — grading it, writing its history — while the
-// environment stays up so the candidate can read their score. Ending the
-// seat is a different act and gets a different path, or the two would be
-// impossible to tell apart and a candidate would lose their results by
-// clicking the wrong one.
 func (s *Server) handleSessionEnd(w http.ResponseWriter, r *http.Request) {
 	user, ok := s.requireUser(w, r)
 	if !ok {
@@ -177,20 +141,11 @@ func (s *Server) handleSwitch(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	// The gate, and the only route that needs it: reset passes no bank,
-	// and every other way into recycle would have to add one. A new
-	// caller that lets a candidate name an exam has to come through here.
+
 	if !s.seatCanRun(w, user.UserID, body.Bank) {
 		return
 	}
-	// A switch rebuilds the environment for a named exam, which is two
-	// to four destructive minutes. Refusing here saves them; the seat
-	// itself was already granted to a client that could use it, so this
-	// only catches a device that changed under the session — a laptop
-	// closed and the tab reopened on a phone. Skipped when the hub has
-	// no catalog to read the engine from: the facilitator's own start
-	// gate is the backstop either way, and guessing here would refuse a
-	// legitimate mcq switch.
+
 	if entry, ok := s.bank(body.Bank); ok {
 		if refuseTouchOnlyPractical(w, r, session.KindOf(entry.ExamType)) {
 			return
@@ -199,29 +154,6 @@ func (s *Server) handleSwitch(w http.ResponseWriter, r *http.Request) {
 	s.recycle(w, r, body.Bank)
 }
 
-// seatCanRun reports whether this candidate's seat may run the exam they
-// are asking for, writing the refusal itself when it may not.
-//
-// A seat is now a certification, not a flavour. It is created for one
-// exam — the candidate chose it in the lobby, and the Pod was stamped
-// and sized for it — so the only bank it can run is its own, and the
-// answer to "I want a different exam" is a new session rather than a
-// rebuild of this one.
-//
-// That is stricter than it was, and the strictness is the point. The
-// previous rule allowed any same-flavour bank, which was correct while
-// the exam was a deployment value nobody chose; it is wrong now, because
-// a seat sized for CKAD's two-node cluster is not a seat for CKA's
-// three, and the seat pool a candidate was admitted through was the one
-// their chosen exam draws from.
-//
-// The kind check below stays underneath it as the second line: an empty
-// seat bank is possible for a session adopted from a Pod that predates
-// this, and that session must not fall through to no check at all.
-//
-// Every uncertain answer refuses. Not knowing whether a hands-on bank is
-// about to be booted into a Pod with no cluster is not a reason to try
-// it and find out.
 func (s *Server) seatCanRun(w http.ResponseWriter, user, bank string) bool {
 	live, err := s.Sessions.Get(user)
 	switch {
@@ -264,9 +196,6 @@ func (s *Server) seatCanRun(w http.ResponseWriter, user, bank string) bool {
 	return true
 }
 
-// bankKind asks a session Pod's facilitator what flavour of seat an exam
-// needs. The catalog is the same document the exam picker renders, so
-// the answer the hub enforces is the one the candidate was shown.
 func (s *Server) bankKind(addr, bank string) (session.Kind, bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -299,9 +228,6 @@ func (s *Server) bankKind(addr, bank string) (session.Kind, bool, error) {
 	return "", false, nil
 }
 
-// recycle answers reset and switch in the conductor's 202-plus-job
-// shape, which is what lets ControlProgress render hosted and local
-// alike with no branch.
 func (s *Server) recycle(w http.ResponseWriter, r *http.Request, bank string) {
 	user, ok := s.requireUser(w, r)
 	if !ok {
@@ -323,28 +249,6 @@ func (s *Server) recycle(w http.ResponseWriter, r *http.Request, bank string) {
 	writeJSON(w, http.StatusAccepted, map[string]any{"job": job})
 }
 
-// handleControlStatus and handleControlLog answer for the hub's own jobs
-// first, and for the session Pod's conductor when the hub has none
-// running.
-//
-// The hub owns reset and switch here — they are Pod replacement, and the
-// Pod they describe does not exist for most of the time they run — so
-// while one of those is in flight it is the only truthful answer, and
-// the Pod cannot be asked anyway. The conductor inside a session still
-// has one job type of its own: `seed`, which prepares the cluster for
-// the questions a pooled bank's draw picked, triggered by the
-// facilitator server-to-server between the candidate pressing Start and
-// their clock beginning.
-//
-// Without the fall-through below that seed job was invisible: the
-// browser polled the hub, the hub answered from a job store the seed was
-// never in, and the candidate watched a blank hold with no explanation
-// for however long the setup took. docs/follow-ups.md recorded this as
-// waiting for the first pooled hands-on bank.
-//
-// The priority is in-flight over settled. The hub's own settled job
-// still wins over an idle Pod, so a FAILED reset the candidate has not
-// dismissed does not vanish from under them.
 func (s *Server) handleControlStatus(w http.ResponseWriter, r *http.Request) {
 	user, ok := s.requireUser(w, r)
 	if !ok {
@@ -352,9 +256,7 @@ func (s *Server) handleControlStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	snap, err := s.Sessions.Status(user.UserID)
 	if errors.Is(err, session.ErrNoSession) {
-		// Not 404: the SPA polls this to decide whether a control
-		// operation is in flight, and "you have no session" is a true
-		// and useful answer to that question.
+
 		writeJSON(w, http.StatusOK, session.Snapshot{})
 		return
 	}
@@ -382,10 +284,7 @@ func (s *Server) handleControlLog(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"jobId": "", "lines": []string{}})
 		return
 	}
-	// Same rule as the status above, and it has to be the same rule: the
-	// log pane is opened from the overlay the status put on screen, so a
-	// pane reading from the other job store would be empty for exactly
-	// the job somebody opened it to watch.
+
 	if snap, statusErr := s.Sessions.Status(user.UserID); statusErr == nil && !snap.Busy {
 		if raw, ok := s.podControl(user.UserID, "/api/control/log"); ok {
 			var pod struct {
@@ -403,13 +302,6 @@ func (s *Server) handleControlLog(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"jobId": id, "lines": lines})
 }
 
-// podControl asks the candidate's own session for one of the conductor's
-// control routes, returning false for anything that is not a clean 200.
-//
-// Deliberately quiet about failures. This is a fall-through on a polling
-// route: the caller's own answer is always available and always
-// truthful, so a Pod that is restarting, gone, or slow should cost a
-// poll rather than an error the browser has to interpret.
 func (s *Server) podControl(user, path string) ([]byte, bool) {
 	live, err := s.Sessions.Get(user)
 	if err != nil || live.Addr() == "" {
@@ -436,12 +328,6 @@ func (s *Server) podControl(user, path string) ([]byte, bool) {
 	return raw, true
 }
 
-// writeRaw passes a session Pod's JSON answer through untouched.
-//
-// Re-encoding it would mean modelling the conductor's job shape in the
-// hub, which is precisely the coupling that lets the two drift: the
-// overlay renders whatever the conductor sends, and the hub's only
-// interest here is which of the two answers to forward.
 func writeRaw(w http.ResponseWriter, raw []byte) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

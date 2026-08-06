@@ -54,7 +54,7 @@ func TestAuthCodeURLCarriesClientRedirectAndState(t *testing.T) {
 			t.Errorf("%s = %q, want %q", k, got, want)
 		}
 	}
-	// No scope: the hub wants an identity, not access to anything.
+
 	if q.Has("scope") {
 		t.Errorf("AuthCodeURL requested scope %q; identity needs none", q.Get("scope"))
 	}
@@ -74,14 +74,12 @@ func TestExchangeAndUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("User: %v", err)
 	}
-	// The numeric id, not the login: a login can be renamed and reused.
+
 	if sess.UserID != "583231" || sess.Login != "octocat" {
 		t.Errorf("session = %+v, want UserID 583231 / Login octocat", sess)
 	}
 }
 
-// GitHub reports a bad code with HTTP 200 and an error field, so a
-// status-only check would treat a refusal as a successful login.
 func TestExchangeFailures(t *testing.T) {
 	cases := map[string]struct {
 		body   string
@@ -150,8 +148,7 @@ func TestGitHubModeCookieRoundTrip(t *testing.T) {
 	if !c.HttpOnly || !c.Secure {
 		t.Errorf("cookie = %+v, want HttpOnly and Secure", c)
 	}
-	// Lax, not Strict: the OAuth callback is a cross-site navigation
-	// back from github.com and Strict would not send the cookie on it.
+
 	if c.SameSite != http.SameSiteLaxMode {
 		t.Errorf("SameSite = %v, want Lax", c.SameSite)
 	}
@@ -173,8 +170,6 @@ func TestGitHubModeCookieRoundTrip(t *testing.T) {
 	}
 }
 
-// __Host- requires Secure, so over plain HTTP the browser would drop
-// every cookie the hub sets and login would loop forever.
 func TestInsecureDeploymentDropsTheHostPrefix(t *testing.T) {
 	a := &Authenticator{Mode: ModeGitHub, Signer: testSigner(t), Secure: false}
 	w := httptest.NewRecorder()
