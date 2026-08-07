@@ -17,17 +17,20 @@ api=$(kubectl -n orbit get pod -l role=api \
   exit 1
 }
 
-if ! kubectl -n orbit exec deploy/frontend -- \
-     wget -q -T 5 -O /dev/null "http://${api}:80" 2>/dev/null; then
-  echo "frontend cannot reach api on port 80, but the policy should allow it"
-  evidence "The policy is denying traffic it was supposed to permit. An ingress rule allows a source only if BOTH halves match — the peer's labels and the destination port — so a rule naming the wrong label, or restricted to the wrong port, denies frontend just as completely as no rule at all would."
-  exit 1
-fi
+reaches() {
+  kubectl -n orbit exec "deploy/$1" -- \
+    wget -q -T 5 -O /dev/null "http://${api}:80" 2>/dev/null
+}
 
-if kubectl -n orbit exec deploy/metrics -- \
-     wget -q -T 5 -O /dev/null "http://${api}:80" 2>/dev/null; then
-  echo "metrics reached api on port 80 — ingress is not restricted to role=frontend"
-  evidence "Everything that is not explicitly allowed has to be denied, and metrics got through. Either spec.podSelector matches no Pod — a policy that protects nothing is not a policy that allows everything, it simply never applies — or the ingress rule's peer selector is wider than role=frontend."
-  exit 1
-fi
-echo "policy enforced: frontend allowed, metrics denied"
+crit 2 "frontend still reaches api on port 80" \
+  "frontend cannot reach api on port 80, but the policy should allow it" \
+  "The policy is denying traffic it was supposed to permit. An ingress rule allows a source only if BOTH halves match — the peer's labels and the destination port — so a rule naming the wrong label, or restricted to the wrong port, denies frontend just as completely as no rule at all would." \
+  -- reaches frontend
+
+crit 3 "metrics is denied" \
+  "metrics reached api on port 80 — ingress is not restricted to role=frontend" \
+  "Everything that is not explicitly allowed has to be denied, and metrics got through. Either spec.podSelector matches no Pod — a policy that protects nothing is not a policy that allows everything, it simply never applies — or the ingress rule's peer selector is wider than role=frontend." \
+  -- negate reaches metrics
+
+crit_all_passed || evidence "$(crit_why)"
+report "policy enforced: frontend allowed, metrics denied"

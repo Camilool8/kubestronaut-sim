@@ -20,14 +20,15 @@ writer=$(kubectl -n lyra get deploy feed-writer \
   -o jsonpath='{.spec.template.spec.containers[?(@.name=="writer")].volumeMounts[?(@.name=="feed-logs")].mountPath}' 2>/dev/null)
 shipper=$(kubectl -n lyra get deploy feed-writer \
   -o jsonpath='{.spec.template.spec.initContainers[?(@.name=="shipper")].volumeMounts[?(@.name=="feed-logs")].mountPath}' 2>/dev/null)
-[ "$writer" = "/var/log/feed" ] || {
-  echo "writer mounts feed-logs at '$writer'"
-  evidence "Declaring the volume is not mounting it: each container needs its own volumeMounts entry, and both have to use the same path for one to read the file the other wrote. writer appends its timestamps to a file under this directory."
-  exit 1
-}
-[ "$shipper" = "/var/log/feed" ] || {
-  echo "shipper mounts feed-logs at '$shipper'"
-  evidence "The sidecar tails the file writer produces, so it needs the same volume at the same path. Its volumeMounts belong on its initContainers entry, which is where a native sidecar is declared — mounted anywhere else, tail -F waits on a file that will never appear."
-  exit 1
-}
-echo "shared volume ok"
+crit 1 "writer mounts it at /var/log/feed" \
+  "writer mounts feed-logs at '$writer'" \
+  "Declaring the volume is not mounting it: each container needs its own volumeMounts entry, and both have to use the same path for one to read the file the other wrote. writer appends its timestamps to a file under this directory." \
+  -- [ "$writer" = "/var/log/feed" ]
+
+crit 1 "shipper mounts it at the same path" \
+  "shipper mounts feed-logs at '$shipper'" \
+  "The sidecar tails the file writer produces, so it needs the same volume at the same path. Its volumeMounts belong on its initContainers entry, which is where a native sidecar is declared — mounted anywhere else, tail -F waits on a file that will never appear." \
+  -- [ "$shipper" = "/var/log/feed" ]
+
+crit_all_passed || evidence "$(crit_why)"
+report "shared volume ok"

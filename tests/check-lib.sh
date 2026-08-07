@@ -172,6 +172,18 @@ ok "notes stay out of the output" "$(printf '%s' "$out" | grep -c 'note for')" "
 ok "a criterion with a note still scores" "$(printf '%s' "$out" | grep -c 'sim:criterion pass 1 first')" "1"
 ok "a note does not become the test" "$(printf '%s' "$out" | grep -c 'sim:criterion fail 1 second')" "1"
 
+# `!` is a keyword, so `-- ! cmd` would hunt for a binary named '!', fail, and
+# score the criterion backwards. negate() is the way to express a negative, and
+# is not called "not" because that word appears in 160 places in the prose the
+# unsourced-helper lint scans.
+succeeds "negate inverts a failure" negate false
+fails    "negate inverts a success" negate true
+ok "crit with negate scores a denial as a pass" \
+   "$(_CRIT_EARNED=0; _CRIT_TOTAL=0; _CRIT_LINES=''; crit 1 "denied" "got through" -- negate false; printf '%s' "$_CRIT_LINES" | grep -c 'pass 1 denied')" "1"
+ok "crit with negate scores a success as a failure" \
+   "$(_CRIT_EARNED=0; _CRIT_TOTAL=0; _CRIT_LINES=''; crit 1 "denied" "got through" -- negate true >/dev/null; printf '%s' "$_CRIT_LINES" | grep -c 'fail 1 denied')" "1"
+_CRIT_EARNED=0; _CRIT_TOTAL=0; _CRIT_LINES=''; _CRIT_WHY=''
+
 succeeds "crit returns the test's status on pass" eval "crit 1 d m w -- true >/dev/null"
 fails    "crit returns the test's status on fail" eval "crit 1 d m w -- false >/dev/null"
 _CRIT_EARNED=0; _CRIT_TOTAL=0; _CRIT_LINES=''; _CRIT_WHY=''

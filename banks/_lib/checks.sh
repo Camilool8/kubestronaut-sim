@@ -125,27 +125,25 @@ show_why() { _artifact why text "$1"; }
 #
 # Never gate on something the candidate cannot undo. An ephemeral container's
 # name is permanent once added, so it is matched on what it does instead.
-# Output order matters and the shape below gets it right by construction. The
-# grader reads everything before the first sentinel as the check's message, so
-# crit prints its failure line the moment it happens — ahead of any evidence
-# pane — and report emits the tally last:
 #
-#   crit 1 "runs as uid 10001"  "runAsUser='$uid', want 10001"  -- [ "$uid" = 10001 ]
-#   crit 1 "refuses to run as root" "runAsNonRoot='$nr', want true" -- [ "$nr" = true ]
-#   crit_all_passed || evidence "why these fields are what the question asks for"
-#   report
+# The full shape, which gets the output order right by construction — the grader
+# reads everything before the first sentinel as the check's message, so crit
+# prints its failure line the moment it happens, ahead of any evidence pane, and
+# report emits the tally last:
 #
-# The criterion carries the LABEL of what it grades; the message carries the
-# detail. They read as a pair rather than repeating each other.
-# A criterion may carry its own note, in which case crit_why hands back the one
-# belonging to the first thing that failed — the explanation the candidate needs
-# rather than a digest of all of them:
-#
+#   crit 1 "runs as uid 10001" "runAsUser='$uid', want 10001" \
+#     "runAsUser is the UID the process runs as, overriding the image's USER." \
+#     -- [ "$uid" = 10001 ]
 #   crit 1 "read-only root filesystem" "readOnlyRootFilesystem='$ro', want true" \
-#     "Container-level only; written at Pod level the API rejects it." -- [ "$ro" = true ]
-#   ...
+#     "Container-level only; written at Pod level the API rejects it." \
+#     -- [ "$ro" = true ]
 #   crit_all_passed || evidence "$(crit_why)"
-#   report
+#   report "identity ok"
+#
+# The criterion carries the LABEL of what it grades and the message carries the
+# detail, so they read as a pair rather than repeating each other. The note is
+# optional and crit_why returns the one belonging to the FIRST failure — the
+# explanation the candidate needs, rather than a digest of all of them.
 _CRIT_EARNED=0
 _CRIT_TOTAL=0
 _CRIT_LINES=''
@@ -187,6 +185,16 @@ crit() {
 
 # The note belonging to the first criterion that failed.
 crit_why() { printf '%s' "$_CRIT_WHY"; }
+
+# For a criterion that passes when something does NOT happen. `!` is a shell
+# keyword rather than a command, so it cannot be passed through crit's argument
+# list — `-- ! reaches metrics` would look for a binary named '!', fail to find
+# it, and score the criterion backwards.
+#
+# Named negate rather than not because the lint that catches an unsourced helper
+# looks for the helper's name in a command position, and the standalone word
+# "not" appears in 160 places in these scripts' prose.
+negate() { ! "$@"; }
 
 # Has every criterion so far passed? Guards the evidence pane, which is only
 # worth attaching to a failure.
