@@ -13,6 +13,14 @@ const (
 	maxCheckArtifacts     = 8
 )
 
+// Stands in for a pane a check opened and then had nothing to put in, which is
+// what a lookup by a name nothing matches produces. Dropping those panes hid
+// the one fact that explained the failure, so an opened sentinel always
+// becomes an artifact. banks/_lib/checks.sh substitutes a wordier line of its
+// own before the output ever gets here; this is the backstop for checks that
+// build the sentinel themselves.
+const emptyArtifactBody = "none — the check found nothing here"
+
 type CheckArtifact struct {
 	Kind string `json:"kind"`
 
@@ -37,10 +45,12 @@ func splitArtifacts(out string) (string, []CheckArtifact) {
 		if open == nil {
 			return
 		}
-		if a := open.result(); a.Body != "" {
-			arts = append(arts, a)
-			budget -= len(a.Body)
+		a := open.result()
+		if strings.TrimSpace(a.Body) == "" {
+			a.Lang, a.Body = "text", emptyArtifactBody
 		}
+		arts = append(arts, a)
+		budget -= len(a.Body)
 		open = nil
 	}
 

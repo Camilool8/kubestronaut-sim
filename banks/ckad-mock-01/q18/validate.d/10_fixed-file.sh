@@ -39,12 +39,12 @@ printf '%s' "$versions" | grep -q 'v1beta1' && {
   fixed "A beta API version is not merely deprecated here — it has been removed from the cluster, so a manifest naming one has nothing to apply against. Both documents in this file have to move to a version the cluster actually serves."
   exit 1
 }
-printf '%s' "$versions" | grep -qw 'batch/v1' || {
+has_name "$versions" 'batch/v1' || {
   echo "fixed.yaml has no batch/v1 CronJob (found: $versions)"
   fixed "CronJob's move out of beta was a pure version bump: the schema did not change, so the apiVersion line moves and everything below it stays exactly as it was. A missing document is the other way to reach this — the file has to keep both resources."
   exit 1
 }
-printf '%s' "$versions" | grep -qw 'networking.k8s.io/v1' || {
+has_name "$versions" 'networking.k8s.io/v1' || {
   echo "fixed.yaml has no networking.k8s.io/v1 Ingress (found: $versions)"
   fixed "The Ingress is the half that is a real migration rather than a rename, so its apiVersion moving is only the first of several changes it needs. A missing document is the other way to reach this — the file has to keep both resources."
   exit 1

@@ -68,12 +68,47 @@ succeeds "semver_ge equal"   semver_ge 1.2.0 1.2.0
 succeeds "semver_ge greater" semver_ge 1.10.0 1.9.0
 fails    "semver_ge lesser"  semver_ge 1.9.0 1.10.0
 
+# has_name matches one whole token out of a jsonpath list. grep -w cannot do
+# this job: a hyphen is not a word character, so -w 'agent' matches
+# 'vault-agent' and -w 'app-tuning' matches 'my-app-tuning' — the second of
+# those scores a wrong answer as correct.
+succeeds "has_name single"        has_name 'agent' agent
+succeeds "has_name among many"    has_name 'app adapter' adapter
+succeeds "has_name newline list"  has_name "$(printf 'app\nadapter')" adapter
+succeeds "has_name tab list"      has_name "$(printf 'app\tadapter')" adapter
+fails    "has_name hyphen suffix" has_name 'vault-agent' agent
+fails    "has_name hyphen prefix" has_name 'agent-sidecar' agent
+fails    "has_name substring"     has_name 'my-app-tuning' app-tuning
+fails    "has_name empty list"    has_name '' agent
+fails    "has_name absent"        has_name 'web db' agent
+succeeds "has_name exact hyphen"  has_name 'vault-agent' vault-agent
+succeeds "has_name slash"         has_name 'batch/v1 networking.k8s.io/v1' batch/v1
+fails    "has_name slash partial" has_name 'batch/v1beta1' batch/v1
+
+# name_list renders what IS there when a lookup by name found nothing, so the
+# message can say "found: vault-agent" instead of reporting an empty field.
+ok "name_list one"    "$(name_list 'vault-agent')"        "vault-agent"
+ok "name_list many"   "$(name_list 'app adapter')"        "app, adapter"
+ok "name_list tabs"   "$(name_list "$(printf 'a\tb')")"   "a, b"
+ok "name_list spaced" "$(name_list '  app   adapter  ')"  "app, adapter"
+ok "name_list empty"  "$(name_list '')"                   "none"
+ok "name_list blank"  "$(name_list '   ')"                "none"
+
 ok "show_actual"   "$(show_actual yaml 'kind: Service')"  "$(printf -- '---8<--- sim:artifact actual yaml\nkind: Service')"
 ok "show_why"      "$(show_why 'The selector matches no Pod.')" "$(printf -- '---8<--- sim:artifact why text\nThe selector matches no Pod.')"
 ok "show_actual multiline" "$(show_actual yaml "$(printf 'a: 1\nb: 2')")" \
    "$(printf -- '---8<--- sim:artifact actual yaml\na: 1\nb: 2')"
-ok "show_actual empty body" "$(show_actual yaml '')" ""
-succeeds "show_actual empty body succeeds" show_actual yaml ''
+# An empty body is the case the candidate most needs to see: the object or the
+# named container is not there at all. Emitting nothing left them reading
+# "runAsUser='', want 10001" with no pane to explain it, so empty must still
+# produce an artifact.
+ok "show_actual empty body" "$(show_actual yaml '')" \
+   "$(printf -- '---8<--- sim:artifact actual text\n%s' "$ARTIFACT_EMPTY")"
+succeeds "show_actual empty body succeeds" eval "show_actual yaml '' >/dev/null"
+ok "show_actual whitespace body" "$(show_actual yaml '   ')" \
+   "$(printf -- '---8<--- sim:artifact actual text\n%s' "$ARTIFACT_EMPTY")"
+ok "show_actual jq null body" "$(show_actual json 'null')" \
+   "$(printf -- '---8<--- sim:artifact actual text\n%s' "$ARTIFACT_EMPTY")"
 ok "show_why printf-safe" "$(show_why 'literal %s and \n stay put')" \
    "$(printf -- '---8<--- sim:artifact why text\nliteral %%s and \\n stay put')"
 

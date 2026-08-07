@@ -7,10 +7,21 @@ set -uo pipefail
 tmpl='.spec.template.spec'
 evidence() {
   show_actual json "$(kubectl -n auriga get deploy report-runner -o json 2>/dev/null \
-    | jq "{pod: ${tmpl}.securityContext,
-           container: (${tmpl}.containers[] | select(.name == \"report\") | .securityContext)}")"
+    | jq --arg c report "
+        if any(${tmpl}.containers[]; .name == \$c)
+        then {pod: ${tmpl}.securityContext,
+              container: (first(${tmpl}.containers[] | select(.name == \$c)) | .securityContext)}
+        else {\"no such container\": \$c, \"containers that exist\": [${tmpl}.containers[].name]}
+        end")"
   show_expected json "/banks/${BANK:-ckad-mock-01}/q24/expected/securitycontext.json"
   show_why "$1"
+}
+
+names=$(kubectl -n auriga get deploy report-runner -o jsonpath="{${tmpl}.containers[*].name}" 2>/dev/null)
+has_name "$names" report || {
+  echo "deployment report-runner has no container named 'report' (found: $(name_list "$names"))"
+  evidence "The question asks the container to keep the name 'report' it had as a bare Pod. Every securityContext field below is read off that name, so under a different one they are not consulted and each reads back empty."
+  exit 1
 }
 
 get() {

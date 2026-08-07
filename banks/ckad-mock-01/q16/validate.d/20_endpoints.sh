@@ -11,7 +11,11 @@ probe=$(kubectl -n hydra get deploy orders-api \
   -o jsonpath='{.spec.template.spec.containers[?(@.name=="api")].readinessProbe.httpGet.port}' 2>/dev/null)
 [ -n "$probe" ] || {
   echo "no readinessProbe is configured, so endpoint readiness proves nothing"
-  show_actual json "$(kubectl -n hydra get deploy orders-api -o json 2>/dev/null | jq '.spec.template.spec.containers[] | select(.name == "api") | {startupProbe, readinessProbe, livenessProbe}')"
+  show_actual json "$(kubectl -n hydra get deploy orders-api -o json 2>/dev/null | jq --arg c api '
+    if any(.spec.template.spec.containers[]; .name == $c)
+    then first(.spec.template.spec.containers[] | select(.name == $c)) | {startupProbe, readinessProbe, livenessProbe}
+    else {"no such container": $c, "containers that exist": [.spec.template.spec.containers[].name]}
+    end')"
   show_why "A container with no readinessProbe is considered ready the moment it starts, so its Pod joins the Service's endpoint list whether or not the application can actually serve. That is why the endpoint count below cannot prove anything until the probe exists — on an untouched Deployment it is already 2."
   exit 1
 }

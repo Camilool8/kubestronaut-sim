@@ -4,8 +4,19 @@
 set -uo pipefail
 . /banks/_lib/checks.sh
 evidence() {
-  show_actual json "$(kubectl -n cygnus get pod vault-agent -o json 2>/dev/null | jq '.spec.containers[] | select(.name == "agent") | .resources')"
+  show_actual json "$(kubectl -n cygnus get pod vault-agent -o json 2>/dev/null | jq --arg c agent '
+    if any(.spec.containers[]; .name == $c)
+    then first(.spec.containers[] | select(.name == $c)) | .resources
+    else {"no such container": $c, "containers that exist": [.spec.containers[].name]}
+    end')"
   show_why "$1"
+}
+
+names=$(kubectl -n cygnus get pod vault-agent -o jsonpath='{.spec.containers[*].name}' 2>/dev/null)
+has_name "$names" agent || {
+  echo "pod vault-agent has no container named 'agent' (found: $(name_list "$names"))"
+  evidence "Requests and limits are per container, and they are read off the container the question names. Set on a container under another name they are real, but not on the one being graded, so every quantity below reads back empty."
+  exit 1
 }
 
 sel='{.spec.containers[?(@.name=="agent")].resources'

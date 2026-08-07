@@ -4,8 +4,23 @@
 set -uo pipefail
 . /banks/_lib/checks.sh
 evidence() {
-  show_actual json "$(kubectl -n orion get pod archiver -o json 2>/dev/null | jq '{volumes: .spec.volumes, mounts: (.spec.containers[] | select(.name == "web") | .volumeMounts)}')"
+  show_actual json "$(kubectl -n orion get pod archiver -o json 2>/dev/null | jq --arg c web '
+    {volumes: .spec.volumes,
+     mounts: (if any(.spec.containers[]; .name == $c)
+              then first(.spec.containers[] | select(.name == $c)) | .volumeMounts
+              else {"no such container": $c, "containers that exist": [.spec.containers[].name]}
+              end)}')"
   show_why "$1"
+}
+
+# The mount comparison at the end addresses the container by the name the
+# question gave it, so a Pod built with a differently named container would
+# report its mounts as empty rather than as unreachable.
+names=$(kubectl -n orion get pod archiver -o jsonpath='{.spec.containers[*].name}' 2>/dev/null)
+[ -z "$names" ] || has_name "$names" web || {
+  echo "pod archiver has no container named 'web' (found: $(name_list "$names"))"
+  evidence "The question names the container 'web'. Mounts are per container and are read off that name, so under another one the volumes below are mounted in a container this check cannot see."
+  exit 1
 }
 
 claim=$(kubectl -n orion get pod archiver -o json 2>/dev/null \

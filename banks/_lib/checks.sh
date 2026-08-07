@@ -31,6 +31,21 @@ file_lines_sorted() {
     | sort
 }
 
+# Does a whitespace-separated list of names contain this exact name?
+#
+# Use this rather than grep -w for anything kubectl printed. A hyphen is not a
+# word character, so grep -w 'agent' matches 'vault-agent' and grep -w
+# 'app-tuning' matches 'my-app-tuning' — the second scores a wrong answer as
+# correct. Kubernetes names cannot contain glob characters, so splitting on IFS
+# is safe here.
+has_name() {
+  local want=$2 n
+  for n in ${1-}; do
+    [ "$n" = "$want" ] && return 0
+  done
+  return 1
+}
+
 same_set() {
   [ "$(printf '%s\n' "$1" | grep -v '^$' | sort)" = "$(printf '%s\n' "$2" | grep -v '^$' | sort)" ]
 }
@@ -53,12 +68,32 @@ yaml_api_versions() {
 
 semver_ge() { [ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | head -1)" = "$2" ]; }
 
+# What a lookup found when it found nothing. A name that does not match — a
+# container called vault-agent where the question asked for agent — makes
+# kubectl and jq alike return nothing, and staying silent then left the
+# candidate reading "runAsUser='', want 10001" with no way to see why. Say so
+# instead.
+ARTIFACT_EMPTY='none — the object, container or field named here does not exist'
+
 _artifact() {
-  [ -n "$3" ] || return 0
-  printf '%s %s %s\n%s\n' '---8<--- sim:artifact' "$1" "$2" "$3"
+  local body=$3
+  case "$(printf '%s' "$body" | tr -d '[:space:]')" in
+    ''|null) body=$ARTIFACT_EMPTY; set -- "$1" text "$body" ;;
+  esac
+  printf '%s %s %s\n%s\n' '---8<--- sim:artifact' "$1" "$2" "$body"
 }
 
-show_actual() { _artifact actual "$1" "$2"; }
+show_actual() { _artifact actual "$1" "${2-}"; }
+
+# The names that DO exist, for a message that can name the real problem:
+#   no container named 'agent' (found: vault-agent)
+# Takes the raw jsonpath list — '{.spec.containers[*].name}' and friends.
+name_list() {
+  local names
+  names=$(printf '%s' "${1-}" | tr -s '[:space:]' ' ' | sed -e 's/^ //' -e 's/ $//')
+  [ -n "$names" ] || { printf 'none'; return; }
+  printf '%s' "$names" | sed 's/ /, /g'
+}
 
 show_expected() {
   [ -f "$2" ] || return 0

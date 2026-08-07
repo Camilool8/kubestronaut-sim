@@ -167,12 +167,41 @@ func TestSplitArtifactsMalformedSentinelDoesNotEatItsNeighbours(t *testing.T) {
 	}
 }
 
-func TestSplitArtifactsDropsEmptyBodies(t *testing.T) {
+// A sentinel with nothing under it means the check looked and found nothing —
+// a missing object, or a container under a name nobody used. That is the pane
+// the candidate needs most, so it has to survive as an explicit statement
+// rather than disappearing and leaving only "field='', want x".
+func TestSplitArtifactsKeepsEmptyBodiesAsAnExplicitMarker(t *testing.T) {
 	out := "msg\n---8<--- sim:artifact actual yaml\n---8<--- sim:artifact why text\nreal\n"
 	_, arts := splitArtifacts(out)
-	want := []CheckArtifact{{Kind: "why", Lang: "text", Body: "real"}}
+	want := []CheckArtifact{
+		{Kind: "actual", Lang: "text", Body: emptyArtifactBody},
+		{Kind: "why", Lang: "text", Body: "real"},
+	}
 	if !reflect.DeepEqual(arts, want) {
 		t.Errorf("artifacts = %#v, want %#v", arts, want)
+	}
+}
+
+func TestSplitArtifactsTreatsWhitespaceOnlyBodyAsEmpty(t *testing.T) {
+	out := "msg\n---8<--- sim:artifact actual json\n   \n\t\n"
+	_, arts := splitArtifacts(out)
+	want := []CheckArtifact{{Kind: "actual", Lang: "text", Body: emptyArtifactBody}}
+	if !reflect.DeepEqual(arts, want) {
+		t.Errorf("artifacts = %#v, want %#v", arts, want)
+	}
+}
+
+// The empty marker must not consume the per-check budget meant for real
+// evidence, nor push a genuine artifact out of the eight-artifact window.
+func TestSplitArtifactsEmptyMarkerDoesNotCrowdOutRealEvidence(t *testing.T) {
+	out := "msg\n---8<--- sim:artifact actual yaml\n---8<--- sim:artifact expected yaml\nkind: Pod\n"
+	_, arts := splitArtifacts(out)
+	if len(arts) != 2 {
+		t.Fatalf("artifacts = %#v, want 2", arts)
+	}
+	if arts[1].Body != "kind: Pod" {
+		t.Errorf("real evidence = %q, want %q", arts[1].Body, "kind: Pod")
 	}
 }
 

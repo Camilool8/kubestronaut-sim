@@ -6,8 +6,23 @@ set -uo pipefail
 src=$(kubectl -n atlas get pod tuned \
   -o jsonpath='{.spec.volumes[?(@.name=="limits")].configMap.name}' 2>/dev/null)
 evidence() {
-  show_actual json "$(kubectl -n atlas get pod tuned -o json 2>/dev/null | jq '{volumes: .spec.volumes, mounts: (.spec.containers[] | select(.name == "web") | .volumeMounts)}')"
+  show_actual json "$(kubectl -n atlas get pod tuned -o json 2>/dev/null | jq --arg c web '
+    {volumes: .spec.volumes,
+     mounts: (if any(.spec.containers[]; .name == $c)
+              then first(.spec.containers[] | select(.name == $c)) | .volumeMounts
+              else {"no such container": $c, "containers that exist": [.spec.containers[].name]}
+              end)}')"
   show_why "$1"
+}
+
+# Both halves of this check address things by the names the question gave them.
+# Report a name that does not exist as such, rather than as a field that is set
+# to nothing.
+vols=$(kubectl -n atlas get pod tuned -o jsonpath='{.spec.volumes[*].name}' 2>/dev/null)
+has_name "$vols" limits || {
+  echo "pod tuned has no volume named 'limits' (found: $(name_list "$vols"))"
+  evidence "A volume's name is the handle its mount refers to, and the question fixes it at 'limits'. Naming the volume after the ConfigMap it carries is the common habit and works perfectly at runtime, but this check looks the volume up by the name it was told to expect, so a different one is invisible to it."
+  exit 1
 }
 
 [ "$src" = "app-limits" ] || {

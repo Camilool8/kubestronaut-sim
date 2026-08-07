@@ -21,6 +21,8 @@ jobs:
         run: bash tests/check-lint.sh
       - name: Check helper library
         run: bash tests/check-lib.sh
+      - name: Failing-check evidence
+        run: bash tests/check-evidence.sh
       - name: Hints
         run: bash tests/bank-hints.sh
       - name: MCQ banks

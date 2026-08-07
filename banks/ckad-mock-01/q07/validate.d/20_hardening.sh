@@ -4,9 +4,20 @@
 set -uo pipefail
 . /banks/_lib/checks.sh
 evidence() {
-  show_actual json "$(kubectl -n cygnus get pod vault-agent -o json 2>/dev/null | jq '.spec.containers[] | select(.name == "agent") | .securityContext')"
+  show_actual json "$(kubectl -n cygnus get pod vault-agent -o json 2>/dev/null | jq --arg c agent '
+    if any(.spec.containers[]; .name == $c)
+    then first(.spec.containers[] | select(.name == $c)) | .securityContext
+    else {"no such container": $c, "containers that exist": [.spec.containers[].name]}
+    end')"
   show_expected json "/banks/${BANK:-ckad-mock-01}/q07/expected/securitycontext.json"
   show_why "$1"
+}
+
+names=$(kubectl -n cygnus get pod vault-agent -o jsonpath='{.spec.containers[*].name}' 2>/dev/null)
+has_name "$names" agent || {
+  echo "pod vault-agent has no container named 'agent' (found: $(name_list "$names"))"
+  evidence "The hardening fields are read off the container the question names. Under any other name they are not consulted at all, so each one reads back empty however carefully it was set."
+  exit 1
 }
 
 sel='{.spec.containers[?(@.name=="agent")].securityContext'
@@ -24,7 +35,7 @@ drops=$(kubectl -n cygnus get pod vault-agent -o jsonpath="${sel}.capabilities.d
   evidence "This mounts the container's own filesystem read-only, so an intruder cannot drop a binary into it and the image cannot be modified at runtime. Container-level only, like the two beside it. An image that needs a writable path gets an emptyDir mounted over exactly that path rather than the whole root filesystem back."
   exit 1
 }
-printf '%s' "$drops" | grep -qw ALL || {
+has_name "$drops" ALL || {
   echo "capabilities.drop is '$drops', want ALL"
   evidence "Linux capabilities are root's powers split into pieces, and a container gets a default set even when it is not running as root. Dropping ALL leaves it none, which is the baseline a hardened workload starts from before adding back anything it genuinely needs. ALL is spelled in capitals; the API does not accept 'all'."
   exit 1

@@ -4,8 +4,22 @@
 set -uo pipefail
 . /banks/_lib/checks.sh
 evidence() {
-  show_actual json "$(kubectl -n cygnus get pod vault-agent -o json 2>/dev/null | jq '{pod: .spec.securityContext, container: (.spec.containers[] | select(.name == "agent") | .securityContext)}')"
+  show_actual json "$(kubectl -n cygnus get pod vault-agent -o json 2>/dev/null | jq --arg c agent '
+    if any(.spec.containers[]; .name == $c)
+    then {pod: .spec.securityContext, container: (first(.spec.containers[] | select(.name == $c)) | .securityContext)}
+    else {"no such container": $c, "containers that exist": [.spec.containers[].name]}
+    end')"
   show_why "$1"
+}
+
+# The fields below are read out of the container the question names. Nothing
+# matching that name reads exactly like nothing being set, so say which it is
+# before reporting a field as empty.
+names=$(kubectl -n cygnus get pod vault-agent -o jsonpath='{.spec.containers[*].name}' 2>/dev/null)
+has_name "$names" agent || {
+  echo "pod vault-agent has no container named 'agent' (found: $(name_list "$names"))"
+  evidence "Every securityContext field below is read off the container the question names. A container under a different name is a different container to the API, so the settings you put on it are not consulted and each field reads back empty — which is what the rest of this check would otherwise report."
+  exit 1
 }
 
 get() {
