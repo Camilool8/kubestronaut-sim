@@ -25,19 +25,25 @@ claims=$(printf '%s' "$payload" | tr '_-' '/+' | base64 -d 2>/dev/null)
   exit 1
 }
 
-printf '%s' "$claims" | grep -q 'system:serviceaccount:phoenix:pipeline-runner' || {
-  echo "the token is not for phoenix/pipeline-runner"
-  show_actual json "$claims"
-  show_why "The sub claim names the identity the token was issued for, spelled system:serviceaccount:<namespace>:<name>. This one names something else — usually the Namespace's default account, which is what you get when the request does not name one."
-  exit 1
-}
-
 iat=$(printf '%s' "$claims" | jq -r '.iat // 0')
 exp=$(printf '%s' "$claims" | jq -r '.exp // 0')
 life=$((exp - iat))
-[ "$life" -ge 3600 ] && echo "token valid for ${life}s" || {
-  echo "token lifetime is ${life}s, want at least 3600 (--duration=1h)"
+
+right_identity() { printf '%s' "$claims" | grep -q 'system:serviceaccount:phoenix:pipeline-runner'; }
+long_enough()    { [ "$life" -ge 3600 ]; }
+
+crit 2 "issued for phoenix/pipeline-runner" \
+  "the token is not for phoenix/pipeline-runner" \
+  "The sub claim names the identity the token was issued for, spelled system:serviceaccount:<namespace>:<name>. This one names something else — usually the Namespace's default account, which is what you get when the request does not name one." \
+  -- right_identity
+
+crit 1 "valid for at least an hour" \
+  "token lifetime is ${life}s, want at least 3600 (--duration=1h)" \
+  "A modern ServiceAccount token is short-lived on purpose and its lifetime is decided when it is REQUESTED — exp minus iat, both seconds since the epoch. Ask for no duration and you get the cluster's default, which is an hour on many clusters and is not something to bet on when the question names a figure." \
+  -- long_enough
+
+crit_all_passed || {
   show_actual json "$claims"
-  show_why "A modern ServiceAccount token is short-lived on purpose and its lifetime is decided when it is REQUESTED — exp minus iat, both seconds since the epoch. Ask for no duration and you get the cluster's default, which is an hour on many clusters and is not something to bet on when the question names a figure."
-  exit 1
+  show_why "$(crit_why)"
 }
+report "token valid for ${life}s"
