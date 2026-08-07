@@ -23,6 +23,8 @@ jobs:
         run: bash tests/check-lib.sh
       - name: Failing-check evidence
         run: bash tests/check-evidence.sh
+      - name: Release version arithmetic
+        run: bash tests/next-version.sh
       - name: Hints
         run: bash tests/bank-hints.sh
       - name: MCQ banks

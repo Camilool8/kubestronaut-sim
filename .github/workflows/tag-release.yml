@@ -1,0 +1,184 @@
+name: Tag and release
+
+# Every push to main becomes a release. The size of the bump comes from the
+# Conventional Commits in the range since the last tag — see
+# .github/scripts/next-version.py, which is unit-tested by tests/next-version.sh.
+#
+# The order below matters. Chart.yaml is bumped and committed FIRST, then the tag
+# is put on that commit, so a released tag always contains a chart whose default
+# images are the ones that release publishes. CI asserts that pairing, so tagging
+# before the bump would ship a tag that fails its own check.
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Force a bump instead of reading the commits"
+        required: false
+        type: choice
+        options: ["", "patch", "minor", "major"]
+        default: ""
+
+permissions:
+  contents: write   # commit the chart bump, push the tag, create the release
+  actions: write    # dispatch the image build (see "Build the images" below)
+
+concurrency:
+  # Never two releases at once: they would race for the next version number.
+  group: tag-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # the whole history, and the tags, to read the range
+
+      - name: Should this push release at all?
+        id: gate
+        run: |
+          set -euo pipefail
+          subject=$(git log -1 --format=%s)
+          # Defence in depth. A commit pushed with GITHUB_TOKEN does not trigger
+          # workflows, so this job's own chart bump cannot re-enter here — but it
+          # would the day someone swaps in a PAT, and [skip release] is also the
+          # escape hatch for a push that should not ship.
+          case "$subject" in
+            *"[skip release]"*|*"[release skip]"*)
+              echo "skip=true" >>"$GITHUB_OUTPUT"
+              echo "'$subject' asks to be skipped" ;;
+            *)
+              echo "skip=false" >>"$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Work out the next version
+        id: next
+        if: steps.gate.outputs.skip == 'false'
+        env:
+          FORCED: ${{ inputs.bump }}
+        run: |
+          set -euo pipefail
+
+          # --match keeps this away from pre-strip-backup and anything else that
+          # is not a release.
+          last=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || true)
+          if [ -z "$last" ]; then
+            echo "no release tag in history yet; starting at v0.1.0"
+            echo "version=v0.1.0" >>"$GITHUB_OUTPUT"
+            echo "last=" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "last release: $last"
+
+          if [ -n "${FORCED:-}" ]; then
+            # A forced bump still goes through the same code, so the 0.x rule
+            # and the version arithmetic cannot drift between the two paths.
+            case "$FORCED" in
+              major) msg='feat!: forced major' ;;
+              minor) msg='feat: forced minor' ;;
+              *)     msg='fix: forced patch' ;;
+            esac
+            version=$(printf '%s\0' "$msg" | python3 .github/scripts/next-version.py "$last")
+            echo "forced a $FORCED bump: $version"
+          else
+            # --no-merges: a "Merge pull request #69 from ..." subject is not a
+            # Conventional Commit and would only ever contribute a patch. The
+            # commits it brings in are the ones that describe the change.
+            if ! version=$(git log --no-merges --format=%B%x00 "$last..HEAD" \
+                           | python3 .github/scripts/next-version.py "$last"); then
+              echo "nothing to release"
+              echo "skip=true" >>"$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
+          if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
+            echo "$version is already tagged — refusing to move it" >&2
+            exit 1
+          fi
+
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+          echo "last=$last" >>"$GITHUB_OUTPUT"
+          echo "skip=false" >>"$GITHUB_OUTPUT"
+
+      - name: Pin the chart to this release
+        if: steps.gate.outputs.skip == 'false' && steps.next.outputs.skip == 'false'
+        env:
+          VERSION: ${{ steps.next.outputs.version }}
+        run: |
+          set -euo pipefail
+          chart=deploy/helm/kubestronaut-sim/Chart.yaml
+          bare=${VERSION#v}
+
+          # Chart.version has no v prefix; appVersion carries one because it is
+          # also the image tag. values.yaml leaves image.tag empty and falls back
+          # to appVersion, which is what makes this the chart's default release.
+          python3 - "$chart" "$bare" "$VERSION" <<'PY'
+          import re, sys
+          path, bare, tagged = sys.argv[1:4]
+          text = open(path).read()
+          text, n1 = re.subn(r'(?m)^version:\s*\S+$', f'version: {bare}', text, count=1)
+          text, n2 = re.subn(r'(?m)^appVersion:\s*.*$', f'appVersion: "{tagged}"', text, count=1)
+          if (n1, n2) != (1, 1):
+              sys.exit(f'{path}: rewrote {n1} version and {n2} appVersion lines, want 1 and 1')
+          open(path, 'w').write(text)
+          PY
+
+          grep -E '^(version|appVersion):' "$chart"
+
+          if git diff --quiet -- "$chart"; then
+            echo "chart already on $VERSION"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$chart"
+          git commit -m "chore(release): $VERSION [skip release]"
+          git push origin HEAD:main
+
+      - name: Tag it
+        if: steps.gate.outputs.skip == 'false' && steps.next.outputs.skip == 'false'
+        env:
+          VERSION: ${{ steps.next.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$VERSION" -m "$VERSION"
+          git push origin "refs/tags/$VERSION"
+          echo "tagged $(git rev-parse --short HEAD) as $VERSION"
+
+      - name: Release it
+        if: steps.gate.outputs.skip == 'false' && steps.next.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.next.outputs.version }}
+          LAST: ${{ steps.next.outputs.last }}
+        run: |
+          set -euo pipefail
+          # --generate-notes is GitHub's own changelog: the merged PRs and new
+          # contributors since the previous release, with the compare link.
+          args=(--title "$VERSION" --generate-notes --verify-tag)
+          if [ -n "${LAST:-}" ]; then
+            args+=(--notes-start-tag "$LAST")
+          fi
+          gh release create "$VERSION" "${args[@]}"
+          gh release view "$VERSION" --json url,tagName --jq '"released \(.tagName) at \(.url)"'
+
+      - name: Build the images
+        if: steps.gate.outputs.skip == 'false' && steps.next.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.next.outputs.version }}
+        run: |
+          set -euo pipefail
+          # release.yml also triggers on `push: tags: v*`, but a tag pushed with
+          # GITHUB_TOKEN deliberately does not trigger workflows — so without this
+          # dispatch the tag and the release would exist with no images behind
+          # them. Dispatched at the tag so it builds the tagged tree, not main.
+          gh workflow run release.yml --ref "$VERSION" -f tag="$VERSION"
+          echo "dispatched release.yml for $VERSION"
