@@ -21,18 +21,28 @@ probe=$(kubectl -n hydra get deploy orders-api \
 }
 
 ready=$(kubectl -n hydra get deploy orders-api -o jsonpath='{.status.readyReplicas}' 2>/dev/null)
-[ "$ready" = "2" ] || {
-  echo "readyReplicas is '$ready', want 2"
-  show_actual text "$(kubectl -n hydra get pod 2>/dev/null)"
-  show_why "readyReplicas counts Pods that are passing readiness, so a probe aimed at the wrong port or path leaves the Pods Running and never ready — no restarts, no errors in the log, just a Deployment that never finishes rolling out. A startupProbe with too small a budget produces the opposite symptom: the container is killed mid-boot and restarts climb."
-  exit 1
-}
-
 count=$(kubectl -n hydra get endpointslice -l kubernetes.io/service-name=orders-api -o json 2>/dev/null \
   | jq '[.items[].endpoints[]? | select(.conditions.ready == true)] | length')
-[ "$count" = "2" ] && echo "2 ready endpoints" || {
-  echo "the Service has $count ready endpoints, want 2"
-  show_actual yaml "$(kubectl -n hydra get endpointslice -l kubernetes.io/service-name=orders-api -o yaml 2>/dev/null | k8s_clean | yq "$view")"
-  show_why "This is the pairing the question is built on: a Pod that fails readiness stays Running and is REMOVED from the Service's endpoints, so traffic stops reaching it without anything being killed. Each address above carries its own ready condition, and the list being shorter than the replica count is that happening."
-  exit 1
+
+pod_pane() {
+  show_actual text "$(kubectl -n hydra get pod 2>/dev/null)"
+  show_why "$1"
 }
+slice_pane() {
+  show_actual yaml "$(kubectl -n hydra get endpointslice -l kubernetes.io/service-name=orders-api -o yaml 2>/dev/null | k8s_clean | yq "$view")"
+  show_why "$1"
+}
+pane=''
+
+crit 2 "both replicas pass readiness" \
+  "readyReplicas is '$ready', want 2" \
+  "readyReplicas counts Pods that are passing readiness, so a probe aimed at the wrong port or path leaves the Pods Running and never ready — no restarts, no errors in the log, just a Deployment that never finishes rolling out. A startupProbe with too small a budget produces the opposite symptom: the container is killed mid-boot and restarts climb." \
+  -- [ "$ready" = "2" ] || pane=${pane:-pod_pane}
+
+crit 2 "and both appear as ready Service endpoints" \
+  "the Service has $count ready endpoints, want 2" \
+  "This is the pairing the question is built on: a Pod that fails readiness stays Running and is REMOVED from the Service's endpoints, so traffic stops reaching it without anything being killed. Each address carries its own ready condition, and the list being shorter than the replica count is that happening." \
+  -- [ "$count" = "2" ] || pane=${pane:-slice_pane}
+
+crit_all_passed || "${pane:-pod_pane}" "$(crit_why)"
+report "2 ready endpoints"

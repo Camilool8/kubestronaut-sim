@@ -227,6 +227,43 @@ case $out in
   *) bad "q25 nothing attached: message does not say so. got: $(printf '%s' "$out" | head -1)" ;;
 esac
 
+# ------------------------------------------------ every check, smoke-run for real
+#
+# A jq program written in double quotes inside "$( ... )" is a trap: the outer
+# layer unescapes \" into a real quote, the program ends early, and bash brace-
+# expands the {…} jq was supposed to receive. That shipped once and the only
+# visible symptom was jq noise where the evidence pane should have been. So run
+# every check against a stub that answers everything with an empty object and
+# assert the tooling itself never complains.
+
+all=$tmp/all
+make_kubectl "$all/bin"
+fixture "$all/fx"
+echo '{}' > "$all/fx/json"
+# Everything else a check might shell out to, stubbed to succeed silently.
+for cmd in helm podman curl yq; do
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$all/bin/$cmd"
+  chmod +x "$all/bin/$cmd"
+done
+
+noisy=0
+for script in banks/*/q*/validate.d/*.sh; do
+  out=$(FIXTURE=$all/fx run_check "$script" "$all/bin" </dev/null || true)
+  # Only malformed PROGRAMS count. A stub that answers {} makes jq complain at
+  # runtime ("Cannot iterate over null") for every check that walks a list, and
+  # that says nothing about the script — a real cluster returns a real object,
+  # or nothing at all.
+  case $out in
+    *"syntax error"*|*"compile error"*|*"command not found"*|*"unbound variable"*|*"parse error"*)
+      echo "FAIL: $script hands its tooling something malformed:"
+      printf '%s\n' "$out" \
+        | grep -E "syntax error|compile error|command not found|unbound variable|parse error" \
+        | head -3 | sed 's/^/        /'
+      noisy=$((noisy+1)) ;;
+  esac
+done
+if [ "$noisy" -eq 0 ]; then note; else FAIL=$((FAIL+noisy)); fi
+
 echo
 if [ "$FAIL" -eq 0 ]; then
   echo "check-evidence: $PASS passed, 0 failed"
