@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # points: 4
-# desc: an ephemeral container named debugger runs busybox:1.37 targeting api, in the original Pod
+# desc: an ephemeral container runs busybox:1.37 targeting api, in the original Pod
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -25,26 +25,35 @@ same_set "$containers" "api" || {
   exit 1
 }
 
-eph=$(kubectl -n perseus get pod ledger-api -o json 2>/dev/null \
-  | jq -r '.spec.ephemeralContainers // [] | map(select(.name == "debugger")) | first // empty')
-[ -n "$eph" ] || {
-  echo "the Pod has no ephemeral container named debugger"
-  evidence "kubectl debug names the container it adds with -c/--container; left to itself it invents a name like debugger-8kx2t, which is fine in a terminal and not what the question asks for. The name is recorded in the Pod spec permanently — an ephemeral container can never be removed, only stopped."
+count=$(kubectl -n perseus get pod ledger-api -o json 2>/dev/null \
+  | jq -r '.spec.ephemeralContainers // [] | length')
+[ "${count:-0}" -gt 0 ] || {
+  echo "the Pod has no ephemeral containers"
+  evidence "An ephemeral container is added to a running Pod with kubectl debug, and it lands in spec.ephemeralContainers rather than spec.containers — which is why it can be attached to a Pod nobody wants to restart. Nothing has been attached to this one."
   exit 1
 }
+
+# Judge the container that does the job, not the one with the expected name. An
+# ephemeral container can never be removed, so a first attempt under the wrong
+# name — or with --target forgotten — is permanent, and holding the name against
+# the candidate would make the whole check unrecoverable. Pick the best
+# candidate: one that does both, else one that does either, else the first.
+eph=$(kubectl -n perseus get pod ledger-api -o json 2>/dev/null | jq -r '
+  (.spec.ephemeralContainers // []) as $e
+  | ( first($e[] | select(.image == "busybox:1.37" and .targetContainerName == "api"))
+    // first($e[] | select(.targetContainerName == "api"))
+    // first($e[] | select(.image == "busybox:1.37"))
+    // $e[0] )')   # lint: allow-index (last resort: judge whatever was attached)
 
 img=$(printf '%s' "$eph" | jq -r '.image // ""')
-[ "$img" = "busybox:1.37" ] || {
-  echo "the debugger container runs '$img', want busybox:1.37"
-  evidence "The whole point of a debugging image is that it carries tools the application image does not have to ship. Which image you pick is the --image flag, and it is the only reason the ephemeral container is worth adding."
-  exit 1
-}
-
 target=$(printf '%s' "$eph" | jq -r '.targetContainerName // ""')
-[ "$target" = "api" ] || {
-  echo "targetContainerName is '$target', want api"
-  evidence "Without --target, an ephemeral container shares the Pod's network and IPC but gets a process namespace of its own, so 'ps' shows only itself. Naming the target joins that container's process namespace, which is what makes another container's processes and its /proc visible at all."
-  exit 1
-}
 
-echo "ephemeral debugger attached"
+crit 1 "runs busybox:1.37" \
+  "the ephemeral container runs '$img', want busybox:1.37" \
+  -- [ "$img" = "busybox:1.37" ]
+crit 3 "shares the api container's process namespace" \
+  "targetContainerName is '$target', want api" \
+  -- [ "$target" = "api" ]
+
+crit_all_passed || evidence "Two flags carry this task. --image picks a debugging image that has the tools the application image does not ship. --target joins ANOTHER container's process namespace: without it an ephemeral container shares the Pod's network and IPC but gets a process namespace of its own, so ps shows only itself. Any one ephemeral container satisfying both is accepted — the name is not graded, because an ephemeral container can never be removed and a wrong one would be unfixable."
+report "ephemeral debugger attached"

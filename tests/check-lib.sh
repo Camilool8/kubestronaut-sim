@@ -112,6 +112,70 @@ ok "show_actual jq null body" "$(show_actual json 'null')" \
 ok "show_why printf-safe" "$(show_why 'literal %s and \n stay put')" \
    "$(printf -- '---8<--- sim:artifact why text\nliteral %%s and \\n stay put')"
 
+# --- scored criteria ---------------------------------------------------------
+# crit prints the detail immediately, so it lands in the message ahead of any
+# evidence pane; report emits the tally last and decides the exit status.
+crit_run() ( # subshell: the accumulators are globals
+  _CRIT_EARNED=0; _CRIT_TOTAL=0; _CRIT_LINES=''
+  "$@"
+  report
+)
+
+two_of_three() {
+  crit 1 "uid is 10001"   "runAsUser='', want 10001"   -- [ 1 = 1 ]
+  crit 1 "gid is 20001"   "runAsGroup='', want 20001"  -- [ 1 = 1 ]
+  crit 1 "refuses root"   "runAsNonRoot='', want true" -- [ 1 = 2 ]
+}
+out=$(crit_run two_of_three)
+rc=$?
+ok "crit failing detail is in the message" "$(printf '%s' "$out" | head -1)" "runAsNonRoot='', want true"
+ok "crit emits one line per criterion" "$(printf '%s' "$out" | grep -c 'sim:criterion')" "3"
+ok "crit marks the passes"  "$(printf '%s' "$out" | grep -c 'sim:criterion pass 1 ')" "2"
+ok "crit marks the failure" "$(printf '%s' "$out" | grep -c 'sim:criterion fail 1 refuses root')" "1"
+ok "report exits non-zero when a criterion failed" "$rc" "1"
+# A passing criterion must not leak its detail into the message.
+case $out in
+  *"want 10001"*) bad=1 ;;
+  *) bad=0 ;;
+esac
+ok "crit stays quiet about passes" "$bad" "0"
+
+all_three() {
+  crit 2 "uid is 10001" "no" -- [ 1 = 1 ]
+  crit 1 "refuses root" "no" -- true
+}
+out=$(crit_run all_three)
+rc=$?
+ok "report exits zero when every criterion passed" "$rc" "0"
+ok "clean run emits no message" "$(printf '%s' "$out" | grep -vc 'sim:criterion')" "0"
+ok "weights are carried through" "$(printf '%s' "$out" | grep -c 'sim:criterion pass 2 uid is 10001')" "1"
+
+# -- is what tells an optional note apart from the test command, so a missing one
+# must be loud. Silently guessing would grade something other than the answer.
+no_dashes() { crit 1 "plain" "no" [ 1 = 1 ]; }
+out=$(crit_run no_dashes 2>/dev/null)
+ok "crit without -- scores nothing" "$(printf '%s' "$out" | grep -c 'sim:criterion pass')" "0"
+ok "crit without -- fails the criterion" "$(printf '%s' "$out" | grep -c 'sim:criterion fail 1 plain')" "1"
+ok "crit without -- says so on stderr" \
+   "$(crit_run no_dashes 2>&1 >/dev/null | grep -c 'needs -- before the test')" "1"
+
+# Per-criterion notes: crit_why hands back the FIRST failure's, because that is
+# the one the candidate has to read. A passing criterion's note stays unused.
+with_whys() {
+  crit 1 "first"  "m1" "note for first"  -- true
+  crit 1 "second" "m2" "note for second" -- false
+  crit 1 "third"  "m3" "note for third"  -- false
+}
+out=$(crit_run with_whys)
+ok "crit_why is the first failure's note" "$(_CRIT_WHY=''; crit 1 a m 'note for second' -- false >/dev/null; crit_why)" "note for second"
+ok "notes stay out of the output" "$(printf '%s' "$out" | grep -c 'note for')" "0"
+ok "a criterion with a note still scores" "$(printf '%s' "$out" | grep -c 'sim:criterion pass 1 first')" "1"
+ok "a note does not become the test" "$(printf '%s' "$out" | grep -c 'sim:criterion fail 1 second')" "1"
+
+succeeds "crit returns the test's status on pass" eval "crit 1 d m w -- true >/dev/null"
+fails    "crit returns the test's status on fail" eval "crit 1 d m w -- false >/dev/null"
+_CRIT_EARNED=0; _CRIT_TOTAL=0; _CRIT_LINES=''; _CRIT_WHY=''
+
 printf 'kind: Service\nspec:\n  selector:\n    app: inventory\n' > "$tmp/expected.yaml"
 ok "show_expected reads the file" "$(show_expected yaml "$tmp/expected.yaml")" \
    "$(printf -- '---8<--- sim:artifact expected yaml\nkind: Service\nspec:\n  selector:\n    app: inventory')"

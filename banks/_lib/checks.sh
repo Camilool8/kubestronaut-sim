@@ -102,6 +102,109 @@ show_expected() {
 
 show_why() { _artifact why text "$1"; }
 
+# --------------------------------------------------------------- scored checks
+#
+# A check used to be all-or-nothing: the first gate that failed took every
+# point with it, so a Deployment missing one field out of six scored the same
+# as one nobody had touched. Criteria split a check's points across the things
+# it actually grades.
+#
+#   crit WEIGHT "what it grades" "what to say when it fails" -- <test command>
+#   report
+#
+# report exits 0 only when every criterion passed, so the check still reads as
+# pass/fail; the grader scales the check's `# points:` by the weight earned.
+#
+# Not everything should be scored. Keep the plain echo + evidence + exit 1 form
+# — a GATE — for the three cases where partial credit would be dishonest:
+#   * the object does not exist, so the work was not done at all
+#   * a name the question pinned is wrong AND could have been fixed by
+#     recreating the object
+#   * an action the question ruled out was taken
+# A gate exits before report runs, which is what makes it score zero.
+#
+# Never gate on something the candidate cannot undo. An ephemeral container's
+# name is permanent once added, so it is matched on what it does instead.
+# Output order matters and the shape below gets it right by construction. The
+# grader reads everything before the first sentinel as the check's message, so
+# crit prints its failure line the moment it happens — ahead of any evidence
+# pane — and report emits the tally last:
+#
+#   crit 1 "runs as uid 10001"  "runAsUser='$uid', want 10001"  -- [ "$uid" = 10001 ]
+#   crit 1 "refuses to run as root" "runAsNonRoot='$nr', want true" -- [ "$nr" = true ]
+#   crit_all_passed || evidence "why these fields are what the question asks for"
+#   report
+#
+# The criterion carries the LABEL of what it grades; the message carries the
+# detail. They read as a pair rather than repeating each other.
+# A criterion may carry its own note, in which case crit_why hands back the one
+# belonging to the first thing that failed — the explanation the candidate needs
+# rather than a digest of all of them:
+#
+#   crit 1 "read-only root filesystem" "readOnlyRootFilesystem='$ro', want true" \
+#     "Container-level only; written at Pod level the API rejects it." -- [ "$ro" = true ]
+#   ...
+#   crit_all_passed || evidence "$(crit_why)"
+#   report
+_CRIT_EARNED=0
+_CRIT_TOTAL=0
+_CRIT_LINES=''
+_CRIT_WHY=''
+
+crit() {
+  local weight=$1 desc=$2 msg=$3 why=''
+  shift 3
+  # -- is mandatory: it is the only thing that tells an optional note apart from
+  # the start of the test command. Getting it wrong would silently grade the
+  # wrong thing, so say so instead of guessing.
+  if [ "${1-}" != "--" ]; then
+    why=$1
+    shift
+  fi
+  if [ "${1-}" != "--" ]; then
+    printf 'check bug: crit %s needs -- before the test command\n' "$desc" >&2
+    _CRIT_TOTAL=$((_CRIT_TOTAL + weight))
+    _CRIT_LINES="${_CRIT_LINES}---8<--- sim:criterion fail ${weight} ${desc}
+"
+    return 1
+  fi
+  shift
+
+  _CRIT_TOTAL=$((_CRIT_TOTAL + weight))
+  if "$@"; then
+    _CRIT_EARNED=$((_CRIT_EARNED + weight))
+    _CRIT_LINES="${_CRIT_LINES}---8<--- sim:criterion pass ${weight} ${desc}
+"
+    return 0
+  fi
+
+  printf '%s\n' "$msg"
+  _CRIT_LINES="${_CRIT_LINES}---8<--- sim:criterion fail ${weight} ${desc}
+"
+  [ -n "$_CRIT_WHY" ] || _CRIT_WHY=$why
+  return 1
+}
+
+# The note belonging to the first criterion that failed.
+crit_why() { printf '%s' "$_CRIT_WHY"; }
+
+# Has every criterion so far passed? Guards the evidence pane, which is only
+# worth attaching to a failure.
+crit_all_passed() { [ "$_CRIT_EARNED" -eq "$_CRIT_TOTAL" ]; }
+
+# report [message-when-everything-passed]
+#
+# The message goes out ahead of the sentinels so it lands in the check's message
+# rather than inside an artifact. On failure the message is already there: crit
+# printed each failure as it happened.
+report() {
+  if crit_all_passed && [ -n "${1-}" ]; then
+    printf '%s\n' "$1"
+  fi
+  printf '%s' "$_CRIT_LINES"
+  crit_all_passed
+}
+
 k8s_clean() {
   yq '(., (select(has("items")) | .items[])) |= (
         del(.metadata.managedFields, .metadata.creationTimestamp, .metadata.resourceVersion,

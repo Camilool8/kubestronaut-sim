@@ -40,24 +40,10 @@ mib() {
     *) printf 'x' ;;
   esac
 }
-[ "$(milli "$rc")" = "100" ] || {
-  echo "cpu request is '$rc', want 100m"
-  evidence "A request is what the SCHEDULER reserves on a node — it decides where the Pod fits and is guaranteed to the container. A limit is the ceiling the kernel enforces. They are separate keys under resources and this one is requests.cpu. Quantities are compared by value, so 100m and 0.1 are the same answer."
-  exit 1
-}
-[ "$(milli "$lc")" = "500" ] || {
-  echo "cpu limit is '$lc', want 500m"
-  evidence "limits.cpu is a throttle rather than a kill: a container over its CPU limit is slowed down, never terminated. Set a limit with no request and Kubernetes copies the limit into the request, which reserves far more of the node than intended — which is why the question names both."
-  exit 1
-}
-[ "$(mib "$rm")" = "64" ] || {
-  echo "memory request is '$rm', want 64Mi"
-  evidence "requests.memory is the amount reserved for scheduling. Memory behaves nothing like CPU here: it cannot be throttled, so a container over its memory LIMIT is killed with OOMKilled and restarted. Mi is mebibytes; M would be a decimal megabyte and a different number."
-  exit 1
-}
-[ "$(mib "$lm")" = "128" ] || {
-  echo "memory limit is '$lm', want 128Mi"
-  evidence "limits.memory is the hard ceiling the kernel enforces by killing the container. Requests and limits together also decide the Pod's QoS class, which is what the kubelet uses to choose whom to evict when a node runs short."
-  exit 1
-}
-echo "resources ok"
+crit 1 "requests 100m CPU"    "cpu request is '$rc', want 100m"     -- [ "$(milli "$rc")" = "100" ]
+crit 1 "limited to 500m CPU"  "cpu limit is '$lc', want 500m"       -- [ "$(milli "$lc")" = "500" ]
+crit 1 "requests 64Mi memory" "memory request is '$rm', want 64Mi"  -- [ "$(mib "$rm")" = "64" ]
+crit 1 "limited to 128Mi memory" "memory limit is '$lm', want 128Mi" -- [ "$(mib "$lm")" = "128" ]
+
+crit_all_passed || evidence "A request is what the SCHEDULER reserves on a node; a limit is the ceiling the kernel enforces. They are separate keys under resources and quantities are compared by value, so 100m and 0.1 are the same answer. The two resources behave differently at the limit: a container over its CPU limit is throttled and never terminated, while one over its memory limit is killed with OOMKilled and restarted. Set a limit with no request and Kubernetes copies the limit into the request, reserving far more of the node than intended — which is why the question names all four. Mi is mebibytes; M would be a decimal megabyte and a different number."
+report "resources ok"

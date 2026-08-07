@@ -123,10 +123,14 @@ canned "$q07/ok" '{.spec.containers[?(@.name=="agent")].securityContext.runAsGro
 canned "$q07/ok" '{.spec.containers[?(@.name=="agent")].securityContext.runAsNonRoot}'  'true'
 
 out=$(FIXTURE=$q07/ok run_check banks/ckad-mock-01/q07/validate.d/10_identity.sh "$q07/bin")
+rc=$?
+[ "$rc" = 0 ] && note || bad "q07 correct answer no longer passes: exit $rc, got '$out'"
 case $out in
   "identity ok"*) note ;;
-  *) bad "q07 correct answer no longer passes: got '$out'" ;;
+  *) bad "q07 correct answer lost its message: got '$(printf '%s' "$out" | head -1)'" ;;
 esac
+[ "$(printf '%s' "$out" | grep -c 'sim:criterion fail')" = 0 ] && note \
+  || bad "q07 correct answer reported a failed criterion"
 
 # Case 3: nothing there at all. The pane must say so rather than vanish.
 fixture "$q07/absent"
@@ -164,6 +168,63 @@ esac
 case $out in
   *'sim:artifact actual'*) note ;;
   *) bad "q06 misnamed volume: no actual pane" ;;
+esac
+
+# ------------------------------------------------------- q25 ephemeral container
+#
+# An ephemeral container can never be removed, so a first attempt under a name
+# you did not want is permanent. Grading the name made the check unrecoverable:
+# a real attempt added `debugger` without --target, retried correctly as
+# `debugger2`, and scored 0/4 for work that was done.
+
+q25=$tmp/q25
+make_kubectl "$q25/bin"
+eph_fixture() { # dir, ephemeralContainers JSON array
+  fixture "$1"
+  cat > "$1/json" <<JSON
+{"spec":{"containers":[{"name":"api"}],"ephemeralContainers":$2}}
+JSON
+  canned "$1" '{range .spec.containers[*]}{.name}{"\n"}{end}' 'api'
+}
+
+crit_count() { printf '%s' "$1" | grep -c "sim:criterion $2"; }
+
+# The real attempt: a wrong first try left behind, and a correct second one.
+eph_fixture "$q25/retried" '[{"name":"debugger","image":"busybox:1.37"},
+  {"name":"debugger2","image":"busybox:1.37","targetContainerName":"api"}]'
+out=$(FIXTURE=$q25/retried run_check banks/ckad-mock-01/q25/validate.d/10_ephemeral.sh "$q25/bin")
+rc=$?
+[ "$rc" = 0 ] && note || bad "q25 retried under a second name: exit $rc, want 0 — the objectives were met"
+[ "$(crit_count "$out" fail)" = 0 ] && note || bad "q25 retried: criteria reported a failure"
+
+# Named exactly as the old question demanded: must still pass.
+eph_fixture "$q25/named" '[{"name":"debugger","image":"busybox:1.37","targetContainerName":"api"}]'
+out=$(FIXTURE=$q25/named run_check banks/ckad-mock-01/q25/validate.d/10_ephemeral.sh "$q25/bin")
+[ "$?" = 0 ] && note || bad "q25 single correctly-named container no longer passes"
+
+# An unusual name is not a defect.
+eph_fixture "$q25/odd" '[{"name":"debugger-8kx2t","image":"busybox:1.37","targetContainerName":"api"}]'
+out=$(FIXTURE=$q25/odd run_check banks/ckad-mock-01/q25/validate.d/10_ephemeral.sh "$q25/bin")
+[ "$?" = 0 ] && note || bad "q25 auto-generated name rejected, but the name is not graded"
+
+# --target forgotten and never retried: partial, not zero.
+eph_fixture "$q25/notarget" '[{"name":"debugger","image":"busybox:1.37"}]'
+out=$(FIXTURE=$q25/notarget run_check banks/ckad-mock-01/q25/validate.d/10_ephemeral.sh "$q25/bin")
+rc=$?
+[ "$rc" = 1 ] && note || bad "q25 missing --target: exit $rc, want 1"
+[ "$(crit_count "$out" 'pass 1 runs busybox')" = 1 ] && note \
+  || bad "q25 missing --target: the image criterion should still be credited"
+[ "$(crit_count "$out" "fail 3 shares")" = 1 ] && note \
+  || bad "q25 missing --target: the namespace criterion should be the one that failed"
+
+# Nothing attached at all is a gate: no criteria, so no partial credit.
+eph_fixture "$q25/none" '[]'
+out=$(FIXTURE=$q25/none run_check banks/ckad-mock-01/q25/validate.d/10_ephemeral.sh "$q25/bin")
+[ "$(crit_count "$out" '')" = 0 ] && note \
+  || bad "q25 nothing attached: emitted criteria, so it would earn partial credit for no work"
+case $out in
+  *"no ephemeral containers"*) note ;;
+  *) bad "q25 nothing attached: message does not say so. got: $(printf '%s' "$out" | head -1)" ;;
 esac
 
 echo
