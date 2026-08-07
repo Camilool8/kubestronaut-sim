@@ -17,8 +17,9 @@ policy=$(kubectl -n lyra get deploy feed-writer \
   exit 1
 }
 
-if kubectl -n lyra get deploy feed-writer \
-  -o jsonpath='{.spec.template.spec.containers[*].name}' 2>/dev/null | grep -qw shipper; then
+mains=$(kubectl -n lyra get deploy feed-writer \
+  -o jsonpath='{.spec.template.spec.containers[*].name}' 2>/dev/null)
+if has_name "$mains" shipper; then
   echo "shipper is also under .spec.containers — it must only be a sidecar"
   evidence "Declared under containers, shipper is an ordinary container: it starts in parallel with writer rather than before it, and it is killed at the same time rather than after. The log tailing appears to work anyway, which is exactly why this is worth being strict about — tail -F survives the file not existing yet."
   exit 1

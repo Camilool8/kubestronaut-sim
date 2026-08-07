@@ -34,19 +34,22 @@ fixed() {
   show_why "$1"
 }
 
-printf '%s' "$versions" | grep -q 'v1beta1' && {
-  echo "fixed.yaml still contains a v1beta1 apiVersion: $versions"
-  fixed "A beta API version is not merely deprecated here — it has been removed from the cluster, so a manifest naming one has nothing to apply against. Both documents in this file have to move to a version the cluster actually serves."
-  exit 1
-}
-printf '%s' "$versions" | grep -qw 'batch/v1' || {
-  echo "fixed.yaml has no batch/v1 CronJob (found: $versions)"
-  fixed "CronJob's move out of beta was a pure version bump: the schema did not change, so the apiVersion line moves and everything below it stays exactly as it was. A missing document is the other way to reach this — the file has to keep both resources."
-  exit 1
-}
-printf '%s' "$versions" | grep -qw 'networking.k8s.io/v1' || {
-  echo "fixed.yaml has no networking.k8s.io/v1 Ingress (found: $versions)"
-  fixed "The Ingress is the half that is a real migration rather than a rename, so its apiVersion moving is only the first of several changes it needs. A missing document is the other way to reach this — the file has to keep both resources."
-  exit 1
-}
-echo "apiVersions updated"
+no_beta() { ! printf '%s' "$versions" | grep -q 'v1beta1'; }
+
+crit 1 "no v1beta1 apiVersion is left" \
+  "fixed.yaml still contains a v1beta1 apiVersion: $versions" \
+  "A beta API version is not merely deprecated here — it has been removed from the cluster, so a manifest naming one has nothing to apply against. Both documents in this file have to move to a version the cluster actually serves." \
+  -- no_beta
+
+crit 1 "the CronJob is on batch/v1" \
+  "fixed.yaml has no batch/v1 CronJob (found: $versions)" \
+  "CronJob's move out of beta was a pure version bump: the schema did not change, so the apiVersion line moves and everything below it stays exactly as it was. A missing document is the other way to reach this — the file has to keep both resources." \
+  -- has_name "$versions" 'batch/v1'
+
+crit 1 "the Ingress is on networking.k8s.io/v1" \
+  "fixed.yaml has no networking.k8s.io/v1 Ingress (found: $versions)" \
+  "The Ingress is the half that is a real migration rather than a rename, so its apiVersion moving is only the first of several changes it needs. A missing document is the other way to reach this — the file has to keep both resources." \
+  -- has_name "$versions" 'networking.k8s.io/v1'
+
+crit_all_passed || fixed "$(crit_why)"
+report "apiVersions updated"

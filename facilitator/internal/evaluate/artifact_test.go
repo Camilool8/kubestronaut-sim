@@ -39,7 +39,7 @@ var sampleCheckOutputs = []string{
 
 func TestSplitArtifactsLeavesTodaysMessageByteIdentical(t *testing.T) {
 	for _, out := range sampleCheckOutputs {
-		msg, arts := splitArtifacts(out)
+		msg, _, arts := splitArtifacts(out)
 		if want := legacyMessage(out); msg != want {
 			t.Errorf("splitArtifacts(%q) message = %q, want %q (the pre-artifact expression)", out, msg, want)
 		}
@@ -77,7 +77,7 @@ func FuzzSplitArtifactsPreservesMessage(f *testing.F) {
 		if sentinelStart(out) >= 0 {
 			return
 		}
-		msg, arts := splitArtifacts(out)
+		msg, _, arts := splitArtifacts(out)
 		if want := legacyMessage(out); msg != want {
 			t.Errorf("message = %q, want %q", msg, want)
 		}
@@ -97,7 +97,7 @@ func TestSplitArtifacts(t *testing.T) {
 		"The Service selector does not match the Pod labels, so the\n" +
 		"Endpoints list is empty and the Ingress has nothing to route to.\n"
 
-	msg, arts := splitArtifacts(out)
+	msg, _, arts := splitArtifacts(out)
 	if want := "selector is 'app=inventory-api', want app=inventory"; msg != want {
 		t.Errorf("message = %q, want %q", msg, want)
 	}
@@ -113,7 +113,7 @@ func TestSplitArtifacts(t *testing.T) {
 
 func TestSplitArtifactsAtStartOfOutput(t *testing.T) {
 
-	msg, arts := splitArtifacts("---8<--- sim:artifact why text\nnothing to say first\n")
+	msg, _, arts := splitArtifacts("---8<--- sim:artifact why text\nnothing to say first\n")
 	if msg != "" {
 		t.Errorf("message = %q, want empty", msg)
 	}
@@ -139,7 +139,7 @@ func TestSplitArtifactsMalformedSentinel(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			out := "the real message\n" + tc.line + "\nkind: Service\napiVersion: v1\n"
-			msg, arts := splitArtifacts(out)
+			msg, _, arts := splitArtifacts(out)
 
 			if msg != "the real message" {
 				t.Errorf("message = %q, want %q", msg, "the real message")
@@ -157,7 +157,7 @@ func TestSplitArtifactsMalformedSentinelDoesNotEatItsNeighbours(t *testing.T) {
 		"---8<--- sim:artifact wat yaml\nthis block is discarded\n" +
 		"---8<--- sim:artifact why text\nand this one is not\n"
 
-	_, arts := splitArtifacts(out)
+	_, _, arts := splitArtifacts(out)
 	want := []CheckArtifact{
 		{Kind: "actual", Lang: "yaml", Body: "kind: Service"},
 		{Kind: "why", Lang: "text", Body: "and this one is not"},
@@ -167,18 +167,144 @@ func TestSplitArtifactsMalformedSentinelDoesNotEatItsNeighbours(t *testing.T) {
 	}
 }
 
-func TestSplitArtifactsDropsEmptyBodies(t *testing.T) {
+func TestSplitArtifactsReadsCriteria(t *testing.T) {
+	out := "runAsNonRoot='', want true\n" +
+		"---8<--- sim:criterion pass 1 runs as uid 10001\n" +
+		"---8<--- sim:criterion pass 2 drops all capabilities\n" +
+		"---8<--- sim:criterion fail 1 refuses to start as root\n"
+	msg, crits, arts := splitArtifacts(out)
+
+	if msg != "runAsNonRoot='', want true" {
+		t.Errorf("message = %q", msg)
+	}
+	if len(arts) != 0 {
+		t.Errorf("artifacts = %#v, want none", arts)
+	}
+	want := []Criterion{
+		{Desc: "runs as uid 10001", Weight: 1, Passed: true},
+		{Desc: "drops all capabilities", Weight: 2, Passed: true},
+		{Desc: "refuses to start as root", Weight: 1, Passed: false},
+	}
+	if !reflect.DeepEqual(crits, want) {
+		t.Errorf("criteria = %#v, want %#v", crits, want)
+	}
+}
+
+// Criteria are emitted after the evidence panes, so a criterion sentinel has to
+// close the artifact that is open rather than being swallowed into its body.
+func TestSplitArtifactsCriterionClosesAnOpenArtifact(t *testing.T) {
+	out := "msg\n" +
+		"---8<--- sim:artifact actual yaml\nkind: Pod\n" +
+		"---8<--- sim:criterion fail 1 read-only root filesystem\n"
+	msg, crits, arts := splitArtifacts(out)
+
+	if msg != "msg" {
+		t.Errorf("message = %q", msg)
+	}
+	if len(arts) != 1 || arts[0].Body != "kind: Pod" {
+		t.Fatalf("artifacts = %#v, want one holding just the yaml", arts)
+	}
+	if len(crits) != 1 || crits[0].Desc != "read-only root filesystem" {
+		t.Errorf("criteria = %#v", crits)
+	}
+}
+
+func TestSplitArtifactsIgnoresMalformedCriteria(t *testing.T) {
+	for _, line := range []string{
+		"---8<--- sim:criterion",
+		"---8<--- sim:criterion pass",
+		"---8<--- sim:criterion pass 1",
+		"---8<--- sim:criterion maybe 1 desc",
+		"---8<--- sim:criterion pass x desc",
+		"---8<--- sim:criterion pass -1 desc",
+	} {
+		_, crits, _ := splitArtifacts("msg\n" + line + "\n")
+		if len(crits) != 0 {
+			t.Errorf("%q produced %#v, want none", line, crits)
+		}
+	}
+}
+
+func TestPartialEarned(t *testing.T) {
+	crits := func(points ...int) []Criterion {
+		// positive weight = passed, negative = failed
+		var cs []Criterion
+		for _, p := range points {
+			if p > 0 {
+				cs = append(cs, Criterion{Weight: p, Passed: true})
+			} else {
+				cs = append(cs, Criterion{Weight: -p})
+			}
+		}
+		return cs
+	}
+	cases := []struct {
+		name   string
+		points int
+		crits  []Criterion
+		want   int
+	}{
+		{"two of three", 3, crits(1, 1, -1), 2},
+		{"all passed", 3, crits(1, 1, 1), 3},
+		{"none passed", 3, crits(-1, -1, -1), 0},
+		// A near miss must never round up to full marks.
+		{"eleven of twelve", 4, crits(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, -1), 3},
+		{"two of twelve", 4, crits(1, 1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1), 1},
+		// A one-point check cannot be split.
+		{"one point partial", 1, crits(1, -1), 0},
+		{"weights respected", 6, crits(3, -3), 3},
+		{"no criteria at all", 4, nil, 0},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := partialEarned(c.points, c.crits); got != c.want {
+				t.Errorf("partialEarned(%d, %v) = %d, want %d", c.points, c.crits, got, c.want)
+			}
+		})
+	}
+}
+
+// A sentinel with nothing under it means the check looked and found nothing —
+// a missing object, or a container under a name nobody used. That is the pane
+// the candidate needs most, so it has to survive as an explicit statement
+// rather than disappearing and leaving only "field='', want x".
+func TestSplitArtifactsKeepsEmptyBodiesAsAnExplicitMarker(t *testing.T) {
 	out := "msg\n---8<--- sim:artifact actual yaml\n---8<--- sim:artifact why text\nreal\n"
-	_, arts := splitArtifacts(out)
-	want := []CheckArtifact{{Kind: "why", Lang: "text", Body: "real"}}
+	_, _, arts := splitArtifacts(out)
+	want := []CheckArtifact{
+		{Kind: "actual", Lang: "text", Body: emptyArtifactBody},
+		{Kind: "why", Lang: "text", Body: "real"},
+	}
 	if !reflect.DeepEqual(arts, want) {
 		t.Errorf("artifacts = %#v, want %#v", arts, want)
 	}
 }
 
+func TestSplitArtifactsTreatsWhitespaceOnlyBodyAsEmpty(t *testing.T) {
+	out := "msg\n---8<--- sim:artifact actual json\n   \n\t\n"
+	_, _, arts := splitArtifacts(out)
+	want := []CheckArtifact{{Kind: "actual", Lang: "text", Body: emptyArtifactBody}}
+	if !reflect.DeepEqual(arts, want) {
+		t.Errorf("artifacts = %#v, want %#v", arts, want)
+	}
+}
+
+// The empty marker must not consume the per-check budget meant for real
+// evidence, nor push a genuine artifact out of the eight-artifact window.
+func TestSplitArtifactsEmptyMarkerDoesNotCrowdOutRealEvidence(t *testing.T) {
+	out := "msg\n---8<--- sim:artifact actual yaml\n---8<--- sim:artifact expected yaml\nkind: Pod\n"
+	_, _, arts := splitArtifacts(out)
+	if len(arts) != 2 {
+		t.Fatalf("artifacts = %#v, want 2", arts)
+	}
+	if arts[1].Body != "kind: Pod" {
+		t.Errorf("real evidence = %q, want %q", arts[1].Body, "kind: Pod")
+	}
+}
+
 func TestSplitArtifactsTruncatesOneOversizedDocument(t *testing.T) {
 	huge := strings.Repeat("a: 0123456789abcdef\n", 2000)
-	msg, arts := splitArtifacts("msg\n---8<--- sim:artifact actual yaml\n" + huge)
+	msg, _, arts := splitArtifacts("msg\n---8<--- sim:artifact actual yaml\n" + huge)
 
 	if msg != "msg" {
 		t.Errorf("message = %q", msg)
@@ -201,7 +327,7 @@ func TestSplitArtifactsCapsTheWholeCheck(t *testing.T) {
 		b.WriteString("---8<--- sim:artifact actual yaml\n")
 		b.WriteString(strings.Repeat("a: 0123456789abcdef\n", 2000))
 	}
-	_, arts := splitArtifacts(b.String())
+	_, _, arts := splitArtifacts(b.String())
 
 	total := 0
 	for _, a := range arts {
@@ -227,7 +353,7 @@ func TestSplitArtifactsCapsTheArtifactCount(t *testing.T) {
 		b.WriteString(strings.Repeat("x", i%5))
 		b.WriteString("\n")
 	}
-	_, arts := splitArtifacts(b.String())
+	_, _, arts := splitArtifacts(b.String())
 
 	if len(arts) != maxCheckArtifacts {
 		t.Errorf("kept %d artifacts, want the %d cap", len(arts), maxCheckArtifacts)
@@ -240,7 +366,7 @@ func TestSplitArtifactsCapsTheArtifactCount(t *testing.T) {
 func TestSplitArtifactsTruncatesOnARuneBoundary(t *testing.T) {
 
 	line := strings.Repeat("日", maxArtifactBytes)
-	_, arts := splitArtifacts("msg\n---8<--- sim:artifact actual text\n" + line + "\n")
+	_, _, arts := splitArtifacts("msg\n---8<--- sim:artifact actual text\n" + line + "\n")
 
 	if len(arts) != 1 {
 		t.Fatalf("artifacts = %d", len(arts))

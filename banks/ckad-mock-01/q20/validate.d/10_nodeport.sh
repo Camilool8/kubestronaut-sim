@@ -13,21 +13,23 @@ evidence() {
 }
 
 type=$(kubectl -n aquila get svc status-page -o jsonpath='{.spec.type}' 2>/dev/null)
-[ "$type" = "NodePort" ] || {
-  echo "type is '$type', want NodePort"
-  evidence "A NodePort Service is a ClusterIP Service PLUS a port opened on every node — the cluster IP keeps working exactly as before and the node port is additional, which is why nothing inside the cluster notices the change. The type field is what opens it."
-  exit 1
-}
-
 np=$(kubectl -n aquila get svc status-page \
   -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}' 2>/dev/null)
-[ -n "$np" ] || {
-  echo "the Service publishes no port 80"
-  evidence "port is what clients connect to on the Service, and the question keeps it at 80. Nothing in this Service publishes that port, so there is no entry for a node port to hang off — a Service's ports are a list and each entry carries port, targetPort and nodePort together."
-  exit 1
-}
-[ "$np" = "30081" ] && echo "nodeport ok" || {
-  echo "nodePort for port 80 is '$np', want 30081"
-  evidence "Leave nodePort out and the cluster allocates one at random from its node-port range, which is normally what you want. Pinning it is for when something outside the cluster has the number written down — and pinning one already in use makes the Service rejected rather than silently moved."
-  exit 1
-}
+
+crit 2 "type NodePort" \
+  "type is '$type', want NodePort" \
+  "A NodePort Service is a ClusterIP Service PLUS a port opened on every node — the cluster IP keeps working exactly as before and the node port is additional, which is why nothing inside the cluster notices the change. The type field is what opens it." \
+  -- [ "$type" = "NodePort" ]
+
+crit 1 "still publishes port 80" \
+  "the Service publishes no port 80" \
+  "port is what clients connect to on the Service, and the question keeps it at 80. Nothing in this Service publishes that port, so there is no entry for a node port to hang off — a Service's ports are a list and each entry carries port, targetPort and nodePort together." \
+  -- [ -n "$np" ]
+
+crit 1 "node port pinned to 30081" \
+  "nodePort for port 80 is '$np', want 30081" \
+  "Leave nodePort out and the cluster allocates one at random from its node-port range, which is normally what you want. Pinning it is for when something outside the cluster has the number written down — and pinning one already in use makes the Service rejected rather than silently moved." \
+  -- [ "$np" = "30081" ]
+
+crit_all_passed || evidence "$(crit_why)"
+report "nodeport ok"

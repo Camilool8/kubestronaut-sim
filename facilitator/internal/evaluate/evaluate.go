@@ -154,6 +154,8 @@ type CheckResult struct {
 
 	Skipped bool `json:"skipped,omitempty"`
 
+	Criteria []Criterion `json:"criteria,omitempty"`
+
 	Artifacts []CheckArtifact `json:"artifacts,omitempty"`
 }
 
@@ -328,12 +330,17 @@ func gradeCheck(r Runner, bank string, q exam.Question, c exam.Check, checkTimeo
 		cr.Message = err.Error()
 	default:
 		var artifacts []CheckArtifact
-		cr.Message, artifacts = splitArtifacts(out)
+		cr.Message, cr.Criteria, artifacts = splitArtifacts(out)
 		if ok {
 			cr.Passed = true
 			cr.Earned = c.Points
 		} else {
 			cr.Artifacts = artifacts
+
+			// A check that reports criteria is graded on how many it met. One
+			// that reports none is still all-or-nothing — which is what a gate
+			// wants, since it exits before the tally is ever emitted.
+			cr.Earned = partialEarned(c.Points, cr.Criteria)
 		}
 	}
 	return cr
@@ -358,7 +365,23 @@ func (r *Results) Scoreboard() string {
 			case c.Passed:
 				fmt.Fprintf(&b, "  [PASS] %s (%d pts) — %s\n", c.Desc, c.Points, c.Message)
 			default:
-				fmt.Fprintf(&b, "  [FAIL] %s (0/%d pts) — %s\n", c.Desc, c.Points, c.Message)
+				verdict := "FAIL"
+				if c.Earned > 0 {
+					verdict = "PART"
+				}
+				fmt.Fprintf(&b, "  [%s] %s (%d/%d pts) — %s\n", verdict, c.Desc, c.Earned, c.Points, c.Message)
+			}
+
+			// Which of the check's criteria were met. Only worth spelling out
+			// where the check did not simply pass.
+			if !c.Passed && !c.Skipped {
+				for _, cc := range c.Criteria {
+					mark := "x"
+					if cc.Passed {
+						mark = "+"
+					}
+					fmt.Fprintf(&b, "         [%s] %s\n", mark, cc.Desc)
+				}
 			}
 		}
 	}

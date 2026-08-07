@@ -11,15 +11,17 @@ evidence() {
 
 sel=$(kubectl -n orbit get netpol api-guard \
   -o jsonpath='{.spec.podSelector.matchLabels.role}' 2>/dev/null)
-[ "$sel" = "api" ] || {
-  echo "podSelector role is '$sel', want 'api'"
-  evidence "spec.podSelector names the Pods the policy applies TO — the ones being protected — and it is matched inside the policy's own Namespace. An empty selector would select every Pod in orbit; one matching nothing leaves the api Pods with no policy at all, which means unrestricted rather than denied."
-  exit 1
-}
-
 types=$(kubectl -n orbit get netpol api-guard -o json 2>/dev/null | jq -r '.spec.policyTypes[]?')
-same_set "$types" "$(printf 'Ingress\nEgress')" && echo "selector+types ok" || {
-  echo "policyTypes are '$(printf '%s' "$types" | tr '\n' ' ')', want Ingress and Egress"
-  evidence "policyTypes declares which directions this policy governs, and that is what makes 'everything else is denied' true: a direction listed here is denied except for the rules that allow it, and a direction NOT listed is left completely unrestricted no matter what rules are written below. Both directions have to appear for the question's last requirement to hold."
-  exit 1
-}
+
+crit 1 "selects the role=api Pods" \
+  "podSelector role is '$sel', want 'api'" \
+  "spec.podSelector names the Pods the policy applies TO — the ones being protected — and it is matched inside the policy's own Namespace. An empty selector would select every Pod in orbit; one matching nothing leaves the api Pods with no policy at all, which means unrestricted rather than denied." \
+  -- [ "$sel" = "api" ]
+
+crit 1 "declares both Ingress and Egress" \
+  "policyTypes are '$(printf '%s' "$types" | tr '\n' ' ')', want Ingress and Egress" \
+  "policyTypes declares which directions this policy governs, and that is what makes 'everything else is denied' true: a direction listed here is denied except for the rules that allow it, and a direction NOT listed is left completely unrestricted no matter what rules are written below. Both directions have to appear for the question's last requirement to hold." \
+  -- same_set "$types" "$(printf 'Ingress\nEgress')"
+
+crit_all_passed || evidence "$(crit_why)"
+report "selector+types ok"

@@ -12,24 +12,23 @@ evidence() {
 rules=$(kubectl -n orbit get netpol api-guard -o json 2>/dev/null | jq -c '.spec.ingress // []')
 
 n=$(printf '%s' "$rules" | jq 'length')
-[ "$n" = "1" ] || {
-  echo "expected exactly 1 ingress rule, found ${n}"
-  evidence "Ingress rules are additive: every rule in the list is a separate way in, so a second rule widens the policy rather than narrowing it. The question allows exactly one source on exactly one port, which is one rule."
-  exit 1
-}
-
 peers=$(printf '%s' "$rules" | jq -r '[.[].from[]? | .podSelector.matchLabels | to_entries[] | "\(.key)=\(.value)"] | .[]')
-same_set "$peers" "role=frontend" || {
-  echo "ingress peers are '$(printf '%s' "$peers" | tr '\n' ' ')', want role=frontend"
-  evidence "A podSelector under 'from' selects the Pods allowed to connect, by label, inside this same Namespace — peers are never named, only labelled. An empty from list means every source is allowed, and a namespaceSelector beside it would widen the rule to other Namespaces instead of narrowing it."
-  exit 1
-}
-
 ports=$(printf '%s' "$rules" | jq -r '[.[].ports[]? | "\(.port)/\(.protocol // "TCP")"] | .[]')
-same_set "$ports" "80/TCP" || {
-  echo "ingress ports are '$(printf '%s' "$ports" | tr '\n' ' ')', want 80/TCP"
-  evidence "The ports list restricts a rule to those destination ports on the selected Pods; omit it and the rule allows every port from that source. protocol defaults to TCP, so leaving it out is a correct answer — the number is what has to be 80."
-  exit 1
-}
 
-echo "ingress ok"
+crit 1 "exactly one ingress rule" \
+  "expected exactly 1 ingress rule, found ${n}" \
+  "Ingress rules are additive: every rule in the list is a separate way in, so a second rule widens the policy rather than narrowing it. The question allows exactly one source on exactly one port, which is one rule." \
+  -- [ "$n" = "1" ]
+
+crit 1 "allows only role=frontend as the source" \
+  "ingress peers are '$(printf '%s' "$peers" | tr '\n' ' ')', want role=frontend" \
+  "A podSelector under 'from' selects the Pods allowed to connect, by label, inside this same Namespace — peers are never named, only labelled. An empty from list means every source is allowed, and a namespaceSelector beside it would widen the rule to other Namespaces instead of narrowing it." \
+  -- same_set "$peers" "role=frontend"
+
+crit 1 "restricted to TCP 80" \
+  "ingress ports are '$(printf '%s' "$ports" | tr '\n' ' ')', want 80/TCP" \
+  "The ports list restricts a rule to those destination ports on the selected Pods; omit it and the rule allows every port from that source. protocol defaults to TCP, so leaving it out is a correct answer — the number is what has to be 80." \
+  -- same_set "$ports" "80/TCP"
+
+crit_all_passed || evidence "$(crit_why)"
+report "ingress ok"

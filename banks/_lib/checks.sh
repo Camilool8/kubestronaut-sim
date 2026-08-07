@@ -31,6 +31,21 @@ file_lines_sorted() {
     | sort
 }
 
+# Does a whitespace-separated list of names contain this exact name?
+#
+# Use this rather than grep -w for anything kubectl printed. A hyphen is not a
+# word character, so grep -w 'agent' matches 'vault-agent' and grep -w
+# 'app-tuning' matches 'my-app-tuning' — the second scores a wrong answer as
+# correct. Kubernetes names cannot contain glob characters, so splitting on IFS
+# is safe here.
+has_name() {
+  local want=$2 n
+  for n in ${1-}; do
+    [ "$n" = "$want" ] && return 0
+  done
+  return 1
+}
+
 same_set() {
   [ "$(printf '%s\n' "$1" | grep -v '^$' | sort)" = "$(printf '%s\n' "$2" | grep -v '^$' | sort)" ]
 }
@@ -53,12 +68,32 @@ yaml_api_versions() {
 
 semver_ge() { [ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | head -1)" = "$2" ]; }
 
+# What a lookup found when it found nothing. A name that does not match — a
+# container called vault-agent where the question asked for agent — makes
+# kubectl and jq alike return nothing, and staying silent then left the
+# candidate reading "runAsUser='', want 10001" with no way to see why. Say so
+# instead.
+ARTIFACT_EMPTY='none — the object, container or field named here does not exist'
+
 _artifact() {
-  [ -n "$3" ] || return 0
-  printf '%s %s %s\n%s\n' '---8<--- sim:artifact' "$1" "$2" "$3"
+  local body=$3
+  case "$(printf '%s' "$body" | tr -d '[:space:]')" in
+    ''|null) body=$ARTIFACT_EMPTY; set -- "$1" text "$body" ;;
+  esac
+  printf '%s %s %s\n%s\n' '---8<--- sim:artifact' "$1" "$2" "$body"
 }
 
-show_actual() { _artifact actual "$1" "$2"; }
+show_actual() { _artifact actual "$1" "${2-}"; }
+
+# The names that DO exist, for a message that can name the real problem:
+#   no container named 'agent' (found: vault-agent)
+# Takes the raw jsonpath list — '{.spec.containers[*].name}' and friends.
+name_list() {
+  local names
+  names=$(printf '%s' "${1-}" | tr -s '[:space:]' ' ' | sed -e 's/^ //' -e 's/ $//')
+  [ -n "$names" ] || { printf 'none'; return; }
+  printf '%s' "$names" | sed 's/ /, /g'
+}
 
 show_expected() {
   [ -f "$2" ] || return 0
@@ -66,6 +101,117 @@ show_expected() {
 }
 
 show_why() { _artifact why text "$1"; }
+
+# --------------------------------------------------------------- scored checks
+#
+# A check used to be all-or-nothing: the first gate that failed took every
+# point with it, so a Deployment missing one field out of six scored the same
+# as one nobody had touched. Criteria split a check's points across the things
+# it actually grades.
+#
+#   crit WEIGHT "what it grades" "what to say when it fails" -- <test command>
+#   report
+#
+# report exits 0 only when every criterion passed, so the check still reads as
+# pass/fail; the grader scales the check's `# points:` by the weight earned.
+#
+# Not everything should be scored. Keep the plain echo + evidence + exit 1 form
+# — a GATE — for the three cases where partial credit would be dishonest:
+#   * the object does not exist, so the work was not done at all
+#   * a name the question pinned is wrong AND could have been fixed by
+#     recreating the object
+#   * an action the question ruled out was taken
+# A gate exits before report runs, which is what makes it score zero.
+#
+# Never gate on something the candidate cannot undo. An ephemeral container's
+# name is permanent once added, so it is matched on what it does instead.
+#
+# The full shape, which gets the output order right by construction — the grader
+# reads everything before the first sentinel as the check's message, so crit
+# prints its failure line the moment it happens, ahead of any evidence pane, and
+# report emits the tally last:
+#
+#   crit 1 "runs as uid 10001" "runAsUser='$uid', want 10001" \
+#     "runAsUser is the UID the process runs as, overriding the image's USER." \
+#     -- [ "$uid" = 10001 ]
+#   crit 1 "read-only root filesystem" "readOnlyRootFilesystem='$ro', want true" \
+#     "Container-level only; written at Pod level the API rejects it." \
+#     -- [ "$ro" = true ]
+#   crit_all_passed || evidence "$(crit_why)"
+#   report "identity ok"
+#
+# The criterion carries the LABEL of what it grades and the message carries the
+# detail, so they read as a pair rather than repeating each other. The note is
+# optional and crit_why returns the one belonging to the FIRST failure — the
+# explanation the candidate needs, rather than a digest of all of them.
+_CRIT_EARNED=0
+_CRIT_TOTAL=0
+_CRIT_LINES=''
+_CRIT_WHY=''
+
+crit() {
+  local weight=$1 desc=$2 msg=$3 why=''
+  shift 3
+  # -- is mandatory: it is the only thing that tells an optional note apart from
+  # the start of the test command. Getting it wrong would silently grade the
+  # wrong thing, so say so instead of guessing.
+  if [ "${1-}" != "--" ]; then
+    why=$1
+    shift
+  fi
+  if [ "${1-}" != "--" ]; then
+    printf 'check bug: crit %s needs -- before the test command\n' "$desc" >&2
+    _CRIT_TOTAL=$((_CRIT_TOTAL + weight))
+    _CRIT_LINES="${_CRIT_LINES}---8<--- sim:criterion fail ${weight} ${desc}
+"
+    return 1
+  fi
+  shift
+
+  _CRIT_TOTAL=$((_CRIT_TOTAL + weight))
+  if "$@"; then
+    _CRIT_EARNED=$((_CRIT_EARNED + weight))
+    _CRIT_LINES="${_CRIT_LINES}---8<--- sim:criterion pass ${weight} ${desc}
+"
+    return 0
+  fi
+
+  printf '%s\n' "$msg"
+  _CRIT_LINES="${_CRIT_LINES}---8<--- sim:criterion fail ${weight} ${desc}
+"
+  [ -n "$_CRIT_WHY" ] || _CRIT_WHY=$why
+  return 1
+}
+
+# The note belonging to the first criterion that failed.
+crit_why() { printf '%s' "$_CRIT_WHY"; }
+
+# For a criterion that passes when something does NOT happen. `!` is a shell
+# keyword rather than a command, so it cannot be passed through crit's argument
+# list — `-- ! reaches metrics` would look for a binary named '!', fail to find
+# it, and score the criterion backwards.
+#
+# Named negate rather than not because the lint that catches an unsourced helper
+# looks for the helper's name in a command position, and the standalone word
+# "not" appears in 160 places in these scripts' prose.
+negate() { ! "$@"; }
+
+# Has every criterion so far passed? Guards the evidence pane, which is only
+# worth attaching to a failure.
+crit_all_passed() { [ "$_CRIT_EARNED" -eq "$_CRIT_TOTAL" ]; }
+
+# report [message-when-everything-passed]
+#
+# The message goes out ahead of the sentinels so it lands in the check's message
+# rather than inside an artifact. On failure the message is already there: crit
+# printed each failure as it happened.
+report() {
+  if crit_all_passed && [ -n "${1-}" ]; then
+    printf '%s\n' "$1"
+  fi
+  printf '%s' "$_CRIT_LINES"
+  crit_all_passed
+}
 
 k8s_clean() {
   yq '(., (select(has("items")) | .items[])) |= (

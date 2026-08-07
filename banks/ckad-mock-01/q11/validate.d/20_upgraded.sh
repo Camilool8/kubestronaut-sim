@@ -23,18 +23,23 @@ revision=${rest##*|}
 version=${chart#sim-web-}
 
 newest=$(printf '1.0.0\n%s\n' "$version" | sort -V | tail -1)
-[ "$version" != "1.0.0" ] && [ "$newest" = "$version" ] || {
-  echo "chart is '$chart'; it must be newer than sim-web-1.0.0"
-  evidence "An upgrade re-renders the release from a chart version, and the release is still on the one it was installed with. The repo's own index is the authority on which versions exist — guessing a number that is not published just fails, and asking for no version at all takes the newest."
-  exit 1
-}
-[ "$status" = "deployed" ] || {
-  echo "release status is '$status', want deployed"
-  evidence "The release exists but is not in the deployed state. An upgrade that fails leaves the release marked failed with the previous revision's objects still running, so the cluster can look completely healthy while Helm considers the release broken."
-  exit 1
-}
-[ "$revision" -ge 2 ] 2>/dev/null && echo "upgraded to ${chart} (revision ${revision})" || {
-  echo "revision is '$revision'; an upgrade should have produced at least 2"
-  evidence "Every successful upgrade increments the release's revision, so revision 1 means nothing has been applied through Helm since it was installed. Changing the objects with kubectl instead moves the cluster without telling Helm, and the next upgrade renders the chart again and undoes it."
-  exit 1
-}
+moved_on()  { [ "$version" != "1.0.0" ] && [ "$newest" = "$version" ]; }
+revised()   { [ "$revision" -ge 2 ] 2>/dev/null; }
+
+crit 2 "on a chart newer than sim-web-1.0.0" \
+  "chart is '$chart'; it must be newer than sim-web-1.0.0" \
+  "An upgrade re-renders the release from a chart version, and the release is still on the one it was installed with. The repo's own index is the authority on which versions exist — guessing a number that is not published just fails, and asking for no version at all takes the newest." \
+  -- moved_on
+
+crit 1 "the release is deployed, not failed" \
+  "release status is '$status', want deployed" \
+  "The release exists but is not in the deployed state. An upgrade that fails leaves the release marked failed with the previous revision's objects still running, so the cluster can look completely healthy while Helm considers the release broken." \
+  -- [ "$status" = "deployed" ]
+
+crit 1 "the upgrade went through Helm" \
+  "revision is '$revision'; an upgrade should have produced at least 2" \
+  "Every successful upgrade increments the release's revision, so revision 1 means nothing has been applied through Helm since it was installed. Changing the objects with kubectl instead moves the cluster without telling Helm, and the next upgrade renders the chart again and undoes it." \
+  -- revised
+
+crit_all_passed || evidence "$(crit_why)"
+report "upgraded to ${chart} (revision ${revision})"

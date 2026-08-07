@@ -75,6 +75,30 @@ for path in scripts:
                 errors.append((path, lines.index(ln) + 1, "points",
                                f"header {ln!r} does not match '# points: N' exactly (no leading zeros, one space)"))
 
+    # A check that scores criteria has to emit the tally. Without report the
+    # sentinels never reach the grader, the check silently reverts to
+    # all-or-nothing, and nothing anywhere says so.
+    crit_lines = [i for i, ln in enumerate(lines, 1)
+                  if re.search(r"(?:^|[|&;(]|\s)crit\s", ln) and not ln.strip().startswith("#")]
+    code = "\n".join(ln for ln in lines if not ln.strip().startswith("#"))
+    if crit_lines and not re.search(r"(?:^|[|&;(]|\s)report(?=\s|$|[)|;&])", code, re.MULTILINE):
+        errors.append((path, crit_lines[0], "crit-without-report",
+                       "uses crit but never calls report — the criterion tally is never "
+                       "emitted, so the grader falls back to all-or-nothing and the partial "
+                       "credit silently disappears"))
+
+    # report decides the exit status, so anything after it is dead code and any
+    # explicit exit after it throws the status away.
+    for i, line in enumerate(lines, 1):
+        if re.match(r"^\s*report\s*$", line):
+            for j in range(i, len(lines)):
+                tail = lines[j].strip()
+                if tail and not tail.startswith("#"):
+                    errors.append((path, j + 1, "code-after-report",
+                                   f"{tail!r} follows report, which already sets the check's "
+                                   f"exit status — this line either never runs or discards it"))
+                    break
+
     if CALLS:
         sourced = "_lib/checks.sh" in text
         local = set(re.findall(r"^([a-z_][a-z0-9_]*)\(\)", text, re.MULTILINE))

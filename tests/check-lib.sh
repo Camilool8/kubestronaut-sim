@@ -68,14 +68,125 @@ succeeds "semver_ge equal"   semver_ge 1.2.0 1.2.0
 succeeds "semver_ge greater" semver_ge 1.10.0 1.9.0
 fails    "semver_ge lesser"  semver_ge 1.9.0 1.10.0
 
+# has_name matches one whole token out of a jsonpath list. grep -w cannot do
+# this job: a hyphen is not a word character, so -w 'agent' matches
+# 'vault-agent' and -w 'app-tuning' matches 'my-app-tuning' — the second of
+# those scores a wrong answer as correct.
+succeeds "has_name single"        has_name 'agent' agent
+succeeds "has_name among many"    has_name 'app adapter' adapter
+succeeds "has_name newline list"  has_name "$(printf 'app\nadapter')" adapter
+succeeds "has_name tab list"      has_name "$(printf 'app\tadapter')" adapter
+fails    "has_name hyphen suffix" has_name 'vault-agent' agent
+fails    "has_name hyphen prefix" has_name 'agent-sidecar' agent
+fails    "has_name substring"     has_name 'my-app-tuning' app-tuning
+fails    "has_name empty list"    has_name '' agent
+fails    "has_name absent"        has_name 'web db' agent
+succeeds "has_name exact hyphen"  has_name 'vault-agent' vault-agent
+succeeds "has_name slash"         has_name 'batch/v1 networking.k8s.io/v1' batch/v1
+fails    "has_name slash partial" has_name 'batch/v1beta1' batch/v1
+
+# name_list renders what IS there when a lookup by name found nothing, so the
+# message can say "found: vault-agent" instead of reporting an empty field.
+ok "name_list one"    "$(name_list 'vault-agent')"        "vault-agent"
+ok "name_list many"   "$(name_list 'app adapter')"        "app, adapter"
+ok "name_list tabs"   "$(name_list "$(printf 'a\tb')")"   "a, b"
+ok "name_list spaced" "$(name_list '  app   adapter  ')"  "app, adapter"
+ok "name_list empty"  "$(name_list '')"                   "none"
+ok "name_list blank"  "$(name_list '   ')"                "none"
+
 ok "show_actual"   "$(show_actual yaml 'kind: Service')"  "$(printf -- '---8<--- sim:artifact actual yaml\nkind: Service')"
 ok "show_why"      "$(show_why 'The selector matches no Pod.')" "$(printf -- '---8<--- sim:artifact why text\nThe selector matches no Pod.')"
 ok "show_actual multiline" "$(show_actual yaml "$(printf 'a: 1\nb: 2')")" \
    "$(printf -- '---8<--- sim:artifact actual yaml\na: 1\nb: 2')"
-ok "show_actual empty body" "$(show_actual yaml '')" ""
-succeeds "show_actual empty body succeeds" show_actual yaml ''
+# An empty body is the case the candidate most needs to see: the object or the
+# named container is not there at all. Emitting nothing left them reading
+# "runAsUser='', want 10001" with no pane to explain it, so empty must still
+# produce an artifact.
+ok "show_actual empty body" "$(show_actual yaml '')" \
+   "$(printf -- '---8<--- sim:artifact actual text\n%s' "$ARTIFACT_EMPTY")"
+succeeds "show_actual empty body succeeds" eval "show_actual yaml '' >/dev/null"
+ok "show_actual whitespace body" "$(show_actual yaml '   ')" \
+   "$(printf -- '---8<--- sim:artifact actual text\n%s' "$ARTIFACT_EMPTY")"
+ok "show_actual jq null body" "$(show_actual json 'null')" \
+   "$(printf -- '---8<--- sim:artifact actual text\n%s' "$ARTIFACT_EMPTY")"
 ok "show_why printf-safe" "$(show_why 'literal %s and \n stay put')" \
    "$(printf -- '---8<--- sim:artifact why text\nliteral %%s and \\n stay put')"
+
+# --- scored criteria ---------------------------------------------------------
+# crit prints the detail immediately, so it lands in the message ahead of any
+# evidence pane; report emits the tally last and decides the exit status.
+crit_run() ( # subshell: the accumulators are globals
+  _CRIT_EARNED=0; _CRIT_TOTAL=0; _CRIT_LINES=''
+  "$@"
+  report
+)
+
+two_of_three() {
+  crit 1 "uid is 10001"   "runAsUser='', want 10001"   -- [ 1 = 1 ]
+  crit 1 "gid is 20001"   "runAsGroup='', want 20001"  -- [ 1 = 1 ]
+  crit 1 "refuses root"   "runAsNonRoot='', want true" -- [ 1 = 2 ]
+}
+out=$(crit_run two_of_three)
+rc=$?
+ok "crit failing detail is in the message" "$(printf '%s' "$out" | head -1)" "runAsNonRoot='', want true"
+ok "crit emits one line per criterion" "$(printf '%s' "$out" | grep -c 'sim:criterion')" "3"
+ok "crit marks the passes"  "$(printf '%s' "$out" | grep -c 'sim:criterion pass 1 ')" "2"
+ok "crit marks the failure" "$(printf '%s' "$out" | grep -c 'sim:criterion fail 1 refuses root')" "1"
+ok "report exits non-zero when a criterion failed" "$rc" "1"
+# A passing criterion must not leak its detail into the message.
+case $out in
+  *"want 10001"*) bad=1 ;;
+  *) bad=0 ;;
+esac
+ok "crit stays quiet about passes" "$bad" "0"
+
+all_three() {
+  crit 2 "uid is 10001" "no" -- [ 1 = 1 ]
+  crit 1 "refuses root" "no" -- true
+}
+out=$(crit_run all_three)
+rc=$?
+ok "report exits zero when every criterion passed" "$rc" "0"
+ok "clean run emits no message" "$(printf '%s' "$out" | grep -vc 'sim:criterion')" "0"
+ok "weights are carried through" "$(printf '%s' "$out" | grep -c 'sim:criterion pass 2 uid is 10001')" "1"
+
+# -- is what tells an optional note apart from the test command, so a missing one
+# must be loud. Silently guessing would grade something other than the answer.
+no_dashes() { crit 1 "plain" "no" [ 1 = 1 ]; }
+out=$(crit_run no_dashes 2>/dev/null)
+ok "crit without -- scores nothing" "$(printf '%s' "$out" | grep -c 'sim:criterion pass')" "0"
+ok "crit without -- fails the criterion" "$(printf '%s' "$out" | grep -c 'sim:criterion fail 1 plain')" "1"
+ok "crit without -- says so on stderr" \
+   "$(crit_run no_dashes 2>&1 >/dev/null | grep -c 'needs -- before the test')" "1"
+
+# Per-criterion notes: crit_why hands back the FIRST failure's, because that is
+# the one the candidate has to read. A passing criterion's note stays unused.
+with_whys() {
+  crit 1 "first"  "m1" "note for first"  -- true
+  crit 1 "second" "m2" "note for second" -- false
+  crit 1 "third"  "m3" "note for third"  -- false
+}
+out=$(crit_run with_whys)
+ok "crit_why is the first failure's note" "$(_CRIT_WHY=''; crit 1 a m 'note for second' -- false >/dev/null; crit_why)" "note for second"
+ok "notes stay out of the output" "$(printf '%s' "$out" | grep -c 'note for')" "0"
+ok "a criterion with a note still scores" "$(printf '%s' "$out" | grep -c 'sim:criterion pass 1 first')" "1"
+ok "a note does not become the test" "$(printf '%s' "$out" | grep -c 'sim:criterion fail 1 second')" "1"
+
+# `!` is a keyword, so `-- ! cmd` would hunt for a binary named '!', fail, and
+# score the criterion backwards. negate() is the way to express a negative, and
+# is not called "not" because that word appears in 160 places in the prose the
+# unsourced-helper lint scans.
+succeeds "negate inverts a failure" negate false
+fails    "negate inverts a success" negate true
+ok "crit with negate scores a denial as a pass" \
+   "$(_CRIT_EARNED=0; _CRIT_TOTAL=0; _CRIT_LINES=''; crit 1 "denied" "got through" -- negate false; printf '%s' "$_CRIT_LINES" | grep -c 'pass 1 denied')" "1"
+ok "crit with negate scores a success as a failure" \
+   "$(_CRIT_EARNED=0; _CRIT_TOTAL=0; _CRIT_LINES=''; crit 1 "denied" "got through" -- negate true >/dev/null; printf '%s' "$_CRIT_LINES" | grep -c 'fail 1 denied')" "1"
+_CRIT_EARNED=0; _CRIT_TOTAL=0; _CRIT_LINES=''; _CRIT_WHY=''
+
+succeeds "crit returns the test's status on pass" eval "crit 1 d m w -- true >/dev/null"
+fails    "crit returns the test's status on fail" eval "crit 1 d m w -- false >/dev/null"
+_CRIT_EARNED=0; _CRIT_TOTAL=0; _CRIT_LINES=''; _CRIT_WHY=''
 
 printf 'kind: Service\nspec:\n  selector:\n    app: inventory\n' > "$tmp/expected.yaml"
 ok "show_expected reads the file" "$(show_expected yaml "$tmp/expected.yaml")" \

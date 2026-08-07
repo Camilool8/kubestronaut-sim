@@ -140,6 +140,14 @@ export interface CheckArtifact {
   body: string;
 }
 
+// One graded thing inside a check. Weights are relative to each other, not to
+// the check's points — the grader scales them.
+export interface Criterion {
+  desc: string;
+  weight: number;
+  passed: boolean;
+}
+
 export interface CheckResult {
   name: string;
   desc: string;
@@ -149,6 +157,8 @@ export interface CheckResult {
   message: string;
 
   skipped?: boolean;
+
+  criteria?: Criterion[];
 
   artifacts?: CheckArtifact[];
 }

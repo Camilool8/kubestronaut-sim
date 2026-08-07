@@ -8,18 +8,31 @@ evidence() {
   show_why "$1"
 }
 
-out=$(kubectl -n vega get job backfill \
-  -o jsonpath='{.spec.completions}|{.spec.parallelism}|{.spec.backoffLimit}' 2>/dev/null)
-[ "$out" = "3|2|2" ] || {
-  echo "completions|parallelism|backoffLimit is '$out', want '3|2|2'"
-  evidence "completions is how many Pods must exit successfully before the Job is Complete, parallelism is how many of them may run at the same time, and backoffLimit is how many failures are tolerated before the Job gives up and is marked Failed. All three default (1, 1 and 6) and kubectl create job accepts none of them as flags, so this Job has to be written out rather than generated."
-  exit 1
-}
-
-img=$(kubectl -n vega get job backfill \
-  -o jsonpath='{.spec.template.spec.containers[?(@.name=="worker")].image}' 2>/dev/null)
-[ -n "$img" ] && echo "job spec ok" || {
-  echo "no container named 'worker' in the Job's Pod template"
+names=$(kubectl -n vega get job backfill \
+  -o jsonpath='{.spec.template.spec.containers[*].name}' 2>/dev/null)
+has_name "$names" worker || {
+  echo "no container named 'worker' in the Job's Pod template (found: $(name_list "$names"))"
   evidence "The container is found by name, and the question names it worker. A Pod template whose container is called something else describes a different workload as far as anything selecting by name is concerned."
   exit 1
 }
+
+field() { kubectl -n vega get job backfill -o jsonpath="{.spec.$1}" 2>/dev/null; }
+completions=$(field completions); parallelism=$(field parallelism); backoff=$(field backoffLimit)
+
+crit 1 "3 completions" \
+  "completions is '$completions', want 3" \
+  "completions is how many Pods must exit successfully before the Job is Complete. It defaults to 1 and kubectl create job accepts no flag for it, so this Job has to be written out rather than generated." \
+  -- [ "$completions" = "3" ]
+
+crit 1 "parallelism 2" \
+  "parallelism is '$parallelism', want 2" \
+  "parallelism is how many of the Job's Pods may run at the same time — the difference between three Pods one after another and three at once. It defaults to 1." \
+  -- [ "$parallelism" = "2" ]
+
+crit 1 "backoffLimit 2" \
+  "backoffLimit is '$backoff', want 2" \
+  "backoffLimit is how many failures are tolerated before the Job gives up and is marked Failed. It defaults to 6, so leaving it alone means a broken Job retries far longer than the question asks." \
+  -- [ "$backoff" = "2" ]
+
+crit_all_passed || evidence "$(crit_why)"
+report "job spec ok"

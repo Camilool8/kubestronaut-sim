@@ -26,33 +26,34 @@ svc=$(printf '%s' "$out" | yq 'select(.kind == "Service")' - 2>/dev/null)
 
 name=$(printf '%s' "$dep" | yq -r '.metadata.name')
 svcname=$(printf '%s' "$svc" | yq -r '.metadata.name')
-[ "$name" = "staging-cargo-api" ] || {
-  echo "Deployment renders as '$name', want staging-cargo-api"
-  evidence "namePrefix rewrites the name of every resource in the build and fixes up the references between them — which is why the Service still finds the Deployment's Pods after both have been renamed. It is a transformer, not a text edit on the base."
-  exit 1
-}
-[ "$svcname" = "staging-cargo-api" ] || {
-  echo "Service renders as '$svcname', want staging-cargo-api"
-  evidence "The prefix applies to EVERY resource the build renders, not only the Deployment. A Service that came out unprefixed means it is not coming through the same overlay."
-  exit 1
-}
-
 img=$(printf '%s' "$dep" | yq -r '.spec.template.spec.containers[] | select(.name == "api") | .image')
 reps=$(printf '%s' "$dep" | yq -r '.spec.replicas')
 label=$(printf '%s' "$dep" | yq -r '.metadata.labels.tier // ""')
-[ "$img" = "nginx:1.29-alpine" ] || {
-  echo "rendered image is '$img', want nginx:1.29-alpine"
-  evidence "The images transformer matches on the image NAME as written in the base — the bare repository, not the full reference with its tag — and replaces the tag through newTag. Matching against the tagged string finds nothing and the transformer silently does no work; newName is the separate field for changing the repository."
-  exit 1
-}
-[ "$reps" = "3" ] || {
-  echo "rendered replicas is '$reps', want 3"
-  evidence "The replicas transformer matches the resource's ORIGINAL name, as the base spells it, because transformers see resources before namePrefix has been applied. Naming the prefixed resource here matches nothing and the override quietly does nothing at all — which is the single most common way this task goes wrong."
-  exit 1
-}
-[ "$label" = "staging" ] || {
-  echo "rendered tier label is '$label', want staging"
-  evidence "The labels transformer adds the pair to every resource it renders. Whether it is ALSO injected into the Deployment's selector.matchLabels is a separate switch, and it matters: selectors are immutable after creation, so injecting one into a Deployment that already exists makes every later apply fail."
-  exit 1
-}
-echo "overlay renders correctly"
+
+crit 1 "namePrefix reaches the Deployment" \
+  "Deployment renders as '$name', want staging-cargo-api" \
+  "namePrefix rewrites the name of every resource in the build and fixes up the references between them — which is why the Service still finds the Deployment's Pods after both have been renamed. It is a transformer, not a text edit on the base." \
+  -- [ "$name" = "staging-cargo-api" ]
+
+crit 1 "and the Service too" \
+  "Service renders as '$svcname', want staging-cargo-api" \
+  "The prefix applies to EVERY resource the build renders, not only the Deployment. A Service that came out unprefixed means it is not coming through the same overlay." \
+  -- [ "$svcname" = "staging-cargo-api" ]
+
+crit 1 "the images transformer set the tag" \
+  "rendered image is '$img', want nginx:1.29-alpine" \
+  "The images transformer matches on the image NAME as written in the base — the bare repository, not the full reference with its tag — and replaces the tag through newTag. Matching against the tagged string finds nothing and the transformer silently does no work; newName is the separate field for changing the repository." \
+  -- [ "$img" = "nginx:1.29-alpine" ]
+
+crit 1 "the replicas transformer took effect" \
+  "rendered replicas is '$reps', want 3" \
+  "The replicas transformer matches the resource's ORIGINAL name, as the base spells it, because transformers see resources before namePrefix has been applied. Naming the prefixed resource here matches nothing and the override quietly does nothing at all — which is the single most common way this task goes wrong." \
+  -- [ "$reps" = "3" ]
+
+crit 1 "the tier=staging label was added" \
+  "rendered tier label is '$label', want staging" \
+  "The labels transformer adds the pair to every resource it renders. Whether it is ALSO injected into the Deployment's selector.matchLabels is a separate switch, and it matters: selectors are immutable after creation, so injecting one into a Deployment that already exists makes every later apply fail." \
+  -- [ "$label" = "staging" ]
+
+crit_all_passed || evidence "$(crit_why)"
+report "overlay renders correctly"

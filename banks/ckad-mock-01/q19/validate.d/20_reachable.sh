@@ -13,19 +13,24 @@ evidence() {
 
 count=$(kubectl -n serpens get endpointslice -l kubernetes.io/service-name=inventory -o json 2>/dev/null \
   | jq '[.items[].endpoints[]? | select(.conditions.ready == true)] | length')
-[ "$count" = "2" ] || {
-  echo "the Service has $count ready endpoints, want 2"
-  evidence "An endpoint list with no ready addresses means the Service is selecting no Pod at all — that is the selector, not the port. Compare spec.selector on the Service with the labels on the Deployment's Pod template."
-  exit 1
-}
-
 out=$(kubectl -n serpens exec deploy/inventory -- \
   sh -c 'for i in 1 2 3; do
            curl -s -m 4 http://inventory.serpens.svc:80/ && exit 0
            sleep 2
          done; exit 1' 2>/dev/null)
-printf '%s' "$out" | grep -q inventory && { echo "service answers"; exit 0; }
+answers() { printf '%s' "$out" | grep -q inventory; }
 
-echo "the Service did not answer (got: $(printf '%s' "$out" | tr '\n' ' ' | head -c 120))"
-evidence "The addresses are listed, so the selector is right and this is the second fault: the port under 'ports' is where traffic is forwarded, and the container listens on 8080. Endpoints existing and the Service answering are not the same thing."
-exit 1
+# Endpoints existing and the Service answering are not the same thing, and the
+# question's two faults break them separately.
+crit 2 "both Pods appear as ready endpoints" \
+  "the Service has $count ready endpoints, want 2" \
+  "An endpoint list with no ready addresses means the Service is selecting no Pod at all — that is the selector, not the port. Compare spec.selector on the Service with the labels on the Deployment's Pod template." \
+  -- [ "$count" = "2" ]
+
+crit 4 "the Service really answers from inside the cluster" \
+  "the Service did not answer (got: $(printf '%s' "$out" | tr '\n' ' ' | head -c 120))" \
+  "If the addresses are listed then the selector is right and this is the second fault: the port under 'ports' is where traffic is forwarded, and the container listens on 8080." \
+  -- answers
+
+crit_all_passed || evidence "$(crit_why)"
+report "service answers"

@@ -20,14 +20,15 @@ cpu=$(kubectl -n aurora-staging get quota staging-quota \
   exit 1
 }
 
-[ "$(milli "$pods")" = "5000" ] || {
-  echo "pods limit is '$pods', want 5"
-  evidence "spec.hard.pods caps how many Pods may exist in the Namespace at once; once it is reached, creating another is rejected outright rather than left Pending. The question asks for 5 and the quota holds a different number."
-  exit 1
-}
-[ "$(milli "$cpu")" = "1000" ] || {
-  echo "requests.cpu limit is '$cpu', want 1"
-  evidence "requests.cpu caps the sum of the CPU every Pod in the Namespace RESERVES, which is what the scheduler works from — limits.cpu, the ceiling the kernel enforces, is a separate key and capping it is a different guarantee. One CPU written 1, 1000m or 1.0 is the same quantity, so what is here is a different amount or a different key."
-  exit 1
-}
-echo "quota ok"
+crit 1 "caps the Namespace at 5 Pods" \
+  "pods limit is '$pods', want 5" \
+  "spec.hard.pods caps how many Pods may exist in the Namespace at once; once it is reached, creating another is rejected outright rather than left Pending." \
+  -- [ "$(milli "$pods")" = "5000" ]
+
+crit 1 "caps requested CPU at 1" \
+  "requests.cpu limit is '$cpu', want 1" \
+  "requests.cpu caps the sum of the CPU every Pod in the Namespace RESERVES, which is what the scheduler works from — limits.cpu, the ceiling the kernel enforces, is a separate key and capping it is a different guarantee. One CPU written 1, 1000m or 1.0 is the same quantity, so what is here is a different amount or a different key." \
+  -- [ "$(milli "$cpu")" = "1000" ]
+
+crit_all_passed || evidence "$(crit_why)"
+report "quota ok"

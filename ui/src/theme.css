@@ -2611,6 +2611,25 @@ button.nav-menu-item:hover {
   white-space: nowrap;
 }
 
+/* Criterion rows hang off the check above them: indented, quieter, and with
+   the top padding removed so the group reads as one block. */
+.check-criterion td {
+  padding-top: 0;
+}
+
+.check-criterion .check-desc {
+  padding-left: var(--space-4);
+  color: var(--text-muted);
+}
+
+.criterion-pass .check-mark {
+  color: var(--success);
+}
+
+.criterion-fail .check-mark {
+  color: var(--danger);
+}
+
 .check-message {
   color: var(--text-muted);
 }
