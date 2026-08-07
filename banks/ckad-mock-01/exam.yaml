@@ -49,7 +49,7 @@ spec:
       title: Fix a failing Deployment
       instance: instance-1
       domain: Application Deployment
-      weight: 9
+      weight: 7
       targetSeconds: 560
       difficulty: deep
       docs:
@@ -59,7 +59,7 @@ spec:
       title: NetworkPolicy lockdown
       instance: instance-2
       domain: Services and Networking
-      weight: 11
+      weight: 9
       targetSeconds: 600
       difficulty: deep
       docs:
@@ -69,7 +69,7 @@ spec:
       title: CronJob and Job
       instance: instance-2
       domain: Application Design and Build
-      weight: 6
+      weight: 9
       targetSeconds: 660
       difficulty: deep
       docs:
@@ -81,7 +81,7 @@ spec:
       title: Init container and native sidecar
       instance: instance-1
       domain: Application Design and Build
-      weight: 6
+      weight: 9
       targetSeconds: 660
       difficulty: deep
       docs:
@@ -115,7 +115,7 @@ spec:
       title: Route two Services with one Ingress
       instance: instance-2
       domain: Services and Networking
-      weight: 11
+      weight: 9
       targetSeconds: 330
       difficulty: core
       docs:
@@ -125,7 +125,7 @@ spec:
       title: Build, push and run a container image
       instance: instance-1
       domain: Application Design and Build
-      weight: 6
+      weight: 9
       targetSeconds: 480
       difficulty: core
       docs:
@@ -135,7 +135,7 @@ spec:
       title: Persistent and ephemeral storage
       instance: instance-2
       domain: Application Design and Build
-      weight: 6
+      weight: 9
       targetSeconds: 570
       difficulty: deep
       docs:
@@ -147,14 +147,14 @@ spec:
       title: Helm release management
       instance: instance-1
       domain: Application Deployment
-      weight: 9
+      weight: 7
       targetSeconds: 450
       difficulty: core
     - id: q12
       title: Roll out, then roll back
       instance: instance-2
       domain: Application Deployment
-      weight: 9
+      weight: 7
       targetSeconds: 570
       difficulty: deep
       docs:
@@ -164,7 +164,7 @@ spec:
       title: Kustomize overlay
       instance: instance-1
       domain: Application Deployment
-      weight: 9
+      weight: 7
       targetSeconds: 450
       difficulty: core
       docs:
@@ -194,7 +194,7 @@ spec:
       title: Health checks
       instance: instance-2
       domain: Application Observability and Maintenance
-      weight: 8
+      weight: 7
       targetSeconds: 300
       difficulty: core
       docs:
@@ -204,14 +204,14 @@ spec:
       title: Find out why two workloads are broken
       instance: instance-1
       domain: Application Observability and Maintenance
-      weight: 8
+      weight: 7
       targetSeconds: 600
       difficulty: deep
     - id: q18
       title: Bring a manifest up to date
       instance: instance-2
       domain: Application Observability and Maintenance
-      weight: 8
+      weight: 7
       targetSeconds: 450
       difficulty: core
       docs:
@@ -221,7 +221,7 @@ spec:
       title: A Service that reaches nothing
       instance: instance-1
       domain: Services and Networking
-      weight: 11
+      weight: 9
       targetSeconds: 240
       difficulty: quick
       docs:
@@ -231,7 +231,7 @@ spec:
       title: Expose a Deployment on a node port
       instance: instance-2
       domain: Services and Networking
-      weight: 11
+      weight: 9
       targetSeconds: 240
       difficulty: quick
       docs:
@@ -241,21 +241,21 @@ spec:
       title: The adapter pattern
       instance: instance-1
       domain: Application Design and Build
-      weight: 6
+      weight: 9
       targetSeconds: 240
       difficulty: quick
     - id: q22
       title: The ambassador pattern
       instance: instance-2
       domain: Application Design and Build
-      weight: 6
+      weight: 9
       targetSeconds: 240
       difficulty: quick
     - id: q23
       title: Blue/green cutover
       instance: instance-1
       domain: Application Deployment
-      weight: 9
+      weight: 7
       targetSeconds: 150
       difficulty: quick
       docs:
@@ -279,7 +279,7 @@ spec:
       title: Debug a Pod you cannot get into
       instance: instance-1
       domain: Application Observability and Maintenance
-      weight: 8
+      weight: 7
       targetSeconds: 420
       difficulty: core
       docs:
@@ -291,7 +291,7 @@ spec:
       title: Pull policy and shutdown budget
       instance: instance-2
       domain: Application Design and Build
-      weight: 6
+      weight: 9
       targetSeconds: 210
       difficulty: quick
       docs:
@@ -299,3 +299,183 @@ spec:
           url: https://kubernetes.io/docs/concepts/containers/images/
         - label: Pod lifecycle
           url: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/
+    - id: q27
+      title: Defaults from a LimitRange
+      instance: instance-1
+      domain: Application Environment, Configuration and Security
+      weight: 9
+      targetSeconds: 240
+      difficulty: quick
+      docs:
+        - label: Limit ranges
+          url: https://kubernetes.io/docs/concepts/policy/limit-range/
+    - id: q28
+      title: Pull from a private registry
+      instance: instance-2
+      domain: Application Environment, Configuration and Security
+      weight: 9
+      targetSeconds: 240
+      difficulty: quick
+      docs:
+        - label: Pull an image from a private registry
+          url: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    - id: q29
+      title: Discover and use a custom resource
+      instance: instance-1
+      domain: Application Environment, Configuration and Security
+      weight: 9
+      targetSeconds: 420
+      difficulty: core
+      docs:
+        - label: Custom resources
+          url: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
+    - id: q30
+      title: Grant a ServiceAccount only what it needs
+      instance: instance-2
+      domain: Application Environment, Configuration and Security
+      weight: 9
+      targetSeconds: 480
+      difficulty: core
+      docs:
+        - label: RBAC authorization
+          url: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+    - id: q31
+      title: Pause a rollout, then resume it
+      instance: instance-1
+      domain: Application Deployment
+      weight: 7
+      targetSeconds: 240
+      difficulty: quick
+      docs:
+        - label: Deployments
+          url: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
+    - id: q32
+      title: Restart a Deployment in place
+      instance: instance-2
+      domain: Application Deployment
+      weight: 7
+      targetSeconds: 210
+      difficulty: quick
+      docs:
+        - label: kubectl quick reference
+          url: https://kubernetes.io/docs/reference/kubectl/quick-reference/
+    - id: q33
+      title: A canary split by replica count
+      instance: instance-1
+      domain: Application Deployment
+      weight: 7
+      targetSeconds: 450
+      difficulty: core
+      docs:
+        - label: Deployments
+          url: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
+    - id: q34
+      title: Install a Helm release from a values file
+      instance: instance-2
+      domain: Application Deployment
+      weight: 7
+      targetSeconds: 480
+      difficulty: core
+      docs:
+        - label: Values files
+          url: https://helm.sh/docs/chart_template_guide/values_files/
+    - id: q35
+      title: Patch a Kustomize base
+      instance: instance-1
+      domain: Application Deployment
+      weight: 7
+      targetSeconds: 450
+      difficulty: core
+      docs:
+        - label: Declarative management with Kustomize
+          url: https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/
+    - id: q36
+      title: Reach an outside name from inside the cluster
+      instance: instance-2
+      domain: Services and Networking
+      weight: 9
+      targetSeconds: 300
+      difficulty: core
+      docs:
+        - label: Service
+          url: https://kubernetes.io/docs/concepts/services-networking/service/
+    - id: q37
+      title: Terminate TLS at the Ingress
+      instance: instance-1
+      domain: Services and Networking
+      weight: 9
+      targetSeconds: 480
+      difficulty: core
+      docs:
+        - label: Ingress
+          url: https://kubernetes.io/docs/concepts/services-networking/ingress/
+    - id: q38
+      title: Deny everything, then allow one path
+      instance: instance-2
+      domain: Services and Networking
+      weight: 9
+      targetSeconds: 480
+      difficulty: core
+      docs:
+        - label: Network policies
+          url: https://kubernetes.io/docs/concepts/services-networking/network-policies/
+    - id: q39
+      title: A headless Service and the names it publishes
+      instance: instance-1
+      domain: Services and Networking
+      weight: 9
+      targetSeconds: 570
+      difficulty: deep
+      docs:
+        - label: DNS for Services and Pods
+          url: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/
+    - id: q40
+      title: A StatefulSet with storage that survives
+      instance: instance-2
+      domain: Application Design and Build
+      weight: 9
+      targetSeconds: 480
+      difficulty: core
+      docs:
+        - label: StatefulSets
+          url: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
+    - id: q41
+      title: Read the events behind a Pending Pod
+      instance: instance-1
+      domain: Application Observability and Maintenance
+      weight: 7
+      targetSeconds: 240
+      difficulty: quick
+      docs:
+        - label: Debug Pods
+          url: https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/
+    - id: q42
+      title: Report on workloads with custom columns
+      instance: instance-2
+      domain: Application Observability and Maintenance
+      weight: 7
+      targetSeconds: 210
+      difficulty: quick
+      docs:
+        - label: kubectl quick reference
+          url: https://kubernetes.io/docs/reference/kubectl/quick-reference/
+    - id: q43
+      title: A container that keeps failing its liveness probe
+      instance: instance-1
+      domain: Application Observability and Maintenance
+      weight: 7
+      targetSeconds: 450
+      difficulty: core
+      docs:
+        - label: Configure probes
+          url: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+    - id: q44
+      title: A Job that never finishes
+      instance: instance-2
+      domain: Application Observability and Maintenance
+      weight: 7
+      targetSeconds: 570
+      difficulty: deep
+      docs:
+        - label: Jobs
+          url: https://kubernetes.io/docs/concepts/workloads/controllers/job/
