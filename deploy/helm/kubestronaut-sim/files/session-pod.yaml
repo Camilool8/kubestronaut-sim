@@ -128,9 +128,15 @@ spec:
         httpGet: {path: /vnc.html, port: 6080}
         periodSeconds: 10
         failureThreshold: 30
+      # Xvnc, XFCE and websockify share this. Average draw is a few percent
+      # of a core, but every mouse move repaints hover state and re-encodes,
+      # and a 500m limit put those bursts over the 50ms-per-100ms quota: CFS
+      # then froze the container to the next period boundary and frames
+      # landed in 100ms steps. The ceiling is what needs the room, not the
+      # request.
       resources:
         requests: {memory: "768Mi", cpu: "100m"}
-        limits: {memory: "2Gi", cpu: "500m"}
+        limits: {memory: "2Gi", cpu: "2"}
 
     - name: conductor
       image: cjoga/kubestronaut-sim-conductor:dev
