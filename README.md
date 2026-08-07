@@ -44,10 +44,13 @@ what creates its cluster, and the page shows each phase as it completes.
 
 | Bank | Engine | Questions | Per attempt | Time | Pass |
 |---|---|---|---|---|---|
-| CKAD Mock Exam 01 | Hands-on | 26 | 22 drawn | 120 min | 66% |
+| CKAD Mock Exam | Hands-on | 26 | 17 drawn | 120 min | 66% |
 | KCNA Mock Exam | Multiple choice | 97 | 65 drawn | 90 min | 75% |
 
 - Every draw is stratified to the published curriculum weights.
+- CKAD also mixes the draw across three levels — quick, core and deep, set
+  by how long a task should take — so a sitting is not a wall of long
+  multi-step tasks.
 - CKAD runs against a two-node Kubernetes 1.35 cluster.
 - KCNA ships a full explanation for every question.
 - CKA, KCSA and CKS appear in the catalog as coming soon.
@@ -155,8 +158,7 @@ Calibration choices, not gaps.
 | Divergence | Reason |
 |---|---|
 | Harder than the real exam | Pass here, be comfortable there. |
-| 22 questions vs a real CKAD's 15–20 | More coverage per sitting. Point budgets still track curriculum weights within 2 points. |
-| Two-node cluster | Enough for scheduling, affinity and DaemonSet questions, and it fits in 9GB. |
+| Two-node cluster | Headroom for scheduling, affinity and DaemonSet questions, and it fits in 9GB. No question needs the second node today — CKAD has no node-management competency. |
 | Ingress and NodePorts published to your host | Convenience for debugging. No grading check depends on it. |
 | Documentation allowlist has no deny-override | Allowing `kubernetes.io` also allows `discuss.kubernetes.io`. |
 | Solutions readable in Training | That is the point of the mode. Exam and Mastery keep the gate. |

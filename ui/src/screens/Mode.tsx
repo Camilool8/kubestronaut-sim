@@ -180,7 +180,9 @@ function DrawPanel({ exam, selected, onSelect }: DrawPanelProps) {
           {selected.length > 0
             ? strings.mode.drawNarrowed(drawn, pool, selected.length)
             : pooled
-              ? strings.mode.drawPooled(drawn, pool)
+              ? exam.levelMixed
+                ? strings.mode.drawPooledMixed(drawn, pool)
+                : strings.mode.drawPooled(drawn, pool)
               : strings.mode.drawAll(drawn)}
         </p>
       </div>

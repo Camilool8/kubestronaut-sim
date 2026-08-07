@@ -116,6 +116,8 @@ export const strings = {
     drawTitle: "What you'll be asked",
     drawPooled: (drawn: number, pool: number) =>
       `${drawn} drawn at random from ${pool}, weighted to the published domain split. A different set every attempt.`,
+    drawPooledMixed: (drawn: number, pool: number) =>
+      `${drawn} drawn at random from ${pool}, weighted to the published domain split and mixed across three levels, so a sitting is not a wall of long tasks. A different set every attempt.`,
     drawAll: (n: number) =>
       `All ${n}, every attempt. This bank has no larger pool behind it yet, so the set does not change between sessions.`,
 

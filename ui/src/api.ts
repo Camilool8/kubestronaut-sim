@@ -99,6 +99,7 @@ export interface ExamInfo {
   environment?: ExamEnvironment;
 
   hasTips?: boolean;
+  levelMixed?: boolean;
 }
 
 export interface ExamEnvironment {

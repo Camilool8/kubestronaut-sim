@@ -766,7 +766,7 @@ weighting existed. Both floor rather than round.
 
 Weighting happens at scoring time rather than being baked into a bank's
 point budget, because **a bank's points are fixed and a draw is not**.
-`tests/bank-weights.sh` can promise ckad-mock-01's 180 points sit in the
+`tests/bank-weights.sh` can promise ckad-mock-01's 217 points sit in the
 curriculum's ratios, but not that a filtered or partial draw out of it
 does.
 
@@ -1298,7 +1298,7 @@ The exam catalog the exam selector renders. Always 200.
 {
   "active": "ckad-mock-01",
   "banks": [
-    {"id": "ckad-mock-01", "title": "CKAD Mock Exam 01", "certification": "CKAD", "description": "Developer-track exercises...", "examType": "hands-on", "durationSeconds": 7200, "passingScore": 66, "kubernetesVersion": "1.35", "questionCount": 22, "poolCount": 26, "available": true},
+    {"id": "ckad-mock-01", "title": "CKAD Mock Exam", "certification": "CKAD", "description": "Developer-track exercises...", "examType": "hands-on", "durationSeconds": 7200, "passingScore": 66, "kubernetesVersion": "1.35", "questionCount": 17, "poolCount": 26, "available": true},
     {"id": "kcna-mock", "title": "KCNA Mock Exam", "certification": "KCNA", "description": "65 questions drawn each attempt...", "examType": "mcq", "durationSeconds": 5400, "passingScore": 75, "questionCount": 65, "poolCount": 97, "available": true},
     {"id": "cks-mock", "title": "CKS Mock Exam", "certification": "CKS", "examType": "hands-on", "available": false, "comingSoon": true, "note": "Requires security add-ons not in the kind environment yet"}
   ]
@@ -1311,7 +1311,7 @@ The exam catalog the exam selector renders. Always 200.
 | `poolCount` | How many the bank authors |
 
 - They differ only for a pooled bank, and the exam card prints them as a
-  pair (`65 / 97`) only when they do. A card reading `22 / 22` would
+  pair (`65 / 97`) only when they do. A card reading `26 / 26` would
   advertise a pool that is not one.
 - The facilitator knows both for the *active* bank, but the catalog is
   the only place that knows them for the others — and the exam selector

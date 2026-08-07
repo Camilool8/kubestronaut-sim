@@ -123,6 +123,11 @@ type examResponse struct {
 	Domains []domainInfo `json:"domains"`
 
 	HasTips bool `json:"hasTips,omitempty"`
+
+	// Whether the draw is stratified by level as well as by domain. The
+	// per-question tier deliberately stays server-side: it shapes the
+	// draw, it is not something to brace a candidate with mid-attempt.
+	LevelMixed bool `json:"levelMixed,omitempty"`
 }
 
 type environmentInfo struct {
@@ -179,6 +184,7 @@ func (s *server) handleExam(w http.ResponseWriter, r *http.Request) {
 		KubernetesVersion: s.ex.KubernetesVersion,
 		QuestionCount:     s.declaredQuestionCount(),
 		HasTips:           s.ex.HasTips,
+		LevelMixed:        len(s.ex.DifficultyMix) > 0,
 
 		Questions: make([]examQuestionInfo, 0, len(pool)),
 	}
