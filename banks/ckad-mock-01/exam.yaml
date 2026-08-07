@@ -2,7 +2,7 @@ apiVersion: sim.kubestronaut.dev/v1alpha2
 kind: Exam
 metadata:
   name: ckad-mock-01
-  title: CKAD Mock Exam 01
+  title: CKAD Mock Exam
   certification: CKAD
   description: >-
     Developer-track exercises across the full CKAD curriculum: workloads
@@ -14,13 +14,17 @@ spec:
   duration: 120m
   passingScore: 66
   kubernetesVersion: "1.35"
-  examLength: 22
+  examLength: 17
   domainWeights:
     Application Design and Build: 20
     Application Deployment: 20
     Application Environment, Configuration and Security: 25
     Application Observability and Maintenance: 15
     Services and Networking: 20
+  difficultyMix:
+    quick: 30
+    core: 45
+    deep: 25
   environment:
     provider: kind
     nodes: 2
@@ -34,6 +38,8 @@ spec:
       instance: instance-1
       domain: Application Environment, Configuration and Security
       weight: 9
+      targetSeconds: 300
+      difficulty: core
       docs:
         - label: Namespaces
           url: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
@@ -44,6 +50,8 @@ spec:
       instance: instance-1
       domain: Application Deployment
       weight: 9
+      targetSeconds: 560
+      difficulty: deep
       docs:
         - label: Deployments
           url: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
@@ -52,6 +60,8 @@ spec:
       instance: instance-2
       domain: Services and Networking
       weight: 11
+      targetSeconds: 600
+      difficulty: deep
       docs:
         - label: Network policies
           url: https://kubernetes.io/docs/concepts/services-networking/network-policies/
@@ -60,6 +70,8 @@ spec:
       instance: instance-2
       domain: Application Design and Build
       weight: 6
+      targetSeconds: 660
+      difficulty: deep
       docs:
         - label: CronJob
           url: https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/
@@ -70,6 +82,8 @@ spec:
       instance: instance-1
       domain: Application Design and Build
       weight: 6
+      targetSeconds: 660
+      difficulty: deep
       docs:
         - label: Init containers
           url: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/
@@ -80,6 +94,8 @@ spec:
       instance: instance-2
       domain: Application Environment, Configuration and Security
       weight: 9
+      targetSeconds: 570
+      difficulty: deep
       docs:
         - label: ConfigMaps
           url: https://kubernetes.io/docs/concepts/configuration/configmap/
@@ -90,6 +106,8 @@ spec:
       instance: instance-1
       domain: Application Environment, Configuration and Security
       weight: 9
+      targetSeconds: 400
+      difficulty: core
       docs:
         - label: Security contexts
           url: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
@@ -98,6 +116,8 @@ spec:
       instance: instance-2
       domain: Services and Networking
       weight: 11
+      targetSeconds: 330
+      difficulty: core
       docs:
         - label: Ingress
           url: https://kubernetes.io/docs/concepts/services-networking/ingress/
@@ -106,6 +126,8 @@ spec:
       instance: instance-1
       domain: Application Design and Build
       weight: 6
+      targetSeconds: 480
+      difficulty: core
       docs:
         - label: Container images
           url: https://kubernetes.io/docs/concepts/containers/images/
@@ -114,6 +136,8 @@ spec:
       instance: instance-2
       domain: Application Design and Build
       weight: 6
+      targetSeconds: 570
+      difficulty: deep
       docs:
         - label: Persistent volumes
           url: https://kubernetes.io/docs/concepts/storage/persistent-volumes/
@@ -124,11 +148,15 @@ spec:
       instance: instance-1
       domain: Application Deployment
       weight: 9
+      targetSeconds: 450
+      difficulty: core
     - id: q12
       title: Roll out, then roll back
       instance: instance-2
       domain: Application Deployment
       weight: 9
+      targetSeconds: 570
+      difficulty: deep
       docs:
         - label: Deployment rollouts and rollbacks
           url: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
@@ -137,6 +165,8 @@ spec:
       instance: instance-1
       domain: Application Deployment
       weight: 9
+      targetSeconds: 450
+      difficulty: core
       docs:
         - label: Kustomize
           url: https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/
@@ -145,6 +175,8 @@ spec:
       instance: instance-2
       domain: Application Environment, Configuration and Security
       weight: 9
+      targetSeconds: 640
+      difficulty: deep
       docs:
         - label: Secrets
           url: https://kubernetes.io/docs/concepts/configuration/secret/
@@ -153,6 +185,8 @@ spec:
       instance: instance-1
       domain: Application Environment, Configuration and Security
       weight: 9
+      targetSeconds: 600
+      difficulty: deep
       docs:
         - label: ServiceAccounts for Pods
           url: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
@@ -161,6 +195,8 @@ spec:
       instance: instance-2
       domain: Application Observability and Maintenance
       weight: 8
+      targetSeconds: 300
+      difficulty: core
       docs:
         - label: Liveness, readiness and startup probes
           url: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
@@ -169,11 +205,15 @@ spec:
       instance: instance-1
       domain: Application Observability and Maintenance
       weight: 8
+      targetSeconds: 600
+      difficulty: deep
     - id: q18
       title: Bring a manifest up to date
       instance: instance-2
       domain: Application Observability and Maintenance
       weight: 8
+      targetSeconds: 450
+      difficulty: core
       docs:
         - label: Deprecated API migration guide
           url: https://kubernetes.io/docs/reference/using-api/deprecation-guide/
@@ -182,6 +222,8 @@ spec:
       instance: instance-1
       domain: Services and Networking
       weight: 11
+      targetSeconds: 240
+      difficulty: quick
       docs:
         - label: Services
           url: https://kubernetes.io/docs/concepts/services-networking/service/
@@ -190,6 +232,8 @@ spec:
       instance: instance-2
       domain: Services and Networking
       weight: 11
+      targetSeconds: 240
+      difficulty: quick
       docs:
         - label: Service types
           url: https://kubernetes.io/docs/concepts/services-networking/service/
@@ -198,16 +242,22 @@ spec:
       instance: instance-1
       domain: Application Design and Build
       weight: 6
+      targetSeconds: 240
+      difficulty: quick
     - id: q22
       title: The ambassador pattern
       instance: instance-2
       domain: Application Design and Build
       weight: 6
+      targetSeconds: 240
+      difficulty: quick
     - id: q23
       title: Blue/green cutover
       instance: instance-1
       domain: Application Deployment
       weight: 9
+      targetSeconds: 150
+      difficulty: quick
       docs:
         - label: Services
           url: https://kubernetes.io/docs/concepts/services-networking/service/
@@ -218,6 +268,8 @@ spec:
       instance: instance-2
       domain: Application Environment, Configuration and Security
       weight: 9
+      targetSeconds: 450
+      difficulty: core
       docs:
         - label: Security contexts
           url: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
@@ -228,6 +280,8 @@ spec:
       instance: instance-1
       domain: Application Observability and Maintenance
       weight: 8
+      targetSeconds: 420
+      difficulty: core
       docs:
         - label: Ephemeral containers
           url: https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/
@@ -238,6 +292,8 @@ spec:
       instance: instance-2
       domain: Application Design and Build
       weight: 6
+      targetSeconds: 210
+      difficulty: quick
       docs:
         - label: Images and pull policy
           url: https://kubernetes.io/docs/concepts/containers/images/
