@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 1
 # desc: rollingUpdate maxSurge=1 maxUnavailable=0
 set -uo pipefail
 . /banks/_lib/checks.sh

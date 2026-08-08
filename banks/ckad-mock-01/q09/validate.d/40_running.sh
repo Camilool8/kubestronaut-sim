@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 1
+# points: 2
 # desc: a container named pulsar-agent is running from that image
 set -uo pipefail
 . /banks/_lib/checks.sh

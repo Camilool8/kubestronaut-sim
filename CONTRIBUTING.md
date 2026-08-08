@@ -45,7 +45,7 @@ If you touched `site/`, also run `bash site/build.sh --check`.
 
 | Gate | Proves |
 |---|---|
-| `bank-weights.sh` | Each question's `weight:` equals the sum of its `# points:` headers, `exam.yaml` and the `q*/` directories agree, and the domain balance matches the curriculum |
+| `bank-weights.sh` | Each question's `weight:` equals the sum of its `# points:` headers, `exam.yaml` and the `q*/` directories agree, and the domain balance matches the curriculum. For a bank declaring `spec.difficultyMix`, also that every question's level matches its `targetSeconds` band, that the pool is deep enough per domain and level to hold the mix, and that a drawn sitting fits the clock |
 | `check-lint.sh` | No validator grades spelling instead of behaviour, and every check carries an exact `# points: N` header |
 | `check-lib.sh` | The `banks/_lib/checks.sh` helpers still treat `0.1` and `100m`, or `1Gi` and `1024Mi`, as the same answer |
 | `bank-hints.sh` | Every hinted question has both tiers, and no hint shares 120 consecutive characters with its solution |

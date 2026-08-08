@@ -25,6 +25,25 @@ const (
 	TypeMCQ     = "mcq"
 )
 
+const (
+	TierQuick = "quick"
+	TierCore  = "core"
+	TierDeep  = "deep"
+)
+
+var tierOrder = []string{TierQuick, TierCore, TierDeep}
+
+// Tiers in the order a breakdown should read: shortest task first.
+func Tiers() []string { return append([]string(nil), tierOrder...) }
+
+// A tier is the time band, not a judgement: the gate checks the label
+// against targetSeconds so it cannot drift into an opinion.
+var tierBounds = map[string][2]int{
+	TierQuick: {1, 240},
+	TierCore:  {241, 540},
+	TierDeep:  {541, 840},
+}
+
 type Exam struct {
 	Name  string
 	Title string
@@ -42,6 +61,8 @@ type Exam struct {
 	Questions   []Question
 
 	DomainWeights map[string]int
+
+	DifficultyMix map[string]int
 
 	Domains []Domain
 
@@ -76,6 +97,8 @@ type Question struct {
 
 	TargetSeconds int
 
+	Difficulty string
+
 	Docs []Doc
 
 	Options []string
@@ -108,6 +131,7 @@ type examDoc struct {
 		PassingScore      int            `json:"passingScore"`
 		KubernetesVersion string         `json:"kubernetesVersion"`
 		DomainWeights     map[string]int `json:"domainWeights"`
+		DifficultyMix     map[string]int `json:"difficultyMix"`
 		ExamLength        int            `json:"examLength"`
 		Environment       struct {
 			Provider string `json:"provider"`
@@ -120,6 +144,7 @@ type examDoc struct {
 			Domain        string        `json:"domain"`
 			Weight        int           `json:"weight"`
 			TargetSeconds int           `json:"targetSeconds"`
+			Difficulty    string        `json:"difficulty"`
 			Options       []string      `json:"options"`
 			Correct       []int         `json:"correct"`
 			Multi         bool          `json:"multi"`
@@ -175,6 +200,7 @@ func Load(examJSONPath, bankDir string) (*Exam, error) {
 		PassingScore:      doc.Spec.PassingScore,
 		KubernetesVersion: doc.Spec.KubernetesVersion,
 		DomainWeights:     doc.Spec.DomainWeights,
+		DifficultyMix:     doc.Spec.DifficultyMix,
 		ExamLength:        doc.Spec.ExamLength,
 		Environment: Environment{
 			Provider: doc.Spec.Environment.Provider,
@@ -194,6 +220,7 @@ func Load(examJSONPath, bankDir string) (*Exam, error) {
 			Domain:        q.Domain,
 			Weight:        q.Weight,
 			TargetSeconds: q.TargetSeconds,
+			Difficulty:    q.Difficulty,
 			HintCount:     countHints(bankDir, q.ID),
 			Docs:          loadDocs(q.ID, q.Docs),
 		}
@@ -226,11 +253,64 @@ func Load(examJSONPath, bankDir string) (*Exam, error) {
 		return nil, fmt.Errorf("exam: spec.examLength %d exceeds the pool of %d questions", e.ExamLength, len(e.Questions))
 	}
 
+	if err := validateDifficulty(e); err != nil {
+		return nil, err
+	}
+
 	for _, name := range domainOrder(e.Questions) {
 		e.Domains = append(e.Domains, Domain{Name: name, WeightPct: e.DomainWeights[name]})
 	}
 
 	return e, nil
+}
+
+func validateDifficulty(e *Exam) error {
+	if len(e.DifficultyMix) == 0 {
+		for _, q := range e.Questions {
+			if q.Difficulty != "" {
+				return fmt.Errorf("exam: question %s declares difficulty %q, but the bank declares no spec.difficultyMix to draw against", q.ID, q.Difficulty)
+			}
+		}
+		return nil
+	}
+
+	total := 0
+	for tier, share := range e.DifficultyMix {
+		if _, ok := tierBounds[tier]; !ok {
+			return fmt.Errorf("exam: spec.difficultyMix names an unknown tier %q, want one of %s", tier, strings.Join(tierOrder, ", "))
+		}
+		if share < 0 {
+			return fmt.Errorf("exam: spec.difficultyMix gives %s a negative share %d", tier, share)
+		}
+		total += share
+	}
+	if total != 100 {
+		return fmt.Errorf("exam: spec.difficultyMix sums to %d, want 100", total)
+	}
+
+	for _, q := range e.Questions {
+		bounds, ok := tierBounds[q.Difficulty]
+		if !ok {
+			return fmt.Errorf("exam: question %s has difficulty %q, want one of %s — a bank declaring spec.difficultyMix declares a tier on every question", q.ID, q.Difficulty, strings.Join(tierOrder, ", "))
+		}
+		if q.TargetSeconds == 0 {
+			return fmt.Errorf("exam: question %s is %s but sets no targetSeconds; the tier is the time band, so it cannot be derived from the question's share of the points", q.ID, q.Difficulty)
+		}
+		if q.TargetSeconds < bounds[0] || q.TargetSeconds > bounds[1] {
+			return fmt.Errorf("exam: question %s is %s with targetSeconds %d, outside that tier's %d-%d band", q.ID, q.Difficulty, q.TargetSeconds, bounds[0], bounds[1])
+		}
+	}
+
+	held := map[string]bool{}
+	for _, q := range e.Questions {
+		held[q.Difficulty] = true
+	}
+	for _, tier := range tierOrder {
+		if e.DifficultyMix[tier] > 0 && !held[tier] {
+			return fmt.Errorf("exam: spec.difficultyMix asks for %d%% %s questions and the bank holds none", e.DifficultyMix[tier], tier)
+		}
+	}
+	return nil
 }
 
 func domainOrder(questions []Question) []string {
@@ -502,6 +582,15 @@ func Draw(ex *Exam, opts DrawOptions) (DrawResult, error) {
 		return DrawResult{}, err
 	}
 
+	if len(ex.DifficultyMix) > 0 {
+		ids, err := drawMixed(ex, inScope, order, targets, length, seed)
+		if err != nil {
+			return DrawResult{}, err
+		}
+		res.IDs = ids
+		return res, nil
+	}
+
 	drawn := make([]string, 0, length)
 	for _, d := range order {
 		k := targets[d]
@@ -514,6 +603,61 @@ func Draw(ex *Exam, opts DrawOptions) (DrawResult, error) {
 	}
 	res.IDs = drawn
 	return res, nil
+}
+
+// The domain targets are a hard constraint and the tier mix a soft one:
+// spec.domainWeights is the promise the graders weight a score by, while
+// the mix only shapes how tiring the sitting is. So each domain takes its
+// exact count and spends it on whichever tier is furthest behind, and any
+// shortfall carries to the next domain rather than bending the split.
+func drawMixed(ex *Exam, inScope []Question, order []string, targets map[string]int, length int, seed string) ([]string, error) {
+	byDomainTier := map[string]map[string][]string{}
+	for _, q := range inScope {
+		if byDomainTier[q.Domain] == nil {
+			byDomainTier[q.Domain] = map[string][]string{}
+		}
+		byDomainTier[q.Domain][q.Difficulty] = append(byDomainTier[q.Domain][q.Difficulty], q.ID)
+	}
+
+	totalShare := 0
+	for _, t := range tierOrder {
+		totalShare += ex.DifficultyMix[t]
+	}
+	deficit := largestRemainder(ex.DifficultyMix, tierOrder, length, totalShare)
+
+	drawn := make([]string, 0, length)
+	for _, d := range order {
+		k := targets[d]
+		queues := make(map[string][]string, len(tierOrder))
+		held := 0
+		for _, t := range tierOrder {
+			queues[t] = shuffle(byDomainTier[d][t], seed, d+"\x00"+t)
+			held += len(queues[t])
+		}
+		if k > held {
+			return nil, fmt.Errorf("exam: domain %q needs %d questions for a %d-question draw, pool has only %d", d, k, length, held)
+		}
+		for i := 0; i < k; i++ {
+			t := neediestTier(deficit, queues)
+			drawn = append(drawn, queues[t][0])
+			queues[t] = queues[t][1:]
+			deficit[t]--
+		}
+	}
+	return drawn, nil
+}
+
+func neediestTier(deficit map[string]int, queues map[string][]string) string {
+	best := ""
+	for _, t := range tierOrder {
+		if len(queues[t]) == 0 {
+			continue
+		}
+		if best == "" || deficit[t] > deficit[best] {
+			best = t
+		}
+	}
+	return best
 }
 
 func questionIDs(questions []Question) []string {
@@ -626,12 +770,6 @@ func domainTargets(domainWeights map[string]int, order []string, n int) (map[str
 		return nil, fmt.Errorf("exam: spec.domainWeights is required to draw a %d-question subset", n)
 	}
 
-	type remainder struct {
-		domain string
-		frac   float64
-		index  int
-	}
-
 	totalWeight := 0
 	for _, d := range order {
 		w, ok := domainWeights[d]
@@ -644,20 +782,33 @@ func domainTargets(domainWeights map[string]int, order []string, n int) (map[str
 		return nil, fmt.Errorf("exam: the domains of a %d-question draw declare no weight between them", n)
 	}
 
+	targets := largestRemainder(domainWeights, order, n, totalWeight)
+	assigned := 0
+	for _, d := range order {
+		assigned += targets[d]
+	}
+	if assigned != n {
+		return nil, fmt.Errorf("exam: domainWeights do not add up cleanly for a %d-question draw", n)
+	}
+	return targets, nil
+}
+
+func largestRemainder(weights map[string]int, order []string, n, totalWeight int) map[string]int {
+	type remainder struct {
+		key   string
+		frac  float64
+		index int
+	}
+
 	targets := make(map[string]int, len(order))
 	remainders := make([]remainder, 0, len(order))
 	assigned := 0
-	for i, d := range order {
-		raw := float64(domainWeights[d]) * float64(n) / float64(totalWeight)
+	for i, k := range order {
+		raw := float64(weights[k]) * float64(n) / float64(totalWeight)
 		floor := int(raw)
-		targets[d] = floor
+		targets[k] = floor
 		assigned += floor
-		remainders = append(remainders, remainder{domain: d, frac: raw - float64(floor), index: i})
-	}
-
-	leftover := n - assigned
-	if leftover < 0 || leftover > len(order) {
-		return nil, fmt.Errorf("exam: domainWeights do not add up cleanly for a %d-question draw", n)
+		remainders = append(remainders, remainder{key: k, frac: raw - float64(floor), index: i})
 	}
 
 	sort.Slice(remainders, func(i, j int) bool {
@@ -666,10 +817,10 @@ func domainTargets(domainWeights map[string]int, order []string, n int) (map[str
 		}
 		return remainders[i].index < remainders[j].index
 	})
-	for i := 0; i < leftover; i++ {
-		targets[remainders[i].domain]++
+	for i := 0; i < n-assigned && i < len(remainders); i++ {
+		targets[remainders[i].key]++
 	}
-	return targets, nil
+	return targets
 }
 
 func shuffle(ids []string, seed, label string) []string {

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 1
+# points: 2
 # desc: emptyDir feed-logs mounted at /var/log/feed in both writer and shipper
 set -uo pipefail
 . /banks/_lib/checks.sh

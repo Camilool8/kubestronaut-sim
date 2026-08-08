@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 1
+# points: 2
 # desc: Pod checkout runs app (busybox) and ambassador (nginx), and is Running
 set -uo pipefail
 . /banks/_lib/checks.sh

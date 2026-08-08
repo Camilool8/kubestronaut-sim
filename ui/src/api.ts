@@ -99,6 +99,7 @@ export interface ExamInfo {
   environment?: ExamEnvironment;
 
   hasTips?: boolean;
+  levelMixed?: boolean;
 }
 
 export interface ExamEnvironment {
@@ -174,6 +175,13 @@ export interface DomainResult {
   questionCount: number;
 }
 
+export interface LevelResult {
+  level: string;
+  earned: number;
+  total: number;
+  questionCount: number;
+}
+
 export interface QuestionResult {
   id: string;
 
@@ -214,6 +222,7 @@ export interface Results {
   questions: QuestionResult[];
 
   domains?: DomainResult[];
+  levels?: LevelResult[];
 
   mode?: SessionMode;
   seed?: string;

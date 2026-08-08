@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 2
 # desc: fixed.yaml uses current apiVersions and legacy.yaml was left alone
 set -uo pipefail
 . /banks/_lib/checks.sh

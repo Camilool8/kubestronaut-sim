@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 4
+# points: 3
 # desc: the upgrade really happened, was annotated, and was undone via rollout
 set -uo pipefail
 . /banks/_lib/checks.sh

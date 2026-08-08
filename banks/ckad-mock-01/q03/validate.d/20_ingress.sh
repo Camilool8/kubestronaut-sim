@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 2
 # desc: single ingress rule: from role=frontend pods, TCP 80 only
 set -uo pipefail
 . /banks/_lib/checks.sh

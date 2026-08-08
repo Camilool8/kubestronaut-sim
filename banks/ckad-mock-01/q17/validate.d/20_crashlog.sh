@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 2
 # desc: the dead container's own log message was captured
 set -uo pipefail
 . /banks/_lib/checks.sh

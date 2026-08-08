@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 2
 # desc: report-api-v2 was upgraded to a newer sim-web chart and is deployed
 set -uo pipefail
 . /banks/_lib/checks.sh
@@ -26,15 +26,20 @@ newest=$(printf '1.0.0\n%s\n' "$version" | sort -V | tail -1)
 moved_on()  { [ "$version" != "1.0.0" ] && [ "$newest" = "$version" ]; }
 revised()   { [ "$revision" -ge 2 ] 2>/dev/null; }
 
+# 'deployed' is the state report-api-v2 was seeded in, so on its own it grades
+# nothing. It says something once an upgrade has been through the release: a
+# failed upgrade records a new revision and leaves the release marked failed.
+upgrade_deployed() { revised && [ "$status" = "deployed" ]; }
+
 crit 2 "on a chart newer than sim-web-1.0.0" \
   "chart is '$chart'; it must be newer than sim-web-1.0.0" \
   "An upgrade re-renders the release from a chart version, and the release is still on the one it was installed with. The repo's own index is the authority on which versions exist — guessing a number that is not published just fails, and asking for no version at all takes the newest." \
   -- moved_on
 
-crit 1 "the release is deployed, not failed" \
-  "release status is '$status', want deployed" \
-  "The release exists but is not in the deployed state. An upgrade that fails leaves the release marked failed with the previous revision's objects still running, so the cluster can look completely healthy while Helm considers the release broken." \
-  -- [ "$status" = "deployed" ]
+crit 1 "the upgrade left the release deployed, not failed" \
+  "release is at revision '$revision' with status '$status'; an upgrade that lands leaves it deployed at revision 2 or later" \
+  "No successful upgrade has been through this release. It was installed deployed and revision 1 means nothing has been applied since, so the status alone proves nothing here. An upgrade that fails records a new revision and marks the release failed with the previous revision's objects still running, so the cluster can look completely healthy while Helm considers the release broken." \
+  -- upgrade_deployed
 
 crit 1 "the upgrade went through Helm" \
   "revision is '$revision'; an upgrade should have produced at least 2" \

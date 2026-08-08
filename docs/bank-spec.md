@@ -92,6 +92,7 @@ Where the optional keys go:
 |---|---|
 | `title:` | *Inside* the run, directly after `id:`. Nowhere else |
 | `targetSeconds:` | *After* the run, below `weight:` (hands-on) or `correct:` (mcq) |
+| `difficulty:` | Same as `targetSeconds:` |
 | `docs:` | Same as `targetSeconds:` |
 
 | Field | Meaning and status |
@@ -105,6 +106,7 @@ Where the optional keys go:
 | `spec.passingScore` | Percent. Enforced by the facilitator's `Results.Passed` |
 | `spec.kubernetesVersion` | Informational; shown on the catalog card |
 | `spec.domainWeights` | The certification's published weights, and a runtime value in three places: `exam.Load` builds `Exam.Domains` from it, `exam.Draw` stratifies a pooled or filtered draw by it, and both graders weight the final score by it. [bank-weights.sh](../tests/bank-weights.sh) still gates it too. Getting it wrong now moves real scores, not just a build check |
+| `spec.difficultyMix` | Optional, hands-on. Opts a **pooled** bank into a second stratification: the percentage of a drawn attempt that should be `quick`, `core` and `deep`. Must sum to 100, must name only those three tiers, and every question in the bank must then declare a `difficulty` and a `targetSeconds`. Absent — every bank in this repo but `ckad-mock-01` — the draw is stratified by domain alone and nothing changes. See [Mixing a draw by level](#mixing-a-draw-by-level-specdifficultymix) |
 | `spec.examLength` | Optional, **both engines**. Pools the bank: author more questions than one attempt should ask, set this to the smaller per-attempt count, and `exam.Draw` takes a fresh domain-stratified subset every start. Must be positive and no larger than the pool — `exam.Load` rejects both, because an `examLength` typo that silently turns pooling *off* is worse than one that fails the boot. A pooled bank must declare `spec.domainWeights`; the draw stratifies against them and errors without. Absent or `>=` the pool means no pooling, which is every bank in this repo. **A pooled hands-on bank also changes when its cluster is seeded** — see below |
 | `spec.environment.nodes` | **The size of this exam's cluster.** [bootstrap.sh](../images/k8s-env/bootstrap.sh) copies `kind-config.yaml` — which holds the control-plane node and nothing else — and appends one `- role: worker` per extra node before `kind create cluster`. Absent means 2; anything that is not a positive integer fails the boot rather than falling back, because a cluster silently the wrong size is discovered by a drain question grading zero. Also served on `GET /api/exam` so the screens that describe the environment while it builds describe the one being built |
 | `spec.environment.provider` | Informational; `kind` is the only one that exists. Served on `GET /api/exam` beside `nodes` |
@@ -114,7 +116,8 @@ Where the optional keys go:
 | `spec.questions[].title` | Optional short label shown in the question navigator, the jump grid and the score review. Absent, the UI falls back to the id (hands-on) or the attempt position (mcq) |
 | `spec.questions[].domain` | Must match a `domainWeights` key |
 | `spec.questions[].weight` | Must equal the sum of this question's `# points:` headers |
-| `spec.questions[].targetSeconds` | Optional pacing budget, in seconds, shown on the task chip. Absent, the facilitator derives one from the question's weight's share of the exam clock ([exam.go](../facilitator/internal/exam/exam.go), `TargetSeconds`) and flags it `targetDerived` on `GET /api/exam`, so a derived figure is never presented as the author's judgement — neither shipped bank sets it. It is a budget, never a limit: nothing enforces it and running over costs no points. Write it below `weight:` (hands-on) or `correct:` (mcq); both gate regexes end there, and a `targetSeconds:` line above them hides the question from the gate |
+| `spec.questions[].targetSeconds` | Optional pacing budget, in seconds, shown on the task chip. Absent, the facilitator derives one from the question's weight's share of the exam clock ([exam.go](../facilitator/internal/exam/exam.go), `TargetSeconds`) and flags it `targetDerived` on `GET /api/exam`, so a derived figure is never presented as the author's judgement. `ckad-mock-01` sets it on every question because its `spec.difficultyMix` requires one; `kcna-mock` sets none. It is a budget, never a limit: nothing enforces it and running over costs no points. Write it below `weight:` (hands-on) or `correct:` (mcq); both gate regexes end there, and a `targetSeconds:` line above them hides the question from the gate |
+| `spec.questions[].difficulty` | `quick`, `core` or `deep`. Required on every question of a bank declaring `spec.difficultyMix`, and rejected on a bank that does not — a label nothing draws on is cruft. **The tier is its `targetSeconds` band, not a judgement**: `quick` is at most 240s, `core` 241-540, `deep` 541-840, and [exam.go](../facilitator/internal/exam/exam.go) refuses a bank whose label and budget disagree. Never sent to the client during an attempt: a question labelled `deep` on screen is a spoiler and an anxiety source |
 | `spec.questions[].docs` | Optional upstream reading: a list of `{label, url}`. Shown in the post-attempt deep dive — see [Documentation links](#documentation-links-specquestionsdocs). Write it below `weight:`/`correct:` for the same reason `targetSeconds` goes there |
 
 ## Documentation links: `spec.questions[].docs`
@@ -191,27 +194,105 @@ For an author:
   moved four minutes of seeding from the boot screen to the moment the
   candidate presses Start, and gained almost no variety for it.
 
-`ckad-mock-01` pools 26 down to 22 for the other reason: **holding the
-sitting to the right length.** The real CKAD is around twenty tasks in
-two hours.
+`ckad-mock-01` pools 26 down to 17 for both reasons. **Holding the sitting
+to the right length** comes first: the real CKAD is 15-20 tasks in two
+hours, and 17 is its midpoint.
 
-The variety that comes with it is modest, and worth stating plainly:
+The variety is worth stating plainly, because a draw that barely shrinks
+the pool is pooling in name only:
 
-| Domain | Rotation |
-|---|---|
-| Three of the five | Asked in full every time |
-| Application Design and Build | 4 of 7 |
-| Application Observability and Maintenance | 3 of 4 |
+| Domain | Pool | Rotation |
+|---|---|---|
+| Application Environment, Configuration and Security | 6 | 4 of 6 |
+| Application Deployment | 5 | 4 of 5 |
+| Services and Networking | 4 | 3 of 4 |
+| Application Design and Build | 7 | 3 of 7 |
+| Application Observability and Maintenance | 4 | 3 of 4 |
 
-Deepening a domain widens its rotation.
+Deepening a domain widens its rotation. The gate prints this table, so the
+thinnest domain is always the one to write into next.
+
+## Mixing a draw by level: `spec.difficultyMix`
+
+Domain stratification says *what* an attempt asks about. It says nothing
+about how tiring the attempt is, and a draw of four multi-step questions
+in a row teaches less than a mixed one — the fatigue costs more than the
+extra difficulty buys.
+
+A pooled bank can declare the shape it wants:
+
+```yaml
+spec:
+  examLength: 17
+  difficultyMix:
+    quick: 30
+    core: 45
+    deep: 25
+```
+
+and every question then declares where it sits:
+
+```yaml
+    - id: q23
+      title: Blue/green cutover
+      instance: instance-2
+      domain: Application Deployment
+      weight: 9
+      targetSeconds: 150
+      difficulty: quick
+```
+
+**A tier is a time band, not an opinion.** That is the whole point of
+writing it this way: a subjective label rots, a budget does not.
+
+| Tier | `targetSeconds` | Shape |
+|---|---|---|
+| `quick` | up to 240 | One object, one or two non-default fields. Not a bare `kubectl get` — the floor is still a real object with a field you have to know |
+| `core` | 241-540 | The real exam's median task: a manifest with a few non-obvious fields, or two chained steps |
+| `deep` | 541-840 | Multi-step, ordering matters, or diagnosis before the fix |
+
+[exam.go](../facilitator/internal/exam/exam.go) refuses to load a bank
+whose label and budget disagree, so the two cannot drift apart.
+
+### What the draw guarantees, and what it does not
+
+**The domain split is a hard constraint and the mix a soft one.** Each
+domain takes its exact allocation and spends it on whichever tier is
+furthest behind; a domain that cannot supply that tier supplies the next
+best, and the shortfall carries to the following domain rather than
+bending the domain split. `spec.domainWeights` is the promise the graders
+weight a final score by (`evaluate.Results.Finalize`), and a comfort
+preference does not get to move a score.
+
+One consequence is worth knowing: **the tier composition of a draw does
+not depend on the seed.** Only the deficit and what each domain holds
+decide which tier is spent next, so every attempt of a given bank holds
+the same counts — the seed decides only *which* question fills each slot.
+The mix is guaranteed, not likely.
+
+[bank-weights.sh](../tests/bank-weights.sh) replays that walk and fails
+the bank when a tier lands more than one question from its share, prints
+a domain-by-tier depth table, and checks the drawn sitting against the
+clock: 0.85 to 1.05 of `spec.duration`, because a bank that wastes the
+clock and one nobody finishes are both miscalibrated. `ckad-mock-01`
+currently draws 4 quick, 9 core and 4 deep for 115 minutes of task time
+against 120.
+
+The tier never reaches the candidate **mid-attempt**: a question labelled
+`deep` on screen would only tell someone to brace. It arrives once the
+attempt is over, on `GET /api/results`, where the same score is also cut
+by level — see [api.md](api.md). That cut is the reason the axis is worth
+having beyond comfort: a score that holds up on short tasks and falls
+away on long ones is a pacing problem, and a flat low score is a
+knowledge problem, and the two want different practice.
 
 ### Points in a pooled bank
 
 Derive them against the **pool**, exactly as an unpooled bank does:
 `domain budget / questions in that domain`, counting every authored
-question. `ckad-mock-01`'s 26 questions total 217 points that way, and
-every domain's share of them lands within one percentage point of its
-curriculum weight.
+question. `ckad-mock-01`'s 44 questions total 360 points that way — flat per
+domain, 9 or 7 — and every domain's share of them lands within one
+percentage point of its curriculum weight.
 
 What that does *not* give you is a drawn attempt whose raw points divide
 in the curriculum's ratios, and it cannot: a domain that contributes 4 of

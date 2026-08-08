@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 1
 # desc: 3/3 replicas ready
 set -uo pipefail
 . /banks/_lib/checks.sh

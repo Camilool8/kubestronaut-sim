@@ -114,6 +114,24 @@ for path in scripts:
                                    f"'command not found', scored as a FAILED check, so a "
                                    f"correct answer loses the points"))
 
+    # evaluate.go awards a check its full points whenever it exits 0, and only
+    # consults the criterion tally when it does not. report() returns
+    # crit_all_passed, so anything after it becomes the script's exit status and
+    # a wholly failed check scores full marks in silence.
+    report_at = [i for i, line in enumerate(lines, 1)
+                 if re.match(r"\s*report\b", line)]
+    if report_at:
+        for i, line in enumerate(lines, 1):
+            if i <= report_at[-1] or not line.strip() or line.strip().startswith("#"):
+                continue
+            errors.append((path, i, "after-report",
+                           f"{line.strip()!r} runs after report(), so it — not report() — "
+                           f"sets the exit status. A check that exits 0 is scored full "
+                           f"marks without its criteria being read, so every criterion "
+                           f"could fail and the candidate would still get the points. "
+                           f"report() must be the last command in the script"))
+            break
+
     for i, line in enumerate(lines, 1):
         stripped = line.strip()
         if stripped.startswith("#"):

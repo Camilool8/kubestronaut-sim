@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 1
+# points: 2
 # desc: Pod telemetry runs containers app and adapter on busybox:1.37
 set -uo pipefail
 . /banks/_lib/checks.sh

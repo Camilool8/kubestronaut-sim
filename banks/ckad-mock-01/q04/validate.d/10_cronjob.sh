@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 3
 # desc: CronJob log-rotate runs every 5 minutes, forbids overlap, keeps 2/1 history
 set -uo pipefail
 . /banks/_lib/checks.sh

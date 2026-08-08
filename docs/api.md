@@ -146,7 +146,7 @@ fields.
   "state": "booting",
   "phase": "seed",
   "label": "Setting up the exam questions",
-  "detail": "question 11 of 22",
+  "detail": "question 11 of 17",
   "error": "",
   "step": 7,
   "totalSteps": 8,
@@ -170,14 +170,15 @@ and the three selectable modes. Always 200.
 ```json
 {
   "name": "ckad-mock-01",
-  "title": "CKAD Mock Exam 01",
+  "title": "CKAD Mock Exam",
   "certification": "CKAD",
   "examType": "hands-on",
   "durationSeconds": 7200,
   "passingScore": 66,
   "kubernetesVersion": "1.35",
-  "questionCount": 22,
+  "questionCount": 17,
   "hasTips": true,
+  "levelMixed": true,
   "questions": [
     {"id": "q01", "instance": "instance-1", "domain": "Application Environment, Configuration and Security", "weight": 9, "totalPoints": 9, "hintCount": 2, "targetSeconds": 360, "targetDerived": true}
   ],
@@ -218,7 +219,7 @@ user-facing copy and lives in `ui/src/strings.ts`; its permissions are
 facts only the server knows.
 
 `certification` names the exam this bank rehearses ("CKAD"), where
-`title` names the bank ("CKAD Mock Exam 01"). Omitted when the bank
+`title` names the bank ("CKAD Mock Exam"). Omitted when the bank
 declares none. The mode screen and its header read it from here rather
 than from the conductor's catalog, so a deep link into that screen
 needs no prior call to `GET /api/control/banks`.
@@ -275,6 +276,12 @@ if they were the whole curriculum. `questionCount` is the exam's declared
 length — `spec.examLength` for a pooled bank, otherwise the pool size —
 and is what any display of "how many questions" must read, since
 `questions` still lists the whole pool before an attempt has drawn.
+
+`levelMixed` says the bank declares a `spec.difficultyMix`, so its draw is
+stratified by level as well as by domain. It is a property of the bank, not
+of the attempt, and the per-question tier is deliberately not here — see
+[GET /api/results](#get-apiresults), which carries it once the attempt is
+over.
 
 `hasTips` says the bank ships a `tips.md`, i.e. that
 [`GET /api/exam/tips`](#get-apiexamtips) has something to serve. Omitted
@@ -735,6 +742,7 @@ The graded scoreboard for the ended attempt.
       "id": "q01",
       "instance": "instance-1",
       "domain": "Application Environment, Configuration and Security",
+      "difficulty": "core",
       "earned": 3,
       "total": 9,
       "weightPct": 5,
@@ -749,12 +757,28 @@ The graded scoreboard for the ended attempt.
   ],
   "domains": [
     {"domain": "Application Environment, Configuration and Security", "earned": 30, "total": 45, "weightPct": 25, "questionCount": 5}
+  ],
+  "levels": [
+    {"level": "quick", "earned": 18, "total": 18, "questionCount": 2},
+    {"level": "core", "earned": 45, "total": 45, "questionCount": 5},
+    {"level": "deep", "earned": 0, "total": 27, "questionCount": 3}
   ]
 }
 ```
 
 Abridged: `questions` carries every question the attempt was graded on
 and `checks` every check in each. `passed` is `percent >= passingScore`.
+
+`levels` is the same score cut by `spec.questions[].difficulty`, and
+`questions[].difficulty` is the per-question tier. **Both appear only
+here** — the tier is deliberately absent from `GET /api/exam` during an
+attempt, where it would only tell a candidate to brace. A bank that
+declares no tiers, which is every mcq bank, omits both fields entirely.
+
+The rows stay in tier order — `quick`, `core`, `deep` — rather than being
+sorted by score, because what the candidate is meant to read is the shape:
+a score that holds on short tasks and falls away on long ones is a pacing
+problem, and a flat low score is a knowledge problem.
 
 ### Weighting and the two percentages
 
@@ -766,7 +790,7 @@ weighting existed. Both floor rather than round.
 
 Weighting happens at scoring time rather than being baked into a bank's
 point budget, because **a bank's points are fixed and a draw is not**.
-`tests/bank-weights.sh` can promise ckad-mock-01's 180 points sit in the
+`tests/bank-weights.sh` can promise ckad-mock-01's 217 points sit in the
 curriculum's ratios, but not that a filtered or partial draw out of it
 does.
 
@@ -967,7 +991,7 @@ Every attempt, most recent first, plus the cross-exam summary. Always
       "id": "9f2c41ab30de5517",
       "bank": "ckad-mock-01",
       "certification": "CKAD",
-      "examTitle": "CKAD Mock Exam 01",
+      "examTitle": "CKAD Mock Exam",
       "examType": "hands-on",
       "mode": "exam",
       "startedAt": "2026-07-30T09:20:11Z",
@@ -975,7 +999,7 @@ Every attempt, most recent first, plus the cross-exam summary. Always
       "seed": "a1b2c3",
       "durationSeconds": 7200,
       "elapsedSeconds": 7233,
-      "questionCount": 22,
+      "questionCount": 17,
       "earned": 41,
       "total": 60,
       "percent": 68,
@@ -1085,13 +1109,13 @@ history still has a bank list).
   "exams": [
     {
       "id": "ckad-mock-01",
-      "title": "CKAD Mock Exam 01",
+      "title": "CKAD Mock Exam",
       "certification": "CKAD",
       "examType": "hands-on",
       "durationSeconds": 7200,
       "passingScore": 66,
-      "questionCount": 22,
-      "poolCount": 26,
+      "questionCount": 17,
+      "poolCount": 44,
       "available": true,
       "progress": {
         "attempts": 3,
@@ -1298,7 +1322,7 @@ The exam catalog the exam selector renders. Always 200.
 {
   "active": "ckad-mock-01",
   "banks": [
-    {"id": "ckad-mock-01", "title": "CKAD Mock Exam 01", "certification": "CKAD", "description": "Developer-track exercises...", "examType": "hands-on", "durationSeconds": 7200, "passingScore": 66, "kubernetesVersion": "1.35", "questionCount": 22, "poolCount": 26, "available": true},
+    {"id": "ckad-mock-01", "title": "CKAD Mock Exam", "certification": "CKAD", "description": "Developer-track exercises...", "examType": "hands-on", "durationSeconds": 7200, "passingScore": 66, "kubernetesVersion": "1.35", "questionCount": 17, "poolCount": 44, "available": true},
     {"id": "kcna-mock", "title": "KCNA Mock Exam", "certification": "KCNA", "description": "65 questions drawn each attempt...", "examType": "mcq", "durationSeconds": 5400, "passingScore": 75, "questionCount": 65, "poolCount": 97, "available": true},
     {"id": "cks-mock", "title": "CKS Mock Exam", "certification": "CKS", "examType": "hands-on", "available": false, "comingSoon": true, "note": "Requires security add-ons not in the kind environment yet"}
   ]
@@ -1311,7 +1335,7 @@ The exam catalog the exam selector renders. Always 200.
 | `poolCount` | How many the bank authors |
 
 - They differ only for a pooled bank, and the exam card prints them as a
-  pair (`65 / 97`) only when they do. A card reading `22 / 22` would
+  pair (`65 / 97`) only when they do. A card reading `26 / 26` would
   advertise a pool that is not one.
 - The facilitator knows both for the *active* bank, but the catalog is
   the only place that knows them for the others — and the exam selector

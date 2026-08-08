@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 1
+# points: 2
 # desc: the image was pushed to registry:5000
 set -uo pipefail
 . /banks/_lib/checks.sh

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 2
 # desc: payments-api is back on nginx:1.27-alpine with 4 ready replicas
 set -uo pipefail
 . /banks/_lib/checks.sh
@@ -12,11 +12,19 @@ img=$(kubectl -n draco get deploy payments-api \
   -o jsonpath='{.spec.template.spec.containers[?(@.name=="api")].image}' 2>/dev/null)
 spec=$(kubectl -n draco get deploy payments-api -o jsonpath='{.spec.replicas}' 2>/dev/null)
 ready=$(kubectl -n draco get deploy payments-api -o jsonpath='{.status.readyReplicas}' 2>/dev/null)
+rev=$(kubectl -n draco get deploy payments-api \
+  -o jsonpath='{.metadata.annotations.deployment\.kubernetes\.io/revision}' 2>/dev/null)
 
-crit 1 "back on nginx:1.27-alpine" \
-  "image is '$img', want nginx:1.27-alpine" \
-  "A rollback restores the POD TEMPLATE of an earlier revision — image, env, probes, everything the ReplicaSet was created from — and the image is the visible part of that. Reaching the old tag by editing the image back arrives at the same string without ever using the history, which is what the revision count beside this check exists to tell apart." \
-  -- [ "$img" = "nginx:1.27-alpine" ]
+# This is a round trip: the image it ends on is the image it started on, so the
+# tag alone is as true of a Deployment nobody touched as of a finished answer.
+# The revision counter is what separates the two — an upgrade and an undo leave
+# it at 3 or more, and nothing at all leaves it at 1.
+came_back() { [ "$img" = "nginx:1.27-alpine" ] && [ -n "$rev" ] && [ "$rev" -ge 3 ] 2>/dev/null; }
+
+crit 1 "back on nginx:1.27-alpine, having been off it" \
+  "image is '$img' at revision '$rev'; want nginx:1.27-alpine arrived at by an upgrade and a rollback (revision 3 or more)" \
+  "A rollback restores the POD TEMPLATE of an earlier revision — image, env, probes, everything the ReplicaSet was created from — and the image is the visible part of that. The tag on its own says nothing here, because it is the tag the Deployment started on: what is graded is that it went to 1.29 and came back. Editing the image back by hand arrives at the same string without ever using the history and leaves the revision at 2." \
+  -- came_back
 
 crit 1 "still scaled to 4" \
   "spec.replicas is '$spec', want 4" \

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 3
 # desc: the Pod template asks for a 45 second termination grace period
 set -uo pipefail
 . /banks/_lib/checks.sh

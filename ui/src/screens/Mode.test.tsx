@@ -242,6 +242,18 @@ describe("what the exam will ask", () => {
     expect(await screen.findByText(/2 drawn at random from 3/)).toBeInTheDocument();
   });
 
+  test("a level-mixed bank says so, and one without a mix does not claim it", async () => {
+    exam = { ...ckad, questionCount: 2, levelMixed: true };
+    const { unmount } = renderMode();
+    expect(await screen.findByText(/mixed across three levels/)).toBeInTheDocument();
+    unmount();
+
+    exam = { ...ckad, questionCount: 2 };
+    renderMode();
+    expect(await screen.findByText(/2 drawn at random from 3/)).toBeInTheDocument();
+    expect(screen.queryByText(/mixed across three levels/)).not.toBeInTheDocument();
+  });
+
   test("the chips come from the declared curriculum, not from the drawn questions", async () => {
     renderMode();
     const chip = await screen.findByRole("button", { name: /Application Design and Build/ });
