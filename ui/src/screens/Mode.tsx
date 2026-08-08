@@ -333,6 +333,11 @@ export function Mode({ bankId, catalogVersion, onSessionChange, onPreparing }: M
           const available = new Set((loaded.domains ?? []).map((d) => d.name));
           const selected = (picked ?? presetDomains).filter((d) => available.has(d));
 
+          // Only a pooled hands-on bank seeds at start; everything else is
+          // already sitting on the cluster and begins the moment it is pressed.
+          const seeds = !isMcq && loaded.questions.length > (loaded.questionCount || 0);
+          const drawn = Math.min(loaded.questionCount || 0, loaded.questions.length);
+
           return (
             <>
               <ul className="mode-grid">
@@ -348,6 +353,8 @@ export function Mode({ bankId, catalogVersion, onSessionChange, onPreparing }: M
                   />
                 ))}
               </ul>
+
+              {seeds && <p className="mode-seed-notice">{strings.mode.seedNotice(drawn)}</p>}
 
               {startError && <p className="error-text">{startError}</p>}
 

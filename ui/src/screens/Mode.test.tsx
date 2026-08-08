@@ -528,3 +528,28 @@ describe("a device that cannot sit this exam", () => {
     expect(startCalls).toEqual([]);
   });
 });
+
+describe("what starting will actually do", () => {
+  test("a pooled bank warns that the tasks are set up before the clock starts", async () => {
+    exam = { ...ckad, questionCount: 2 };
+    renderMode();
+
+    expect(await screen.findByText(strings.mode.seedNotice(2))).toBeInTheDocument();
+  });
+
+  test("an unpooled bank starts immediately and does not warn", async () => {
+    exam = ckad;
+    renderMode();
+    await screen.findByRole("heading", { name: "Exam" });
+
+    expect(screen.queryByText(/sets them up on the cluster/i)).not.toBeInTheDocument();
+  });
+
+  test("a multiple-choice bank has no cluster to set anything up on", async () => {
+    exam = { ...ckad, examType: "mcq", questionCount: 2 };
+    renderMode();
+    await screen.findByRole("heading", { name: "Exam" });
+
+    expect(screen.queryByText(/sets them up on the cluster/i)).not.toBeInTheDocument();
+  });
+});

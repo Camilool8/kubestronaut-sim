@@ -113,6 +113,12 @@ export const strings = {
     startFiltered: (label: string) => `Start ${label} drill`,
     starting: "Starting…",
 
+    // A pooled bank draws its tasks now and seeds them on the cluster before
+    // the attempt begins, which is minutes of waiting after the button is
+    // pressed. Saying so here is worth more than any amount of spinner.
+    seedNotice: (drawn: number) =>
+      `Starting draws ${drawn} tasks and sets them up on the cluster first. That takes a few minutes, and your clock does not start until it is done.`,
+
     drawTitle: "What you'll be asked",
     drawPooled: (drawn: number, pool: number) =>
       `${drawn} drawn at random from ${pool}, weighted to the published domain split. A different set every attempt.`,

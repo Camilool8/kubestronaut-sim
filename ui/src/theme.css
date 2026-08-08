@@ -1171,6 +1171,13 @@ button.nav-menu-item:hover {
   line-height: 1.6;
 }
 
+.mode-seed-notice {
+  margin: var(--space-5) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-s);
+  line-height: 1.6;
+}
+
 .mode-fine {
   display: flex;
   align-items: flex-start;
