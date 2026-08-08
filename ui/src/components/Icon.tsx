@@ -21,7 +21,8 @@ export type IconName =
   | "user"
   | "exit"
   | "send"
-  | "home";
+  | "home"
+  | "book";
 
 const SUN_RAYS = [
   "M12 2.4v2.2",
@@ -138,6 +139,12 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <path d="M4.5 10.8L12 4.8l7.5 6" />
       <path d="M6.5 10v9h11v-9" />
+    </>
+  ),
+  book: (
+    <>
+      <path d="M5 4.8h5.5a2 2 0 0 1 2 2v12a1.6 1.6 0 0 0-1.6-1.6H5z" />
+      <path d="M19 4.8h-4.5a2 2 0 0 0-2 2v12a1.6 1.6 0 0 1 1.6-1.6H19z" />
     </>
   ),
 };

@@ -10,6 +10,7 @@ import { strings } from "../strings";
 import { Async } from "./Async";
 import { Icon } from "./Icon";
 import { Markdown } from "./Markdown";
+import { DocsTray } from "./DocsTray";
 import { HintTray } from "./HintTray";
 import { Navigator, type NavigatorQuestion } from "./Navigator";
 import { Skeleton } from "./Pending";
@@ -155,6 +156,10 @@ export function QuestionPanel({
             >
               {(data) => <Markdown>{data.markdown}</Markdown>}
             </Async>
+
+            {mode === "training" && selected && (selected.docsCount ?? 0) > 0 && (
+              <DocsTray key={`docs-${selected.id}`} questionId={selected.id} />
+            )}
 
             {mode === "training" && selected && selected.hintCount > 0 && (
               <HintTray key={selected.id} questionId={selected.id} hintCount={selected.hintCount} />
