@@ -17,15 +17,22 @@ token_present() {
     test -e /var/run/secrets/kubernetes.io/serviceaccount 2>/dev/null
 }
 
+# Only an absence observed inside a running container counts. exec into a Pod
+# that does not exist fails too, and a bare negate would read that as a pass.
+no_token_mounted() {
+  [ "$phase" = "Running" ] || return 1
+  negate token_present
+}
+
 crit 1 "automountServiceAccountToken is false" \
   "automountServiceAccountToken is '$auto', want false" \
   "automountServiceAccountToken: false is what stops the kubelet projecting a token volume into the container at all. The field exists on both the Pod and the ServiceAccount and the POD's setting wins — setting it on the account is the better default when nothing using it needs API access, setting it on the Pod is the targeted version the question asks for." \
   -- [ "$auto" = "false" ]
 
 crit 1 "nothing is mounted at the token path inside the container" \
-  "a token is still mounted inside the container" \
-  "What is declared and what is projected are different things. A projected volume added by hand mounts a token at that path regardless of the automount setting, and the question asks for nothing to be there at all — which is why this is verified from inside the container rather than from the spec." \
-  -- negate token_present
+  "a token is still mounted inside the container, or there is no running container to look inside" \
+  "What is declared and what is projected are different things. A projected volume added by hand mounts a token at that path regardless of the automount setting, and the question asks for nothing to be there at all — which is why this is verified from inside the container rather than from the spec. An absence only counts when there is a running container to observe it in." \
+  -- no_token_mounted
 
 crit 1 "the Pod is Running" \
   "pod phase is '$phase', want Running" \

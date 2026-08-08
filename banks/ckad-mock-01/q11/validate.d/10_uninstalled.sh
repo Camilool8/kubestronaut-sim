@@ -31,4 +31,3 @@ crit 2 "the failed release report-legacy was found and uninstalled" \
 
 crit_all_passed || evidence "$(crit_why)"
 report "releases uninstalled"
-echo "uninstalls ok"

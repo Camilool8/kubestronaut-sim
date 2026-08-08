@@ -38,15 +38,22 @@ evidence() {
 
 allowed() { [ "$1" = "yes" ]; }
 
+# can-i answers for a subject that was never created, and the legacy binding
+# setup.sh plants already says yes to both reads — so on an untouched
+# environment these two would score without anything having been done. An
+# allowed read only counts once the account it names exists.
+sa_exists() { kubectl -n crater get serviceaccount report-reader >/dev/null 2>&1; }
+granted() { sa_exists && allowed "$1"; }
+
 crit 1 "may list ConfigMaps in crater" \
-  "listing ConfigMaps in crater answers '$a_list', want yes" \
+  "listing ConfigMaps as report-reader answers '$a_list', want yes from an account that exists" \
   "The pane shows every rule that resolves for this ServiceAccount in crater. Nothing grants list on configmaps: either the Role does not carry the verb, or the RoleBinding never joined the Role to this subject — a Role with no binding grants nobody anything." \
-  -- allowed "$a_list"
+  -- granted "$a_list"
 
 crit 1 "may get a ConfigMap in crater" \
-  "getting a ConfigMap in crater answers '$a_get', want yes" \
+  "getting a ConfigMap as report-reader answers '$a_get', want yes from an account that exists" \
   "get and list are separate verbs on the same resource. Reading one object by name and enumerating them are different requests to the API server, and a Role that carries only one of the two is a common way for a workload to half-work." \
-  -- allowed "$a_get"
+  -- granted "$a_get"
 
 crit 1 "may NOT delete ConfigMaps in crater" \
   "deleting a ConfigMap in crater answers '$a_delete', want no" \
