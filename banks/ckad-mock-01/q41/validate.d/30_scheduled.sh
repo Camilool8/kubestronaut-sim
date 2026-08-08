@@ -36,10 +36,20 @@ img=$(kubectl -n columba get pod archive-indexer \
 mem=$(kubectl -n columba get pod archive-indexer \
   -o jsonpath='{.spec.containers[?(@.name=="indexer")].resources.requests.memory}' 2>/dev/null)
 
-crit 1 "still the container and image it had" \
-  "the indexer container runs '$img', want busybox:1.37" \
-  "Replacing a Pod is not the same as writing a new one. The question fixes the name, the container name and the image so that only the request changes; an empty value here also means the container was renamed, since it is looked up by name." \
-  -- [ "$img" = "busybox:1.37" ]
+# The seeded Pod already runs that container on that image — the exercise
+# changes nothing but the request — so "it still does" is true of a Namespace
+# nobody has touched. What survived the replacement only counts once there has
+# been a replacement, which is visible as the request that could not be
+# scheduled being gone.
+seeded_request=$(mib 900Gi)
+survived_the_replacement() {
+  [ "$img" = "busybox:1.37" ] && [ "$(mib "$mem")" != "$seeded_request" ]
+}
+
+crit 1 "replaced, and still the container and image it had" \
+  "the indexer container runs '$img' asking for '$mem'; want busybox:1.37 on a Pod that no longer carries the 900Gi request it was created with" \
+  "Replacing a Pod is not the same as writing a new one. The question fixes the name, the container name and the image so that only the request changes; an empty value here also means the container was renamed, since it is looked up by name. Keeping them is not work on its own — the Pod that is there already has them — so this counts once the original request has actually been replaced." \
+  -- survived_the_replacement
 
 crit 1 "asks for 64Mi of memory" \
   "the indexer container requests '$mem' of memory, want 64Mi" \

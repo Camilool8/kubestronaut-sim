@@ -12,10 +12,33 @@ live=$(kubectl -n volans get pods -l app=edge-cache -o json 2>/dev/null \
   | jq -r '[.items[] | select(.spec.terminationGracePeriodSeconds == 45)
             | select([.spec.containers[].imagePullPolicy] | unique == ["Never"])] | length')
 
-rolled_out() { [ "$want" -gt 0 ] && [ "$ready" = "$want" ]; }
+grace=$(kubectl -n volans get deploy edge-cache \
+  -o jsonpath='{.spec.template.spec.terminationGracePeriodSeconds}' 2>/dev/null)
+policies=$(kubectl -n volans get deploy edge-cache \
+  -o jsonpath='{.spec.template.spec.containers[*].imagePullPolicy}' 2>/dev/null)
+
+# The seeded Deployment is healthy at 2/2 before the candidate arrives, so a
+# bare "2 of 2 are ready" is true of an untouched Namespace. A rollout is only
+# evidence of anything once what rolled out is what the question asked for.
+template_updated() {
+  [ "$grace" = "45" ] || return 1
+  [ -n "$policies" ] || return 1
+  local p
+  for p in $policies; do
+    [ "$p" = "Never" ] || return 1
+  done
+}
+rolled_out() { template_updated && [ "$want" -gt 0 ] && [ "$ready" = "$want" ]; }
 
 list_pane() {
   show_actual text "$(kubectl -n volans get pods -l app=edge-cache 2>/dev/null)"
+  show_why "$1"
+}
+template_pane() {
+  show_actual json "$(kubectl -n volans get deploy edge-cache -o json 2>/dev/null \
+    | jq '{replicas: .spec.replicas, readyReplicas: .status.readyReplicas,
+           template: {grace: .spec.template.spec.terminationGracePeriodSeconds,
+                      containers: [.spec.template.spec.containers[] | {name, imagePullPolicy}]}}')"
   show_why "$1"
 }
 settings_pane() {
@@ -26,10 +49,10 @@ settings_pane() {
 }
 pane=''
 
-crit 1 "the rollout completed" \
-  "${ready}/${want} replicas are ready" \
-  "A template edited but not rolled out has changed nothing that is running. ErrImageNeverPull is the failure to expect here: it means the kubelet was told never to pull and could not find the image already on the node, which is exactly what Never is for — a loud failure instead of a silent trip to a registry." \
-  -- rolled_out || pane=${pane:-list_pane}
+crit 1 "the template carries both settings and the rollout completed" \
+  "the template has terminationGracePeriodSeconds '$grace' and imagePullPolicy '$policies' (want 45, and Never on every container), and ${ready}/${want} replicas are ready" \
+  "A template edited but not rolled out has changed nothing that is running — and a Deployment nobody has edited is already 2/2, so the replica count alone says nothing about whether the work was done. ErrImageNeverPull is the failure to expect here: it means the kubelet was told never to pull and could not find the image already on the node, which is exactly what Never is for — a loud failure instead of a silent trip to a registry." \
+  -- rolled_out || pane=${pane:-template_pane}
 
 crit 1 "every live Pod carries both settings" \
   "only ${live} of ${ready} running Pods carry both settings" \

@@ -34,6 +34,16 @@ green=$(pods_for "app=checkout,release=green")
 port=$(kubectl -n lacerta get svc checkout \
   -o jsonpath='{.spec.ports[?(@.port==80)].port}' 2>/dev/null)
 
+# The question rules this one out: the Service was to be left publishing port
+# 80, so a cutover that moves the port is not a partial answer to anything. It
+# is also true of a Service nobody touched, which is why it is a gate and not a
+# criterion — respecting it earns nothing.
+[ "$port" = "80" ] || {
+  echo "the Service no longer publishes port 80"
+  evidence "The question ruled this out: the Service was to keep publishing port 80, and it no longer does. Clients hold the Service's name and port, not its selector, so a cutover that changes the published port has broken every caller in exchange for a release that was meant to reach them invisibly. Deleting the Service and writing a new one is the usual way to lose it — patch the selector on the Service that is there instead."
+  exit 1
+}
+
 match_pane() {
   show_actual text "$(printf 'selector: %s\nmatches:\n%s\n\ngreen release Pods:\n%s\n' "$sel" "$matched" "$green")"
   show_why "$1"
@@ -44,11 +54,6 @@ crit 2 "selects exactly the green release's Pods" \
   "selector '$sel' matches $(printf '%s\n' "$matched" | grep -c . || true) Pod(s), want exactly the $(printf '%s\n' "$green" | grep -c .) green one(s)" \
   "A Service routes to every Pod its labels match and has no other opinion about them, so 'switch the release' means 'change which labels the selector names'. Matching both releases at once is the failure worth knowing: it does not error, it silently load-balances across the two versions." \
   -- same_set "$matched" "$green" || pane=${pane:-match_pane}
-
-crit 1 "still publishes port 80" \
-  "the Service no longer publishes port 80" \
-  "Clients hold the Service's name and port, not its selector, so a cutover that changes the published port has broken every caller in exchange for the release it was meant to deliver invisibly." \
-  -- [ "$port" = "80" ] || pane=${pane:-evidence}
 
 crit_all_passed || "${pane:-evidence}" "$(crit_why)"
 report "selector cut over to green"

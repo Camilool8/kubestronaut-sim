@@ -22,6 +22,16 @@ port=$(kubectl -n lupus get svc search -o jsonpath='{.spec.ports[?(@.port==80)].
   exit 1
 }
 
+# The question rules this one out: Service search was not to be edited or
+# replaced. It is a gate rather than a criterion because leaving it alone is
+# what a candidate who has done nothing at all has also done.
+[ "$port" = "80" ] || {
+  echo "Service search no longer publishes port 80 (selector: $sel)"
+  show_actual json "$(kubectl -n lupus get svc search -o json 2>/dev/null | jq '{selector: .spec.selector, ports: .spec.ports}')"
+  show_why "The question ruled this out: Service search was not to be edited or replaced, and it no longer publishes the port it was published on. Clients hold the Service's name and port. A canary that changes either has broken every caller in exchange for a trial that was supposed to be invisible to them — the whole point of this shape is that the Service needs no edit, because it already selects on the one label both releases share."
+  exit 1
+}
+
 names=$(printf '%s' "$slices" | jq -r '.items[].endpoints[]? | select(.conditions.ready == true) | .targetRef.name // empty')
 total=$(printf '%s\n' "$names" | grep -c . || true)
 canary_pods=$(kubectl -n lupus get pods -l app=search,track=canary \
@@ -32,15 +42,14 @@ for n in $names; do
   has_name "$canary_pods" "$n" && canary=$((canary + 1))
 done
 
-crit 1 "the Service was left as it was" \
-  "Service search no longer publishes port 80 (selector: $sel)" \
-  "Clients hold the Service's name and port. A canary that changes either has broken every caller in exchange for a trial that was supposed to be invisible to them." \
-  -- [ "$port" = "80" ]
+# Five ready endpoints is the number the Service started with, so the count
+# grades the answer only once the canary is one of them.
+held_at_five() { [ "$total" = "5" ] && [ "${canary:-0}" -ge 1 ]; }
 
-crit 1 "5 Pods are behind it, as before" \
-  "the Service has $total ready endpoint(s), want 5" \
-  "Every ready Pod matching the selector lands in one flat endpoint list, and kube-proxy picks from it evenly. Six endpoints means the canary was added on top of the stable five instead of taking a share of them, which is both the wrong proportion and more capacity than the workload was sized for; fewer than five means Pods are still starting or the labels do not match." \
-  -- [ "$total" = "5" ]
+crit 1 "5 Pods are behind it, as before, and the canary is among them" \
+  "the Service has $total ready endpoint(s), $canary of them canary; want 5 in total with the canary in the list" \
+  "Every ready Pod matching the selector lands in one flat endpoint list, and kube-proxy picks from it evenly. Five is where this Service started, so it counts once the canary has joined that list: capacity held constant WITH the trial running is the thing being graded. Six endpoints means the canary was added on top of the stable five instead of taking a share of them, which is both the wrong proportion and more capacity than the workload was sized for; five with no canary in the list means its Pods do not carry the label the Service selects on." \
+  -- held_at_five
 
 crit 1 "exactly one of them is the canary" \
   "$canary of the $total ready endpoints belong to track=canary Pods, want 1" \

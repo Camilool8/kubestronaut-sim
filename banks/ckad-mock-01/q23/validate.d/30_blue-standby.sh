@@ -47,17 +47,20 @@ sel_pane() {
   show_actual text "$(printf 'selector: %s\nmatches:\n%s\n\nblue release Pods:\n%s\n' "$sel" "$matched" "$blue")"
   show_why "$1"
 }
-pane=''
 
-crit 1 "blue is still at full strength" \
-  "checkout-blue has ${ready}/${want} replicas ready, want 2/2" \
-  "Scaling blue to zero costs the same as deleting it: the rollback is no longer instant, because the Pods have to be scheduled and started again before the selector can be moved back." \
-  -- at_full_strength || pane=${pane:-deploy_pane}
+# The question rules this one out: blue was to be left running at its current
+# replica count. Leaving it alone is what a candidate who has done nothing at
+# all has also done, so it earns nothing — scaling it down costs the check.
+at_full_strength || {
+  echo "checkout-blue has ${ready}/${want} replicas ready, want 2/2"
+  deploy_pane "The question ruled this out: blue was to be left running at its current replica count, because it is the rollback. Scaling it to zero costs the same as deleting it — the rollback is no longer instant, since the Pods have to be scheduled and started again before the selector can be moved back."
+  exit 1
+}
 
-crit 1 "and takes no traffic" \
+crit 1 "blue takes no traffic, so it is standing by rather than serving" \
   "the Service still sends traffic to the blue release, so nothing is on standby" \
   "Blue is the rollback only once green is the one being served. Until the selector moves, blue IS the release — and a selector that matches both is worse than either, because it silently splits live traffic across two versions." \
-  -- off_the_service || pane=${pane:-sel_pane}
+  -- off_the_service
 
-crit_all_passed || "${pane:-deploy_pane}" "$(crit_why)"
+crit_all_passed || sel_pane "$(crit_why)"
 report "blue is warm and on standby, ready to roll back to"

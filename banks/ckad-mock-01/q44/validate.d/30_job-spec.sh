@@ -55,10 +55,21 @@ crit 1 "restarts the container in place" \
   "A Job's Pod template takes only Never or OnFailure; Always is rejected outright, because a Pod that always restarts can never be counted as complete. OnFailure keeps the same Pod and restarts its container, so the restart count climbs and no new Pod is scheduled. Never is the opposite bargain and is what the broken Job used: one Pod per attempt, all of them left behind to read." \
   -- [ "$policy" = "OnFailure" ]
 
-crit 1 "still the container and image it had" \
-  "the container list is '$(name_list "$names")' with reconcile on image '$img', want one named reconcile on busybox:1.37" \
-  "The rewrite was to change the Job's settings, not the work it does. The container is looked up by name, so an empty image here means it was renamed rather than that the image is missing." \
-  -- [ "$img" = "busybox:1.37" ]
+# The Job that gave up already runs a container named reconcile on busybox:1.37
+# — the rewrite was never meant to change either — so "it still does" is true of
+# an untouched Namespace. What survived the rewrite counts once there has been a
+# rewrite: at least one of the settings above has to have landed, or the Job
+# sitting there is still the one that failed.
+rewritten() {
+  [ "$completions" = "4" ] || [ "$parallelism" = "2" ] || [ "$backoff" = "4" ] \
+    || [ "$deadline" = "120" ] || [ "$policy" = "OnFailure" ]
+}
+survived_the_rewrite() { rewritten && [ "$img" = "busybox:1.37" ]; }
+
+crit 1 "rewritten, and still the container and image it had" \
+  "the container list is '$(name_list "$names")' with reconcile on image '$img', want one named reconcile on busybox:1.37 in a Job that carries at least one of the settings above" \
+  "The rewrite was to change the Job's settings, not the work it does. The container is looked up by name, so an empty image here means it was renamed rather than that the image is missing. Keeping them is not work on its own — the Job that gave up already has them — so this counts once something about the Job has actually changed." \
+  -- survived_the_rewrite
 
 crit_all_passed || evidence "$(crit_why)"
 report "job spec ok"

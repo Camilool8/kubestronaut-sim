@@ -35,12 +35,16 @@ detail_pane() {
 }
 pane=''
 
-rolled_out() { [ "$want" = "2" ] && [ "$ready" = "2" ]; }
+# A Pod being killed by liveness reports Ready between kills, so the seeded
+# Deployment is already 2/2 and a bare readiness count is true of a Namespace
+# nobody has touched. Both replicas being ready means something once the two
+# that are ready are the ones carrying the corrected probe.
+rolled_out() { [ "$want" = "2" ] && [ "$ready" = "2" ] && [ "${live:-0}" -ge 2 ]; }
 quiet() { [ "${live:-0}" -ge 2 ] && [ "${worst:-1}" = "0" ]; }
 
-crit 1 "both replicas are ready" \
-  "${ready}/${want} replicas are ready" \
-  "A Pod being killed by its liveness probe still reports Ready between kills, so readiness alone was never the symptom here — the replica count is the other half of the pair. If this is short, the rollout has not finished or the new Pods are failing for a second reason." \
+crit 1 "both replicas are ready on the corrected probe" \
+  "${ready}/${want} replicas are ready and ${live} Pod(s) carry the corrected probe, want 2 of each" \
+  "A Pod being killed by its liveness probe still reports Ready between kills, so readiness alone was never the symptom here and it was already 2/2 before you started — the replica count is only half of the pair, and the Pods being counted have to be the repaired ones. If this is short, the rollout has not finished or the new Pods are failing for a second reason." \
   -- rolled_out || pane=${pane:-list_pane}
 
 crit 1 "the Pods now serving show no restarts" \

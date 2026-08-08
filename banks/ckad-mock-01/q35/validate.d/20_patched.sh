@@ -34,17 +34,20 @@ base_delay=$(yq -r "$api | .readinessProbe.initialDelaySeconds" "$BASE" 2>/dev/n
 
 declares_a_patch() { [ -n "$patches" ] && [ "$patches" -ge 1 ] 2>/dev/null; }
 base_untouched() { [ "$base_env" = "0" ] && [ "$base_delay" = "30" ]; }
-pane=''
+
+# The question rules this one out: only the overlay's kustomization was to be
+# completed. Leaving base/ alone is a gate rather than a criterion because a
+# candidate who has written nothing anywhere has left it alone too.
+base_untouched || {
+  echo "base/deployment.yaml has been edited: container 'api' now has $base_env env var(s) and initialDelaySeconds '$base_delay', want 0 and 30"
+  base_pane "The question ruled this out: nothing under base/ was to be edited. The base is what every environment shares; the overlay is what one environment differs by. Putting LEDGER_MODE=prod in the base gives it to staging too, silently, the next time anyone builds that overlay — and the overlay that was supposed to document production's differences documents nothing at all. Restore the file from the document beside this pane and make the change in the overlay."
+  exit 1
+}
 
 crit 1 "the overlay declares a patch" \
   "the overlay's kustomization declares no patches at all" \
   "A transformer changes one well-known thing across every resource, and its vocabulary is deliberately small — images, replicas, namePrefix, namespace, labels. Anything outside it is a patch, and both of this question's changes are outside it. Hand-writing the finished Deployment into the overlay's resources reaches the same rendered output and abandons the base, which is the one thing the layout exists to share." \
-  -- declares_a_patch || pane=${pane:-overlay_pane}
+  -- declares_a_patch
 
-crit 1 "the base still says what it said" \
-  "base/deployment.yaml has been edited: container 'api' now has $base_env env var(s) and initialDelaySeconds '$base_delay', want 0 and 30" \
-  "The base is what every environment shares; the overlay is what one environment differs by. Putting LEDGER_MODE=prod in the base gives it to staging too, silently, the next time anyone builds that overlay — and the overlay that was supposed to document production's differences documents nothing at all." \
-  -- base_untouched || pane=${pane:-base_pane}
-
-crit_all_passed || "${pane:-overlay_pane}" "$(crit_why)"
+crit_all_passed || overlay_pane "$(crit_why)"
 report "patched in the overlay, base untouched"

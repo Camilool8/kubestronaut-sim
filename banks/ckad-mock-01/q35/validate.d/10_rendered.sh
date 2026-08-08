@@ -41,10 +41,14 @@ crit 1 "the readiness probe starts after 5 seconds" \
   "The base waits 30 seconds before probing at all. Overriding one field of a probe is again beyond any transformer, so it belongs in the same patch." \
   -- [ "$delay" = "5" ]
 
+# The base's probe renders unharmed when nothing has been patched at all, so
+# "survived" only means anything once the probe has actually been patched.
+probe_survived() { [ "$delay" = "5" ] && [ "$probe" = "/ 80 10" ]; }
+
 crit 1 "and the rest of the probe survived the patch" \
-  "rendered probe is path/port/period '$probe', want '/ 80 10'" \
-  "readinessProbe is a struct, so a strategic merge patch merges it field by field: naming initialDelaySeconds alone leaves httpGet and periodSeconds exactly as the base has them. This is what separates a patch from a replacement — everything you do not mention is left alone — and it is also where a JSON 6902 'replace' on the whole probe would have taken the rest of it with it." \
-  -- [ "$probe" = "/ 80 10" ]
+  "rendered initialDelaySeconds is '$delay' with path/port/period '$probe'; want the delay at 5 and the rest still '/ 80 10'" \
+  "readinessProbe is a struct, so a strategic merge patch merges it field by field: naming initialDelaySeconds alone leaves httpGet and periodSeconds exactly as the base has them. This is graded together with the delay because an unpatched probe survives trivially — what is worth points is the probe coming through a patch with only the field you named changed. It is where a JSON 6902 'replace' on the whole probe would have taken the rest of it with it." \
+  -- probe_survived
 
 crit_all_passed || evidence "$(crit_why)"
 report "the overlay renders the env var and the shortened probe"
