@@ -38,22 +38,27 @@ evidence() {
 
 allowed() { [ "$1" = "yes" ]; }
 
-# can-i answers for a subject that was never created, and the legacy binding
-# setup.sh plants already says yes to both reads — so on an untouched
-# environment these two would score without anything having been done. An
-# allowed read only counts once the account it names exists.
-sa_exists() { kubectl -n crater get serviceaccount report-reader >/dev/null 2>&1; }
-granted() { sa_exists && allowed "$1"; }
+# can-i answers for a subject that was never created, so every criterion here
+# is meaningless until the account exists: the reads are allowed by the legacy
+# binding setup.sh plants, and on a Namespace where nothing was seeded at all
+# the two denials are true because nothing grants anything. A gate rather than
+# four guards — none of these four questions can be asked of nobody.
+kubectl -n crater get serviceaccount report-reader >/dev/null 2>&1 || {
+  echo "there is no ServiceAccount report-reader in crater to authorize"
+  show_actual text "$(kubectl -n crater get serviceaccount 2>/dev/null)"
+  show_why "Every criterion in this check asks what report-reader may do. RBAC answers those questions for a subject that was never created — a binding names a subject by string, and can-i reports on the rules that resolve for it either way — so the answers only mean something once the account the question asks for exists. Create it first; 20_binding.sh scores it."
+  exit 1
+}
 
 crit 1 "may list ConfigMaps in crater" \
-  "listing ConfigMaps as report-reader answers '$a_list', want yes from an account that exists" \
+  "listing ConfigMaps as report-reader answers '$a_list', want yes" \
   "The pane shows every rule that resolves for this ServiceAccount in crater. Nothing grants list on configmaps: either the Role does not carry the verb, or the RoleBinding never joined the Role to this subject — a Role with no binding grants nobody anything." \
-  -- granted "$a_list"
+  -- allowed "$a_list"
 
 crit 1 "may get a ConfigMap in crater" \
-  "getting a ConfigMap as report-reader answers '$a_get', want yes from an account that exists" \
+  "getting a ConfigMap as report-reader answers '$a_get', want yes" \
   "get and list are separate verbs on the same resource. Reading one object by name and enumerating them are different requests to the API server, and a Role that carries only one of the two is a common way for a workload to half-work." \
-  -- granted "$a_get"
+  -- allowed "$a_get"
 
 crit 1 "may NOT delete ConfigMaps in crater" \
   "deleting a ConfigMap in crater answers '$a_delete', want no" \

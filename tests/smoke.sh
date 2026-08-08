@@ -19,6 +19,19 @@ print(data.get(os.environ["FIELD"], ""))
 '
 }
 
+# A drawn question id from the attempt that is open now. The CKAD pool is deep
+# enough that no particular id is drawn every time, so an assertion that names
+# one by hand fails whenever the draw leaves it out.
+drawn_qid() {
+  req GET /api/exam >/dev/null
+  RESP="$RESP" python3 -c '
+import json, os
+with open(os.environ["RESP"]) as f:
+    qs = json.load(f).get("questions", [])
+print(qs[0]["id"] if qs else "")
+'
+}
+
 bash tests/bank-weights.sh || fail "bank weights are out of balance"
 bash tests/check-lint.sh || fail "validate.d checks have brittle idioms"
 bash tests/check-lib.sh || fail "banks/_lib/checks.sh helpers are broken"
@@ -308,7 +321,8 @@ rem2=$(json_field remainingSeconds)
 status=$(req GET /desktop/vnc.html)
 [ "$status" = "200" ] || fail "desktop should be 200 while running, got $status"
 
-status=$(req GET /api/questions/q01/solution)
+gated_qid=$(drawn_qid)
+status=$(req GET /api/questions/${gated_qid}/solution)
 [ "$status" = "403" ] || fail "solution should still be 403 while the session is running, got $status"
 
 ./sim grade | tee /tmp/grade0.txt
@@ -382,10 +396,6 @@ with open(os.environ["RESP"]) as f:
 drawn_n=$(printf '%s' "$drawn_ids" | wc -w | tr -d ' ')
 [ "$drawn_n" = "$declared" ] \
   || fail "a running attempt should ask the declared ${declared} of ${pool}, got ${drawn_n}"
-case " $drawn_ids " in
-  *" q01 "*) ;;
-  *) fail "q01 was not drawn; the gate assertions below name it by id" ;;
-esac
 
 solve_bank ckad-mock-01
 
@@ -430,7 +440,7 @@ for q in data.get("questions", []):
   [ "$passed" = "True" ] || fail "facilitator results: passed should be true, got ${passed}"
 fi
 
-status=$(req GET /api/questions/q01/solution)
+status=$(req GET /api/questions/${gated_qid}/solution)
 [ "$status" = "200" ] || fail "solution should be 200 once the session has ended, got $status"
 
 status=$(req GET /desktop/vnc.html)
@@ -747,11 +757,12 @@ status=$(start_session '{"mode":"training"}')
 training_seed=$(json_field seed)
 [ -n "$training_seed" ] || fail "training: the attempt reported no seed"
 
-[ "$(req GET /api/questions/q01/hints/1)" = "200" ] || fail "training: hint 1 not served"
+training_qid=$(drawn_qid)
+[ "$(req GET /api/questions/${training_qid}/hints/1)" = "200" ] || fail "training: hint 1 not served"
 [ -n "$(json_field markdown)" ] || fail "training: hint 1 is empty"
-[ "$(req GET /api/questions/q01/hints/99)" = "404" ] || fail "training: out-of-range hint should 404"
+[ "$(req GET /api/questions/${training_qid}/hints/99)" = "404" ] || fail "training: out-of-range hint should 404"
 
-[ "$(req GET /api/questions/q01/solution)" = "200" ] \
+[ "$(req GET /api/questions/${training_qid}/solution)" = "200" ] \
   || fail "training: solutions should be readable during a training attempt"
 
 [ "$(req POST /api/session/grade)" = "200" ] || fail "training: mid-attempt grade failed"
@@ -761,7 +772,7 @@ training_seed=$(json_field seed)
   || fail "training: a practice grade must not be recorded as a result"
 
 curl -s -o "$RESP" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
-  -d '{"question":"q01"}' "${BASE}/api/control/reseed" > /tmp/smoke-reseed.txt
+  -d "{\"question\":\"${training_qid}\"}" "${BASE}/api/control/reseed" > /tmp/smoke-reseed.txt
 [ "$(cat /tmp/smoke-reseed.txt)" = "200" ] \
   || fail "training: reseed expected 200, got $(cat /tmp/smoke-reseed.txt)"
 curl -s -o "$RESP" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
@@ -778,13 +789,14 @@ status=$(start_session "{\"seed\":\"${training_seed}\"}")
   || fail "exam-gate: replayed seed ${training_seed}, got '$(json_field seed)'"
 if [ "$status" = "200" ]; then
   [ "$(json_field mode)" = "exam" ] || fail "exam-gate: mode is '$(json_field mode)', want exam"
-  [ "$(req GET /api/questions/q01/hints/1)" = "403" ] || fail "exam-gate: hints must be 403 in an exam"
-  [ "$(req GET /api/questions/q01/solution)" = "403" ] || fail "exam-gate: solutions must be 403 mid-exam"
+  exam_qid=$(drawn_qid)
+  [ "$(req GET /api/questions/${exam_qid}/hints/1)" = "403" ] || fail "exam-gate: hints must be 403 in an exam"
+  [ "$(req GET /api/questions/${exam_qid}/solution)" = "403" ] || fail "exam-gate: solutions must be 403 mid-exam"
 
   [ "$(req GET /api/exam/tips)" = "200" ] || fail "exam-gate: tips must stay readable mid-exam"
   [ "$(req POST /api/session/grade)" = "403" ] || fail "exam-gate: mid-attempt scoring must be 403 in an exam"
   curl -s -o "$RESP" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
-    -d '{"question":"q01"}' "${BASE}/api/control/reseed" > /tmp/smoke-reseed-exam.txt
+    -d "{\"question\":\"${exam_qid}\"}" "${BASE}/api/control/reseed" > /tmp/smoke-reseed-exam.txt
   [ "$(cat /tmp/smoke-reseed-exam.txt)" = "403" ] \
     || fail "exam-gate: reseed must be 403 in an exam, got $(cat /tmp/smoke-reseed-exam.txt)"
 fi
