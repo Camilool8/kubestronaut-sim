@@ -382,6 +382,10 @@ export const strings = {
     disclaimerBody:
       "Kubestronaut Sim is an independent open-source study tool. It is not affiliated with, endorsed by, or associated with the Cloud Native Computing Foundation, The Linux Foundation, or PSI. Kubernetes and the certification names (CKA, CKAD, CKS, KCNA, KCSA) are trademarks of The Linux Foundation.",
     licensesTitle: "Licenses and credits",
+    authorName: "Camilo Joga",
+    authorUrl: "https://cjoga.cloud",
+    authorFooter: "Built by",
+    authorCredit: "Created and maintained by",
     licenses: [
       "Simulator code: Apache License 2.0",
       "Question banks: Creative Commons BY-SA 4.0",

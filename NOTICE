@@ -1,0 +1,52 @@
+kubestronaut-sim
+Copyright 2026 Camilo Joga
+
+Created and maintained by Camilo Joga <https://cjoga.cloud>.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may
+not use this file except in compliance with the License. You may obtain
+a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+--------------------------------------------------------------------------
+
+The question banks under banks/ are licensed separately, under the
+Creative Commons Attribution-ShareAlike 4.0 International License.
+See banks/LICENSE.
+
+--------------------------------------------------------------------------
+
+Third-party components distributed with this product:
+
+  noVNC — Mozilla Public License 2.0
+  https://github.com/novnc/noVNC
+
+  highlight.js — BSD 3-Clause License
+  https://github.com/highlightjs/highlight.js
+
+  React and react-dom — MIT License
+  https://github.com/facebook/react
+
+  react-markdown and remark-gfm — MIT License
+  https://github.com/remarkjs/react-markdown
+
+  IBM Plex Sans and IBM Plex Mono — SIL Open Font License 1.1
+  https://github.com/IBM/plex
+
+  JetBrains Mono — SIL Open Font License 1.1
+  https://github.com/JetBrains/JetBrainsMono
+
+--------------------------------------------------------------------------
+
+kubestronaut-sim is an independent open-source study tool. It is not
+affiliated with, endorsed by, or associated with the Cloud Native
+Computing Foundation, The Linux Foundation, or PSI. Kubernetes and the
+certification names (CKA, CKAD, CKS, KCNA, KCSA) are trademarks of The
+Linux Foundation.

@@ -181,8 +181,10 @@ training.
 
 ## License
 
-- **Code:** Apache-2.0.
+- **Code:** Apache-2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 - **Question banks:** CC BY-SA 4.0 — see [banks/LICENSE](banks/LICENSE).
+
+Created and maintained by [Camilo Joga](https://cjoga.cloud).
 
 Not affiliated with CNCF, The Linux Foundation, or PSI. Kubernetes and
 the certification names are trademarks of The Linux Foundation.

@@ -68,6 +68,13 @@ export function InfoDrawer({ onClose, onShowIntro }: InfoDrawerProps) {
 
         <section>
           <h3>{s.licensesTitle}</h3>
+          <p className="drawer-credit">
+            {s.authorCredit}{" "}
+            <a href={s.authorUrl} target="_blank" rel="noopener noreferrer">
+              {s.authorName}
+            </a>
+            .
+          </p>
           <ul className="license-list">
             {s.licenses.map((line) => (
               <li key={line}>{line}</li>

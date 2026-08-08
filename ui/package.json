@@ -3,6 +3,13 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "license": "Apache-2.0",
+  "author": "Camilo Joga (https://cjoga.cloud)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Camilool8/kubestronaut-sim.git",
+    "directory": "ui"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",

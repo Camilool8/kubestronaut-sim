@@ -587,6 +587,24 @@ button.nav-menu-item:hover {
   text-align: center;
 }
 
+.page-footer p {
+  margin: 0 0 var(--space-1);
+}
+
+.page-footer p:last-child {
+  margin-bottom: 0;
+}
+
+.page-footer-link {
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.page-footer-link:hover {
+  color: var(--accent-strong);
+}
+
 .coverage {
   display: flex;
   align-items: center;
@@ -3533,6 +3551,22 @@ button.nav-menu-item:hover {
   color: var(--text-muted);
   font-size: var(--text-s);
   margin-top: var(--space-3);
+}
+
+.drawer-credit {
+  margin: 0 0 var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--text-s);
+}
+
+.drawer-credit a {
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.drawer-credit a:hover {
+  color: var(--accent-strong);
 }
 
 .license-list {
