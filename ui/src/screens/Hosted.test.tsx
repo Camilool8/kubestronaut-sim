@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../App";
@@ -760,4 +760,62 @@ test("a rebuild finishing behind a deliberate route does not close it", async ()
 
   await vi.advanceTimersByTimeAsync(2_000);
   await waitFor(() => expect(window.location.hash).toBe("#/progress"));
+});
+
+describe("what the boot promises a pooled bank", () => {
+  const booting = {
+    kind: "practical" as const,
+    bank: "ckad-mock-01",
+    pod: "sim-session-practical-583231",
+    state: "starting" as const,
+    startedAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + 3_600_000).toISOString(),
+    lastSeen: new Date(now).toISOString(),
+  };
+
+  const bank = (over: Record<string, unknown>) => [
+    {
+      id: "ckad-mock-01",
+      title: "CKAD Mock Exam 01",
+      certification: "CKAD",
+      examType: "hands-on",
+      kind: "practical",
+      available: true,
+      nodes: 2,
+      ...over,
+    },
+  ];
+
+  // A pooled bank seeds nothing at boot: bootstrap.sh preloads the images and
+  // leaves every setup.sh until an attempt draws its tasks. Claiming the setup
+  // here is what made the seed at start look like a repeat.
+  test("a pooled bank is not promised task setup it defers to the attempt", async () => {
+    hubExams = bank({ questionCount: 17, poolCount: 44 });
+    identity = me({ session: booting });
+    render(<App />);
+
+    await screen.findByRole("heading", { name: strings.hosted.bootStartingTitle });
+    expect(screen.queryByText(/worth of setup/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/2-node Kubernetes cluster/i)).toBeInTheDocument();
+  });
+
+  test("an unpooled bank really does set its tasks up, and still says so", async () => {
+    hubExams = bank({ questionCount: 22 });
+    identity = me({ session: booting });
+    render(<App />);
+
+    await screen.findByRole("heading", { name: strings.hosted.bootStartingTitle });
+    expect(screen.getByText(/22 tasks' worth of setup/i)).toBeInTheDocument();
+  });
+
+  test("the long wait does not claim questions are being set up", async () => {
+    hubExams = bank({ questionCount: 17, poolCount: 44 });
+    identity = me({
+      session: { ...booting, startedAt: new Date(now - 120_000).toISOString() },
+    });
+    render(<App />);
+
+    await screen.findByRole("heading", { name: strings.hosted.bootStartingTitle });
+    expect(screen.queryByText(/questions are being set up/i)).not.toBeInTheDocument();
+  });
 });

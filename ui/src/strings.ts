@@ -606,7 +606,10 @@ export const strings = {
       "api-server": "Waiting for the API server",
       cni: "Installing the pod network",
       ingress: "Installing the ingress controller",
-      seed: "Setting up the exam questions",
+      // The live label from bootstrap.sh replaces this while the phase runs;
+      // it has to stay true for both branches, because a pooled bank only
+      // preloads images here and seeds its tasks when an attempt starts.
+      seed: "Preparing the exam content",
       finalize: "Finishing up",
     },
   },
@@ -1070,13 +1073,21 @@ export const strings = {
       "Your seat is held. Environments are built one at a time — building two at once makes both slow rather than making either fast.",
     bootStartingTitle: "Building your environment",
 
-    bootStartingBody: (nodes?: number, tasks?: number) => {
+    // `pooled` decides whether the boot may claim task setup at all. A pooled
+    // bank draws its tasks when an attempt starts and seeds them then, so the
+    // boot only pulls the cluster and the images — saying otherwise here is
+    // what made the seed at start look like the same work happening twice.
+    bootStartingBody: (nodes?: number, tasks?: number, pooled?: boolean) => {
       const cluster =
         nodes && nodes > 0
           ? `A ${nodes}-node Kubernetes cluster`
           : "A real Kubernetes cluster";
-      const setup = tasks && tasks > 0 ? `, the exam images and ${tasks} tasks' worth of setup` : " and the exam images";
-      return `${cluster}${setup}. Nothing is lost if you close this tab.`;
+      const setup =
+        !pooled && tasks && tasks > 0
+          ? `, the exam images and ${tasks} tasks' worth of setup`
+          : " and the exam images";
+      const then = pooled ? " Your tasks are drawn and set up when you start an attempt." : "";
+      return `${cluster}${setup}. Nothing is lost if you close this tab.${then}`;
     },
     bootStartingBodyMcq:
       "No cluster to build for a multiple-choice exam — just the question bank and the marker. This takes a few seconds.",
@@ -1084,7 +1095,7 @@ export const strings = {
 
     bootReassure: (elapsedMs: number) => {
       if (elapsedMs < 90_000) return "Pulling images and starting the cluster.";
-      if (elapsedMs < 240_000) return "Still going — the cluster is coming up and its questions are being set up.";
+      if (elapsedMs < 240_000) return "Still going — the cluster is coming up and the exam images are being pulled.";
       if (elapsedMs < 600_000)
         return "Taking longer than usual. A first build on a cold node pulls several gigabytes; it is still working.";
       return "This is well past the usual wait. If nothing changes, give up this seat and start again.";

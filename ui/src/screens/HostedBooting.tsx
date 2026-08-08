@@ -87,7 +87,11 @@ export function HostedBooting({ session, onChanged }: HostedBootingProps) {
       ? strings.hosted.bootPendingBody
       : session.kind === "mcq"
         ? strings.hosted.bootStartingBodyMcq
-        : strings.hosted.bootStartingBody(exam?.nodes, exam?.questionCount);
+        : strings.hosted.bootStartingBody(
+            exam?.nodes,
+            exam?.questionCount,
+            (exam?.poolCount ?? 0) > (exam?.questionCount ?? 0),
+          );
 
   return (
     <div className="page hosted-screen hosted-booting">
