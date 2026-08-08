@@ -134,6 +134,30 @@ first if the record matters.
 - The instances *do* have direct internet access — `podman build` needs
   it to resolve short image names.
 
+## The desktop opener
+
+The desktop container runs `sim-opener` on `:6081`, so a Training
+question's documentation link can be opened as a tab in the candidate's
+own Firefox. It is the only thing in the stack that can reach the X
+display, and it does start a process, so what bounds it matters:
+
+- **One route.** `POST /open` with a JSON `url`, plus a health check. A
+  GET cannot open anything, so a page the candidate visits cannot drive
+  their desktop through an image or a link.
+- **https only**, and the URL reaches Firefox as an argv element through
+  `runuser`, never interpolated into a shell string. There is no quoting
+  to get wrong.
+- **The facilitator does the real allowlisting.** It forwards a URL only
+  when it is byte-equal to one the candidate's current question declares
+  and the attempt is in Training. `sim-opener` itself trusts its caller.
+- **The browser is still bound by the proxy.** Whatever opens is fetched
+  through `docs-proxy` and its allowlist like any other page.
+
+In compose the desktop shares `examnet` with the instances, so a
+candidate can reach `:6081` from their own shell. The worst that buys
+them is opening an allowlisted page on their own desktop, which they can
+already do by typing it into the browser.
+
 ## Hosted deployments
 
 A hosted deployment inverts the assumption above: the person at the
