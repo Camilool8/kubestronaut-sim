@@ -663,6 +663,15 @@ export const strings = {
       `The exam environment couldn't be set up, so the attempt never started and no time was used (${detail}). Try starting it again.`,
   },
 
+  preparing: {
+    body: (tasks: number) =>
+      tasks === 1
+        ? "Setting up the 1 task you drew on the cluster."
+        : `Setting up the ${tasks} tasks you drew on the cluster.`,
+
+    elapsed: (span: string) => `Elapsed ${span}`,
+  },
+
   mobile: {
     title: "This exam needs a desktop",
     why: "You work through a full Linux terminal and remote desktop, side by side with the questions, the same split screen as the real exam. That needs a keyboard and room to see both.",

@@ -18,6 +18,7 @@ import {
 import { BootProgress } from "./screens/BootProgress";
 import { Exams } from "./screens/Exams";
 import { Mode } from "./screens/Mode";
+import { Preparing } from "./screens/Preparing";
 import { Exam, ExamGateControls } from "./screens/Exam";
 import { McqExam } from "./screens/McqExam";
 import { Progress } from "./screens/Progress";
@@ -296,6 +297,17 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
     }
   }, []);
 
+  // A prepare is a conductor job we did not start through runControlAction, so
+  // nothing has told the control poll to wake up. Left alone it sits out the
+  // 15s idle interval before it notices, which is most of the dead air between
+  // pressing a mode and seeing what the cluster is doing.
+  const handlePreparing = useCallback(() => {
+    setDismissedJobId(null);
+    setBackgroundedJobId(null);
+    wasBusy.current = true;
+    setJobNonce((n) => n + 1);
+  }, []);
+
   const handleBanksLoaded = useCallback((banks: BanksResponse) => {
     setBankTitles(Object.fromEntries(banks.banks.map((b) => [b.id, b.title])));
   }, []);
@@ -330,14 +342,24 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
     [runControlAction],
   );
 
-  const overlayJob =
+  const candidateJob =
     control?.busy && control.job
       ? control.job
       : control?.lastJob?.error && control.lastJob.id !== dismissedJobId
         ? control.lastJob
         : null;
 
+  // The preparing screen is the seed's own view, and a failed seed reaches the
+  // candidate as `prepareError`. Overlaying a modal on top of either would be
+  // a second telling of the same thing.
+  const overlayJob = candidateJob?.op === "seed" ? null : candidateJob;
+
   const showOverlay = overlayJob !== null && overlayJob.id !== backgroundedJobId;
+
+  const seedDetail =
+    control?.busy && control.job?.op === "seed"
+      ? control.job.phases.find((p) => p.state === "running")?.detail
+      : undefined;
 
   const backgroundedJob =
     control?.busy && control.job && control.job.id === backgroundedJobId ? control.job : null;
@@ -400,13 +422,16 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
   } else {
     switch (session.state) {
       case "idle":
-        screen = onProgress ? (
+        screen = session.preparing ? (
+          <Preparing preparing={session.preparing} detail={seedDetail} />
+        ) : onProgress ? (
           <Progress catalogVersion={catalogVersion} hosted={hosted !== undefined} />
         ) : modeBankId ? (
           <Mode
             bankId={modeBankId}
             catalogVersion={catalogVersion}
             onSessionChange={applySession}
+            onPreparing={handlePreparing}
           />
         ) : (
           <Exams
@@ -484,9 +509,11 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
           screenKey={
             booting
               ? "booting"
-              : `${session?.state ?? "loading"}${
-                  onProgress ? ":progress" : modeBankId ? ":mode" : ""
-                }`
+              : session?.preparing
+                ? "preparing"
+                : `${session?.state ?? "loading"}${
+                    onProgress ? ":progress" : modeBankId ? ":mode" : ""
+                  }`
           }
         >
           {screen}
