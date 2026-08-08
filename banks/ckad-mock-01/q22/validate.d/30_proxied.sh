@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 4
 # desc: the app reaches the backend through localhost, and only through it
 set -uo pipefail
 . /banks/_lib/checks.sh

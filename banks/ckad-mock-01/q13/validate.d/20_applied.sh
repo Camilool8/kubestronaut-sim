@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 4
+# points: 3
 # desc: the overlay was applied to pavo and is running
 set -uo pipefail
 . /banks/_lib/checks.sh

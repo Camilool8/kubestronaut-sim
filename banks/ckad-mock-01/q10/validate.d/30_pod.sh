@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 1
+# points: 2
 # desc: Pod archiver mounts the claim at /var/archive and an emptyDir at /var/scratch
 set -uo pipefail
 . /banks/_lib/checks.sh

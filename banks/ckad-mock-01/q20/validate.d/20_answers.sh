@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 6
+# points: 5
 # desc: the node port really answers, from a node address inside the cluster
 set -uo pipefail
 . /banks/_lib/checks.sh

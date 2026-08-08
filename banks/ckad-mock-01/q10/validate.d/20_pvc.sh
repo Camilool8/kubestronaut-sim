@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 3
 # desc: PVC archive-pvc requests 1Gi RWO on class manual and is Bound to archive-pv
 set -uo pipefail
 . /banks/_lib/checks.sh

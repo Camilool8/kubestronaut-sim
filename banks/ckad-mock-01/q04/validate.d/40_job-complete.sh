@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 1
+# points: 2
 # desc: Job backfill completed, and its succeeded count is recorded on the instance
 set -uo pipefail
 . /banks/_lib/checks.sh

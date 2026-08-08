@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 5
+# points: 4
 # desc: a request through the Service really comes back from the green release
 set -uo pipefail
 . /banks/_lib/checks.sh

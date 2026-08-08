@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 5
+# points: 4
 # desc: the policy is actually enforced — frontend reaches api, metrics does not
 set -uo pipefail
 . /banks/_lib/checks.sh

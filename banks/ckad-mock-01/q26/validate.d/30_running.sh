@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 1
+# points: 2
 # desc: the rollout completed and the live Pods carry the new settings
 set -uo pipefail
 . /banks/_lib/checks.sh

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 3
 # desc: shipper is a native sidecar (initContainers entry with restartPolicy Always)
 set -uo pipefail
 . /banks/_lib/checks.sh

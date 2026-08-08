@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 3
 # desc: Job backfill: 3 completions, parallelism 2, backoffLimit 2, container worker
 set -uo pipefail
 . /banks/_lib/checks.sh

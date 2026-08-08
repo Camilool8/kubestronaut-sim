@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 2
 # desc: report-cache installed from sim-cache with 2 replicas set via values
 set -uo pipefail
 . /banks/_lib/checks.sh

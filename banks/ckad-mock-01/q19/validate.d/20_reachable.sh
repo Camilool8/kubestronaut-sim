@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 6
+# points: 5
 # desc: the Service has both endpoints and really answers from inside the cluster
 set -uo pipefail
 . /banks/_lib/checks.sh

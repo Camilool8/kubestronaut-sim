@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 2
 # desc: report-api-v2 was upgraded to a newer sim-web chart and is deployed
 set -uo pipefail
 . /banks/_lib/checks.sh

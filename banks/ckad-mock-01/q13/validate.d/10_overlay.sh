@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 5
+# points: 4
 # desc: the overlay itself renders the prefix, label, image and replica count
 set -uo pipefail
 . /banks/_lib/checks.sh

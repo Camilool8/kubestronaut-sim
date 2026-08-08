@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 1
+# points: 2
 # desc: init container wait-for-source exists, is not a sidecar, and mounts nothing
 set -uo pipefail
 . /banks/_lib/checks.sh

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 4
 # desc: the adapter really rewrites the app's output into key/value lines
 set -uo pipefail
 . /banks/_lib/checks.sh

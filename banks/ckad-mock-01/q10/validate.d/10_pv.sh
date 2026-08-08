@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 3
 # desc: PV archive-pv: 2Gi, RWO, hostPath /mnt/archive, class manual, Retain
 set -uo pipefail
 . /banks/_lib/checks.sh

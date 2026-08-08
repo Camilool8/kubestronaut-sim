@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 4
 # desc: both containers declare imagePullPolicy Never in the Deployment's Pod template
 set -uo pipefail
 . /banks/_lib/checks.sh

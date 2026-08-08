@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 2
 # desc: the Service selects exactly the green release's Pods and still publishes port 80
 set -uo pipefail
 . /banks/_lib/checks.sh

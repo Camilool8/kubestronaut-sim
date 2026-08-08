@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 3
 # desc: the ambassador holds the config, and the app knows nothing about the backend
 set -uo pipefail
 . /banks/_lib/checks.sh

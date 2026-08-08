@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 2
+# points: 3
 # desc: image registry:5000/pulsar-agent:v1 was built, and carries the new value
 set -uo pipefail
 . /banks/_lib/checks.sh

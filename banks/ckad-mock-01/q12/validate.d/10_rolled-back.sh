@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# points: 3
+# points: 2
 # desc: payments-api is back on nginx:1.27-alpine with 4 ready replicas
 set -uo pipefail
 . /banks/_lib/checks.sh
