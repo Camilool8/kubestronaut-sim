@@ -278,17 +278,21 @@ clock and one nobody finishes are both miscalibrated. `ckad-mock-01`
 currently draws 4 quick, 9 core and 4 deep for 115 minutes of task time
 against 120.
 
-The tier never reaches the candidate mid-attempt. It shapes the draw and
-it is gate input; a question labelled `deep` on screen would only tell
-someone to brace.
+The tier never reaches the candidate **mid-attempt**: a question labelled
+`deep` on screen would only tell someone to brace. It arrives once the
+attempt is over, on `GET /api/results`, where the same score is also cut
+by level — see [api.md](api.md). That cut is the reason the axis is worth
+having beyond comfort: a score that holds up on short tasks and falls
+away on long ones is a pacing problem, and a flat low score is a
+knowledge problem, and the two want different practice.
 
 ### Points in a pooled bank
 
 Derive them against the **pool**, exactly as an unpooled bank does:
 `domain budget / questions in that domain`, counting every authored
-question. `ckad-mock-01`'s 26 questions total 217 points that way, and
-every domain's share of them lands within one percentage point of its
-curriculum weight.
+question. `ckad-mock-01`'s 44 questions total 360 points that way — flat per
+domain, 9 or 7 — and every domain's share of them lands within one
+percentage point of its curriculum weight.
 
 What that does *not* give you is a drawn attempt whose raw points divide
 in the curriculum's ratios, and it cannot: a domain that contributes 4 of

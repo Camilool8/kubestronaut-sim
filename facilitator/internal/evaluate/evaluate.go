@@ -67,6 +67,8 @@ type Results struct {
 
 	Domains []DomainResult `json:"domains,omitempty"`
 
+	Levels []LevelResult `json:"levels,omitempty"`
+
 	Mode string `json:"mode,omitempty"`
 	Seed string `json:"seed,omitempty"`
 
@@ -114,6 +116,16 @@ type DomainResult struct {
 	QuestionCount int     `json:"questionCount"`
 }
 
+// The same attempt cut by how long each task was meant to take. A score that
+// falls away as the tasks get longer is a different problem from one that is
+// flat and low, and only the candidate can act on the difference.
+type LevelResult struct {
+	Level         string `json:"level"`
+	Earned        int    `json:"earned"`
+	Total         int    `json:"total"`
+	QuestionCount int    `json:"questionCount"`
+}
+
 type QuestionResult struct {
 	ID       string        `json:"id"`
 	Title    string        `json:"title,omitempty"`
@@ -122,6 +134,10 @@ type QuestionResult struct {
 	Earned   int           `json:"earned"`
 	Total    int           `json:"total"`
 	Checks   []CheckResult `json:"checks"`
+
+	// Only ever sent once the attempt is over. During one it would just tell
+	// a candidate to brace.
+	Difficulty string `json:"difficulty,omitempty"`
 
 	WeightPct float64 `json:"weightPct"`
 
@@ -167,7 +183,8 @@ func Grade(ex *exam.Exam, bank string, r Runner, checkTimeout time.Duration, que
 	}
 
 	for _, q := range exam.Subset(ex, questionIDs) {
-		qr := QuestionResult{ID: q.ID, Title: q.Title, Instance: q.Instance, Domain: q.Domain}
+		qr := QuestionResult{ID: q.ID, Title: q.Title, Instance: q.Instance, Domain: q.Domain,
+			Difficulty: q.Difficulty}
 
 		for _, c := range q.Checks {
 			if c.Skip {
@@ -238,6 +255,8 @@ func (r *Results) Finalize(domains []exam.Domain) {
 		r.Domains = nil
 	}
 
+	r.rollUpLevels()
+
 	if r.Total > 0 {
 		r.PointsPercent = r.Earned * 100 / r.Total
 	} else {
@@ -301,6 +320,33 @@ func (r *Results) weight(declared map[string]int) {
 		}
 		qShare := new(big.Rat).Mul(shares[i], big.NewRat(int64(q.Total), int64(r.Domains[i].Total)))
 		r.Questions[j].WeightPct, _ = qShare.Float64()
+	}
+}
+
+// Levels stay in tier order rather than being sorted by score: the point of
+// reading them is the shape as the tasks get longer, which a sort destroys.
+// A bank that declares no tiers — every mcq bank — gets no breakdown at all.
+func (r *Results) rollUpLevels() {
+	by := map[string]*LevelResult{}
+	for _, q := range r.Questions {
+		if q.Difficulty == "" {
+			continue
+		}
+		l, ok := by[q.Difficulty]
+		if !ok {
+			l = &LevelResult{Level: q.Difficulty}
+			by[q.Difficulty] = l
+		}
+		l.Earned += q.Earned
+		l.Total += q.Total
+		l.QuestionCount++
+	}
+
+	r.Levels = nil
+	for _, tier := range exam.Tiers() {
+		if l, ok := by[tier]; ok {
+			r.Levels = append(r.Levels, *l)
+		}
 	}
 }
 

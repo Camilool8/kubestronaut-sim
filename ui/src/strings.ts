@@ -758,6 +758,22 @@ export const strings = {
       points: number,
     ) => `${weight}% of exam · ${count} of ${total} tasks · ${earned}/${points} pts`,
 
+    levelTitle: "By task length",
+    levelHint:
+      "The same attempt cut by how long each task was meant to take. Levels are time bands, not a judgement of how clever a task is.",
+    levelNames: {
+      quick: "Quick — up to 4 min",
+      core: "Core — 4 to 9 min",
+      deep: "Deep — 9 to 14 min",
+    } as Record<string, string>,
+    levelMeta: (count: number, earned: number, points: number) =>
+      `${count} ${count === 1 ? "task" : "tasks"} · ${earned}/${points} pts`,
+
+    levelSlump:
+      "Your score falls away as the tasks get longer. That is usually pacing rather than missing knowledge — the fix is to plan a long task into steps before you start typing, not to read more.",
+    levelFlat:
+      "Your score holds up across short and long tasks, so length is not what is costing you.",
+
     domainBelow: "below threshold",
     domainUnknown: "Unclassified",
 

@@ -8,6 +8,7 @@ import {
   type SessionMode,
 } from "../api";
 import { DomainBreakdown } from "../components/DomainBreakdown";
+import { LevelBreakdown } from "../components/LevelBreakdown";
 import { ExamTips } from "../components/ExamTips";
 import { PendingBar } from "../components/Pending";
 import { ResultsBanner } from "../components/ResultsBanner";
@@ -139,6 +140,7 @@ export function Score({ onNewAttempt, endReason, mode }: ScoreProps) {
               domains={results.domains}
               passingScore={results.passingScore}
             />
+            <LevelBreakdown levels={results.levels} />
             <NextSession
               results={results}
               starting={starting}

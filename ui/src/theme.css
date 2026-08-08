@@ -2689,6 +2689,10 @@ button.nav-menu-item:hover {
   color: var(--text-muted);
 }
 
+.level-verdict {
+  margin-top: var(--space-4);
+}
+
 .domain-rows {
   list-style: none;
   margin: var(--space-4) 0 0;

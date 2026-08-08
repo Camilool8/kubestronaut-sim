@@ -33,6 +33,9 @@ const (
 
 var tierOrder = []string{TierQuick, TierCore, TierDeep}
 
+// Tiers in the order a breakdown should read: shortest task first.
+func Tiers() []string { return append([]string(nil), tierOrder...) }
+
 // A tier is the time band, not a judgement: the gate checks the label
 // against targetSeconds so it cannot drift into an opinion.
 var tierBounds = map[string][2]int{
