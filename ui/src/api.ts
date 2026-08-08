@@ -1,4 +1,5 @@
 import { pointerHeader } from "./lib/deviceCapability";
+import { progressStore } from "./components/progressStore";
 
 export type SessionState = "idle" | "running" | "ended";
 
@@ -291,6 +292,13 @@ function withTimeout(ms: number, external?: AbortSignal): AbortSignal {
 
 async function request(path: string, opts: RequestOptions = {}): Promise<Response> {
   const { signal, timeoutMs = FETCH_TIMEOUT_MS, headers, ...init } = opts;
+
+  // Mutations only. Reads are either driven by useAsync, which raises the bar
+  // itself, or they are polls — pollSession alone runs a GET every second for
+  // the life of the app, and counting those would pin the bar on permanently.
+  const tracked = init.method !== undefined && init.method !== "GET";
+  if (tracked) progressStore.start();
+
   try {
     return await fetch(path, {
       ...init,
@@ -303,6 +311,8 @@ async function request(path: string, opts: RequestOptions = {}): Promise<Respons
       throw new Error(`no answer in ${Math.round(timeoutMs / 1000)}s`, { cause: err });
     }
     throw err;
+  } finally {
+    if (tracked) progressStore.done();
   }
 }
 
