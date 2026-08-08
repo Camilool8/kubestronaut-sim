@@ -347,7 +347,20 @@ export function Exams({
                 </ul>
               )}
 
-              <p className="page-footer">{strings.info.footerLine}</p>
+              <div className="page-footer">
+                <p className="page-footer-by">
+                  {strings.info.authorFooter}{" "}
+                  <a
+                    className="page-footer-link"
+                    href={strings.info.authorUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {strings.info.authorName}
+                  </a>
+                </p>
+                <p>{strings.info.footerLine}</p>
+              </div>
             </>
           );
         }}

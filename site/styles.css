@@ -989,6 +989,12 @@ img {
   max-width: 40ch;
 }
 
+.footer-byline {
+  margin-top: var(--space-3);
+  font-size: var(--text-s);
+  color: var(--text-muted);
+}
+
 .footer-links {
   display: flex;
   flex-direction: column;
