@@ -30,6 +30,10 @@ template_updated() {
 }
 rolled_out() { template_updated && [ "$want" -gt 0 ] && [ "$ready" = "$want" ]; }
 
+# "every Pod carries the settings" is vacuously true of no Pods at all, which
+# is the state a bank-wide grade with nothing seeded runs in.
+every_live_pod_updated() { [ "$ready" -gt 0 ] && [ "$live" = "$ready" ]; }
+
 list_pane() {
   show_actual text "$(kubectl -n volans get pods -l app=edge-cache 2>/dev/null)"
   show_why "$1"
@@ -55,9 +59,9 @@ crit 1 "the template carries both settings and the rollout completed" \
   -- rolled_out || pane=${pane:-template_pane}
 
 crit 1 "every live Pod carries both settings" \
-  "only ${live} of ${ready} running Pods carry both settings" \
+  "only ${live} of ${ready} running Pods carry both settings — and no Pods at all is not every Pod" \
   "Changing a Deployment's Pod template starts a rollout; it does not edit the Pods that are already there. Until the new ReplicaSet has fully replaced the old one, some of what is running is still the previous spec — 'kubectl -n volans rollout status deploy/edge-cache' is what waits for that." \
-  -- [ "$live" = "$ready" ] || pane=${pane:-settings_pane}
+  -- every_live_pod_updated || pane=${pane:-settings_pane}
 
 crit_all_passed || "${pane:-list_pane}" "$(crit_why)"
 report "rollout complete with both settings live"
