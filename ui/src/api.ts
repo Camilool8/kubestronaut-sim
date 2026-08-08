@@ -51,6 +51,8 @@ export interface ExamQuestionInfo {
 
   hintCount: number;
 
+  docsCount?: number;
+
   multi?: boolean;
 
   targetSeconds?: number;
@@ -708,6 +710,46 @@ export async function getHint(
     throw await apiError(res);
   }
   return { ok: true, hint: (await res.json()) as HintDetail };
+}
+
+export async function getQuestionDocs(
+  id: string,
+  signal?: AbortSignal,
+): Promise<{ ok: true; docs: SolutionDoc[] } | { ok: false; error: string }> {
+  const res = await request(`/api/questions/${encodeURIComponent(id)}/docs`, { signal });
+  if (res.status === 403 || res.status === 404) {
+    return { ok: false, error: await readError(res) };
+  }
+  if (!res.ok) {
+    throw await apiError(res);
+  }
+  const body = (await res.json()) as { docs?: SolutionDoc[] };
+  return { ok: true, docs: body.docs ?? [] };
+}
+
+/**
+ * Opens a documentation page as a tab in the exam desktop's Firefox.
+ *
+ * The URL is sent back rather than an index because the facilitator validates
+ * it against the ones this question declares — the endpoint will not open a
+ * page the bank did not name.
+ */
+export async function openQuestionDoc(
+  id: string,
+  url: string,
+  signal?: AbortSignal,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await request(`/api/questions/${encodeURIComponent(id)}/docs/open`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+    signal,
+  });
+  if (res.ok) return { ok: true };
+  if (res.status >= 400 && res.status < 500) {
+    return { ok: false, error: await readError(res) };
+  }
+  throw await apiError(res);
 }
 
 export async function practiceGrade(

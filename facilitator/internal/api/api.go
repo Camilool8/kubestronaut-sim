@@ -69,6 +69,7 @@ func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desk
 	mux.HandleFunc("GET /api/questions/{id}", s.handleQuestion)
 	mux.HandleFunc("GET /api/questions/{id}/solution", s.handleSolution)
 	mux.HandleFunc("GET /api/questions/{id}/hints/{n}", s.handleHint)
+	mux.HandleFunc("GET /api/questions/{id}/docs", s.handleDocs)
 
 	mux.HandleFunc("PUT /api/questions/{id}/answer", s.handleAnswerPut)
 	mux.HandleFunc("GET /api/answers", s.handleAnswersGet)
@@ -163,6 +164,7 @@ type examQuestionInfo struct {
 	Weight      int    `json:"weight"`
 	TotalPoints int    `json:"totalPoints"`
 	HintCount   int    `json:"hintCount"`
+	DocsCount   int    `json:"docsCount"`
 	Multi       bool   `json:"multi,omitempty"`
 
 	TargetSeconds int  `json:"targetSeconds,omitempty"`
@@ -199,6 +201,7 @@ func (s *server) handleExam(w http.ResponseWriter, r *http.Request) {
 			Domain:    q.Domain,
 			Weight:    q.Weight,
 			HintCount: q.HintCount,
+			DocsCount: len(q.Docs),
 			Multi:     q.Multi,
 		}
 		info.TargetSeconds, info.TargetDerived = exam.TargetSeconds(s.ex, q)
