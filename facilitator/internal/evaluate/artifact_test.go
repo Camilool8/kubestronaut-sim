@@ -267,7 +267,7 @@ func TestPartialEarned(t *testing.T) {
 // A sentinel with nothing under it means the check looked and found nothing —
 // a missing object, or a container under a name nobody used. That is the pane
 // the candidate needs most, so it has to survive as an explicit statement
-// rather than disappearing and leaving only "field='', want x".
+// rather than disappearing and leaving only "field=”, want x".
 func TestSplitArtifactsKeepsEmptyBodiesAsAnExplicitMarker(t *testing.T) {
 	out := "msg\n---8<--- sim:artifact actual yaml\n---8<--- sim:artifact why text\nreal\n"
 	_, _, arts := splitArtifacts(out)

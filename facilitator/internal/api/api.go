@@ -39,6 +39,8 @@ type server struct {
 
 	control http.Handler
 
+	docsOpener DocsOpener
+
 	seeder    Seeder
 	prepMu    sync.Mutex
 	prep      *prep
@@ -70,6 +72,7 @@ func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desk
 	mux.HandleFunc("GET /api/questions/{id}/solution", s.handleSolution)
 	mux.HandleFunc("GET /api/questions/{id}/hints/{n}", s.handleHint)
 	mux.HandleFunc("GET /api/questions/{id}/docs", s.handleDocs)
+	mux.HandleFunc("POST /api/questions/{id}/docs/open", s.handleDocsOpen)
 
 	mux.HandleFunc("PUT /api/questions/{id}/answer", s.handleAnswerPut)
 	mux.HandleFunc("GET /api/answers", s.handleAnswersGet)

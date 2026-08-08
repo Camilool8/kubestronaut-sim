@@ -1,4 +1,14 @@
-FROM debian:12-slim
+FROM golang:1.24 AS opener
+WORKDIR /src
+COPY opener/ ./
+ENV CGO_ENABLED=0 GOFLAGS=-buildvcs=false
+RUN go build -o /out/sim-opener .
+
+# Debian 13 for the VNC stack, not the browser. Bookworm pinned noVNC at 1.3.0
+# and TigerVNC at 1.12, both from 2021, and that is what the candidate actually
+# looks through all exam. firefox-esr is 140.13 either way, and ESR is what the
+# real exam environment runs.
+FROM debian:13-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
       xfce4-session xfwm4 xfdesktop4 xfce4-panel xfce4-settings xfce4-terminal \
       thunar \
@@ -21,7 +31,9 @@ COPY --chown=candidate:candidate assets/xfconf /home/candidate/.config/xfce4/xfc
 COPY --chown=candidate:candidate assets/terminalrc /home/candidate/.config/xfce4/terminal/terminalrc
 RUN chmod +x /home/candidate/Desktop/*.desktop
 
+COPY --from=opener /out/sim-opener /usr/local/bin/sim-opener
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-EXPOSE 6080
+EXPOSE 6080 6081
 ENTRYPOINT ["/entrypoint.sh"]

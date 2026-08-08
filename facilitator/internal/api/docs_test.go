@@ -1,10 +1,17 @@
 package api_test
 
 import (
+	"context"
+	"errors"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
+	"kubestronaut-sim/facilitator/internal/api"
+	"kubestronaut-sim/facilitator/internal/exam"
 	"kubestronaut-sim/facilitator/internal/session"
 )
 
@@ -122,5 +129,152 @@ func TestExamReportsDocsCount(t *testing.T) {
 		if w, ok := want[q.ID]; ok && q.DocsCount != w {
 			t.Errorf("%s docsCount = %d, want %d", q.ID, q.DocsCount, w)
 		}
+	}
+}
+
+type fakeOpener struct {
+	opened []string
+	err    error
+}
+
+func (f *fakeOpener) Open(_ context.Context, url string) error {
+	f.opened = append(f.opened, url)
+	return f.err
+}
+
+func newDocsServer(t *testing.T, o api.DocsOpener) *testServer {
+	t.Helper()
+
+	ex, err := exam.Load(examJSON, bankDir)
+	if err != nil {
+		t.Fatalf("exam.Load: %v", err)
+	}
+	clock, setNow := fakeClock(epoch)
+	mgr, err := session.New(t.TempDir()+"/session.json", ex.Name, ex.Duration, clock, func() {})
+	if err != nil {
+		t.Fatalf("session.New: %v", err)
+	}
+	grader := &fakeGrader{}
+
+	opts := []api.Option{}
+	if o != nil {
+		opts = append(opts, api.WithDocsOpener(o))
+	}
+	h := api.New(ex, bankDir, mgr, grader.Grade, fakeDesktop, fakeControl, fstest.MapFS{}, nil, nil, opts...)
+	return &testServer{handler: h, mgr: mgr, grader: grader, setNow: setNow}
+}
+
+func openDoc(t *testing.T, ts *testServer, id, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/api/questions/"+id+"/docs/open", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	ts.handler.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestDocsOpenForwardsADeclaredLink(t *testing.T) {
+	opener := &fakeOpener{}
+	ts := newDocsServer(t, opener)
+	if _, err := ts.mgr.Start(session.ModeTraining, time.Hour); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	rec := openDoc(t, ts, "q01", `{"url":"`+q01Doc+`"}`)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204: %s", rec.Code, rec.Body)
+	}
+	if len(opener.opened) != 1 || opener.opened[0] != q01Doc {
+		t.Errorf("opened %v, want [%s]", opener.opened, q01Doc)
+	}
+}
+
+// The security boundary. The client names a URL, so the server has to prove it
+// is one this question declared — otherwise the endpoint is an arbitrary-URL
+// opener pointed at a browser running on the candidate's desktop.
+func TestDocsOpenRefusesAnUndeclaredURL(t *testing.T) {
+	for name, url := range map[string]string{
+		"another site":           "https://example.com/",
+		"another question's":     "https://kubernetes.io/docs/tasks/",
+		"a prefix of a real one": "https://kubernetes.io/docs/concepts/",
+		"the dropped http one":   "http://kubernetes.io/docs/",
+		"empty":                  "",
+	} {
+		t.Run(name, func(t *testing.T) {
+			opener := &fakeOpener{}
+			ts := newDocsServer(t, opener)
+			if _, err := ts.mgr.Start(session.ModeTraining, time.Hour); err != nil {
+				t.Fatalf("start: %v", err)
+			}
+
+			rec := openDoc(t, ts, "q01", `{"url":"`+url+`"}`)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("status = %d, want 400", rec.Code)
+			}
+			if len(opener.opened) != 0 {
+				t.Errorf("opened %v; nothing should have reached the desktop", opener.opened)
+			}
+		})
+	}
+}
+
+func TestDocsOpenRefusedOutsideTraining(t *testing.T) {
+	for _, mode := range []string{session.ModeExam, session.ModeSpeed} {
+		t.Run(mode, func(t *testing.T) {
+			opener := &fakeOpener{}
+			ts := newDocsServer(t, opener)
+			if _, err := ts.mgr.Start(mode, time.Hour); err != nil {
+				t.Fatalf("start: %v", err)
+			}
+
+			rec := openDoc(t, ts, "q01", `{"url":"`+q01Doc+`"}`)
+
+			if rec.Code != http.StatusForbidden {
+				t.Errorf("status = %d, want 403", rec.Code)
+			}
+			if len(opener.opened) != 0 {
+				t.Errorf("opened %v in %s mode", opener.opened, mode)
+			}
+		})
+	}
+}
+
+func TestDocsOpenUnknownQuestion(t *testing.T) {
+	ts := newDocsServer(t, &fakeOpener{})
+	if _, err := ts.mgr.Start(session.ModeTraining, time.Hour); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	rec := openDoc(t, ts, "nope", `{"url":"`+q01Doc+`"}`)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404", rec.Code)
+	}
+}
+
+func TestDocsOpenWithoutADesktop(t *testing.T) {
+	ts := newDocsServer(t, nil)
+	if _, err := ts.mgr.Start(session.ModeTraining, time.Hour); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	rec := openDoc(t, ts, "q01", `{"url":"`+q01Doc+`"}`)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Errorf("status = %d, want 503", rec.Code)
+	}
+}
+
+func TestDocsOpenReportsADesktopThatRefuses(t *testing.T) {
+	ts := newDocsServer(t, &fakeOpener{err: errors.New("connection refused")})
+	if _, err := ts.mgr.Start(session.ModeTraining, time.Hour); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	rec := openDoc(t, ts, "q01", `{"url":"`+q01Doc+`"}`)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Errorf("status = %d, want 502", rec.Code)
 	}
 }
