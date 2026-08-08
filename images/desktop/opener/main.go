@@ -33,9 +33,19 @@ const (
 	display = ":1"
 )
 
-// openBudget bounds the wait on Firefox's remote handshake. A running instance
-// answers in well under a second; a cold start forks and returns.
-const openBudget = 20 * time.Second
+// launchGrace bounds the wait for a launch that fails outright, which is the
+// only thing waiting can tell us. Firefox exits within a second or so when it
+// cannot reach the display or the profile is locked; a launch that works does
+// not exit at all on the path that matters. With an instance already running,
+// --new-tab hands the URL over the remote protocol and returns immediately;
+// with none, this process becomes the browser and lives as long as the window.
+//
+// So the grace only has to outlast a fast failure, and it must stay the
+// shortest of the three nested budgets — the UI gives a mutation 10s and the
+// facilitator sits between. A cold start is the common case, and waiting one
+// out answers the candidate with a timeout for a page that is opening in front
+// of them.
+const launchGrace = 3 * time.Second
 
 type runner func(rawURL string) error
 
@@ -102,7 +112,15 @@ func validURL(raw string) bool {
 func openInBrowser(rawURL string) error {
 	cmd := exec.Command(runuser, "-u", user, "--", browser, "--new-tab", rawURL)
 	cmd.Env = append(os.Environ(), "DISPLAY="+display)
+	return launch(cmd, launchGrace)
+}
 
+// launch starts cmd and waits only long enough to catch a launch that fails
+// outright. A process still running when the grace expires is the browser
+// itself, so leaving it is the point; reaping it would close the window we
+// just opened. The goroutine outlives this call to reap the child whenever it
+// does exit.
+func launch(cmd *exec.Cmd, grace time.Duration) error {
 	if err := cmd.Start(); err != nil {
 		return err
 	}
@@ -113,9 +131,7 @@ func openInBrowser(rawURL string) error {
 	select {
 	case err := <-done:
 		return err
-	case <-time.After(openBudget):
-		// A cold start keeps running as the browser itself. Leaving it is the
-		// point; reaping it would close the window we just opened.
+	case <-time.After(grace):
 		return nil
 	}
 }

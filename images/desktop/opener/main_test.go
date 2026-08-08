@@ -3,8 +3,10 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"os/exec"
 	"strings"
 	"testing"
+	"time"
 )
 
 func post(t *testing.T, h http.Handler, body string) *httptest.ResponseRecorder {
@@ -110,6 +112,35 @@ func TestReportsABrowserThatWillNotStart(t *testing.T) {
 type errBrowser struct{}
 
 func (errBrowser) Error() string { return "exec: firefox-esr: not found" }
+
+// The call is the innermost of three nested budgets — the UI gives a mutation
+// 10s and the facilitator sits between — so it has to be the shortest. A cold
+// start is the common case and it never exits: this process becomes the
+// browser. Waiting it out answers the candidate with a timeout for a page that
+// is opening in front of them.
+func TestABrowserThatStaysUpAnswersInsideTheCallersBudget(t *testing.T) {
+	start := time.Now()
+
+	if err := launch(exec.Command("sleep", "30"), launchGrace); err != nil {
+		t.Fatalf("launch = %v, want nil for a browser that stays up", err)
+	}
+
+	if waited := time.Since(start); waited > 5*time.Second {
+		t.Errorf("waited %v, must answer well inside the UI's 10s fetch timeout", waited)
+	}
+}
+
+func TestABrowserThatExitsNonZeroIsReported(t *testing.T) {
+	if err := launch(exec.Command("false"), launchGrace); err == nil {
+		t.Error("launch = nil for a browser that exited non-zero")
+	}
+}
+
+func TestABrowserThatIsNotInstalledIsReported(t *testing.T) {
+	if err := launch(exec.Command("sim-opener-no-such-browser"), launchGrace); err == nil {
+		t.Error("launch = nil for a browser that is not installed")
+	}
+}
 
 // The route is POST-only: a GET that opened a tab would let any page the
 // candidate visits drive their desktop through a plain image or link.

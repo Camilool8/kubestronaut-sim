@@ -70,7 +70,12 @@ func (s *server) handleDocs(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-const docsOpenBudget = 25 * time.Second
+// docsOpenBudget is the middle of three nested budgets and has to stay between
+// them: above the opener's own grace, which answers a cold start in a few
+// seconds, and below the 10s the UI gives a mutation. Sitting above the UI's
+// would mean a desktop that is genuinely unreachable reads to the candidate as
+// a timeout rather than as the refusal this returns.
+const docsOpenBudget = 8 * time.Second
 
 func (s *server) handleDocsOpen(w http.ResponseWriter, r *http.Request) {
 	q, ok := s.docsForCandidate(w, r)
