@@ -619,3 +619,63 @@ describe("App choosing the exam screen", () => {
     expect(screen.getByRole("timer")).toBeInTheDocument();
   });
 });
+
+describe("an attempt whose tasks are still being set up", () => {
+  const preparingSession: SessionSnapshot = {
+    ...idleSession,
+    preparing: {
+      jobId: "seed-1",
+      mode: "exam",
+      questionCount: 17,
+      startedAt: "2026-07-25T12:00:00Z",
+    },
+  };
+
+  function stubPreparing() {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        const json = (body: unknown, status = 200) =>
+          new Response(JSON.stringify(body), { status });
+
+        if (url.endsWith("/api/control/status")) return json({ busy: false });
+        if (url.endsWith("/api/me")) return json({ error: "not found" }, 404);
+        if (url.endsWith("/api/boot")) return json(readyBoot);
+        if (url.endsWith("/api/session")) return json(preparingSession);
+        if (url.endsWith("/api/exam")) return json(exam);
+        if (url.endsWith("/api/catalog")) return json(catalog);
+        return json({});
+      }),
+    );
+  }
+
+  beforeEach(() => {
+    matchMediaMock([]);
+    stubPreparing();
+  });
+
+  test("shows the setup screen instead of the lobby, without waiting on the control poll", async () => {
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Setting up your tasks" }),
+    ).toBeInTheDocument();
+  });
+
+  test("says how many tasks, and that the clock has not started", async () => {
+    render(<App />);
+
+    expect(
+      await screen.findByText("Setting up the 17 tasks you drew on the cluster."),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/clock has not started/i)).toBeInTheDocument();
+  });
+
+  test("does not offer the exam list underneath it", async () => {
+    render(<App />);
+
+    await screen.findByRole("heading", { level: 1, name: "Setting up your tasks" });
+    expect(screen.queryByRole("button", { name: /^Choose/ })).toBeNull();
+  });
+});

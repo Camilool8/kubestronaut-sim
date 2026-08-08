@@ -1171,6 +1171,13 @@ button.nav-menu-item:hover {
   line-height: 1.6;
 }
 
+.mode-seed-notice {
+  margin: var(--space-5) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-s);
+  line-height: 1.6;
+}
+
 .mode-fine {
   display: flex;
   align-items: flex-start;
@@ -2863,6 +2870,65 @@ button.nav-menu-item:hover {
   border-top: 1px solid var(--border);
 }
 
+.docs-tray {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.docs-tray h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-s);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.docs-tray-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.docs-tray-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-s);
+  color: var(--accent-strong);
+  font: inherit;
+  font-size: var(--text-s);
+  text-align: left;
+  cursor: pointer;
+}
+
+.docs-tray-link:hover:not(:disabled) {
+  background: var(--surface-raised);
+}
+
+.docs-tray-link:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.docs-tray-glyph {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.docs-tray-hint {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
 .hint {
   margin-bottom: var(--space-3);
   padding: var(--space-3);
@@ -3122,6 +3188,20 @@ button.nav-menu-item:hover {
   font-family: var(--font-mono);
   font-size: var(--text-s);
   font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+/*
+ * The seed's per-task detail on the preparing screen. Not .phase-detail: that
+ * one is a grid cell in the boot and control phase lists, and inside a
+ * paragraph it collapses to an inline span with no separation, running
+ * "question 5 of 17" straight onto the end of the sentence.
+ */
+.preparing-detail {
+  display: block;
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
   color: var(--text-muted);
 }
 

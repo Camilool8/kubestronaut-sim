@@ -121,6 +121,17 @@ function mockApi() {
         if (startStatus === 409) {
           return new Response(JSON.stringify({ error: "already running" }), { status: 409 });
         }
+        if (startStatus === 202) {
+          return new Response(
+            JSON.stringify({
+              state: "preparing",
+              jobId: "seed-1",
+              mode: body.mode,
+              questionCount: 17,
+            }),
+            { status: 202 },
+          );
+        }
         return new Response(JSON.stringify(runningSession), { status: 200 });
       }
       if (url.endsWith("/api/session")) {
@@ -131,8 +142,19 @@ function mockApi() {
   );
 }
 
-const renderMode = (onSessionChange = () => {}, bankId = "ckad-mock-01") =>
-  render(<Mode bankId={bankId} catalogVersion={0} onSessionChange={onSessionChange} />);
+const renderMode = (
+  onSessionChange = () => {},
+  bankId = "ckad-mock-01",
+  onPreparing?: () => void,
+) =>
+  render(
+    <Mode
+      bankId={bankId}
+      catalogVersion={0}
+      onSessionChange={onSessionChange}
+      onPreparing={onPreparing}
+    />,
+  );
 
 const cardFor = (label: string) =>
   screen.getByRole("heading", { name: label }).closest("article") as HTMLElement;
@@ -217,7 +239,7 @@ describe("starting", () => {
     expect(onSessionChange).toHaveBeenCalledWith(runningSession);
   });
 
-  test("a 409 refetches the authoritative session instead of erroring", async () => {
+  test("a 409 refetches the authoritative session, and says why the click did nothing", async () => {
     const user = userEvent.setup();
     const onSessionChange = vi.fn();
     startStatus = 409;
@@ -225,8 +247,42 @@ describe("starting", () => {
     await screen.findByRole("heading", { name: "Exam" });
 
     await user.click(screen.getByRole("button", { name: "Start Exam" }));
+
+    // The refetch is the recovery: a 409 often means the attempt is already
+    // running, and the fresh snapshot is what moves this tab onto it.
     await waitFor(() => expect(onSessionChange).toHaveBeenCalledWith(runningSession));
-    expect(screen.queryByText(/error/i)).not.toBeInTheDocument();
+
+    // But not every 409 is that one. "the cluster still holds an earlier
+    // draw" needs the candidate to go and reset, and was swallowed whole.
+    expect(await screen.findByText("already running")).toBeInTheDocument();
+  });
+
+  test("a refused start unlocks the modes so it can be tried again", async () => {
+    const user = userEvent.setup();
+    startStatus = 409;
+    renderMode();
+    await screen.findByRole("heading", { name: "Exam" });
+
+    await user.click(screen.getByRole("button", { name: "Start Exam" }));
+    await screen.findByText("already running");
+
+    expect(screen.getByRole("button", { name: "Start Exam" })).toBeEnabled();
+  });
+
+  test("a start that only draws the tasks keeps every mode locked", async () => {
+    const user = userEvent.setup();
+    const onPreparing = vi.fn();
+    startStatus = 202;
+    renderMode(() => {}, "ckad-mock-01", onPreparing);
+    await screen.findByRole("heading", { name: "Exam" });
+
+    await user.click(screen.getByRole("button", { name: "Start Exam" }));
+
+    // The attempt has not begun; the cluster is still being seeded. Re-enabling
+    // the buttons here is what made the wait look like nothing had happened.
+    await waitFor(() => expect(onPreparing).toHaveBeenCalled());
+    expect(screen.getByRole("button", { name: /Starting/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Start Training/ })).toBeDisabled();
   });
 });
 
@@ -470,5 +526,30 @@ describe("a device that cannot sit this exam", () => {
 
     await screen.findByRole("heading", { level: 1, name: /needs a desktop/i });
     expect(startCalls).toEqual([]);
+  });
+});
+
+describe("what starting will actually do", () => {
+  test("a pooled bank warns that the tasks are set up before the clock starts", async () => {
+    exam = { ...ckad, questionCount: 2 };
+    renderMode();
+
+    expect(await screen.findByText(strings.mode.seedNotice(2))).toBeInTheDocument();
+  });
+
+  test("an unpooled bank starts immediately and does not warn", async () => {
+    exam = ckad;
+    renderMode();
+    await screen.findByRole("heading", { name: "Exam" });
+
+    expect(screen.queryByText(/sets them up on the cluster/i)).not.toBeInTheDocument();
+  });
+
+  test("a multiple-choice bank has no cluster to set anything up on", async () => {
+    exam = { ...ckad, examType: "mcq", questionCount: 2 };
+    renderMode();
+    await screen.findByRole("heading", { name: "Exam" });
+
+    expect(screen.queryByText(/sets them up on the cluster/i)).not.toBeInTheDocument();
   });
 });

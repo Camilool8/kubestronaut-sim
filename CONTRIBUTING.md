@@ -35,7 +35,7 @@ Run these. They need no Docker and take seconds:
 ```bash
 tests/bank-weights.sh && tests/check-lint.sh && tests/check-lib.sh \
   && tests/bank-hints.sh && tests/bank-mcq.sh
-for m in conductor facilitator proxy hub; do (cd $m && go test ./... && go vet ./...); done
+for m in conductor facilitator proxy hub images/desktop/opener; do (cd $m && go test ./... && go vet ./...); done
 (cd ui && npm ci && npx tsc --noEmit && npm run lint && npm test)
 ```
 

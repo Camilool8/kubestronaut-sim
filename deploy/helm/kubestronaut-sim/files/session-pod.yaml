@@ -163,6 +163,7 @@ spec:
         - {name: BANK, value: "ckad-mock-01"}
         - {name: CONDUCTOR_ADDR, value: "unix:/run/control/conductor.sock"}
         - {name: DESKTOP_ADDR, value: "127.0.0.1:6080"}
+        - {name: DESKTOP_CONTROL_ADDR, value: "127.0.0.1:6081"}
         - {name: HISTORY_WEBHOOK_URL, value: ""}
         - {name: HISTORY_WEBHOOK_TOKEN, value: ""}
       volumeMounts:

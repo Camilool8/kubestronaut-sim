@@ -235,9 +235,12 @@ interface ModeProps {
   bankId: string;
   catalogVersion: number;
   onSessionChange: (session: SessionSnapshot) => void;
+
+  /** Called when a start answers 202: the attempt is drawn but not yet begun. */
+  onPreparing?: () => void;
 }
 
-export function Mode({ bankId, catalogVersion, onSessionChange }: ModeProps) {
+export function Mode({ bankId, catalogVersion, onSessionChange, onPreparing }: ModeProps) {
   const [starting, setStarting] = useState<SessionMode | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const [introOpen, setIntroOpen] = useState(false);
@@ -270,12 +273,28 @@ export function Mode({ bankId, catalogVersion, onSessionChange }: ModeProps) {
 
       if (result.ok && "session" in result) {
         onSessionChange(result.session);
-      } else {
-        onSessionChange(await getSession());
+        return;
       }
+
+      if (result.ok) {
+        // A pooled bank answers 202 and seeds the drawn tasks in the
+        // background. Wake the control poll, and leave `starting` set: the
+        // attempt has not begun, and clearing it here re-enabled every mode
+        // button while the cluster was still being prepared. App takes over
+        // and swaps in the preparing screen.
+        onPreparing?.();
+        onSessionChange(await getSession());
+        return;
+      }
+
+      // A refused start used to be swallowed. Say why, and still resync: a 409
+      // can mean the attempt is already running somewhere else, and the fresh
+      // snapshot is what moves this tab onto it.
+      setStartError(result.error);
+      setStarting(null);
+      onSessionChange(await getSession());
     } catch (err) {
       setStartError(String(err));
-    } finally {
       setStarting(null);
     }
   };
@@ -314,6 +333,11 @@ export function Mode({ bankId, catalogVersion, onSessionChange }: ModeProps) {
           const available = new Set((loaded.domains ?? []).map((d) => d.name));
           const selected = (picked ?? presetDomains).filter((d) => available.has(d));
 
+          // Only a pooled hands-on bank seeds at start; everything else is
+          // already sitting on the cluster and begins the moment it is pressed.
+          const seeds = !isMcq && loaded.questions.length > (loaded.questionCount || 0);
+          const drawn = Math.min(loaded.questionCount || 0, loaded.questions.length);
+
           return (
             <>
               <ul className="mode-grid">
@@ -329,6 +353,8 @@ export function Mode({ bankId, catalogVersion, onSessionChange }: ModeProps) {
                   />
                 ))}
               </ul>
+
+              {seeds && <p className="mode-seed-notice">{strings.mode.seedNotice(drawn)}</p>}
 
               {startError && <p className="error-text">{startError}</p>}
 

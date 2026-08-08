@@ -15,5 +15,10 @@ until su - candidate -c 'DISPLAY=:1 xset q' >/dev/null 2>&1; do
 done
 su - candidate -c 'DISPLAY=:1 dbus-launch startxfce4' &
 websockify --heartbeat=30 --web /usr/share/novnc 6080 localhost:5901 &
-echo "desktop ready: noVNC on :6080"
+
+# Opens a documentation page as a tab in the candidate's Firefox. Only the
+# facilitator calls it, and only with a URL the current question declared.
+sim-opener &
+
+echo "desktop ready: noVNC on :6080, opener on :6081"
 wait -n

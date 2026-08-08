@@ -137,18 +137,24 @@ if [ "$exam_length" -gt 0 ] && [ "$exam_length" -lt "$pool_size" ]; then
   pooled=1
 fi
 
-phase seed "Setting up the exam questions" 7
+# The label is set per branch, not once up front: only the last branch here
+# actually seeds anything. A pooled bank draws its questions when an attempt
+# starts and seeds them then, and announcing "setting up the exam questions"
+# while merely pulling images made that later seed look like a repeat.
 if [ "$exam_type" = "mcq" ]; then
+  phase seed "Preparing the exam content" 7
   echo "multiple-choice bank; no cluster seeding needed"
   detail "no cluster seeding for a multiple-choice bank"
 elif [ "$created" != "1" ]; then
+  phase seed "Preparing the exam content" 7
   echo "existing cluster resumed; skipping seed"
 elif [ "$pooled" = "1" ]; then
-
+  phase seed "Preloading the exam images" 7
   preload_bank_images
   echo "pooled bank (${exam_length} of ${pool_size}); questions are seeded when an attempt starts"
-  detail "questions are set up when an attempt starts"
+  detail "questions are set up when you start an attempt"
 else
+  phase seed "Setting up the exam questions" 7
   preload_bank_images
   qids=$(yq -r '.spec.questions[].id' "${BANK_DIR}/exam.yaml")
   total=$(printf '%s\n' "$qids" | grep -c . || true)

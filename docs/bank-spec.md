@@ -118,7 +118,7 @@ Where the optional keys go:
 | `spec.questions[].weight` | Must equal the sum of this question's `# points:` headers |
 | `spec.questions[].targetSeconds` | Optional pacing budget, in seconds, shown on the task chip. Absent, the facilitator derives one from the question's weight's share of the exam clock ([exam.go](../facilitator/internal/exam/exam.go), `TargetSeconds`) and flags it `targetDerived` on `GET /api/exam`, so a derived figure is never presented as the author's judgement. `ckad-mock-01` sets it on every question because its `spec.difficultyMix` requires one; `kcna-mock` sets none. It is a budget, never a limit: nothing enforces it and running over costs no points. Write it below `weight:` (hands-on) or `correct:` (mcq); both gate regexes end there, and a `targetSeconds:` line above them hides the question from the gate |
 | `spec.questions[].difficulty` | `quick`, `core` or `deep`. Required on every question of a bank declaring `spec.difficultyMix`, and rejected on a bank that does not — a label nothing draws on is cruft. **The tier is its `targetSeconds` band, not a judgement**: `quick` is at most 240s, `core` 241-540, `deep` 541-840, and [exam.go](../facilitator/internal/exam/exam.go) refuses a bank whose label and budget disagree. Never sent to the client during an attempt: a question labelled `deep` on screen is a spoiler and an anxiety source |
-| `spec.questions[].docs` | Optional upstream reading: a list of `{label, url}`. Shown in the post-attempt deep dive — see [Documentation links](#documentation-links-specquestionsdocs). Write it below `weight:`/`correct:` for the same reason `targetSeconds` goes there |
+| `spec.questions[].docs` | Optional upstream reading: a list of `{label, url}`. Shown in the post-attempt deep dive, and during a Training attempt — see [Documentation links](#documentation-links-specquestionsdocs). Write it below `weight:`/`correct:` for the same reason `targetSeconds` goes there |
 
 ## Documentation links: `spec.questions[].docs`
 
@@ -135,13 +135,27 @@ A question may name the upstream pages that explain its subject:
           url: https://kubernetes.io/docs/concepts/services-networking/ingress/
 ```
 
-- They reach the client on `GET /api/questions/{id}/solution` and nowhere
-  else.
-- They appear in exactly one place: the footer of the **post-attempt
-  deep dive**, in the candidate's own browser, once the attempt is over.
-- They are deliberately not attached to the question. During the attempt
-  the candidate is on the exam desktop, browsing through the allowlist
-  proxy (`spec.environment.allowedDomains`), and never sees this field.
+They appear in two places, and the difference between them is the mode:
+
+- The footer of the **post-attempt deep dive**, in the candidate's own
+  browser, once the attempt is over. Served on
+  `GET /api/questions/{id}/solution`.
+- Under the task itself during a **Training** attempt, where clicking one
+  opens it as a tab in the exam desktop's Firefox. Served on
+  `GET /api/questions/{id}/docs`, opened through
+  `POST /api/questions/{id}/docs/open`.
+
+**Mastery and Exam refuse both endpoints.** Documentation links are help,
+and they sit behind the same `session.HelpAllowed` gate as hints and
+solutions, so a recorded score still means the candidate found the page
+themselves. The open endpoint additionally accepts only a URL that the
+named question declares, so it cannot be used to put an arbitrary page in
+front of the browser running on the candidate's desktop.
+
+The links still resolve through the allowlist proxy
+(`spec.environment.allowedDomains`) like any other page the desktop
+fetches, so a `docs:` entry on a host the bank does not allow will open a
+tab that cannot load.
 
 Rules, all enforced by [exam.go](../facilitator/internal/exam/exam.go):
 

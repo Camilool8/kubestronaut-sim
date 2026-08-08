@@ -98,6 +98,7 @@ func runServer() error {
 	historyFile := envOr("HISTORY_FILE", "/state/history.json")
 	listen := envOr("LISTEN", ":8080")
 	desktopAddr := envOr("DESKTOP_ADDR", "desktop:6080")
+	desktopControlAddr := envOr("DESKTOP_CONTROL_ADDR", "desktop:6081")
 	durOverride := os.Getenv("SESSION_DURATION_OVERRIDE")
 
 	if err := checkSSHKey(cfg.sshKey); err != nil {
@@ -192,6 +193,7 @@ func runServer() error {
 		api.WithHistory(hist),
 		api.WithBanks(newBanksFetcher(conductorURL, conductorTransport)),
 		api.WithSeeder(newConductorSeeder(conductorURL, conductorTransport)),
+		api.WithDocsOpener(api.NewHTTPDocsOpener(desktopControlAddr)),
 	)
 
 	srv := &http.Server{

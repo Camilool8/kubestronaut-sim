@@ -54,6 +54,7 @@ describe("Icon", () => {
       "exit",
       "send",
       "home",
+      "book",
     ];
     expect(new Set(ICON_NAMES)).toEqual(new Set(declared));
   });

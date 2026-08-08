@@ -395,6 +395,47 @@ over the `hintCount` reported by `GET /api/exam`.
 The route is registered unconditionally, so the difference between 404
 and 403 never leaks the attempt's mode.
 
+### GET /api/questions/{id}/docs
+
+The upstream pages this question's author named, from
+`spec.questions[].docs`. `docsCount` on `GET /api/exam` says whether
+there are any, so a client can decide not to ask.
+
+```json
+{"id": "q01", "docs": [{"label": "Ingress", "url": "https://kubernetes.io/docs/..."}]}
+```
+
+| Code | When |
+|---|---|
+| 200 | Training attempt, known `id`. `docs` may be empty. |
+| 403 | Not a training attempt, or no attempt at all (`facilitator/internal/api/docs.go`). |
+| 404 | Unknown `id` (`facilitator/internal/api/docs.go`). |
+
+### POST /api/questions/{id}/docs/open
+
+Opens one of those pages as a tab in the exam desktop's Firefox, through
+the `sim-opener` listener in the desktop container
+(`DESKTOP_CONTROL_ADDR`, default `desktop:6081`). Answers 204 with no
+body.
+
+```json
+{"url": "https://kubernetes.io/docs/concepts/services-networking/ingress/"}
+```
+
+**The `url` must be byte-equal to one this question declares.** The
+client names a URL, so the server proves it is the question's own —
+exact match, no parsing and no prefixes. Without that the route is an
+arbitrary-URL opener aimed at a browser on the candidate's desktop.
+
+| Code | When |
+|---|---|
+| 204 | Opened. An already-running Firefox gets a new tab, not a new window. |
+| 400 | Body is not JSON, or `url` is not one of this question's links (`facilitator/internal/api/docs.go`). |
+| 403 | Not a training attempt, or no attempt at all (`facilitator/internal/api/docs.go`). |
+| 404 | Unknown `id` (`facilitator/internal/api/docs.go`). |
+| 502 | The desktop opener refused or could not be reached (`facilitator/internal/api/docs.go`). |
+| 503 | No opener is configured (`facilitator/internal/api/docs.go`). |
+
 ### PUT /api/questions/{id}/answer
 
 Records the candidate's selection for one mcq question: an idempotent

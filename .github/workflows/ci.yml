@@ -38,7 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [facilitator, conductor, proxy, hub]
+        module: [facilitator, conductor, proxy, hub, images/desktop/opener]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7

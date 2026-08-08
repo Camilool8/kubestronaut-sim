@@ -1,4 +1,5 @@
 import { pointerHeader } from "./lib/deviceCapability";
+import { progressStore } from "./components/progressStore";
 
 export type SessionState = "idle" | "running" | "ended";
 
@@ -49,6 +50,8 @@ export interface ExamQuestionInfo {
   totalPoints: number;
 
   hintCount: number;
+
+  docsCount?: number;
 
   multi?: boolean;
 
@@ -291,6 +294,13 @@ function withTimeout(ms: number, external?: AbortSignal): AbortSignal {
 
 async function request(path: string, opts: RequestOptions = {}): Promise<Response> {
   const { signal, timeoutMs = FETCH_TIMEOUT_MS, headers, ...init } = opts;
+
+  // Mutations only. Reads are either driven by useAsync, which raises the bar
+  // itself, or they are polls — pollSession alone runs a GET every second for
+  // the life of the app, and counting those would pin the bar on permanently.
+  const tracked = init.method !== undefined && init.method !== "GET";
+  if (tracked) progressStore.start();
+
   try {
     return await fetch(path, {
       ...init,
@@ -303,6 +313,8 @@ async function request(path: string, opts: RequestOptions = {}): Promise<Respons
       throw new Error(`no answer in ${Math.round(timeoutMs / 1000)}s`, { cause: err });
     }
     throw err;
+  } finally {
+    if (tracked) progressStore.done();
   }
 }
 
@@ -698,6 +710,46 @@ export async function getHint(
     throw await apiError(res);
   }
   return { ok: true, hint: (await res.json()) as HintDetail };
+}
+
+export async function getQuestionDocs(
+  id: string,
+  signal?: AbortSignal,
+): Promise<{ ok: true; docs: SolutionDoc[] } | { ok: false; error: string }> {
+  const res = await request(`/api/questions/${encodeURIComponent(id)}/docs`, { signal });
+  if (res.status === 403 || res.status === 404) {
+    return { ok: false, error: await readError(res) };
+  }
+  if (!res.ok) {
+    throw await apiError(res);
+  }
+  const body = (await res.json()) as { docs?: SolutionDoc[] };
+  return { ok: true, docs: body.docs ?? [] };
+}
+
+/**
+ * Opens a documentation page as a tab in the exam desktop's Firefox.
+ *
+ * The URL is sent back rather than an index because the facilitator validates
+ * it against the ones this question declares — the endpoint will not open a
+ * page the bank did not name.
+ */
+export async function openQuestionDoc(
+  id: string,
+  url: string,
+  signal?: AbortSignal,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await request(`/api/questions/${encodeURIComponent(id)}/docs/open`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+    signal,
+  });
+  if (res.ok) return { ok: true };
+  if (res.status >= 400 && res.status < 500) {
+    return { ok: false, error: await readError(res) };
+  }
+  throw await apiError(res);
 }
 
 export async function practiceGrade(
