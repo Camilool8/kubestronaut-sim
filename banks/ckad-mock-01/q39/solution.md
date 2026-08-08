@@ -75,19 +75,32 @@ as a name **only for a headless Service**. Point the same StatefulSet at
 an ordinary ClusterIP Service and the per-Pod names silently stop
 resolving while everything else keeps working.
 
-## Record the addresses
+## Record the names
+
+Each endpoint on the EndpointSlice carries a `targetRef` naming the Pod
+it publishes, so the per-Pod names can be built straight from it:
 
 ```bash
 k -n telescopium get endpointslice -l kubernetes.io/service-name=shard \
-  -o jsonpath='{range .items[*].endpoints[*]}{.addresses[0]}{"\n"}{end}' \
-  > /opt/course/39/shard-addresses
-cat /opt/course/39/shard-addresses
+  -o jsonpath='{range .items[*].endpoints[*]}{.targetRef.name}{".shard.telescopium.svc.cluster.local"}{"\n"}{end}' \
+  > /opt/course/39/shard-names
+cat /opt/course/39/shard-names
+# shard-0.shard.telescopium.svc.cluster.local
+# shard-1.shard.telescopium.svc.cluster.local
+# shard-2.shard.telescopium.svc.cluster.local
 ```
 
-The EndpointSlice is where the addresses come from in the first place —
-the DNS answer is generated from it, so the two always agree. Reading it
-avoids parsing `nslookup` output, which mixes the resolver's own address
-in with the answers.
+Then prove one of them rather than trusting the string:
+
+```bash
+k -n telescopium exec shard-0 -- nslookup shard-1.shard.telescopium.svc.cluster.local
+```
+
+The addresses were the easier thing to write down and the wrong thing to
+keep. Delete `shard-1` and the StatefulSet brings it back under the same
+name at a different address; the name is what a peer, a connection string
+or a config file can hold on to, and publishing it is the entire job of
+the headless Service you just created.
 
 ## What headless actually changes
 

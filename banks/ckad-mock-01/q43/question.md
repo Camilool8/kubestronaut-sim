@@ -10,5 +10,6 @@ killing it anyway — the `RESTARTS` column climbs and never stops.
    HTTP GET of `/` — do not remove the probe and do not change its
    timings. Only the thing it is aimed at is wrong.
 
-When you are done both replicas must be ready, and the Pods that are
-running must show **0** restarts.
+When you are done both replicas must be ready and must have stopped
+restarting — a freshly rolled-out replica starts at **0** and stays
+there.

@@ -16,8 +16,9 @@ than an empty one. `kubectl create service clusterip --clusterip=None`
 writes it, or `kubectl expose --cluster-ip=None`; either way check the
 selector afterwards, since `expose` copies it from whatever you exposed.
 
-To read the addresses back, ask DNS from inside a Pod with `nslookup`, or
-read them off the EndpointSlice the Service owns:
+The file wants one name per Pod, not one address: a Pod's own name is
+`<pod>.<service>.<namespace>.svc.cluster.local`. Which Pods the Service
+publishes is on the EndpointSlice it owns, one `targetRef` per endpoint:
 
 ```bash
 k -n telescopium get endpointslice -l kubernetes.io/service-name=shard

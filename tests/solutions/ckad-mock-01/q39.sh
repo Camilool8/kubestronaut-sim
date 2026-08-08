@@ -23,8 +23,10 @@ for _ in $(seq 1 20); do
 done
 
 kubectl -n telescopium get endpointslice -l kubernetes.io/service-name=shard -o json \
-  | jq -r '[.items[].endpoints[]? | select(.conditions.ready == true) | .addresses[]?] | unique | .[]' \
-  > /opt/course/39/shard-addresses
+  | jq -r '[.items[].endpoints[]?
+            | select(.conditions.ready == true)
+            | .targetRef.name + ".shard.telescopium.svc.cluster.local"] | unique | .[]' \
+  > /opt/course/39/shard-names
 
 out=""
 for _ in $(seq 1 10); do
