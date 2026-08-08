@@ -45,7 +45,7 @@ export function Preparing({ preparing, detail }: PreparingProps) {
 
         <p className="control-status" role="status" aria-live="polite" aria-atomic="true">
           {strings.preparing.body(preparing.questionCount)}
-          {detail && <span className="phase-detail">{detail}</span>}
+          {detail && <span className="preparing-detail">{detail}</span>}
         </p>
 
         <PendingBar />

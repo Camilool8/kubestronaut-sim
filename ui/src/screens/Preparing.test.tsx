@@ -56,3 +56,15 @@ describe("Preparing", () => {
     expect(screen.getByRole("heading", { name: strings.control.seedTitle })).toBeTruthy();
   });
 });
+
+describe("Preparing layout", () => {
+  test("the per-task detail is its own block, not run onto the sentence", () => {
+    const { container } = render(<Preparing preparing={preparing()} detail="question 5 of 17" />);
+
+    // .phase-detail is a grid cell in the boot and control phase lists; inside
+    // this paragraph it collapsed to an inline span and rendered
+    // "...on the cluster.question 5 of 17".
+    expect(container.querySelector(".phase-detail")).toBeNull();
+    expect(container.querySelector(".preparing-detail")?.textContent).toBe("question 5 of 17");
+  });
+});
