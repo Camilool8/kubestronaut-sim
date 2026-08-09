@@ -309,6 +309,31 @@ describe("McqExam attempt state", () => {
     expect(toastStore.list()).toHaveLength(0);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
+
+  test("the menu doesn't show an empty 'This attempt' header when there's nothing under it", async () => {
+    // session is exam-mode, not training, and the exam fetch fails, so
+    // questions stays empty: extras must resolve to undefined rather than
+    // a fragment whose children are all false, or the section header
+    // ("This attempt") renders with nothing underneath it.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/api/exam")) {
+          return new Response(JSON.stringify({ error: "exam failed" }), { status: 500 });
+        }
+        if (url.includes("/api/answers")) {
+          return new Response(JSON.stringify({ answers: {} }), { status: 200 });
+        }
+        return new Response("{}", { status: 200 });
+      }),
+    );
+    const user = userEvent.setup();
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+
+    await openMenu(user);
+    expect(screen.queryByText(strings.header.menuExam)).not.toBeInTheDocument();
+  });
 });
 
 describe("McqExam navigator", () => {

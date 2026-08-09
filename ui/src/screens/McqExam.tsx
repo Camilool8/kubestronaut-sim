@@ -217,18 +217,20 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
         onEndClick={() => setConfirmOpen(true)}
 
         extras={
-          <>
-            {questions.length > 0 && (
-              <McqTally questions={questions} answeredCount={answeredCount} />
-            )}
-            {session.mode === "training" && (
-              <NavMenuItem
-                icon="check"
-                label={scoring ? strings.practice.scoring : strings.practice.scoreNow}
-                onSelect={() => void scoreNow()}
-              />
-            )}
-          </>
+          questions.length > 0 || session.mode === "training" ? (
+            <>
+              {questions.length > 0 && (
+                <McqTally questions={questions} answeredCount={answeredCount} />
+              )}
+              {session.mode === "training" && (
+                <NavMenuItem
+                  icon="check"
+                  label={scoring ? strings.practice.scoring : strings.practice.scoreNow}
+                  onSelect={() => void scoreNow()}
+                />
+              )}
+            </>
+          ) : undefined
         }
       />
 
