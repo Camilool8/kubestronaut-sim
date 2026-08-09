@@ -5,7 +5,7 @@ COPY cmd ./cmd
 COPY internal ./internal
 RUN CGO_ENABLED=0 go build -o /docs-proxy ./cmd/docs-proxy
 
-FROM alpine:3.21
+FROM alpine:3.24
 RUN apk add --no-cache yq-go
 COPY --from=build /docs-proxy /docs-proxy
 COPY entrypoint.sh /entrypoint.sh

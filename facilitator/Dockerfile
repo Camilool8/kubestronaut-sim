@@ -13,7 +13,7 @@ COPY facilitator/internal ./internal
 COPY --from=ui-build /src/ui/dist/. ./internal/web/dist/
 RUN CGO_ENABLED=0 go build -o /facilitator ./cmd/facilitator
 
-FROM alpine:3.21
+FROM alpine:3.24
 RUN apk add --no-cache yq-go openssh-client
 COPY --from=build /facilitator /facilitator
 COPY facilitator/entrypoint.sh /entrypoint.sh
