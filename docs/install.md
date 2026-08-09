@@ -25,6 +25,9 @@ below asks you to open a WSL shell.
 
 ### 1. Install WSL2
 
+Open PowerShell as **Administrator** first — a standard window fails
+this command with an access-denied error.
+
 ```powershell
 wsl --install
 ```
@@ -118,6 +121,8 @@ cd kubestronaut-sim
 ./sim up
 ```
 
+Then open <http://localhost:8080>.
+
 Apple Silicon needs nothing extra. `images/k8s-env` builds arm64 natively.
 
 ## Linux
@@ -144,7 +149,17 @@ cgroup v2 is required. `./sim doctor` prints the version Docker reports.
 **Rootless Docker cannot run this stack.** `k8s-env` is a privileged
 container.
 
-### 4. Clone and run
+### 4. curl
+
+> **`curl` is not optional either.** `sim` polls with `curl -fsS
+> --max-time 5 "${UI}/api/boot"`. If the command itself is missing, `up`
+> does not error — it sleeps and retries until the shell budget expires,
+> then points you at `docker compose logs k8s-env`, which is perfectly
+> healthy. A minimal Debian or RHEL install may not have `curl`
+> preinstalled. `bash` is virtually always present already; if it is
+> not, `./sim` fails immediately and says so.
+
+### 5. Clone and run
 
 ```bash
 git clone https://github.com/Camilool8/kubestronaut-sim
@@ -152,6 +167,8 @@ cd kubestronaut-sim
 ./sim doctor
 ./sim up
 ```
+
+Then open <http://localhost:8080>.
 
 ## When something goes wrong
 
