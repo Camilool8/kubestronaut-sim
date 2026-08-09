@@ -2,8 +2,11 @@
 
 ## Setup
 
-**You need:** Docker Desktop (or docker + compose v2), python3, ~9GB of
-free RAM. For the code itself: Go 1.24 and Node 22 — or Docker alone.
+**You need:** Docker Desktop (or docker + compose v2), python3 — not
+needed on Windows, where `sim.ps1` parses JSON natively — and ~9GB of
+free RAM. For the code itself: Go 1.24 and Node 22 — or Docker alone. On
+Windows, run `sim.ps1` instead of `sim` — see
+[docs/install.md](docs/install.md) for the PowerShell steps.
 
 ```bash
 git clone git@github.com:Camilool8/kubestronaut-sim.git
@@ -41,6 +44,10 @@ for m in conductor facilitator proxy hub images/desktop/opener; do (cd $m && go 
 
 If you touched `site/`, also run `bash site/build.sh --check`.
 
+If you touched `sim` or `sim.ps1`, also run `bash tests/check-sim-parity.sh`
+— the Windows launcher must offer the same nine subcommands, and CI fails
+when the two drift.
+
 ### What each gate proves
 
 | Gate | Proves |
@@ -51,11 +58,13 @@ If you touched `site/`, also run `bash site/build.sh --check`.
 | `bank-hints.sh` | Every hinted question has both tiers, and no hint shares 120 consecutive characters with its solution |
 | `bank-mcq.sh` | Six invariants over every `examType: mcq` bank, including a non-degenerate answer key |
 | `site/build.sh --check` | The generated mirrors are current, the page's figures match `banks/*/exam.yaml`, and its cert marks match `CertMark.tsx` |
+| `check-sim-parity.sh` | `sim` and `sim.ps1` offer the same subcommands and the same usage string |
 
 ### What CI cannot run
 
-CI runs everything above, plus the eight image builds and a shell syntax
-pass. It does **not** run `tests/smoke.sh`.
+CI runs everything above, plus the eight image builds, a shell syntax
+pass, and a Windows job that runs `sim.ps1` under both Windows PowerShell
+5.1 and PowerShell 7. It does **not** run `tests/smoke.sh`.
 
 That means the two gates keeping the banks honest are never enforced by
 machine:

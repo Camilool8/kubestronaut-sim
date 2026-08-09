@@ -19,12 +19,19 @@ locally on your own machine.
 
 ## Quickstart
 
-**Requirements:** Docker Desktop (or docker + compose v2), python3, and
-~9GB of free RAM.
+**Requirements:** Docker Desktop (or docker + compose v2) and ~9GB of
+free RAM. Full per-OS steps are in [docs/install.md](docs/install.md).
 
 ```bash
 ./sim doctor    # preflight: RAM, disk, cgroups, tools
 ./sim up        # up in seconds
+```
+
+On Windows the launcher is PowerShell, and needs no `python3`:
+
+```powershell
+.\sim.ps1 doctor
+.\sim.ps1 up
 ```
 
 Then open <http://localhost:8080> and pick an exam. Everything after
@@ -35,6 +42,10 @@ Then open <http://localhost:8080> and pick an exam. Everything after
 >
 > ```bash
 > SIM_BIND=127.0.0.1 ./sim up
+> ```
+>
+> ```powershell
+> .\sim.ps1 up -Bind 127.0.0.1
 > ```
 
 Nothing is built until you choose an exam. Picking a certification is
@@ -171,6 +182,7 @@ training.
 
 | Document | Covers |
 |---|---|
+| [docs/install.md](docs/install.md) | Per-OS prerequisites and setup |
 | [docs/cli.md](docs/cli.md) | `./sim` subcommands, environment variables, host ports |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Symptoms and fixes |
 | [docs/hosting.md](docs/hosting.md) | The Helm chart and its values |

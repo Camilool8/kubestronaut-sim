@@ -315,6 +315,18 @@ jobs:
             bash -n "$f" || { echo "syntax error: $f"; fail=1; }
           done
           exit $fail
+      - name: No script carries CRLF
+        run: sh tests/check-line-endings.sh
+      - name: Parse the PowerShell launcher
+        shell: pwsh
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path ./sim.ps1), [ref]$null, [ref]$errors) | Out-Null
+          if ($errors) { $errors | ForEach-Object { $_.Message }; exit 1 }
+          Write-Host "sim.ps1 parses clean"
+      - name: The two launchers agree
+        run: bash tests/check-sim-parity.sh
       - name: Writes into /shared are atomic
         run: |
           if grep -rnE '>>?[[:space:]]*/shared/' images/ proxy/; then
@@ -323,3 +335,26 @@ jobs:
             exit 1
           fi
           echo "no truncating writes into /shared"
+
+  windows:
+    name: Windows launcher
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Windows PowerShell 5.1 can parse and run it
+        shell: powershell
+        run: |
+          .\sim.ps1 help
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: PowerShell 7 can parse and run it
+        shell: pwsh
+        run: |
+          .\sim.ps1 help
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: An unknown command exits 1
+        shell: powershell
+        run: |
+          .\sim.ps1 nonsense
+          if ($LASTEXITCODE -ne 1) { Write-Error "expected exit 1, got $LASTEXITCODE"; exit 1 }
+          Write-Host "unknown command exits 1"
+          exit 0

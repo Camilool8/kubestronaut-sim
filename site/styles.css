@@ -341,6 +341,53 @@ img {
   color: var(--text-muted);
 }
 
+.os-tabs {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.os-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 var(--space-2) var(--space-4) 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-s);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.os-mark {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  fill: currentColor;
+}
+
+.os-radio:checked + .os-tab {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.os-radio:focus-visible + .os-tab {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.os-panel {
+  display: none;
+}
+
+#os-win:checked ~ .os-panels .os-panel[data-os="win"],
+#os-mac:checked ~ .os-panels .os-panel[data-os="mac"],
+#os-linux:checked ~ .os-panels .os-panel[data-os="linux"] {
+  display: block;
+}
+
 .term {
   margin: 0;
   border: 1px solid var(--machine-border);

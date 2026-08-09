@@ -667,7 +667,7 @@ describe("an attempt whose tasks are still being set up", () => {
     render(<App />);
 
     expect(
-      await screen.findByText("Setting up the 17 tasks you drew on the cluster."),
+      await screen.findByText("Setting up the 17 tasks in this draw on the cluster."),
     ).toBeInTheDocument();
     expect(screen.getByText(/clock has not started/i)).toBeInTheDocument();
   });

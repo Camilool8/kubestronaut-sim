@@ -34,6 +34,6 @@ RUN chmod +x /home/candidate/Desktop/*.desktop
 COPY --from=opener /out/sim-opener /usr/local/bin/sim-opener
 
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 EXPOSE 6080 6081
 ENTRYPOINT ["/entrypoint.sh"]

@@ -36,7 +36,8 @@ RUN curl -fsSL -o /opt/sim/ingress-nginx.yaml \
 
 COPY kind-config.yaml bootstrap.sh phase.sh preload.txt /opt/sim/
 COPY start.sh /start.sh
-RUN chmod +x /start.sh /opt/sim/bootstrap.sh
+RUN sed -i 's/\r$//' /start.sh /opt/sim/bootstrap.sh /opt/sim/phase.sh /opt/sim/preload.txt \
+ && chmod +x /start.sh /opt/sim/bootstrap.sh
 
 FROM sim AS preload
 ARG PRELOAD=full

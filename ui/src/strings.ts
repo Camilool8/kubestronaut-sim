@@ -649,7 +649,7 @@ export const strings = {
     hintFast: "Restarting the exam services. Usually a few seconds.",
 
     hintSeed:
-      "Preparing the cluster for the tasks you drew. Your clock has not started and will not start until this finishes.",
+      "Preparing the cluster for the tasks in this draw. Your clock has not started and will not start until this finishes.",
     stepOf: (step: number, total: number, label: string) =>
       `Step ${step} of ${total}: ${label}`,
     elapsed: (span: string) => `Elapsed ${span}`,
@@ -680,8 +680,8 @@ export const strings = {
   preparing: {
     body: (tasks: number) =>
       tasks === 1
-        ? "Setting up the 1 task you drew on the cluster."
-        : `Setting up the ${tasks} tasks you drew on the cluster.`,
+        ? "Setting up the 1 task in this draw on the cluster."
+        : `Setting up the ${tasks} tasks in this draw on the cluster.`,
 
     elapsed: (span: string) => `Elapsed ${span}`,
   },

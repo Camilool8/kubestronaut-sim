@@ -1,6 +1,7 @@
 FROM alpine:3.21 AS index
 RUN apk add --no-cache yq
 COPY . /src
+RUN find /src -type f -name '*.sh' -exec sed -i 's/\r$//' {} +
 RUN set -eu; \
     mkdir -p /index; \
     for f in /src/*/exam.yaml; do \
@@ -14,4 +15,5 @@ RUN set -eu; \
 
 FROM alpine:3.21
 COPY . /src
+RUN find /src -type f -name '*.sh' -exec sed -i 's/\r$//' {} +
 COPY --from=index /index /index
