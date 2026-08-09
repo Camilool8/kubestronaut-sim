@@ -55,7 +55,7 @@ what creates its cluster, and the page shows each phase as it completes.
 
 | Bank | Engine | Questions | Per attempt | Time | Pass |
 |---|---|---|---|---|---|
-| CKAD Mock Exam | Hands-on | 26 | 17 drawn | 120 min | 66% |
+| CKAD Mock Exam | Hands-on | 44 | 17 drawn | 120 min | 66% |
 | KCNA Mock Exam | Multiple choice | 97 | 65 drawn | 90 min | 75% |
 
 - Every draw is stratified to the published curriculum weights.
@@ -107,7 +107,8 @@ routes.
           alt="The score screen: a pass against the threshold, a domain breakdown ordered weakest first with two domains flagged below threshold, and a table of per-task verdicts with the points each one earned." />
    </picture>
 
-Press `?` in the app for the full shortcut list.
+Press `?` in the exam view for the full shortcut list. The key is bound
+on that screen only.
 
 ### Clipboard
 
@@ -136,7 +137,12 @@ A kind cluster sized by the exam you picked
 
 - **Calico** rather than kindnet, so NetworkPolicies are genuinely
   enforced and policy questions can be graded on behaviour.
-- ingress-nginx.
+- ingress-nginx, pinned to `controller-v1.15.1`. That is its last
+  release: the project was retired upstream in March 2026 and will get
+  no further patches. The Ingress **API** is not deprecated, and one
+  retired controller is not an exam change — see
+  [SECURITY.md](SECURITY.md#ingress-nginx-is-retired-upstream) for why
+  that is acceptable here and what would force a migration.
 - A local Helm repository.
 - A plain-HTTP registry for the image-building questions.
 

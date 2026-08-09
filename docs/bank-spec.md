@@ -6,14 +6,16 @@ The conductor scans every `banks/*/exam.yaml` into the catalog
 the exam selector renders; [banks/catalog.yaml](../banks/catalog.yaml) adds
 coming-soon entries whose exam engine does not exist yet.
 
-Five gates decide whether a bank ships —
+Six gates decide whether a bank ships —
 [bank-weights.sh](../tests/bank-weights.sh),
 [check-lint.sh](../tests/check-lint.sh),
-[check-lib.sh](../tests/check-lib.sh) and
+[check-lib.sh](../tests/check-lib.sh),
+[check-evidence.sh](../tests/check-evidence.sh) and
 [bank-hints.sh](../tests/bank-hints.sh) for hands-on banks, and
 [bank-mcq.sh](../tests/bank-mcq.sh) for multiple-choice ones. All are
-offline and run at the top of [tests/smoke.sh](../tests/smoke.sh), so a
-bank mistake fails in seconds rather than forty minutes into a cold boot.
+offline and CI runs all six. Every one but `check-evidence.sh` also runs
+at the top of [tests/smoke.sh](../tests/smoke.sh), so a bank mistake
+fails in seconds rather than forty minutes into a cold boot.
 
 There are two exam engines. Everything down to
 [Multiple-choice banks](#multiple-choice-banks-examtype-mcq) describes
@@ -208,7 +210,7 @@ For an author:
   moved four minutes of seeding from the boot screen to the moment the
   candidate presses Start, and gained almost no variety for it.
 
-`ckad-mock-01` pools 26 down to 17 for both reasons. **Holding the sitting
+`ckad-mock-01` pools 44 down to 17 for both reasons. **Holding the sitting
 to the right length** comes first: the real CKAD is 15-20 tasks in two
 hours, and 17 is its midpoint.
 
@@ -217,11 +219,11 @@ the pool is pooling in name only:
 
 | Domain | Pool | Rotation |
 |---|---|---|
-| Application Environment, Configuration and Security | 6 | 4 of 6 |
-| Application Deployment | 5 | 4 of 5 |
-| Services and Networking | 4 | 3 of 4 |
-| Application Design and Build | 7 | 3 of 7 |
-| Application Observability and Maintenance | 4 | 3 of 4 |
+| Application Environment, Configuration and Security | 10 | 4 of 10 |
+| Application Deployment | 10 | 4 of 10 |
+| Services and Networking | 8 | 3 of 8 |
+| Application Design and Build | 8 | 3 of 8 |
+| Application Observability and Maintenance | 8 | 3 of 8 |
 
 Deepening a domain widens its rotation. The gate prints this table, so the
 thinnest domain is always the one to write into next.
@@ -289,7 +291,7 @@ the bank when a tier lands more than one question from its share, prints
 a domain-by-tier depth table, and checks the drawn sitting against the
 clock: 0.85 to 1.05 of `spec.duration`, because a bank that wastes the
 clock and one nobody finishes are both miscalibrated. `ckad-mock-01`
-currently draws 4 quick, 9 core and 4 deep for 115 minutes of task time
+currently draws 5 quick, 8 core and 4 deep for 115 minutes of task time
 against 120.
 
 The tier never reaches the candidate **mid-attempt**: a question labelled
@@ -310,7 +312,7 @@ percentage point of its curriculum weight.
 
 What that does *not* give you is a drawn attempt whose raw points divide
 in the curriculum's ratios, and it cannot: a domain that contributes 4 of
-its 7 questions to the draw contributes 4/7 of its pool points with it.
+its 10 questions to the draw contributes 4/10 of its pool points with it.
 Two other things keep the promise instead, which is why
 [bank-weights.sh](../tests/bank-weights.sh) checks pool DEPTH here rather
 than point share:
@@ -347,13 +349,13 @@ structural ones that set it up.
 
 | # | Assertion | Line |
 |---|---|---|
-| 1 | The questions in `exam.yaml` and the `q*/` directories on disk are the same set | `:87` |
-| 2 | Every question has at least one `validate.d/*.sh` | `:106` |
-| 3 | Every check carries a `# points: N` header matching the grader's pattern exactly | `:110` |
-| 4 | A question's `weight:` equals the sum of its checks' points | `:114` |
-| 5 | Every question's domain has a `spec.domainWeights` entry | `:133` |
-| 6 | Every `spec.domainWeights` entry is used by at least one question | `:135` |
-| 7 | Each domain's share is within 2 percentage points of its target | `:146` |
+| 1 | The questions in `exam.yaml` and the `q*/` directories on disk are the same set | `:229` |
+| 2 | Every question has at least one `validate.d/*.sh` | `:237` |
+| 3 | Every check carries a `# points: N` header matching the grader's pattern exactly | `:241` |
+| 4 | A question's `weight:` equals the sum of its checks' points | `:246` |
+| 5 | Every question's domain has a `spec.domainWeights` entry | `:275` |
+| 6 | Every `spec.domainWeights` entry is used by at least one question | `:277` |
+| 7 | Each domain's share is within 2 percentage points of its target | `:341` |
 
 A bank with no `spec.domainWeights` skips 5 through 7 and is still subject to
 1 through 4. That is how `smoke-01`, the hidden switch-test fixture mapped to

@@ -4,7 +4,7 @@
 
 **You need:** Docker Desktop (or docker + compose v2), python3 — not
 needed on Windows, where `sim.ps1` parses JSON natively — and ~9GB of
-free RAM. For the code itself: Go 1.24 and Node 22 — or Docker alone. On
+free RAM. For the code itself: Go 1.26 and Node 22 — or Docker alone. On
 Windows, run `sim.ps1` instead of `sim` — see
 [docs/install.md](docs/install.md) for the PowerShell steps.
 
@@ -37,12 +37,16 @@ Run these. They need no Docker and take seconds:
 
 ```bash
 tests/bank-weights.sh && tests/check-lint.sh && tests/check-lib.sh \
+  && tests/check-evidence.sh && tests/next-version.sh \
   && tests/bank-hints.sh && tests/bank-mcq.sh
 for m in conductor facilitator proxy hub images/desktop/opener; do (cd $m && go test ./... && go vet ./...); done
 (cd ui && npm ci && npx tsc --noEmit && npm run lint && npm test)
 ```
 
-If you touched `site/`, also run `bash site/build.sh --check`.
+If you touched `site/`, also run `bash site/build.sh --check`. It diffs
+`site/fonts/*.woff2` against `ui/node_modules/@fontsource`, so `npm ci` in
+`ui/` has to have run first — with the sources missing the check now fails
+instead of quietly skipping that comparison.
 
 If you touched `sim` or `sim.ps1`, also run `bash tests/check-sim-parity.sh`
 — the Windows launcher must offer the same nine subcommands, and CI fails
@@ -55,6 +59,8 @@ when the two drift.
 | `bank-weights.sh` | Each question's `weight:` equals the sum of its `# points:` headers, `exam.yaml` and the `q*/` directories agree, and the domain balance matches the curriculum. For a bank declaring `spec.difficultyMix`, also that every question's level matches its `targetSeconds` band, that the pool is deep enough per domain and level to hold the mix, and that a drawn sitting fits the clock |
 | `check-lint.sh` | No validator grades spelling instead of behaviour, and every check carries an exact `# points: N` header |
 | `check-lib.sh` | The `banks/_lib/checks.sh` helpers still treat `0.1` and `100m`, or `1Gi` and `1024Mi`, as the same answer |
+| `check-evidence.sh` | Drives real `validate.d` scripts against a stubbed `kubectl` to prove what a **failing** check reports: a failure never arrives without an `actual` pane, and a name the candidate did not use is named, not shown as an empty field. `tests/solutions/` only ever walks the happy path, which is how a check came to report `runAsUser='', want 10001` for a whole release |
+| `next-version.sh` | `.github/scripts/next-version.py` computes the release tag from the commit log, so this pins the arithmetic: which prefixes are a patch, that the largest bump wins, and that a breaking change on 0.x is a minor rather than v1.0.0 |
 | `bank-hints.sh` | Every hinted question has both tiers, and no hint shares 120 consecutive characters with its solution |
 | `bank-mcq.sh` | Six invariants over every `examType: mcq` bank, including a non-degenerate answer key |
 | `site/build.sh --check` | The generated mirrors are current, the page's figures match `banks/*/exam.yaml`, and its cert marks match `CertMark.tsx` |
@@ -95,8 +101,10 @@ docker run --rm -v "$PWD/ui":/w -w /w node:22-alpine npm install
 proxies `/api` and the `/desktop` websocket to port 8080, so run
 `./sim up` first.
 
-**vitest is pinned to v2** for vite 5 compatibility. Do not bump it
-alone.
+**vite and vitest are one pin, not two** — `vite ^6.4.3` with
+`vitest ^3.2.7`. Vitest runs the tests through Vite's own transform
+pipeline, so a major on one needs the matching major on the other.
+Bumping either alone breaks the suite.
 
 **`npm run lint` is clean at zero warnings.** Keep it that way.
 
@@ -108,7 +116,7 @@ build from their own directories.
 a bind-mounted `.git` has the wrong ownership:
 
 ```bash
-docker run --rm -e GOFLAGS=-buildvcs=false -v "$PWD/facilitator":/w -w /w golang:1.24 go test ./...
+docker run --rm -e GOFLAGS=-buildvcs=false -v "$PWD/facilitator":/w -w /w golang:1.26 go test ./...
 ```
 
 **`facilitator/internal/web/dist/index.html` and
@@ -203,7 +211,8 @@ YAML, Markdown and shell, so a `.txt` there is foreign by definition.
 **Two image tags must stay absent from `images/k8s-env/preload.txt`:**
 
 - `nginx:1.99` — question 02's broken image.
-- `nginx:0.0.0-corvus-nonexistent` — question 11's failing Helm install.
+- `nginx:0.0.0-corvus-nonexistent` — question 17's unpullable image, the
+  one the candidate has to read off the Deployment and correct.
 
 Both questions are built on those tags *not* resolving. Preloading them
 breaks two questions silently, and only a smoke run on a cold cache

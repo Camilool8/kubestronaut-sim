@@ -157,7 +157,7 @@ Per practical session, across its eight containers:
 | | Requested | Limit |
 |---|---|---|
 | Memory | 3.9Gi | 11.8Gi |
-| CPU | 540m | 4400m |
+| CPU | 540m | 5900m |
 
 - Per-container numbers are measured and live in
   `deploy/helm/kubestronaut-sim/files/session-pod.yaml`. Override
@@ -231,5 +231,7 @@ disposable unit:
   hosted reset costs a full boot and reports different phases.
 - Every container except the two candidate shells reports the Pod's
   hostname, because a Pod shares one UTS namespace.
-- History import and the CLI's summary route are refused with an
-  explanation rather than proxied.
+- History import and `GET /api/history/summary` are refused with an
+  explanation rather than proxied. Import would let a durable record hold
+  attempts that were never graded; the summary is a projection of
+  `GET /api/history`, which the hub already serves in full.
