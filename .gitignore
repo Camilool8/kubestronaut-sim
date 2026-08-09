@@ -8,6 +8,9 @@ node_modules/
 ui/dist/
 *.log
 
+__pycache__/
+*.pyc
+
 facilitator/internal/web/dist/*
 !facilitator/internal/web/dist/index.html
 
