@@ -1,6 +1,6 @@
 FROM debian:13-slim
 ARG KUBECTL_VERSION=v1.35.0
-ARG HELM_VERSION=v3.18.0
+ARG HELM_VERSION=v3.21.3
 ARG YQ_VERSION=v4.45.1
 RUN apt-get update && apt-get install -y --no-install-recommends \
       openssh-server curl ca-certificates vim nano jq less bash-completion procps \
