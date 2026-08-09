@@ -44,9 +44,7 @@ fi
 
 cd "$repo"
 
-# The PowerShell mirror cannot be executed here (CI runs this gate on Linux);
-# the Windows job exercises it for real. Gate the wiring so it cannot silently
-# drift out of sim.ps1.
+# Static wiring checks. These catch drift even where no PowerShell exists.
 grep -q '^function Repair-LineEndings {' sim.ps1 || {
   echo "check-crlf-repair: sim.ps1 has no Repair-LineEndings function" >&2
   fail=1
@@ -59,5 +57,21 @@ grep -q '^function Repair-LineEndings {' sim.ps1 || {
   fail=1
 }
 
+# Then run the PowerShell side for real. An earlier version of this gate
+# asserted only the wiring above, on the belief that the mirror could not run
+# outside Windows -- it can, under pwsh on macOS and Linux alike. That gap let
+# a broken extraction reach CI on PR #80 with every local gate green, so the
+# functional test now runs wherever a PowerShell exists and says so out loud
+# when one does not.
+psh=""
+for candidate in pwsh powershell; do
+  if command -v "$candidate" >/dev/null 2>&1; then psh="$candidate"; break; fi
+done
+if [ -z "$psh" ]; then
+  echo "check-crlf-repair: SKIPPED the PowerShell functional test (no pwsh or powershell on PATH)"
+else
+  "$psh" -NoProfile -File tests/check-crlf-repair.ps1 || fail=1
+fi
+
 [ "$fail" = 0 ] || exit 1
-echo "check-crlf-repair: bash repair works; PowerShell mirror is wired"
+echo "check-crlf-repair: bash repair works; PowerShell mirror wired and verified"

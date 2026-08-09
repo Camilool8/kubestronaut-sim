@@ -353,23 +353,16 @@ jobs:
         run: |
           .\sim.ps1 help
           if ($LASTEXITCODE -ne 0) { exit 1 }
-      - name: Repair-LineEndings converts CRLF to LF
+      - name: Windows PowerShell 5.1 repairs CRLF
         shell: powershell
         run: |
-          $src = Get-Content .\sim.ps1 -Raw
-          $fn = [regex]::Match($src, '(?ms)^function Repair-LineEndings \{.*?^\}').Value
-          if (-not $fn) { Write-Error "could not extract Repair-LineEndings"; exit 1 }
-          Invoke-Expression $fn
-          New-Item -ItemType Directory -Force -Path banks\ci\q01 | Out-Null
-          [System.IO.File]::WriteAllBytes(
-            "$PWD\banks\ci\q01\setup.sh",
-            [byte[]](0x73,0x65,0x74,0x0D,0x0A,0x65,0x63,0x68,0x6F,0x0D,0x0A))
-          git add banks\ci\q01\setup.sh
-          $n = Repair-LineEndings
-          $after = [System.IO.File]::ReadAllBytes("$PWD\banks\ci\q01\setup.sh")
-          if ($after -contains 13) { Write-Error "CRLF survived the repair"; exit 1 }
-          if ($n -lt 1) { Write-Error "expected at least one repaired file, got $n"; exit 1 }
-          Write-Host "Repair-LineEndings converted $n file(s) to LF"
+          .\tests\check-crlf-repair.ps1
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: PowerShell 7 repairs CRLF
+        shell: pwsh
+        run: |
+          .\tests\check-crlf-repair.ps1
+          if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: An unknown command exits 1
         shell: powershell
         run: |
