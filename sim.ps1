@@ -93,6 +93,25 @@ function Invoke-DockerSafe {
   }
 }
 
+# Same trap as Invoke-DockerSafe, same fix, for git instead of docker: a
+# missing `git` (GitHub Desktop's bundled copy never lands on PATH; a ZIP
+# download has no git at all) raises a *terminating* CommandNotFoundException
+# under $ErrorActionPreference = 'Stop' that 2>$null cannot suppress -- there
+# is no process yet to redirect. On Windows PowerShell 5.1, `git rev-parse`
+# outside a work tree hits the same NativeCommandError trap: it writes to
+# stderr while stderr is redirected. Repair-LineEndings and Invoke-Doctor's
+# line-endings check both depend on "git missing or outside a work tree"
+# failing safely (non-zero exit, no throw) to keep their documented "no-op
+# outside a git work tree" contract instead of aborting `up`/`doctor` on
+# their very first line.
+function Invoke-GitSafe {
+  try {
+    & git @args 2>$null
+  } catch {
+    $global:LASTEXITCODE = 1
+  }
+}
+
 function Set-Env([string]$Name, $Value) {
   # Assigning $null to $env:X is not portable across 5.1 and 7; this removes it.
   [Environment]::SetEnvironmentVariable($Name, $Value, 'Process')
@@ -105,27 +124,43 @@ function Get-Budget([int]$Param, [string]$EnvName, [int]$Default) {
   return $Default
 }
 
+# Shared by Repair-LineEndings and Invoke-Doctor so both agree on what "has
+# CRLF" means: a lone CR (mid-line, or as a file's final byte) is not
+# something the collapse loop below rewrites, so a predicate that only checks
+# "does byte 13 appear anywhere" would make doctor report N script(s) have
+# CRLF on the same tree the repair just reported 0 script(s) for.
+function Test-HasCrlfPair([byte[]]$Bytes) {
+  for ($i = 0; $i -lt $Bytes.Length - 1; $i++) {
+    if ($Bytes[$i] -eq 13 -and $Bytes[$i + 1] -eq 10) { return $true }
+  }
+  return $false
+}
+
 # Mirrors normalize_line_endings() in sim -- see the long comment there for why
 # a Windows clone keeps CRLF forever and what it breaks. Byte-level CRLF -> LF
 # rather than Get-Content/Set-Content: Set-Content re-encodes on write and
 # would put the CRLFs straight back on Windows, and would add a BOM under 5.1.
 function Repair-LineEndings {
-  $null = & git rev-parse --is-inside-work-tree 2>$null
+  $null = Invoke-GitSafe rev-parse --is-inside-work-tree
   if ($LASTEXITCODE -ne 0) { return 0 }
 
-  $listed = & git ls-files -- 'sim' '*.sh' 'images/k8s-env/preload.txt' 2>$null
+  $listed = Invoke-GitSafe ls-files -- 'sim' '*.sh' 'images/k8s-env/preload.txt'
   if ($LASTEXITCODE -ne 0 -or -not $listed) { return 0 }
 
   $fixed = 0
   foreach ($rel in $listed) {
     if (-not (Test-Path -LiteralPath $rel)) { continue }
     $bytes = [System.IO.File]::ReadAllBytes($rel)
-    if ($bytes -notcontains 13) { continue }
+    if (-not (Test-HasCrlfPair $bytes)) { continue }
     $out = New-Object System.Collections.Generic.List[byte]
     for ($i = 0; $i -lt $bytes.Length; $i++) {
       if ($bytes[$i] -eq 13 -and $i + 1 -lt $bytes.Length -and $bytes[$i + 1] -eq 10) { continue }
       $out.Add($bytes[$i])
     }
+    # Belt-and-suspenders against Test-HasCrlfPair and this loop ever
+    # disagreeing again: only write, and only count as fixed, if the byte
+    # count actually shrank.
+    if ($out.Count -eq $bytes.Length) { continue }
     [System.IO.File]::WriteAllBytes((Resolve-Path -LiteralPath $rel).Path, $out.ToArray())
     $fixed++
   }
@@ -327,12 +362,15 @@ function Invoke-Doctor {
   Write-Host ('powershell        : {0}' -f $PSVersionTable.PSVersion)
 
   $crlf = 0
-  $null = & git rev-parse --is-inside-work-tree 2>$null
+  $null = Invoke-GitSafe rev-parse --is-inside-work-tree
   if ($LASTEXITCODE -eq 0) {
-    $listed = & git ls-files -- 'sim' '*.sh' 'images/k8s-env/preload.txt' 2>$null
+    $listed = Invoke-GitSafe ls-files -- 'sim' '*.sh' 'images/k8s-env/preload.txt'
     foreach ($rel in $listed) {
       if (-not (Test-Path -LiteralPath $rel)) { continue }
-      if ([System.IO.File]::ReadAllBytes($rel) -contains 13) { $crlf++ }
+      # Same predicate Repair-LineEndings uses to decide what it would
+      # actually rewrite -- see Test-HasCrlfPair -- so this never reports a
+      # count `.\sim.ps1 up` wouldn't also report as repaired.
+      if (Test-HasCrlfPair ([System.IO.File]::ReadAllBytes($rel))) { $crlf++ }
     }
   }
   if ($crlf -eq 0) {
