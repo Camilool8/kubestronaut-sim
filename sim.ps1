@@ -318,12 +318,33 @@ function Invoke-Doctor {
   # container's own shell from expanding it.
   $awkArg = 'df -Pk /var/lib/docker | awk ''NR==2{print int($4/1024/1024)}'''
   $avail = Invoke-DockerSafe run --rm -v /var/lib/docker alpine:3.21 sh -c $awkArg
-  if ($avail -is [array]) { $avail = $avail -join '' }
   # Guard the [int] cast, not just the exit code: multi-line or otherwise
   # non-numeric output would otherwise throw under $ErrorActionPreference =
   # 'Stop' and take doctor down -- the one tool meant to survive things
-  # already being broken.
-  if ($LASTEXITCODE -ne 0 -or $avail -notmatch '^\d+$') { $avail = '?' }
+  # already being broken. Two traps here, both found empirically rather
+  # than reasoned about, so both are commented in full:
+  #   - joining a MULTI-line result before validating turns two genuinely
+  #     low readings like "9" and "9" into the digit string "99", which
+  #     passes ^\d+$ and reports a false "99GB ok" -- worse than the crash
+  #     it replaced, since a crash sends you looking and a false ok sends
+  #     you away. So: collapse only a single-element (or empty) result:
+  #     anything with more than one line is unusable, full stop.
+  if ($LASTEXITCODE -ne 0) {
+    $avail = '?'
+  } elseif ($avail -is [array]) {
+    if ($avail.Count -eq 1) { $avail = [string]$avail[0] } else { $avail = '?' }
+  } elseif ($null -eq $avail) {
+    $avail = ''
+  }
+  #   - "$avail -notmatch '^\d+$'" looked equivalent to "-not ($avail
+  #     -match ...)" but is not when $avail is empty: -notmatch applies
+  #     PowerShell's collection-filter semantics and returns an empty
+  #     Object[] rather than $true, and [bool]@() is $false, so the '?'
+  #     fallback silently never fires and doctor prints a blank value
+  #     inside a LOW warning. Forcing scalar boolean coercion with -not
+  #     (... -match ...) avoids that; $mem/$cg/$ostype's sibling guards
+  #     use "-not $var" for the same reason and were never at risk.
+  if ($avail -ne '?' -and -not ($avail -match '^\d+$')) { $avail = '?' }
   if ($avail -ne '?' -and [int]$avail -lt 25) {
     Write-Host ("disk for images   : {0}GB   << LOW: images alone are ~10GB" -f $avail)
   } else {
