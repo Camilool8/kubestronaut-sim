@@ -1,12 +1,28 @@
 #Requires -Version 5.1
-[CmdletBinding()]
+# Deliberately NOT [CmdletBinding()], and no [Parameter()] attribute on any
+# parameter below: either one makes this an *advanced* script, whose binder
+# treats a leading "-" on any token (e.g. the "--all" a user is told on
+# screen to pass to purge) as an attempt to match a declared parameter name
+# and hard-errors when nothing matches. As a plain script, an unmatched
+# dash-token just falls through to $args untouched, while $Command and
+# $Argument still bind positionally (by declaration order) and -Bind /
+# -BootBudget / -ShellBudget still bind by name -- both verified empirically
+# against this exact param block, see task-6-report.md.
 param(
-  [Parameter(Position = 0)][string]$Command = 'help',
-  [Parameter(Position = 1)][string]$Argument,
+  [string]$Command = 'help',
+  [string]$Argument,
   [string]$Bind,
   [int]$BootBudget,
   [int]$ShellBudget
 )
+
+# A basic script/function's binder tries named matching FIRST for any token
+# starting with "-": if nothing matches, it drops straight into $args and is
+# skipped for positional purposes entirely -- it does not fall through to
+# fill $Argument. So "purge --all" (verified empirically) binds $Command to
+# 'purge' but leaves $Argument empty and stashes '--all' in $args alone.
+# Recover it here, same as sim's own "${2:-}" would.
+if (-not $Argument -and $args.Count -gt 0) { $Argument = [string]$args[0] }
 
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
@@ -33,12 +49,39 @@ function Get-Json([string]$Path, [int]$TimeoutSec = 5) {
   }
 }
 
-# $ErrorActionPreference does not catch a native binary's exit code.
+# $ErrorActionPreference does not catch a native binary's exit code -- that's
+# what the explicit check below is for. This is a *basic* function (no
+# param() block at all, so no [CmdletBinding()] and no [Parameter()]
+# attribute anywhere) on purpose: an advanced function's parameter binder
+# prefix-matches dashed tokens against its own declared parameters before
+# they ever reach docker -- "-d" would bind to a same-named/prefixed
+# parameter instead of passing through, "-v" would bind to the built-in
+# -Verbose switch and silently vanish. Using the automatic $args variable
+# means nothing passed here is ever a parameter-binding candidate; it all
+# reaches docker byte for byte. Reserved for callers that must abort on
+# failure (up, purge) -- see the dispatch tail for the down/ssh/status/grade
+# pass-through commands, which call docker directly and propagate its exit
+# code instead of throwing.
 function Invoke-Docker {
-  param([Parameter(ValueFromRemainingArguments = $true)][string[]]$DockerArgs)
-  & docker @DockerArgs
+  & docker @args
   if ($LASTEXITCODE -ne 0) {
-    throw "docker $($DockerArgs -join ' ') exited $LASTEXITCODE"
+    throw "docker $($args -join ' ') exited $LASTEXITCODE"
+  }
+}
+
+# doctor must degrade gracefully, never crash, when docker isn't even on
+# PATH -- that's the single most likely reason someone runs it. Under
+# $ErrorActionPreference = 'Stop', a missing docker.exe raises a terminating
+# CommandNotFoundException that 2>$null cannot suppress (there is no child
+# process yet to redirect), so every probe below goes through this instead
+# of a bare "& docker ...". Basic function, same reasoning as Invoke-Docker:
+# no param() block, so dashed probe args (--format, -v, -f, -q) are never
+# parameter-binding candidates.
+function Invoke-DockerSafe {
+  try {
+    & docker @args 2>$null
+  } catch {
+    $global:LASTEXITCODE = 1
   }
 }
 
@@ -168,7 +211,22 @@ function Invoke-Purge([string]$Mode) {
   $volumes = & docker volume ls -q --filter "label=com.docker.compose.project=$project"
   foreach ($vol in $volumes) {
     if (-not $vol) { continue }
-    $key = & docker volume inspect -f '{{index .Labels "com.docker.compose.volume"}}' $vol 2>$null
+    # NOT '{{index .Labels "com.docker.compose.volume"}}': Windows
+    # PowerShell 5.1 wraps a native argument in "..." whenever it contains
+    # whitespace, but does not escape double quotes already inside it -- an
+    # argument with both (like that template) reaches docker.exe truncated
+    # at the embedded quote, "docker volume inspect" exits non-zero, 2>$null
+    # hides it, and the state volume looks unlabeled and gets deleted along
+    # with everything else. "{{json .Labels}}" has whitespace but no
+    # embedded double quote, so 5.1's plain wrap-in-quotes is safe; decoding
+    # the label map ourselves sidesteps the native templating quoting
+    # entirely.
+    $labelsRaw = & docker volume inspect -f '{{json .Labels}}' $vol 2>$null
+    $key = ''
+    if ($LASTEXITCODE -eq 0 -and $labelsRaw) {
+      $labels = ($labelsRaw -join '') | ConvertFrom-Json
+      $key = Get-Field $labels 'com.docker.compose.volume'
+    }
     if ($key -eq 'state') { $kept = $true; continue }
     & docker volume rm $vol > $null 2>&1
     if ($LASTEXITCODE -ne 0) { Write-Host "  could not remove ${vol} (still in use?)" }
@@ -215,20 +273,20 @@ function Invoke-Doctor {
   Write-Host ('host              : Windows ({0})' -f $PSVersionTable.PSEdition)
   Write-Host ('powershell        : {0}' -f $PSVersionTable.PSVersion)
 
-  $server = & docker version --format '{{.Server.Version}}' 2>$null
+  $server = Invoke-DockerSafe version --format '{{.Server.Version}}'
   Write-Host ('docker            : {0}' -f $(if ($LASTEXITCODE -eq 0 -and $server) { $server } else { 'NOT REACHABLE' }))
 
-  $compose = & docker compose version --short 2>$null
+  $compose = Invoke-DockerSafe compose version --short
   Write-Host ('compose           : {0}' -f $(if ($LASTEXITCODE -eq 0 -and $compose) { $compose } else { 'MISSING' }))
 
-  $ostype = & docker info --format '{{.OSType}}' 2>$null
+  $ostype = Invoke-DockerSafe info --format '{{.OSType}}'
   if ($ostype -eq 'linux') {
     Write-Host 'container OS      : linux   ok'
   } else {
     Write-Host ("container OS      : {0}   << must be linux - switch Docker Desktop to Linux containers" -f $ostype)
   }
 
-  $mem = & docker info --format '{{.MemTotal}}' 2>$null
+  $mem = Invoke-DockerSafe info --format '{{.MemTotal}}'
   if ($LASTEXITCODE -ne 0 -or -not $mem) { $mem = 0 }
   $memgb = [math]::Floor([int64]$mem / 1GB)
   if ($memgb -lt 8) {
@@ -237,7 +295,16 @@ function Invoke-Doctor {
     Write-Host ("RAM to docker     : {0}GB   ok" -f $memgb)
   }
 
-  $avail = & docker run --rm -v /var/lib/docker alpine:3.21 sh -c 'df -Pk /var/lib/docker | awk "NR==2{print int(\$4/1024/1024)}"' 2>$null
+  # NOT 'df -Pk /var/lib/docker | awk "NR==2{print int(\$4/1024/1024)}"':
+  # that argument has both whitespace and an embedded double quote, which
+  # Windows PowerShell 5.1 mangles the same way the volume-label template
+  # above did (see the comment in Invoke-Purge). Single-quoting the awk
+  # program instead needs no embedded double quote at all -- only single
+  # quotes, which 5.1's argv construction never touches -- so $4 needs no
+  # backslash escaping either, since single quotes already stop the
+  # container's own shell from expanding it.
+  $awkArg = 'df -Pk /var/lib/docker | awk ''NR==2{print int($4/1024/1024)}'''
+  $avail = Invoke-DockerSafe run --rm -v /var/lib/docker alpine:3.21 sh -c $awkArg
   if ($LASTEXITCODE -ne 0 -or -not $avail) { $avail = '?' }
   if ($avail -ne '?' -and [int]$avail -lt 25) {
     Write-Host ("disk for images   : {0}GB   << LOW: images alone are ~10GB" -f $avail)
@@ -245,7 +312,7 @@ function Invoke-Doctor {
     Write-Host ("disk for images   : {0}GB   ok" -f $avail)
   }
 
-  $cg = & docker info --format '{{.CgroupVersion}}' 2>$null
+  $cg = Invoke-DockerSafe info --format '{{.CgroupVersion}}'
   if ($LASTEXITCODE -ne 0 -or -not $cg) { $cg = 'unknown' }
   if ($cg -eq '1') {
     Write-Host 'cgroup version    : 1   << the instances need cgroup v2 (compose sets cgroup: host)'
@@ -253,7 +320,7 @@ function Invoke-Doctor {
     Write-Host ("cgroup version    : {0}" -f $cg)
   }
 
-  $warm = @(& docker volume ls -q --filter name=kubestronaut-sim 2>$null).Count
+  $warm = @(Invoke-DockerSafe volume ls -q --filter name=kubestronaut-sim).Count
   if ($warm -eq 0) {
     Write-Host 'warm volumes      : none - this will be a cold first boot (slowest path)'
   } else {
@@ -273,17 +340,26 @@ if ($COMMANDS -notcontains $Command) {
   exit 1
 }
 
+# down/ssh/status/grade call docker directly and exit with its own code,
+# instead of going through Invoke-Docker: sim under `set -e` propagates
+# docker's own exit status for these with no extra message, and Invoke-
+# Docker's throw would flatten that to a generic terminating-error exit (1)
+# regardless of what docker actually returned -- e.g. a candidate's Ctrl-C
+# out of `ssh` (exit 130) would look like a launcher crash instead of an
+# interrupted session. up and purge keep throwing: they have follow-on logic
+# (the boot-poll loop, volume cleanup) that must not run after a failure.
 switch ($Command) {
   'up'     { Invoke-Up $Argument }
-  'down'   { Invoke-Docker compose down --remove-orphans }
+  'down'   { & docker compose down --remove-orphans; exit $LASTEXITCODE }
   'purge'  { Invoke-Purge $Argument }
   'doctor' { Invoke-Doctor }
   'reset'  { Invoke-Reset }
   'ssh'    {
     $instance = if ($Argument) { $Argument } else { 'instance-1' }
-    Invoke-Docker compose exec $instance su - candidate
+    & docker compose exec $instance su - candidate
+    exit $LASTEXITCODE
   }
-  'status' { Invoke-Docker compose ps }
-  'grade'  { Invoke-Docker compose exec facilitator /entrypoint.sh grade }
+  'status' { & docker compose ps; exit $LASTEXITCODE }
+  'grade'  { & docker compose exec facilitator /entrypoint.sh grade; exit $LASTEXITCODE }
   'help'   { Write-Host $USAGE }
 }
