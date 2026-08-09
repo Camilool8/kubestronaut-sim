@@ -302,6 +302,10 @@ describe("App leaving the results screen", () => {
       }),
     );
 
+  afterEach(() => {
+    window.location.hash = "";
+  });
+
   test("the menu offers a new attempt, so results are not a dead end", async () => {
     let reset = 0;
     stubEnded(() => { reset += 1; });
@@ -324,6 +328,27 @@ describe("App leaving the results screen", () => {
     await screen.findByRole("button", { name: "New attempt" });
 
     expect(screen.queryByRole("link", { name: /kubestronaut/i })).not.toBeInTheDocument();
+
+    const wordmark = screen.getByText(/kubestronaut/i);
+    expect(wordmark.closest(".navbar-home-static")).not.toBeNull();
+  });
+
+  test("the menu's new attempt also escapes #/results/<qid>, clearing the stale sub-route hash", async () => {
+    let reset = 0;
+    stubEnded(() => { reset += 1; });
+    const user = userEvent.setup();
+    window.location.hash = "#/results/q01";
+
+    render(<App />);
+    await screen.findByText(/isn't part of this attempt/i);
+    expect(screen.queryByRole("button", { name: "New attempt" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Menu" }));
+    const menu = screen.getByRole("group", { name: "Menu" });
+    await user.click(within(menu).getByRole("button", { name: "New attempt" }));
+
+    await waitFor(() => expect(reset).toBe(1));
+    expect(window.location.hash).toBe("#/exams");
   });
 });
 
