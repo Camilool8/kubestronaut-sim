@@ -279,6 +279,54 @@ describe("App control failures", () => {
   });
 });
 
+describe("App leaving the results screen", () => {
+  const stubEnded = (onReset: () => void) =>
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const json = (body: unknown, status = 200) =>
+          new Response(JSON.stringify(body), { status });
+
+        if (url.endsWith("/api/control/reset") && init?.method === "POST") {
+          onReset();
+          return json({ ok: true, job: { id: "job-1", op: "reset", bank: "", phases: [] } });
+        }
+        if (url.endsWith("/api/control/status")) return json({ busy: false });
+        if (url.endsWith("/api/boot")) return json(readyBoot);
+        if (url.endsWith("/api/session")) return json(endedSession);
+        if (url.endsWith("/api/results")) return json(results);
+        if (url.endsWith("/api/exam")) return json(exam);
+        if (url.endsWith("/api/catalog")) return json(catalog);
+        return json({});
+      }),
+    );
+
+  test("the menu offers a new attempt, so results are not a dead end", async () => {
+    let reset = 0;
+    stubEnded(() => { reset += 1; });
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByRole("button", { name: "New attempt" });
+
+    await user.click(screen.getByRole("button", { name: "Menu" }));
+    const menu = screen.getByRole("group", { name: "Menu" });
+    await user.click(within(menu).getByRole("button", { name: "New attempt" }));
+
+    await waitFor(() => expect(reset).toBe(1));
+  });
+
+  test("the wordmark is not a link on results, because it cannot go anywhere", async () => {
+    stubEnded(() => {});
+
+    render(<App />);
+    await screen.findByRole("button", { name: "New attempt" });
+
+    expect(screen.queryByRole("link", { name: /kubestronaut/i })).not.toBeInTheDocument();
+  });
+});
+
 describe("App session polling", () => {
   test("warns when the session poll fails after the first success, and withdraws it on recovery", async () => {
     let sessionDown = false;

@@ -25,6 +25,7 @@ import { Progress } from "./screens/Progress";
 import { Score } from "./screens/Score";
 import { DesktopRequired, gateOverridden, useDesktopGate } from "./components/DesktopRequired";
 import { NavBar, type Crumb, type NavItem } from "./components/NavBar";
+import { NavMenuItem, NavMenuSection } from "./components/NavMenu";
 import { BackgroundJobChip } from "./components/BackgroundJobChip";
 import { ControlProgress } from "./components/ControlProgress";
 import { ToastLayer } from "./components/Toast";
@@ -37,7 +38,7 @@ import { HostedStart } from "./screens/HostedStart";
 import { Review } from "./screens/Review";
 import { useHosted } from "./lib/useHosted";
 import type { Me } from "./api";
-import { useRoute } from "./lib/useHashRoute";
+import { navigate, useRoute } from "./lib/useHashRoute";
 import { useSeatLanding } from "./lib/useSeatLanding";
 import { strings } from "./strings";
 
@@ -482,7 +483,26 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
         <NavBar
           trail={trail}
           nav={nav}
-
+          // An ended attempt pins this screen to <Score> whatever the route
+          // says, so a live wordmark link would change the hash and nothing
+          // else. Lock it, the way an attempt in progress already does.
+          home={session.state !== "ended"}
+          menuExtra={
+            session.state === "ended" ? (
+              <NavMenuSection label={strings.header.menuExam}>
+                <NavMenuItem
+                  icon="grid"
+                  label={strings.control.newAttempt}
+                  onSelect={() => {
+                    // Clears a stale #/results/<qid> so the reset lands on the
+                    // exam list rather than a solutions URL.
+                    navigate("/exams");
+                    handleNewAttempt();
+                  }}
+                />
+              </NavMenuSection>
+            ) : undefined
+          }
           session={
             hosted
               ? {
