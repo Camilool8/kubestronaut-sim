@@ -149,7 +149,22 @@ cgroup v2 is required. `./sim doctor` prints the version Docker reports.
 **Rootless Docker cannot run this stack.** `k8s-env` is a privileged
 container.
 
-### 4. curl
+### 4. python3
+
+`./sim` reads JSON with it — same requirement as macOS, and for the same
+reason. Most distributions ship it already; if `python3 --version` fails:
+
+```bash
+sudo apt install python3   # Debian/Ubuntu
+sudo dnf install python3   # Fedora/RHEL
+```
+
+> **`python3` is not optional for `./sim`.** Without it every `/api/boot`
+> poll yields an empty state, no phase line prints, and `up` spins until
+> `SIM_BOOT_BUDGET` expires. `.\sim.ps1` on Windows needs none of this —
+> it parses JSON natively.
+
+### 5. curl
 
 > **`curl` is not optional either.** `sim` polls with `curl -fsS
 > --max-time 5 "${UI}/api/boot"`. If the command itself is missing, `up`
@@ -159,7 +174,7 @@ container.
 > preinstalled. `bash` is virtually always present already; if it is
 > not, `./sim` fails immediately and says so.
 
-### 5. Clone and run
+### 6. Clone and run
 
 ```bash
 git clone https://github.com/Camilool8/kubestronaut-sim
