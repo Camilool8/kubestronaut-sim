@@ -101,13 +101,26 @@ case "$cmd" in
         fi
         docker compose down --remove-orphans
         kept=0
+        unreadable=0
         for vol in $(docker volume ls -q --filter "label=com.docker.compose.project=${project}"); do
-          key=$(docker volume inspect -f '{{index .Labels "com.docker.compose.volume"}}' "$vol" 2>/dev/null || true)
+          # Fail closed: if the label can't be read, we do NOT know whether
+          # this is the attempt-history volume, so it must NOT be deleted.
+          # Letting it fall through to `docker volume rm` on a read failure
+          # (the old `key=$(... || true)` did exactly that, since an empty
+          # $key just silently skips the "state" match) is how the state
+          # volume itself gets destroyed by a transient inspect error.
+          if ! key=$(docker volume inspect -f '{{index .Labels "com.docker.compose.volume"}}' "$vol" 2>/dev/null); then
+            echo "  could not read ${vol}'s label (docker volume inspect failed) — leaving it in place"
+            unreadable=$((unreadable + 1))
+            continue
+          fi
           if [ "$key" = "state" ]; then kept=1; continue; fi
           docker volume rm "$vol" >/dev/null || echo "  could not remove ${vol} (still in use?)"
         done
         if [ "$kept" = "1" ]; then
           echo "Purged. Attempt history was kept — remove it too with: ./sim purge --all"
+        elif [ "$unreadable" -gt 0 ]; then
+          echo "Purged. ${unreadable} volume(s) could not be checked and were left in place, just in case — see: docker volume ls"
         else
           echo "Purged. There was no attempt history to keep."
         fi ;;
