@@ -180,10 +180,10 @@ and the three selectable modes. Always 200.
   "hasTips": true,
   "levelMixed": true,
   "questions": [
-    {"id": "q01", "instance": "instance-1", "domain": "Application Environment, Configuration and Security", "weight": 9, "totalPoints": 9, "hintCount": 2, "targetSeconds": 360, "targetDerived": true}
+    {"id": "q01", "instance": "instance-1", "domain": "Application Environment, Configuration and Security", "weight": 9, "totalPoints": 9, "hintCount": 2, "targetSeconds": 300}
   ],
   "domains": [
-    {"name": "Application Environment, Configuration and Security", "weightPct": 25, "questionCount": 6}
+    {"name": "Application Environment, Configuration and Security", "weightPct": 25, "questionCount": 10}
   ],
   "modes": [
     {"id": "training", "durationSeconds": 0, "untimed": true, "helpAllowed": true, "gradesPerTask": true, "recorded": false, "recommended": false},
@@ -238,9 +238,13 @@ never `null`.
 
 `targetDerived` says that figure was **computed**, not authored — the
 question's weight's share of the bank's clock, which is what a bank
-setting no `spec.questions[].targetSeconds` gets.
+setting no `spec.questions[].targetSeconds` gets. It is omitted rather
+than sent as `false`, so it appears only on a derived figure.
 
-- Neither shipped bank sets one, so both are derived today.
+- The two shipped banks differ. `ckad-mock-01` authors one on every
+  question, because `spec.difficultyMix` makes the tier a time band and
+  a band cannot be derived; `kcna-mock` sets none, so all 97 of its
+  figures are derived.
 - The flag exists because the two are different claims: an author's
   judgement of the work, versus arithmetic about weights. A display that
   cannot tell them apart states the second with the first's confidence.
@@ -1084,6 +1088,11 @@ exactly what it is asked.
 Just the `summary` object above, for a caller that wants the four
 numbers without every record. Always 200 (or 503).
 
+**Nothing in this repository calls it** — not `sim`, not `sim.ps1`, not
+the UI, not `tests/`. The app reads the same rollup off
+`GET /api/history`, which it needs anyway. This route exists for a
+script of your own.
+
 ### GET /api/history/export
 
 The record as a downloadable document, with
@@ -1202,8 +1211,14 @@ service that owns that answer is the one that did not reply
 
 ### /desktop and /desktop/
 
-Reverse proxy to the noVNC desktop container, same-origin so the exam
-UI can iframe it.
+Reverse proxy to the noVNC desktop container. There is no iframe: the UI
+mounts noVNC's `RFB` on a plain `div` and points it at
+`ws(s)://<this host>/desktop/websockify`
+(`ui/src/components/DesktopViewport.tsx`). Proxying it here is what makes
+that URL same-origin — one host, one port, one scheme derived from the
+page's own — so the WebSocket needs no CORS, no second published port
+and no separate TLS certificate, and it works unchanged behind whatever
+fronts `:8080`.
 
 | Code | When |
 |---|---|
@@ -1221,10 +1236,16 @@ mux registers the same paths. See [Conductor](#conductor).
 ### Everything else
 
 Any path that is not `/api/*` or `/desktop*` serves the embedded UI:
-the real file when one exists, otherwise `index.html`, so client-side
-routes such as `/score` load. An unmatched path under `/api/` is a JSON
-404, never `index.html`
+the real file when one exists, otherwise `index.html`. An unmatched path
+under `/api/` is a JSON 404, never `index.html`
 (`facilitator/internal/api/api.go`).
+
+The UI routes on the fragment (`ui/src/lib/useHashRoute.ts`), so its own
+routes never reach here — `#/results/q01` is a plain `GET /`. The
+fallback is for the paths that do arrive and are not built assets: a
+bookmark from an older build, a hand-typed `/score`, a link someone
+shortened. Each gets the app rather than a 404, and the app opens at its
+default screen because the fragment is empty.
 
 ## Conductor
 
@@ -1533,7 +1554,7 @@ about to be destroyed.
 | `GET /api/history/export` | The interchange document (`{"version":1,"attempts":[...]}`, oldest first). Importable by a local `./sim`. |
 | `DELETE /api/history` | Erases the user's directory: every attempt and every results blob. |
 | `POST /api/history/import` | 501, with the reason. |
-| `GET /api/history/summary` | 501 — the CLI's route, and answering it wrongly would be worse than not answering. |
+| `GET /api/history/summary` | 501, with the reason. `GET /api/history` already returns every attempt with the rollup beside it, so a second projection of the same data would only be another thing to keep in step. |
 
 ### POST /hub/ingest/history
 

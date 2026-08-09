@@ -9,6 +9,11 @@ TOKENS_SRC="$repo/ui/src/styles/tokens.css"
 FAVICON_SRC="$repo/ui/public/favicon.svg"
 FONT_SRC="$repo/ui/node_modules/@fontsource"
 
+mode=build
+if [ "${1:-}" = "--check" ]; then
+  mode=check
+fi
+
 FONT_FILES="ibm-plex-sans/files/ibm-plex-sans-latin-400-normal.woff2
 ibm-plex-sans/files/ibm-plex-sans-latin-600-normal.woff2
 ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2
@@ -37,13 +42,16 @@ generate() {
 
   if [ -d "$FONT_SRC" ]; then
     for f in $FONT_FILES; do
+      [ -f "$FONT_SRC/$f" ] || { echo "build.sh: missing $FONT_SRC/$f" >&2; exit 1; }
       cp "$FONT_SRC/$f" "$out/fonts/$(basename "$f")"
     done
-  else
+  elif [ "$mode" != check ]; then
     echo "build.sh: $FONT_SRC not found - skipping fonts." >&2
     echo "          Run 'npm ci' in ui/ to vendor IBM Plex; until then the" >&2
     echo "          page renders in the token stacks' system fallbacks." >&2
   fi
+  # Under --check a missing $FONT_SRC is a failure, not a skip, and the
+  # --check block below reports it alongside the other findings.
 }
 
 check_figures() {
@@ -85,11 +93,60 @@ else:
         if str(pool) not in block:
             fail.append(f"{name} has {pool} questions, absent from the stat note")
 
+# A bank's draw is published in exactly one place: its exam card's
+# "Drawn / pool" stat, `<dd>17 <span class="exam-stat-of">/ 44</span></dd>`,
+# with the pool repeated in the card's prose as "44-task pool". Searching the
+# whole document with re.S instead paired a `17` inside the Tux logo's path
+# data with a `44` 10,550 characters later while the visible card said 26. So
+# the search is scoped to the card that carries the stat, and the match has to
+# be short enough to be that one stat rather than a span of unrelated markup.
+SPAN_LIMIT = 40  # a real "17 <span class="exam-stat-of">/ 44" match is 34
+
+# Split on the card opener: a card holds nested <li> and <ul>, so it cannot be
+# matched by a non-greedy close. Each slice ends at the first </ul> after it,
+# which is its own domain list, or at the grid's for a card without one.
+cards = [c.split("</ul>")[0] for c in page.split('<li class="exam-card')[1:]]
+stats = []
+for card in cards:
+    for dd in re.findall(r"<dd\b[^>]*>.*?</dd>", card, re.S):
+        if 'class="exam-stat-of"' in dd:
+            stats.append((card, dd))
+
+if not cards:
+    fail.append('no <li class="exam-card"> on the page -- the parse is wrong')
+elif not stats:
+    fail.append('no exam card carries a "exam-stat-of" stat -- the parse is wrong')
+
 for name, pool, drawn in banks:
     if drawn is None:
         continue
-    if not re.search(rf"\b{drawn}\b.*?\b{pool}\b", page, re.S):
-        fail.append(f"{name} draws {drawn} of {pool}, not advertised as such")
+    if not any(
+        len(m.group(0)) <= SPAN_LIMIT
+        for m in (re.search(rf"\b{drawn}\b.*?\b{pool}\b", dd, re.S) for _, dd in stats)
+        if m is not None
+    ):
+        shown = "; ".join(
+            " ".join(re.findall(r"\d+", re.sub(r"<[^>]*>", " ", dd))) or "no figures"
+            for _, dd in stats
+        )
+        fail.append(
+            f"{name} draws {drawn} of {pool}, advertised by no exam card's "
+            f'"Drawn / pool" stat (the page shows: {shown or "nothing"})'
+        )
+
+# The card's prose repeats the pool. It is the same figure, so it goes stale
+# the same way -- and it is the sentence a reader believes.
+for card, dd in stats:
+    of = re.search(r'<span class="exam-stat-of">\s*/\s*(\d+)', dd)
+    if of is None:
+        fail.append("an exam-stat-of span carries no pool figure")
+        continue
+    for said in re.findall(r"(\d+)[-\s](?:task|question)s? pool", card):
+        if said != of.group(1):
+            fail.append(
+                f"an exam card's stat says a pool of {of.group(1)} while its "
+                f"description says {said}"
+            )
 
 for line in fail:
     print(f"build.sh: {line}", file=sys.stderr)
@@ -338,6 +395,13 @@ if [ "${1:-}" = "--check" ]; then
         status=1
       fi
     done
+  else
+    # Skipping here is how the mirror went unchecked: the CI job that runs
+    # --check has no ui/node_modules, so all four woff2 passed untested.
+    echo "build.sh: $FONT_SRC not found - the four site/fonts/*.woff2 cannot be" >&2
+    echo "          compared against their sources, so --check would prove less" >&2
+    echo "          than it claims. Run 'npm ci' in ui/ before checking." >&2
+    status=1
   fi
 
   [ "$status" -eq 0 ] && echo "build.sh: site/ is in sync with its sources."

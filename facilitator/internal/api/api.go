@@ -98,7 +98,35 @@ func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desk
 
 	mux.HandleFunc("/", s.handleSPA)
 
-	return mux
+	return crossOriginGate(mux)
+}
+
+// crossOriginGate refuses state-changing requests that a page on another
+// origin made. It wraps the whole mux rather than individual handlers, so the
+// /api/control/ proxy is covered by the same check as everything routed here,
+// and a route added later cannot forget it.
+//
+// The gate is needed because nothing else stops it. No handler requires a JSON
+// content type, so a text/plain POST is a CORS simple request that needs no
+// preflight, and POST /api/session/end reads no body at all — so any tab could
+// end a live attempt and start grading. Binding to 127.0.0.1 is no defence:
+// the request originates in the candidate's own browser.
+//
+// http.CrossOriginProtection allows GET, HEAD and OPTIONS unconditionally, and
+// for every other method allows the request only when Sec-Fetch-Site says
+// same-origin or none, or when neither Sec-Fetch-Site nor Origin is present.
+// That last case is what keeps ./sim, tests/smoke.sh and every other curl
+// working: they send neither header. A page cannot suppress either header, so
+// it cannot reach POST /api/session/end or POST /api/control/reset. Rejected
+// requests get 403.
+//
+// No trusted origins and no bypass patterns are configured. Hosted mode puts
+// the hub in front, and the hub rewrites Host to the session Pod's address, so
+// the Origin-against-Host fallback could not match there — but the browser's
+// Sec-Fetch-Site: same-origin is forwarded verbatim through the hub's reverse
+// proxy and settles the request before that fallback is reached.
+func crossOriginGate(h http.Handler) http.Handler {
+	return http.NewCrossOriginProtection().Handler(h)
 }
 
 func handleHealthz(w http.ResponseWriter, r *http.Request) {

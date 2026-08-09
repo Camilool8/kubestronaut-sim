@@ -18,17 +18,39 @@ Anyone who can reach port `8080` can:
 - Open the exam desktop — a real shell with cluster-admin.
 - Read, export or erase your attempt history.
 
-The only control is which interface it listens on.
+Two controls stand between that and a stranger, and neither is
+authentication:
 
-```bash
-SIM_BIND=127.0.0.1 ./sim up     # loopback only
-```
+- **Which interface it listens on.** This is the whole defence against
+  someone else on the network.
 
-```powershell
-.\sim.ps1 up -Bind 127.0.0.1    # loopback only
-```
+  ```bash
+  SIM_BIND=127.0.0.1 ./sim up     # loopback only
+  ```
 
-Use that on any network you do not control.
+  ```powershell
+  .\sim.ps1 up -Bind 127.0.0.1    # loopback only
+  ```
+
+  Use that on any network you do not control.
+
+- **An origin check on every state-changing route.** The facilitator
+  refuses a state-changing request that carries a cross-site `Origin` or
+  `Sec-Fetch-Site`. The check wraps the whole mux, so the
+  `/api/control/*` proxy to the conductor is behind it too. A request
+  sending neither header is allowed — that is `curl`, `./sim` and
+  `tests/smoke.sh`, none of which a browser can impersonate.
+
+The second exists because the first does not address the attacker who
+matters here. A page in another tab can send a `POST` to `:8080` from
+the candidate's own browser: the request originates on the machine
+running the stack, so `SIM_BIND=127.0.0.1` does not touch it. Without
+the origin check, any site the candidate visits could end a live attempt
+or trigger a reset. The response is opaque to the caller either way, so
+the risk was always destruction, never disclosure.
+
+Neither control identifies anybody. Anyone who can genuinely reach
+`:8080` still can do everything in the list above.
 
 ## Scope
 
@@ -65,6 +87,67 @@ the cluster's ingress on `8081`/`8443`, and NodePorts `30080-30082`.
 The instances hold `SYS_ADMIN`, `SYS_CHROOT`, `MKNOD`, `SETFCAP` and
 `SYS_RESOURCE`. Read that set as *meaningfully less than root on the
 host, but not a strong boundary*.
+
+## ingress-nginx is retired upstream
+
+The cluster's ingress controller is pinned to `controller-v1.15.1`
+(`INGRESS_NGINX_VERSION` in
+[images/k8s-env/Dockerfile](images/k8s-env/Dockerfile)). That is the last
+release the project will ever have. Retirement was announced 2025-11-11,
+the Steering Committee and the Security Response Committee restated it
+2026-01-29, the final releases shipped 2026-03-19 and the repository was
+archived read-only 2026-03-24. There will be no more bugfixes and **no
+more security patches**. InGate, the intended successor, is archived too
+— `kubernetes-sigs/ingate` is now `kubernetes-retired/ingate`, marked
+`[EOL]`.
+
+We are not migrating, and the reason is what this cluster is:
+
+- It is a throwaway kind cluster inside the privileged `k8s-env`
+  container, rebuilt from scratch on every reset. It holds nothing worth
+  taking.
+- No untrusted traffic reaches it. Its clients are the candidate's own
+  shells, their own desktop browser, and their own host on `:8081` and
+  `:8443` — and under a loopback `SIM_BIND`, not even that.
+- The CKAD competency is *"use Ingress rules to expose applications"*.
+  The Ingress **API** is not deprecated and is fully supported. One
+  controller implementation retired; nothing a candidate learns here
+  changed.
+- `q08` and `q37` are graded on routing behaviour, so swapping the
+  controller risks two working questions and buys a candidate nothing.
+
+**What would force a migration.** Either of these, and only these:
+
+- A real CVE against `controller-v1.15.1`. There will be no patched
+  release to move to, so the fix is a different controller.
+- The published controller images becoming unavailable. The prebaked
+  tarballs delay that for an existing image; they do nothing for a
+  rebuild, and nothing at all under `PRELOAD=none`.
+
+**The migration, when one of those fires.** Target [Gateway
+API](https://gateway-api.sigs.k8s.io/), which is the project's own
+recommendation; a maintained Ingress controller is the stopgap if the
+questions have to keep grading `networking.k8s.io/v1` Ingress objects.
+Three things have to hold:
+
+1. `banks/ckad-mock-01/q08` and `q37` must grade identically. Both check
+   what the controller *routes*, not what the manifest says, so their
+   `validate.d` scripts are the acceptance test for the swap — and both
+   address the controller by name, `q08` through
+   `ingress-nginx-controller.ingress-nginx.svc` and `q37` through that
+   Service's cluster IP. A rename breaks the check before the answer.
+   `q37` terminates TLS, which is where controllers differ most.
+2. `images/k8s-env/bootstrap.sh` installs the controller and waits on
+   `deployment/ingress-nginx-controller` by name. Both change together.
+3. The prebake list is derived, not written down: the `preload` stage in
+   [images/k8s-env/Dockerfile](images/k8s-env/Dockerfile) reads every
+   `image:` out of `/opt/sim/ingress-nginx.yaml` alongside
+   [images/k8s-env/preload.txt](images/k8s-env/preload.txt). Replacing
+   the manifest replaces the tarballs, so `PRELOAD=full` must be rebuilt
+   and an offline reset re-checked.
+
+The pinned version does not move until then. Bumping it is not an option
+— there is nothing to bump to.
 
 ## The conductor is the one real boundary
 

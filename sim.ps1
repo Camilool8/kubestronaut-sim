@@ -270,7 +270,13 @@ function Invoke-Up([string]$Bank) {
 }
 
 function Invoke-Purge([string]$Mode) {
-  if ($Mode -eq '--all') {
+  # -ceq, not -eq: PowerShell's -eq on strings is case-INSENSITIVE, so
+  # `--ALL`/`--All`/`--aLL` all reached `docker compose down -v` and deleted
+  # every volume including `state` (every attempt ever graded, no backup, no
+  # undo). sim:166 dispatches this through a shell `case` arm `--all)`, which
+  # is byte-exact, so `./sim purge --ALL` falls through to `*)` and refuses.
+  # Only the exact lowercase flag may be destructive, on both launchers.
+  if ($Mode -ceq '--all') {
     Write-Host 'Removing EVERY volume, including attempt history: every attempt graded on'
     Write-Host 'this machine is deleted, there is no backup, and there is no undo.'
     Write-Host '(Export it first from the app if you want to keep it.)'
@@ -322,6 +328,13 @@ function Invoke-Purge([string]$Mode) {
     }
     $labels = ($labelsRaw -join '') | ConvertFrom-Json
     $key = Get-Field $labels 'com.docker.compose.volume'
+    # Deliberately -eq and NOT -ceq, unlike the user-facing `--all` and
+    # $COMMANDS tests: this is a docker label, not something anybody typed,
+    # and the two operators fail in opposite directions here. A hypothetical
+    # 'State' misses a case-sensitive test, leaves $kept false, and the
+    # attempt-history volume is DELETED; it matches the case-insensitive one
+    # and the volume is kept. Same fail-closed rule as the label-read guard
+    # above -- when in doubt, keep the volume.
     if ($key -eq 'state') { $kept = $true; continue }
     # An in-use volume ALWAYS makes "docker volume rm" write to stderr --
     # exactly the case Invoke-DockerSafe exists to survive on 5.1, and
@@ -485,7 +498,12 @@ function Invoke-Doctor {
   }
 }
 
-if ($COMMANDS -notcontains $Command) {
+# -cnotcontains, not -notcontains: -contains/-notcontains compare
+# case-INSENSITIVELY, so `.\sim.ps1 DOCTOR` (or PURGE, or UP) used to run
+# where `./sim DOCTOR` prints usage and exits 1 -- sim dispatches on a shell
+# `case` whose arms are byte-exact. The command names are the nine lowercase
+# strings in $COMMANDS and nothing else, on both launchers.
+if ($COMMANDS -cnotcontains $Command) {
   Write-Host $USAGE
   exit 1
 }
@@ -498,7 +516,15 @@ if ($COMMANDS -notcontains $Command) {
 # out of `ssh` (exit 130) would look like a launcher crash instead of an
 # interrupted session. up and purge keep throwing: they have follow-on logic
 # (the boot-poll loop, volume cleanup) that must not run after a failure.
-switch ($Command) {
+#
+# -casesensitive: a bare `switch` matches its arms case-INSENSITIVELY. The
+# guard above already rejects anything that is not one of the nine exact
+# lowercase names, so nothing reaches here in the wrong case today -- this
+# keeps the two guards independent, so a future edit to either one cannot
+# quietly re-open dispatch on `PURGE`/`DOWN`/`RESET` on its own. Every arm
+# below is a lowercase literal drawn from $COMMANDS, so case-sensitive
+# matching can never fall through to no arm at all.
+switch -casesensitive ($Command) {
   'up'     { Invoke-Up $Argument }
   'down'   { & docker compose down --remove-orphans; exit $LASTEXITCODE }
   'purge'  { Invoke-Purge $Argument }
