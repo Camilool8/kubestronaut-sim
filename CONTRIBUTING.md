@@ -2,8 +2,11 @@
 
 ## Setup
 
-**You need:** Docker Desktop (or docker + compose v2), python3, ~9GB of
-free RAM. For the code itself: Go 1.24 and Node 22 — or Docker alone.
+**You need:** Docker Desktop (or docker + compose v2), python3 — not
+needed on Windows, where `sim.ps1` parses JSON natively — and ~9GB of
+free RAM. For the code itself: Go 1.24 and Node 22 — or Docker alone. On
+Windows, run `sim.ps1` instead of `sim` — see
+[docs/install.md](docs/install.md) for the PowerShell steps.
 
 ```bash
 git clone git@github.com:Camilool8/kubestronaut-sim.git
