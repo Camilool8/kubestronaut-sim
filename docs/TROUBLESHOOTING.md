@@ -12,14 +12,15 @@ docker compose logs k8s-env     # the cluster host, where boots fail
 
 ## Before a boot
 
-Every row here is something `./sim doctor` reports. Run it before a
-first boot on a new machine.
+Most rows here are something `./sim doctor` or `.\sim.ps1 doctor` reports;
+a few are errors you would hit at launch, before doctor ever runs. Run
+doctor before a first boot on a new machine.
 
 | Symptom | Cause | Fix |
 |---|---|---|
 | `docker : NOT REACHABLE` | Daemon not running, or your user cannot reach its socket | Start Docker Desktop, or add yourself to the `docker` group |
 | `compose : MISSING` | Compose v2 absent. The v1 `docker-compose` binary is not a substitute | Install the Compose v2 plugin |
-| `python3 : MISSING` | `./sim` reads JSON with `python3` | Install `python3`. Without it, `up` prints no phases and spins until the boot budget expires |
+| `python3 : MISSING` | `./sim` reads JSON with `python3`. Bash launcher only — `.\sim.ps1 doctor` has no such check, since it parses JSON natively | Install `python3`. Without it, `up` prints no phases and spins until the boot budget expires |
 | `RAM to docker : NGB << LOW` | Under 8GB reaches Docker. The desktop plus a two-node cluster wants ~9GB | Raise the memory limit in Docker Desktop → Resources |
 | `disk for images : NGB << LOW` | Under 25GB free. The images alone are ~10GB | Free space, or `./sim purge` to drop an old install's volumes |
 | `warm volumes : none` | Not a fault — this is a cold first boot | Expect several minutes. Later boots resume |
