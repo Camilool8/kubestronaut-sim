@@ -154,19 +154,21 @@ describe("McqExam answering", () => {
     expect(screen.getByRole("radio", { name: /kube-proxy/ })).toBeChecked();
   });
 
-  test("re-clicking the selected option leaves it selected — a radio cannot be cleared", async () => {
-    const log = stubFetch({ q01: [1] });
+  test("single-answer options are radios and multi-select options are checkboxes", async () => {
+    stubFetch();
     const user = userEvent.setup();
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
-    const option = await screen.findByRole("radio", { name: /etcd/ });
-    await waitFor(() => expect(option).toBeChecked());
-    await user.click(option);
+    // q01 declares multi: false — a radio, which is what makes an answered
+    // question unclearable: a second click cannot transition `checked`, so no
+    // change event fires and the empty selection is unreachable by construction.
+    expect(await screen.findByRole("radio", { name: /etcd/ })).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /etcd/ })).toBeNull();
 
-    expect(option).toBeChecked();
-    for (const put of log.filter((e) => e.method === "PUT" && e.url.endsWith("/answer"))) {
-      expect(put.body).toEqual({ selected: [1] });
-    }
+    // q02 declares multi: true — still a checkbox, still accumulating.
+    await user.click(screen.getByRole("button", { name: /next question/i }));
+    expect(await screen.findByRole("checkbox", { name: /CRI/ })).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: /CRI/ })).toBeNull();
   });
 
   test("multi-select accumulates selections", async () => {
