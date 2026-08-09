@@ -1,3 +1,7 @@
+# This library is sourced, never executed, so it rightly has no shebang. Tell
+# ShellCheck the dialect it would otherwise have read from one.
+# shellcheck shell=bash
+
 milli() {
   case "$1" in
     *m) printf '%s' "${1%m}" ;;

@@ -2,7 +2,7 @@
 
 set -eu
 
-here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 repo=$(dirname "$here")
 
 TOKENS_SRC="$repo/ui/src/styles/tokens.css"

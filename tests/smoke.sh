@@ -531,7 +531,7 @@ case ",${listed}," in
 esac
 
 ./sim grade | tee /tmp/grade-smoke0.txt
-read -r _ se0 st0 _ < <(grep '^RESULT ' /tmp/grade-smoke0.txt)
+read -r _ se0 _ _ < <(grep '^RESULT ' /tmp/grade-smoke0.txt)
 [ "$se0" = "0" ] || fail "fresh smoke env should score 0, got ${se0}"
 
 docker compose exec instance-1 su - candidate -c 'bash /tests/solutions/smoke-01/q01.sh'

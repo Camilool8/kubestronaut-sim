@@ -38,7 +38,7 @@ Run these. They need no Docker and take seconds:
 ```bash
 tests/bank-weights.sh && tests/check-lint.sh && tests/check-lib.sh \
   && tests/check-evidence.sh && tests/next-version.sh \
-  && tests/bank-hints.sh && tests/bank-mcq.sh
+  && tests/bank-hints.sh && tests/bank-mcq.sh && tests/check-shell.sh
 for m in conductor facilitator proxy hub images/desktop/opener; do (cd $m && go test ./... && go vet ./...); done
 (cd ui && npm ci && npx tsc --noEmit && npm run lint && npm test)
 ```
@@ -65,12 +65,15 @@ when the two drift.
 | `bank-mcq.sh` | Six invariants over every `examType: mcq` bank, including a non-degenerate answer key |
 | `site/build.sh --check` | The generated mirrors are current, the page's figures match `banks/*/exam.yaml`, and its cert marks match `CertMark.tsx` |
 | `check-sim-parity.sh` | `sim` and `sim.ps1` offer the same subcommands and the same usage string |
+| `check-shell.sh` | Every shell script git knows about — not a curated glob, so nothing falls outside it — parses under `bash -n` and passes ShellCheck at **severity `warning`**. `info` and `style` add 63 and 71 findings that are not defects, so the floor sits above them. Without ShellCheck installed the lint pass says loudly that it skipped; CI sets `SHELLCHECK_REQUIRED=1`, which makes a missing binary a failure instead |
 
 ### What CI cannot run
 
-CI runs everything above, plus the eight image builds, a shell syntax
-pass, and a Windows job that runs `sim.ps1` under both Windows PowerShell
-5.1 and PowerShell 7. It does **not** run `tests/smoke.sh`.
+CI runs everything above, plus the eight image builds and a Windows job
+that runs `sim.ps1` under both Windows PowerShell 5.1 and PowerShell 7.
+Its ShellCheck is pinned by version and SHA-256 rather than taken from
+the runner image, so a runner bump cannot turn the job red on a pull
+request that changed no shell. It does **not** run `tests/smoke.sh`.
 
 That means the two gates keeping the banks honest are never enforced by
 machine:
