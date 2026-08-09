@@ -492,7 +492,7 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
           home={session.state !== "ended" || reviewId !== null}
           menuExtra={
             session.state === "ended" ? (
-              <NavMenuSection label={strings.header.menuExam}>
+              <NavMenuSection label={strings.header.menuNextAttempt}>
                 <NavMenuItem
                   icon="grid"
                   label={strings.control.newAttempt}

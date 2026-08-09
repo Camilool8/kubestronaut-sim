@@ -29,6 +29,7 @@ export const strings = {
     menuThisApp: "This app",
     menuAccount: "Account",
     menuExam: "This attempt",
+    menuNextAttempt: "Next attempt",
 
     trailLabel: "Where you are",
 
