@@ -1,12 +1,23 @@
 #!/usr/bin/env bash
-# Both launchers must offer the same commands, and no script may be CRLF.
+# Both launchers must offer the same commands.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 fail=0
 
+# The trailing `|| true` on each of these pipelines matters: under `set -o
+# pipefail`, a `grep -oE` that matches nothing exits 1, which would abort the
+# whole script right here — before the `[ -z ... ]` guard below ever runs —
+# and leave whoever tripped it with a bare non-zero exit and no reason why.
+# `sed -n '...p'` does not have this problem (it exits 0 on no match), which
+# is why usage_body() below needs no such guard.
 bash_cmds=$(sed -n '/^case "\$cmd" in/,/^esac/p' sim \
-  | grep -oE '^  [a-z]+\)' | tr -d ' )' | sort -u)
+  | grep -oE '^  [a-z]+\)' | tr -d ' )' | sort -u || true)
+
+if [ -z "$bash_cmds" ]; then
+  echo "check-sim-parity: sim has no 'case \"\$cmd\" in ... esac' block to read commands from" >&2
+  exit 1
+fi
 
 if [ ! -f sim.ps1 ]; then
   echo "check-sim-parity: sim.ps1 does not exist; the Windows launcher is missing" >&2
@@ -14,7 +25,7 @@ if [ ! -f sim.ps1 ]; then
 fi
 
 ps_cmds=$(grep -oE "^\\\$COMMANDS = @\(.*\)$" sim.ps1 \
-  | grep -oE "'[a-z]+'" | tr -d "'" | sort -u)
+  | grep -oE "'[a-z]+'" | tr -d "'" | sort -u || true)
 
 if [ -z "$ps_cmds" ]; then
   echo "check-sim-parity: sim.ps1 has no '\$COMMANDS = @(...)' line to read" >&2
