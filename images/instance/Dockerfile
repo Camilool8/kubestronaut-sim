@@ -30,6 +30,6 @@ RUN useradd -m -s /bin/bash candidate && echo 'candidate:candidate' | chpasswd \
     && mkdir -p /opt/course /run/sshd /var/lib/containers && chown candidate:candidate /opt/course \
     && printf 'alias k=kubectl\nsource <(kubectl completion bash)\ncomplete -o default -F __start_kubectl k\n' >> /home/candidate/.bashrc
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 EXPOSE 22
 ENTRYPOINT ["/entrypoint.sh"]

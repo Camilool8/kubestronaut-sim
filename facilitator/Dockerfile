@@ -17,6 +17,6 @@ FROM alpine:3.21
 RUN apk add --no-cache yq-go openssh-client
 COPY --from=build /facilitator /facilitator
 COPY facilitator/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 EXPOSE 8080
 ENTRYPOINT ["/entrypoint.sh"]

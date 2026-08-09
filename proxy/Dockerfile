@@ -9,6 +9,6 @@ FROM alpine:3.21
 RUN apk add --no-cache yq-go
 COPY --from=build /docs-proxy /docs-proxy
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 EXPOSE 3128
 ENTRYPOINT ["/entrypoint.sh"]
