@@ -272,4 +272,15 @@ describe("Exam topbar and focus reporting", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(toastStore.list()).toHaveLength(0);
   });
+
+  test("Submit exam is in the bar, not behind the menu", async () => {
+    render(<Exam session={runningSession} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+
+    const submit = await screen.findByRole("button", { name: "Submit exam" });
+    expect(submit).toBeInTheDocument();
+
+    // The menu panel only mounts when open (NavMenu.tsx:42), so if the
+    // button were still a menu item it could not be found while closed.
+    expect(screen.queryByRole("group", { name: "Menu" })).not.toBeInTheDocument();
+  });
 });

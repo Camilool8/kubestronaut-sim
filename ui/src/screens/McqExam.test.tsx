@@ -241,6 +241,16 @@ describe("McqExam answering", () => {
     expect(await screen.findByRole("dialog")).toHaveAccessibleName(/training/i);
     expect(screen.queryByText(/cannot be undone/i)).not.toBeInTheDocument();
   });
+
+  test("Submit exam is in the bar on every question, not just the last", async () => {
+    stubFetch();
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+
+    // q01 is the first of two, so the footer still shows Next here.
+    await screen.findByText("Which component persists cluster state?");
+    expect(await screen.findByRole("button", { name: "Submit exam" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /next question/i })).toBeInTheDocument();
+  });
 });
 
 describe("McqExam attempt state", () => {
@@ -385,7 +395,9 @@ describe("McqExam footer navigation", () => {
   test("the last question's footer shows Submit exam instead of Next, and it opens the confirm dialog", async () => {
     stubFetch();
     const user = userEvent.setup();
-    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+    const { container } = render(
+      <McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />,
+    );
 
     await screen.findByText("Which component persists cluster state?");
     expect(screen.getByRole("button", { name: /next question/i })).toBeInTheDocument();
@@ -394,7 +406,12 @@ describe("McqExam footer navigation", () => {
     await screen.findByText("Which are container interface standards? Choose all that apply.");
 
     expect(screen.queryByRole("button", { name: /next question/i })).not.toBeInTheDocument();
-    const submitButtons = screen.getAllByRole("button", { name: /submit exam/i });
+
+    // The bar's Submit is present on every question (see the "on every
+    // question" test above), so scope to the footer to find the one that
+    // only appears here, at the end of the paper.
+    const footer = within(container.querySelector(".mcq-footer")!);
+    const submitButtons = footer.getAllByRole("button", { name: /submit exam/i });
     expect(submitButtons).toHaveLength(1);
 
     await user.click(submitButtons[0]);
@@ -429,10 +446,12 @@ describe("McqExam on a phone", () => {
     expect(screen.getByRole("timer")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: strings.header.menuLabel })).toBeInTheDocument();
 
-    expect(screen.queryByRole("button", { name: "Submit exam" })).toBeNull();
+    // Submit is in the bar at every width — that is the point of it being
+    // there rather than one layer down in the menu.
+    expect(screen.getByRole("button", { name: "Submit exam" })).toBeInTheDocument();
   });
 
-  test("the menu holds the attempt's progress and its one irreversible action", async () => {
+  test("the menu holds the attempt's progress, and no longer its irreversible action", async () => {
     stubFetch({ q01: [1] });
     const user = userEvent.setup();
     renderCompact();
@@ -441,22 +460,20 @@ describe("McqExam on a phone", () => {
     await openMenu(user);
     const panel = screen.getByRole("group", { name: strings.header.menuLabel });
     expect(within(panel).getByText(/Answered 1/)).toBeInTheDocument();
-    expect(within(panel).getByRole("button", { name: "Submit exam" })).toBeInTheDocument();
-
     expect(within(panel).getByRole("button", { name: /Theme/ })).toBeInTheDocument();
+
+    expect(within(panel).queryByRole("button", { name: "Submit exam" })).toBeNull();
   });
 
-  test("submitting from the menu opens the confirmation", async () => {
+  test("submitting from the bar opens the confirmation", async () => {
     stubFetch();
     const user = userEvent.setup();
     renderCompact();
     await screen.findByText(/persists cluster state/);
 
-    await openMenu(user);
     await user.click(screen.getByRole("button", { name: "Submit exam" }));
 
     expect(await screen.findByRole("dialog", { name: /submit/i })).toBeInTheDocument();
-    expect(screen.queryByRole("group", { name: strings.header.menuLabel })).toBeNull();
   });
 
   test("the action bar drops its labels but keeps every accessible name", async () => {
