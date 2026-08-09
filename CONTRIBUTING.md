@@ -44,9 +44,9 @@ for m in conductor facilitator proxy hub images/desktop/opener; do (cd $m && go 
 
 If you touched `site/`, also run `bash site/build.sh --check`.
 
-If you touched `sim`, also run `bash tests/check-sim-parity.sh` — the
-Windows launcher `sim.ps1` must offer the same nine subcommands, and CI
-fails when the two drift.
+If you touched `sim` or `sim.ps1`, also run `bash tests/check-sim-parity.sh`
+— the Windows launcher must offer the same nine subcommands, and CI fails
+when the two drift.
 
 ### What each gate proves
 
@@ -62,8 +62,9 @@ fails when the two drift.
 
 ### What CI cannot run
 
-CI runs everything above, plus the eight image builds and a shell syntax
-pass. It does **not** run `tests/smoke.sh`.
+CI runs everything above, plus the eight image builds, a shell syntax
+pass, and a Windows job that runs `sim.ps1` under both Windows PowerShell
+5.1 and PowerShell 7. It does **not** run `tests/smoke.sh`.
 
 That means the two gates keeping the banks honest are never enforced by
 machine:
