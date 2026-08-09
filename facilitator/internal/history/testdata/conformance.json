@@ -1,0 +1,176 @@
+{
+  "note": "One fixture kept in two places: facilitator/internal/history/testdata/ and hub/internal/store/testdata/. The two Go modules cannot import one another, so these bytes are the whole of what they share. Each module summarises `attempts` with its own code and must land on `expected`, and each must agree with `modes` about which modes count. Edit one copy and the mirror test in both modules fails.",
+  "modes": [
+    {"mode": "training", "recorded": false},
+    {"mode": "speed", "recorded": true},
+    {"mode": "exam", "recorded": true}
+  ],
+  "attempts": [
+    {
+      "id": "conf-01",
+      "bank": "cka-mock-01",
+      "certification": "CKA",
+      "examType": "hands-on",
+      "mode": "exam",
+      "startedAt": "2026-01-02T09:00:00Z",
+      "gradedAt": "2026-01-02T10:00:00Z",
+      "questionCount": 17,
+      "earned": 78,
+      "total": 100,
+      "percent": 78,
+      "passingScore": 66,
+      "passed": true,
+      "counted": true,
+      "domains": [
+        {"domain": "Troubleshooting", "earned": 5, "total": 8, "weightPct": 30, "questionCount": 5},
+        {"domain": "Storage", "earned": 0, "total": 0, "weightPct": 10, "questionCount": 0}
+      ]
+    },
+    {
+      "id": "conf-02",
+      "bank": "ckad-mock-01",
+      "certification": "CKAD",
+      "examType": "hands-on",
+      "mode": "speed",
+      "startedAt": "2026-01-03T09:00:00Z",
+      "gradedAt": "2026-01-03T10:00:00Z",
+      "questionCount": 22,
+      "earned": 68,
+      "total": 100,
+      "percent": 68,
+      "passingScore": 66,
+      "passed": true,
+      "counted": true,
+      "domains": [
+        {"domain": "Observability", "earned": 4, "total": 8},
+        {"domain": "Application Design", "earned": 3, "total": 6}
+      ]
+    },
+    {
+      "id": "conf-03",
+      "bank": "kcna-mock",
+      "certification": "KCNA",
+      "examType": "mcq",
+      "mode": "training",
+      "startedAt": "2026-01-04T09:00:00Z",
+      "gradedAt": "2026-01-04T10:00:00Z",
+      "questionCount": 60,
+      "earned": 100,
+      "total": 100,
+      "percent": 100,
+      "passingScore": 75,
+      "passed": true,
+      "counted": true,
+      "domains": [
+        {"domain": "Kubernetes Fundamentals", "earned": 10, "total": 10}
+      ]
+    },
+    {
+      "id": "conf-04",
+      "bank": "kcsa-mock",
+      "certification": "KCSA",
+      "examType": "mcq",
+      "mode": "training",
+      "startedAt": "2026-01-05T09:00:00Z",
+      "gradedAt": "2026-01-05T10:00:00Z",
+      "questionCount": 60,
+      "earned": 95,
+      "total": 100,
+      "percent": 95,
+      "passingScore": 75,
+      "passed": true,
+      "counted": true,
+      "domains": [
+        {"domain": "Kubernetes Threat Model", "earned": 19, "total": 20}
+      ]
+    },
+    {
+      "id": "conf-05",
+      "bank": "cks-mock-01",
+      "certification": "CKS",
+      "examType": "hands-on",
+      "mode": "exam",
+      "domainFilter": ["Cluster Setup"],
+      "startedAt": "2026-01-06T09:00:00Z",
+      "gradedAt": "2026-01-06T10:00:00Z",
+      "questionCount": 4,
+      "earned": 100,
+      "total": 100,
+      "percent": 100,
+      "passingScore": 67,
+      "passed": true,
+      "counted": true,
+      "domains": [
+        {"domain": "Cluster Setup", "earned": 6, "total": 6}
+      ]
+    },
+    {
+      "id": "conf-06",
+      "bank": "cks-mock-01",
+      "certification": "CKS",
+      "examType": "hands-on",
+      "mode": "exam",
+      "startedAt": "2026-01-07T09:00:00Z",
+      "gradedAt": "2026-01-07T10:00:00Z",
+      "questionCount": 16,
+      "earned": 100,
+      "total": 100,
+      "percent": 100,
+      "passingScore": 67,
+      "passed": true,
+      "counted": false,
+      "domains": [
+        {"domain": "Cluster Setup", "earned": 6, "total": 6}
+      ]
+    },
+    {
+      "id": "conf-07",
+      "bank": "ckad-mock-01",
+      "certification": "CKAD",
+      "examType": "hands-on",
+      "mode": "speed",
+      "startedAt": "2026-01-08T09:00:00Z",
+      "gradedAt": "2026-01-08T10:00:00Z",
+      "questionCount": 22,
+      "earned": 41,
+      "total": 100,
+      "percent": 41,
+      "passingScore": 66,
+      "passed": false,
+      "counted": true,
+      "domains": [
+        {"domain": "Application Design", "earned": 3, "total": 6}
+      ]
+    },
+    {
+      "id": "conf-08",
+      "bank": "lfcs-mock",
+      "certification": "LFCS",
+      "examType": "hands-on",
+      "mode": "exam",
+      "startedAt": "2026-01-09T09:00:00Z",
+      "gradedAt": "2026-01-09T10:00:00Z",
+      "questionCount": 12,
+      "earned": 92,
+      "total": 100,
+      "percent": 92,
+      "passingScore": 66,
+      "passed": true,
+      "counted": true,
+      "domains": []
+    }
+  ],
+  "expected": {
+    "attempts": 8,
+    "passedCount": 2,
+    "trackCount": 5,
+    "weakDomains": [
+      {"domain": "Application Design", "earned": 6, "total": 12, "percent": 50, "attempts": 2},
+      {"domain": "Observability", "earned": 4, "total": 8, "percent": 50, "attempts": 1},
+      {"domain": "Troubleshooting", "earned": 5, "total": 8, "percent": 63, "attempts": 1},
+      {"domain": "Kubernetes Threat Model", "earned": 19, "total": 20, "percent": 95, "attempts": 1},
+      {"domain": "Cluster Setup", "earned": 12, "total": 12, "percent": 100, "attempts": 2},
+      {"domain": "Kubernetes Fundamentals", "earned": 10, "total": 10, "percent": 100, "attempts": 1}
+    ]
+  }
+}
