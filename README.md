@@ -43,6 +43,10 @@ Then open <http://localhost:8080> and pick an exam. Everything after
 > ```bash
 > SIM_BIND=127.0.0.1 ./sim up
 > ```
+>
+> ```powershell
+> .\sim.ps1 up -Bind 127.0.0.1
+> ```
 
 Nothing is built until you choose an exam. Picking a certification is
 what creates its cluster, and the page shows each phase as it completes.

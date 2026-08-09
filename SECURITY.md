@@ -24,6 +24,10 @@ The only control is which interface it listens on.
 SIM_BIND=127.0.0.1 ./sim up     # loopback only
 ```
 
+```powershell
+.\sim.ps1 up -Bind 127.0.0.1    # loopback only
+```
+
 Use that on any network you do not control.
 
 ## Scope
