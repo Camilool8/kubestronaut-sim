@@ -105,7 +105,38 @@ function Get-Budget([int]$Param, [string]$EnvName, [int]$Default) {
   return $Default
 }
 
+# Mirrors normalize_line_endings() in sim -- see the long comment there for why
+# a Windows clone keeps CRLF forever and what it breaks. Byte-level CRLF -> LF
+# rather than Get-Content/Set-Content: Set-Content re-encodes on write and
+# would put the CRLFs straight back on Windows, and would add a BOM under 5.1.
+function Repair-LineEndings {
+  $null = & git rev-parse --is-inside-work-tree 2>$null
+  if ($LASTEXITCODE -ne 0) { return 0 }
+
+  $listed = & git ls-files -- 'sim' '*.sh' 'images/k8s-env/preload.txt' 2>$null
+  if ($LASTEXITCODE -ne 0 -or -not $listed) { return 0 }
+
+  $fixed = 0
+  foreach ($rel in $listed) {
+    if (-not (Test-Path -LiteralPath $rel)) { continue }
+    $bytes = [System.IO.File]::ReadAllBytes($rel)
+    if ($bytes -notcontains 13) { continue }
+    $out = New-Object System.Collections.Generic.List[byte]
+    for ($i = 0; $i -lt $bytes.Length; $i++) {
+      if ($bytes[$i] -eq 13 -and $i + 1 -lt $bytes.Length -and $bytes[$i + 1] -eq 10) { continue }
+      $out.Add($bytes[$i])
+    }
+    [System.IO.File]::WriteAllBytes((Resolve-Path -LiteralPath $rel).Path, $out.ToArray())
+    $fixed++
+  }
+  return $fixed
+}
+
 function Invoke-Up([string]$Bank) {
+  $repaired = Repair-LineEndings
+  if ($repaired -gt 0) {
+    Write-Host "Repaired CRLF line endings in $repaired script(s) - they cannot run inside the containers."
+  }
   if ($Bind) { Set-Env 'SIM_BIND' $Bind }
 
   $previousBank = [Environment]::GetEnvironmentVariable('BANK', 'Process')
@@ -294,6 +325,21 @@ function Invoke-Doctor {
   Write-Host ''
   Write-Host ('host              : Windows ({0})' -f $PSVersionTable.PSEdition)
   Write-Host ('powershell        : {0}' -f $PSVersionTable.PSVersion)
+
+  $crlf = 0
+  $null = & git rev-parse --is-inside-work-tree 2>$null
+  if ($LASTEXITCODE -eq 0) {
+    $listed = & git ls-files -- 'sim' '*.sh' 'images/k8s-env/preload.txt' 2>$null
+    foreach ($rel in $listed) {
+      if (-not (Test-Path -LiteralPath $rel)) { continue }
+      if ([System.IO.File]::ReadAllBytes($rel) -contains 13) { $crlf++ }
+    }
+  }
+  if ($crlf -eq 0) {
+    Write-Host 'line endings      : LF   ok'
+  } else {
+    Write-Host ("line endings      : {0} script(s) have CRLF   << they cannot run in the containers; .\sim.ps1 up repairs them" -f $crlf)
+  }
 
   $server = Invoke-DockerSafe version --format '{{.Server.Version}}'
   Write-Host ('docker            : {0}' -f $(if ($LASTEXITCODE -eq 0 -and $server) { $server } else { 'NOT REACHABLE' }))
