@@ -194,7 +194,10 @@ Three gates exist for fidelity with the real exam:
 
 None of them is a security control:
 
-- Every `solution.md` sits unencrypted in `banks/` the whole time.
+- Every `solution.md` sits unencrypted in `banks/` the whole time. That
+  is fine locally, where the only person you can cheat is yourself, and
+  it still holds on a hosted deployment where the person is a stranger —
+  see [Hosted deployments](#hosted-deployments).
 - The pointer gate is measured by the client, because no server can see
   a pointer type. An absent header is deliberately not treated as
   touch-only, so `./sim`, `tests/smoke.sh` and `curl` keep working.
@@ -276,6 +279,23 @@ container with a root shell in it.
 | The documentation allowlist stops being a network boundary | A Pod is one network namespace and a NetworkPolicy selects Pods, not containers. The desktop and the candidate's shells share one egress, and the shells need theirs. The allowlist still governs the browser. |
 | One candidate cannot reach another | Each session is its own Pod, addressed from the verified cookie. History is stored per user, scoped to the owner's directory. |
 | The one credential is `COOKIE_KEY` | It signs login cookies and, under a *derived* key, the per-Pod ticket a session uses to record an attempt. A ticket read out of a Pod spec can never be spent as that candidate's login. |
+| The answer key is inside the Pod, next to the candidate's root shell | `images/banks/Dockerfile` ships the whole bank tree — 145 `solution.md` and 44 `hints.md` — and the `banks` initContainer copies it into an `emptyDir` that both instances mount. So `cat /banks/ckad-mock-01/q03/solution.md` succeeds mid-attempt, while `GET /api/questions/q03/solution` correctly returns `403`. Assume a hosted candidate can read every answer. |
+
+The instances mount `/banks` because that is where the work happens:
+grading runs `validate.d/` from it over SSH, and a question's `setup.sh`
+seeds the environment from its `files/`. The facilitator mounts it for a
+different reason — it serves `solution.md` and `hints.md` to the API. One
+volume serves both needs, so the instances receive the facilitator's half
+too. Filtering it needs two `emptyDir`s and two copies — a restructure of
+the Pod spec for a threat this product does not otherwise defend against,
+and so deliberately not done.
+
+The [solutions gate](#the-session-gates-are-not-security) is therefore a
+fidelity control here, exactly as it is locally: it keeps the answer out
+of the *app* until the attempt ends. It is not a boundary, and a hosted
+deployment should not be sold as one. `./tests` is correctly absent from
+the hosted manifest, which is why the 44 worked solution scripts do not
+ship with it.
 
 The MCQ flavour has none of this: no cluster, no shell, no privilege.
 
