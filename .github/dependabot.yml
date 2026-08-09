@@ -1,17 +1,83 @@
 version: 2
 updates:
+  # ----------------------------------------------------------------- ui (npm)
   - package-ecosystem: npm
     directory: /ui
     schedule:
       interval: monthly
     open-pull-requests-limit: 5
     groups:
+      # vite and vitest are one unit, not two dependencies: vitest declares a
+      # vite range (vitest 3 -> vite ^5 || ^6 || ^7) and a vite major moves the
+      # plugin API with it. Naming them as their own group is what
+      # CONTRIBUTING.md's "do not bump it alone" actually asks for -- both
+      # halves of the pair arrive in one reviewable pull request, and they do
+      # not arrive buried in a bulk eslint/typescript/jsdom bump.
+      vite-toolchain:
+        patterns:
+          - vite
+          - vitest
+          - "@vitejs/*"
       dev-dependencies:
         dependency-type: development
-    ignore:
-      - dependency-name: vitest
-        update-types: [version-update:semver-major]
+    # There is deliberately no `ignore` entry for vitest here any more.
+    #
+    # This block used to carry:
+    #     ignore:
+    #       - dependency-name: vitest
+    #         update-types: [version-update:semver-major]
+    #
+    # `ignore` suppresses Dependabot *security* pull requests as well as
+    # version bumps, so that rule held the repo on vitest 2.1.9 straight
+    # through CVE-2026-47429 (CVSS 9.8), fixed in 3.2.6 with no 2.x backport.
+    # It also blocked vite 5 -> 6 as a side effect, because vitest 2 requires
+    # vite ^5. The pairing constraint now lives in the vite-toolchain group
+    # above, which proposes the pair rather than hiding one half of it.
+    #
+    # Condition for adding an ignore rule back: only when a specific published
+    # version is known-broken for this repo, pinned by `versions:` to that
+    # exact range, and deleted as soon as the range is superseded. A standing
+    # `update-types: [version-update:semver-major]` ignore on any dependency is
+    # precisely the failure this comment exists to prevent -- it cannot tell a
+    # breaking change from a security fix, and silently withholds both.
 
+  # --------------------------------------------------- container base images
+  # Scoped to the directories whose Dockerfiles hold a Go build stage. Those
+  # FROM lines are the only place the Go toolchain version is written down, and
+  # nothing was watching them when Go 1.24 reached end of life. The runtime and
+  # ui-build bases in the same files (alpine, debian, node) ship in, or build,
+  # the released images, so they come along and are worth the same attention.
+  #
+  # Deliberately not watched, to keep the pull request volume honest:
+  #   images/k8s-env       docker:27-dind. The dind major is a pin the cluster
+  #                        bootstrap is written against, and evaluating a bump
+  #                        means booting a full cluster -- a human decision.
+  #   images/instance      debian:13-slim only; the same base is already
+  #                        watched through images/desktop.
+  #   images/banks         alpine:3.21 only; the same base is already watched
+  #                        through proxy and conductor.
+  #   banks/*/*/files/image  exam fixture content. That base image is part of
+  #                        what a candidate is graded against, not part of the
+  #                        product's supply chain.
+  - package-ecosystem: docker
+    directories:
+      - /proxy
+      - /conductor
+      - /facilitator
+      - /hub
+      - /images/desktop
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      base-images:
+        patterns:
+          - "*"
+        # golang:1.26-alpine appears in all five directories. group-by keeps
+        # one toolchain bump to one pull request instead of five.
+        group-by: dependency-name
+
+  # ------------------------------------------------------------ CI workflows
   - package-ecosystem: github-actions
     directory: /
     schedule:
