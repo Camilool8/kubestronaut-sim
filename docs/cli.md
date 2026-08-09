@@ -30,11 +30,11 @@ Obtaining each of these differs by operating system —
 
 | Command | Does | Destroys |
 |---|---|---|
-| `./sim up [bank]` | Brings the stack up and polls `/api/boot` | Nothing |
+| `./sim up [bank]` | Repairs any CRLF in tracked scripts, then brings the stack up and polls `/api/boot` | Nothing |
 | `./sim down` | Stops the stack. Volumes survive | Nothing |
 | `./sim purge` | `down`, then removes eight volumes | Everything except attempt history |
 | `./sim purge --all` | `down -v`. Prints what it will destroy first | All nine volumes, **including every attempt ever graded** |
-| `./sim doctor` | Preflight: host, Docker, Compose, container OS, `python3`, RAM, disk, cgroups, volumes, docker access (Linux), clone location (WSL), exam UI | Nothing |
+| `./sim doctor` | Preflight: host, Docker, Compose, container OS, `python3`, line endings, RAM, disk, cgroups, volumes, docker access (Linux), clone location (WSL), exam UI | Nothing |
 | `./sim reset` | Rebuilds the environment for a fresh attempt | Session, work directories, podman stores, registry, cluster |
 | `./sim ssh [instance]` | Shell on an instance, default `instance-1` | Nothing |
 | `./sim status` | `docker compose ps` | Nothing |
