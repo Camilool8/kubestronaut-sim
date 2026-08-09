@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"math/big"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -18,14 +21,16 @@ type Runner interface {
 
 type sshRunner struct {
 	keyPath string
+
+	controlPath string
 }
 
 func NewSSHRunner(keyPath string) Runner {
-	return &sshRunner{keyPath: keyPath}
+	return &sshRunner{keyPath: keyPath, controlPath: controlPath(controlDir)}
 }
 
 func (s *sshRunner) Run(ctx context.Context, instance, cmd string) (string, bool, error) {
-	out, err := exec.CommandContext(ctx, "ssh", sshArgs(s.keyPath, instance, cmd)...).CombinedOutput()
+	out, err := exec.CommandContext(ctx, "ssh", sshArgs(s.keyPath, s.controlPath, instance, cmd)...).CombinedOutput()
 	if err == nil {
 		return string(out), true, nil
 	}
@@ -36,16 +41,53 @@ func (s *sshRunner) Run(ctx context.Context, instance, cmd string) (string, bool
 	return string(out), false, fmt.Errorf("evaluate: ssh: %w", err)
 }
 
-func sshArgs(keyPath, instance, cmd string) []string {
-	return []string{
+const controlDir = "/tmp/ssh-mux"
+
+// A sitting runs one validator per check, serially, and each was paying a fresh
+// TCP connect, key exchange and pubkey auth. Multiplexing turns that into one
+// connection per instance. The directory has to be there before the first ssh:
+// ControlMaster=auto does not quietly skip a ControlPath it cannot bind, it
+// exits 255, which would score every check zero. So the options are only handed
+// to ssh once the directory exists, and a run that cannot create one grades
+// exactly as it did before.
+func controlPath(dir string) string {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		log.Printf("ssh connection reuse is off (%v); grading will open one connection per check", err)
+		return ""
+	}
+	return filepath.Join(dir, "%C")
+}
+
+func sshArgs(keyPath, controlPath, instance, cmd string) []string {
+	args := []string{
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null",
 		"-o", "LogLevel=ERROR",
 		"-o", "BatchMode=yes",
 		"-o", "ConnectTimeout=10",
-		"-i", keyPath,
-		"root@" + instance,
-		cmd,
+	}
+	args = append(args, controlArgs(controlPath)...)
+	return append(args, "-i", keyPath, "root@"+instance, cmd)
+}
+
+func controlArgs(controlPath string) []string {
+	if controlPath == "" {
+		return nil
+	}
+	return []string{
+		"-o", "ControlMaster=auto",
+
+		// %C is ssh's hash of user, host and port, so instances never share a
+		// socket and the path stays far short of the ~104 bytes an AF_UNIX
+		// address allows.
+		"-o", "ControlPath=" + controlPath,
+
+		// The master outlives the client that opened it, which is the whole
+		// point, and it does so without holding this check's output open:
+		// before daemonising it points its own stdin, stdout and stderr at
+		// /dev/null, so CombinedOutput sees EOF when the check exits rather
+		// than blocking until the master goes away.
+		"-o", "ControlPersist=60s",
 	}
 }
 
