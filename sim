@@ -157,8 +157,10 @@ case "$cmd" in
       *) host="$os" ;;
     esac
     printf 'host              : %s\n' "$host"
-    printf 'docker            : '; docker version --format '{{.Server.Version}}' 2>/dev/null || echo "NOT REACHABLE"
-    printf 'compose           : '; docker compose version --short 2>/dev/null || echo "MISSING"
+    dver=$(docker version --format '{{.Server.Version}}' 2>/dev/null | tail -n1 || true)
+    printf 'docker            : %s\n' "${dver:-NOT REACHABLE}"
+    cver=$(docker compose version --short 2>/dev/null | tail -n1 || true)
+    printf 'compose           : %s\n' "${cver:-MISSING}"
     printf 'container OS      : '
     ostype=$(docker_info_field '{{.OSType}}')
     [ -n "$ostype" ] || ostype=unknown
