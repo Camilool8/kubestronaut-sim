@@ -22,17 +22,22 @@ Two controls stand between that and a stranger, and neither is
 authentication:
 
 - **Which interface it listens on.** This is the whole defence against
-  someone else on the network.
+  someone else on the network, and it defaults to loopback: a plain
+  `./sim up` publishes on `127.0.0.1` only, so nothing off the machine
+  reaches the stack at all.
+
+  Reaching it from another machine is a deliberate opt-in:
 
   ```bash
-  SIM_BIND=127.0.0.1 ./sim up     # loopback only
+  SIM_BIND=0.0.0.0 ./sim up       # reachable on your LAN
   ```
 
   ```powershell
-  .\sim.ps1 up -Bind 127.0.0.1    # loopback only
+  .\sim.ps1 up -Bind 0.0.0.0      # reachable on your LAN
   ```
 
-  Use that on any network you do not control.
+  Do that only on a network you control, and read [SIM_BIND](#sim_bind)
+  first — your host firewall does not cover a published port.
 
 - **An origin check on every state-changing route.** The facilitator
   refuses a state-changing request that carries a cross-site `Origin` or
@@ -44,7 +49,7 @@ authentication:
 The second exists because the first does not address the attacker who
 matters here. A page in another tab can send a `POST` to `:8080` from
 the candidate's own browser: the request originates on the machine
-running the stack, so `SIM_BIND=127.0.0.1` does not touch it. Without
+running the stack, so the loopback default does not touch it. Without
 the origin check, any site the candidate visits could end a live attempt
 or trigger a reset. The response is opaque to the caller either way, so
 the risk was always destruction, never disclosure.
@@ -73,8 +78,20 @@ the cluster's ingress on `8081`/`8443`, and NodePorts `30080-30082`.
 
 | Value | Effect |
 |---|---|
-| `0.0.0.0` (default) | Reachable on your LAN. Lets you build on a desktop and sit the exam from a laptop. |
-| `127.0.0.1` | Loopback only. |
+| `127.0.0.1` (default) | Loopback only. Nothing off the machine can reach it. |
+| `0.0.0.0` | Reachable on your LAN. Lets you build on a desktop and sit the exam from a laptop, or a KCNA attempt from a phone. |
+
+The default lives in exactly one place — `${SIM_BIND:-127.0.0.1}` on
+every published port in [docker-compose.yaml](docker-compose.yaml).
+Neither launcher sets it, so a direct `docker compose up` gets the same
+default as `./sim up`.
+
+**Your host firewall does not cover a published port.** Traffic to one
+is forwarded to the container rather than delivered to the host, so it
+traverses Docker's own `DOCKER-USER` and `DOCKER` chains and never
+reaches the `INPUT` chain that `ufw` and `firewalld` manage. `ufw deny
+8080` does not close a port published on `0.0.0.0`; only a rule in
+`DOCKER-USER`, or binding to loopback, does.
 
 ## Container privileges
 
@@ -108,7 +125,8 @@ We are not migrating, and the reason is what this cluster is:
   taking.
 - No untrusted traffic reaches it. Its clients are the candidate's own
   shells, their own desktop browser, and their own host on `:8081` and
-  `:8443` — and under a loopback `SIM_BIND`, not even that.
+  `:8443` — and on the default loopback bind, that host is the only
+  machine that can reach either port.
 - The CKAD competency is *"use Ingress rules to expose applications"*.
   The Ingress **API** is not deprecated and is fully supported. One
   controller implementation retired; nothing a candidate learns here
