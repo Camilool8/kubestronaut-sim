@@ -23,6 +23,7 @@ first boot on a new machine.
 | `RAM to docker : NGB << LOW` | Under 8GB reaches Docker. The desktop plus a two-node cluster wants ~9GB | Raise the memory limit in Docker Desktop → Resources |
 | `disk for images : NGB << LOW` | Under 25GB free. The images alone are ~10GB | Free space, or `./sim purge` to drop an old install's volumes |
 | `warm volumes : none` | Not a fault — this is a cold first boot | Expect several minutes. Later boots resume |
+| `env: 'bash\r': No such file or directory` or `exec /entrypoint.sh: no such file or directory` | A Windows clone made before `.gitattributes` existed checked out `sim` and the `.sh` scripts as CRLF, and the images were built from them | Re-clone the repo, then rebuild: `docker compose up -d --build`. Re-cloning alone is not enough — the corrupt scripts are already baked into the images you built before |
 
 ## During a boot
 
