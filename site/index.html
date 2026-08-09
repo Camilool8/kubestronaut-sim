@@ -170,23 +170,88 @@
           </div>
 
           <div class="quickstart-run">
-            <figure class="term">
-              <figcaption class="term-bar">
-                <span class="term-bar-dot" aria-hidden="true"></span>
-                <span class="term-bar-title">bash — quickstart</span>
-              </figcaption>
-              <pre class="term-body"><code><span class="term-line"><span class="term-prompt" aria-hidden="true">$ </span>./sim doctor    <span class="term-note"># optional preflight</span></span>
+            <fieldset class="os-tabs">
+              <legend class="sr-only">Choose your operating system</legend>
+
+              <input class="os-radio sr-only" type="radio" name="os" id="os-win" />
+              <label class="os-tab" for="os-win">
+                <svg class="os-mark" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path d="M1 2h6v6H1zM9 2h6v6H9zM1 10h6v6H1zM9 10h6v6H9z" />
+                </svg>
+                Windows
+              </label>
+
+              <input class="os-radio sr-only" type="radio" name="os" id="os-mac" checked />
+              <label class="os-tab" for="os-mac">
+                <svg class="os-mark" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path d="M8 4C5.8 4 4 5.9 4 8.5S5.8 15 8 15s4-3.9 4-6.5S10.2 4 8 4z" />
+                  <path d="M8.5 3.6c0-1.3 1-2.4 2.3-2.6.1 1.3-.9 2.5-2.3 2.6z" />
+                </svg>
+                macOS
+              </label>
+
+              <input class="os-radio sr-only" type="radio" name="os" id="os-linux" />
+              <label class="os-tab" for="os-linux">
+                <svg class="os-mark" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path d="M8 1c2.2 0 3.5 1.8 3.5 4 0 1.2.4 2 1 2.9.5.8.9 1.6.9 2.6 0 2.5-2.4 4.5-5.4 4.5S2.6 13 2.6 10.5c0-1 .4-1.8.9-2.6.6-.9 1-1.7 1-2.9C4.5 2.8 5.8 1 8 1zm-1.2 3.2a.9.9 0 1 0 0 1.8.9.9 0 0 0 0-1.8zm2.4 0a.9.9 0 1 0 0 1.8.9.9 0 0 0 0-1.8zM8 6.6l-1 1 1 .9 1-.9-1-1z" />
+                </svg>
+                Linux
+              </label>
+
+              <div class="os-panels">
+                <div class="os-panel" data-os="win">
+                  <figure class="term">
+                    <figcaption class="term-bar">
+                      <span class="term-bar-dot" aria-hidden="true"></span>
+                      <span class="term-bar-title">PowerShell — quickstart</span>
+                    </figcaption>
+                    <pre class="term-body"><code><span class="term-line"><span class="term-prompt" aria-hidden="true">&gt; </span>.\sim.ps1 doctor    <span class="term-note"># optional preflight</span></span>
+<span class="term-line"><span class="term-prompt" aria-hidden="true">&gt; </span>.\sim.ps1 up        <span class="term-note"># brings the app up in seconds</span></span>
+<span class="term-line"><span class="term-prompt" aria-hidden="true">&gt; </span>start <span class="term-url">http://localhost:8080</span></span></code></pre>
+                  </figure>
+                  <p class="quickstart-note">
+                    Requires Docker Desktop on the WSL2 backend and about 9GB of
+                    free RAM — the XFCE desktop is inside that figure. No python3:
+                    the PowerShell launcher reads JSON natively. Nothing is built
+                    until you pick an exam.
+                  </p>
+                </div>
+
+                <div class="os-panel" data-os="mac">
+                  <figure class="term">
+                    <figcaption class="term-bar">
+                      <span class="term-bar-dot" aria-hidden="true"></span>
+                      <span class="term-bar-title">bash — quickstart</span>
+                    </figcaption>
+                    <pre class="term-body"><code><span class="term-line"><span class="term-prompt" aria-hidden="true">$ </span>./sim doctor    <span class="term-note"># optional preflight</span></span>
 <span class="term-line"><span class="term-prompt" aria-hidden="true">$ </span>./sim up        <span class="term-note"># brings the app up in seconds</span></span>
 <span class="term-line"><span class="term-prompt" aria-hidden="true">$ </span>open <span class="term-url">http://localhost:8080</span></span></code></pre>
-            </figure>
+                  </figure>
+                  <p class="quickstart-note">
+                    Requires Docker Desktop, python3, and about 9GB of free RAM —
+                    the XFCE desktop is inside that figure. Nothing is built until
+                    you pick an exam.
+                  </p>
+                </div>
 
-            <p class="quickstart-note">
-              Requires Docker Desktop (or docker + compose v2), python3, and
-              about 9GB of free RAM — the XFCE desktop is inside that figure.
-              Nothing is built until you pick an exam: choosing one in the
-              browser is what creates its cluster, and the page shows that
-              build's progress step by step.
-            </p>
+                <div class="os-panel" data-os="linux">
+                  <figure class="term">
+                    <figcaption class="term-bar">
+                      <span class="term-bar-dot" aria-hidden="true"></span>
+                      <span class="term-bar-title">bash — quickstart</span>
+                    </figcaption>
+                    <pre class="term-body"><code><span class="term-line"><span class="term-prompt" aria-hidden="true">$ </span>./sim doctor    <span class="term-note"># optional preflight</span></span>
+<span class="term-line"><span class="term-prompt" aria-hidden="true">$ </span>./sim up        <span class="term-note"># brings the app up in seconds</span></span>
+<span class="term-line"><span class="term-prompt" aria-hidden="true">$ </span>xdg-open <span class="term-url">http://localhost:8080</span></span></code></pre>
+                  </figure>
+                  <p class="quickstart-note">
+                    Requires docker + compose v2, python3, cgroup v2, and about
+                    9GB of free RAM — the XFCE desktop is inside that figure.
+                    Nothing is built until you pick an exam.
+                  </p>
+                </div>
+              </div>
+            </fieldset>
           </div>
 
           <figure class="shot shot-wide">
@@ -749,6 +814,15 @@
             <dl>
               <div class="docs-entry">
                 <dt>
+                  <a
+                    href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/install.md"
+                    >install.md</a
+                  >
+                </dt>
+                <dd>Per-OS prerequisites and setup, for Windows, macOS and Linux.</dd>
+              </div>
+              <div class="docs-entry">
+                <dt>
                   <a href="https://github.com/Camilool8/kubestronaut-sim#readme"
                     >README</a
                   >
@@ -936,6 +1010,19 @@
         new IntersectionObserver(function (entries) {
           orbit.toggleAttribute("data-idle", !entries[0].isIntersecting);
         }).observe(orbit);
+      })();
+
+      (function () {
+        var p =
+          (navigator.userAgentData && navigator.userAgentData.platform) ||
+          navigator.platform ||
+          "";
+        var id = null;
+        if (/win/i.test(p)) id = "os-win";
+        else if (/linux|x11|android|cros/i.test(p)) id = "os-linux";
+        if (!id) return;
+        var el = document.getElementById(id);
+        if (el) el.checked = true;
       })();
     </script>
   </body>
