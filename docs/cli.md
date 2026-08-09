@@ -34,7 +34,7 @@ Obtaining each of these differs by operating system —
 | `./sim down` | Stops the stack. Volumes survive | Nothing |
 | `./sim purge` | `down`, then removes eight volumes | Everything except attempt history |
 | `./sim purge --all` | `down -v`. Prints what it will destroy first | All nine volumes, **including every attempt ever graded** |
-| `./sim doctor` | Preflight: Docker, Compose, `python3`, RAM, disk, cgroups, volumes, UI | Nothing |
+| `./sim doctor` | Preflight: host, Docker, Compose, container OS, `python3`, RAM, disk, cgroups, volumes, docker access (Linux), clone location (WSL), exam UI | Nothing |
 | `./sim reset` | Rebuilds the environment for a fresh attempt | Session, work directories, podman stores, registry, cluster |
 | `./sim ssh [instance]` | Shell on an instance, default `instance-1` | Nothing |
 | `./sim status` | `docker compose ps` | Nothing |
@@ -113,20 +113,30 @@ machine pulls that image.
 
 ## Configuration variables
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `SIM_BIND` | `0.0.0.0` | Host interface every published port binds to |
-| `SIM_BOOT_BUDGET` | `3600` | Seconds `./sim up <bank>` waits for an environment |
-| `SIM_SHELL_BUDGET` | `300` | Seconds a bare `./sim up` waits for the shell |
-| `BANK` | unset | Bank to activate, first boot only |
-| `PRELOAD` | `full` | Build arg for `images/k8s-env`, not a runtime variable |
-| `SESSION_DURATION_OVERRIDE` | unset | Replaces the bank's exam duration |
+| Variable | Default | `sim.ps1` flag | Purpose |
+|---|---|---|---|
+| `SIM_BIND` | `0.0.0.0` | `up -Bind <address>` | Host interface every published port binds to |
+| `SIM_BOOT_BUDGET` | `3600` | `up <bank> -BootBudget <seconds>` | Seconds `./sim up <bank>` waits for an environment |
+| `SIM_SHELL_BUDGET` | `300` | `up -ShellBudget <seconds>` | Seconds a bare `./sim up` waits for the shell |
+| `BANK` | unset | `up <bank>` | Bank to activate, first boot only |
+| `PRELOAD` | `full` | — | Build arg for `images/k8s-env`, not a runtime variable |
+| `SESSION_DURATION_OVERRIDE` | unset | — | Replaces the bank's exam duration |
+
+`sim.ps1` has no flag for `PRELOAD` or `SESSION_DURATION_OVERRIDE` — neither
+is set by invoking `up` on either launcher; both reach the stack through
+`docker build --build-arg` or a direct `docker compose up -d --wait`, shown
+in their own sections below.
 
 ### SIM_BIND
 
 ```bash
 ./sim up                        # default: 0.0.0.0, reaches your whole LAN
 SIM_BIND=127.0.0.1 ./sim up     # loopback only
+```
+
+```powershell
+.\sim.ps1 up                       # default: 0.0.0.0, reaches your whole LAN
+.\sim.ps1 up -Bind 127.0.0.1       # loopback only
 ```
 
 There is no authentication anywhere in the stack. On a network you do
