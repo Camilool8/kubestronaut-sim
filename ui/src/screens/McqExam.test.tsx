@@ -127,14 +127,14 @@ describe("McqExam answering", () => {
     const user = userEvent.setup();
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
-    await user.click(await screen.findByRole("checkbox", { name: /etcd/ }));
+    await user.click(await screen.findByRole("radio", { name: /etcd/ }));
 
     await waitFor(() => {
       const put = log.find((e) => e.method === "PUT" && e.url.endsWith("/answer"));
       expect(put?.url).toBe("/api/questions/q01/answer");
       expect(put?.body).toEqual({ selected: [1] });
     });
-    expect(screen.getByRole("checkbox", { name: /etcd/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /etcd/ })).toBeChecked();
   });
 
   test("single-answer questions swap the selection instead of stacking it", async () => {
@@ -142,32 +142,31 @@ describe("McqExam answering", () => {
     const user = userEvent.setup();
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
-    await user.click(await screen.findByRole("checkbox", { name: /etcd/ }));
-    await user.click(screen.getByRole("checkbox", { name: /kube-proxy/ }));
+    await user.click(await screen.findByRole("radio", { name: /etcd/ }));
+    await user.click(screen.getByRole("radio", { name: /kube-proxy/ }));
 
     await waitFor(() => {
       const puts = log.filter((e) => e.method === "PUT" && e.url.endsWith("/answer"));
       expect(puts).toHaveLength(2);
       expect(puts[1].body).toEqual({ selected: [2] });
     });
-    expect(screen.getByRole("checkbox", { name: /etcd/ })).not.toBeChecked();
-    expect(screen.getByRole("checkbox", { name: /kube-proxy/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /etcd/ })).not.toBeChecked();
+    expect(screen.getByRole("radio", { name: /kube-proxy/ })).toBeChecked();
   });
 
-  test("re-clicking the selected option clears the answer", async () => {
+  test("re-clicking the selected option leaves it selected — a radio cannot be cleared", async () => {
     const log = stubFetch({ q01: [1] });
     const user = userEvent.setup();
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
-    const option = await screen.findByRole("checkbox", { name: /etcd/ });
+    const option = await screen.findByRole("radio", { name: /etcd/ });
     await waitFor(() => expect(option).toBeChecked());
     await user.click(option);
 
-    await waitFor(() => {
-      const put = log.find((e) => e.method === "PUT" && e.url.endsWith("/answer"));
-      expect(put?.body).toEqual({ selected: [] });
-    });
-    expect(option).not.toBeChecked();
+    expect(option).toBeChecked();
+    for (const put of log.filter((e) => e.method === "PUT" && e.url.endsWith("/answer"))) {
+      expect(put.body).toEqual({ selected: [1] });
+    }
   });
 
   test("multi-select accumulates selections", async () => {
@@ -193,7 +192,7 @@ describe("McqExam answering", () => {
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
     await waitFor(() =>
-      expect(screen.getByRole("checkbox", { name: /etcd/ })).toBeChecked(),
+      expect(screen.getByRole("radio", { name: /etcd/ })).toBeChecked(),
     );
   });
 
@@ -202,7 +201,7 @@ describe("McqExam answering", () => {
     const user = userEvent.setup();
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
-    const option = await screen.findByRole("checkbox", { name: /etcd/ });
+    const option = await screen.findByRole("radio", { name: /etcd/ });
     await user.click(option);
 
     await waitFor(() => expect(option).not.toBeChecked());
@@ -322,7 +321,7 @@ describe("McqExam navigator", () => {
     );
     await screen.findByText("Which component persists cluster state?");
 
-    await user.click(screen.getByRole("checkbox", { name: /etcd/i }));
+    await user.click(screen.getByRole("radio", { name: /etcd/i }));
     expect(document.activeElement?.tagName).toBe("INPUT");
 
     await user.keyboard("g");

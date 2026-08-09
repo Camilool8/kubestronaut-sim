@@ -645,7 +645,7 @@ describe("axe: no WCAG violations", () => {
       <McqExam session={mcqSession} fetchedAt={Date.now()} onSessionChange={() => {}} />,
     );
     await screen.findByText("Which component persists cluster state?");
-    expect(screen.getByRole("checkbox", { name: /etcd/ })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /etcd/ })).toBeInTheDocument();
     expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
   });
 
