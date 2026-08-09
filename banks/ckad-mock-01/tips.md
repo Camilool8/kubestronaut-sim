@@ -1,6 +1,6 @@
 Two hours is not long. Most people who fail this exam knew the answers —
 they ran out of time getting to them. What follows is technique, not
-Kubernetes: the habits that decide how many of the twenty-two you reach.
+Kubernetes: the habits that decide how many of the seventeen you reach.
 
 ## Set the terminal up before you start
 
