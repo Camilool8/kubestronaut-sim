@@ -352,6 +352,67 @@ describe("App leaving the results screen", () => {
   });
 });
 
+describe("App in a hosted seat, browsing history after an attempt ended", () => {
+  const hostedMe = {
+    authenticated: true,
+    authMode: "github",
+    user: { id: "u1", login: "octocat" },
+    session: {
+      kind: "practical",
+      bank: "ckad-mock-01",
+      pod: "pod-1",
+      state: "ready",
+      startedAt: "2026-07-25T12:00:00Z",
+      expiresAt: "2026-07-25T14:00:00Z",
+      lastSeen: "2026-07-25T12:00:00Z",
+    },
+  };
+
+  const historyResults = {
+    bank: "ckad-mock-01",
+    gradedAt: "2026-07-24T12:00:00Z",
+    ...results,
+  };
+
+  const stubHostedEndedReviewing = () =>
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        const json = (body: unknown, status = 200) =>
+          new Response(JSON.stringify(body), { status });
+
+        if (url.endsWith("/api/me")) return json(hostedMe);
+        if (url.endsWith("/api/control/status")) return json({ busy: false });
+        if (url.endsWith("/api/boot")) return json(readyBoot);
+        if (url.endsWith("/api/session")) return json(endedSession);
+        if (url.endsWith("/api/history/a1")) return json(historyResults);
+        if (url.endsWith("/api/exam")) return json(exam);
+        if (url.endsWith("/api/catalog")) return json(catalog);
+        return json({});
+      }),
+    );
+
+  afterEach(() => {
+    window.location.hash = "";
+  });
+
+  test("the wordmark stays a working link out of #/history/<id>, even though the live attempt ended", async () => {
+    window.location.hash = "#/history/a1";
+    stubHostedEndedReviewing();
+
+    render(<App />);
+
+    // Land on <Review>, not <Score>: the ended attempt must not override the
+    // review route.
+    await screen.findByText(/this is a record, not a live session/i);
+    expect(screen.queryByRole("button", { name: "New attempt" })).not.toBeInTheDocument();
+
+    expect(screen.getByRole("link", { name: /kubestronaut/i })).toBeInTheDocument();
+    expect(screen.queryByText(/kubestronaut/i)?.closest(".navbar-home-static")).toBeNull();
+  });
+});
+
 describe("App session polling", () => {
   test("warns when the session poll fails after the first success, and withdraws it on recovery", async () => {
     let sessionDown = false;

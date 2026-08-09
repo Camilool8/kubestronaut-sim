@@ -483,10 +483,13 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
         <NavBar
           trail={trail}
           nav={nav}
-          // An ended attempt pins this screen to <Score> whatever the route
-          // says, so a live wordmark link would change the hash and nothing
-          // else. Lock it, the way an attempt in progress already does.
-          home={session.state !== "ended"}
+          // An ended attempt pins this screen to <Score> only when it is not
+          // showing a review route: reviewId (above) wins over "ended", so a
+          // hosted seat that finishes an attempt and then browses back into
+          // #/history/<id> lands on <Review>, where a live wordmark link
+          // still goes somewhere. Lock it only when <Score> is actually the
+          // screen, the way an attempt in progress already does.
+          home={session.state !== "ended" || reviewId !== null}
           menuExtra={
             session.state === "ended" ? (
               <NavMenuSection label={strings.header.menuExam}>
