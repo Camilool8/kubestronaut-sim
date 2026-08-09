@@ -216,6 +216,7 @@ function Invoke-Purge([string]$Mode) {
   Invoke-Docker compose down --remove-orphans
 
   $kept = $false
+  $unreadable = 0
   $volumes = & docker volume ls -q --filter "label=com.docker.compose.project=$project"
   foreach ($vol in $volumes) {
     if (-not $vol) { continue }
@@ -230,11 +231,18 @@ function Invoke-Purge([string]$Mode) {
     # the label map ourselves sidesteps the native templating quoting
     # entirely.
     $labelsRaw = Invoke-DockerSafe volume inspect -f '{{json .Labels}}' $vol
-    $key = ''
-    if ($LASTEXITCODE -eq 0 -and $labelsRaw) {
-      $labels = ($labelsRaw -join '') | ConvertFrom-Json
-      $key = Get-Field $labels 'com.docker.compose.volume'
+    # Fail closed: a read failure here means we do NOT know whether $vol is
+    # the attempt-history volume, so it must NOT be deleted. Defaulting
+    # $key to '' and letting it silently miss the 'state' comparison below
+    # (the old code did exactly that) is how the state volume itself gets
+    # destroyed by nothing worse than a transient inspect error.
+    if ($LASTEXITCODE -ne 0 -or -not $labelsRaw) {
+      Write-Host "  could not read ${vol}'s label (docker volume inspect failed) - leaving it in place"
+      $unreadable++
+      continue
     }
+    $labels = ($labelsRaw -join '') | ConvertFrom-Json
+    $key = Get-Field $labels 'com.docker.compose.volume'
     if ($key -eq 'state') { $kept = $true; continue }
     # An in-use volume ALWAYS makes "docker volume rm" write to stderr --
     # exactly the case Invoke-DockerSafe exists to survive on 5.1, and
@@ -246,6 +254,8 @@ function Invoke-Purge([string]$Mode) {
 
   if ($kept) {
     Write-Host 'Purged. Attempt history was kept - remove it too with: .\sim.ps1 purge --all'
+  } elseif ($unreadable -gt 0) {
+    Write-Host "Purged. $unreadable volume(s) could not be checked and were left in place, just in case - see: docker volume ls"
   } else {
     Write-Host 'Purged. There was no attempt history to keep.'
   }
