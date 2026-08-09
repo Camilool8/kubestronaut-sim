@@ -42,6 +42,12 @@ const DesktopViewport = lazy(() =>
   import("../components/DesktopViewport").then((m) => ({ default: m.DesktopViewport })),
 );
 
+// QuestionPanel is memoized, and a session poll re-renders Exam every 10
+// seconds with a fresh `fetchedAt`. One shared empty array keeps the
+// questions prop referentially stable while the exam is still loading, so
+// the poll cannot invalidate the memo through it.
+const NO_QUESTIONS: ExamQuestionInfo[] = [];
+
 interface ExamProps {
   session: SessionSnapshot;
   fetchedAt: number;
@@ -183,8 +189,9 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
 
   const examState = useAsync((signal) => getExam(signal), []);
   const exam = examState.data;
+  const questions = exam?.questions ?? NO_QUESTIONS;
 
-  const selectedId = pickedId ?? exam?.questions[0]?.id ?? null;
+  const selectedId = pickedId ?? questions[0]?.id ?? null;
 
   useEffect(() => {
     if (!selectedId) return;
@@ -194,12 +201,12 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
   }, [selectedId]);
 
   const reviewMarked = confirmOpen
-    ? (exam?.questions ?? []).flatMap((q, i) =>
+    ? questions.flatMap((q, i) =>
         marksStore.isMarked(q.id) ? [strings.exam.taskNumber(i + 1)] : [],
       )
     : [];
   const reviewUnseen = confirmOpen
-    ? (exam?.questions ?? []).flatMap((q, i) =>
+    ? questions.flatMap((q, i) =>
         marksStore.isViewed(q.id) ? [] : [strings.exam.taskNumber(i + 1)],
       )
     : [];
@@ -227,6 +234,26 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
     for (const q of exam?.questions ?? []) if (q.instance) seen.add(q.instance);
     return [...seen].sort().join(", ");
   }, [exam]);
+
+  // An inline element would be a new object on every render, which would
+  // defeat QuestionPanel's memo on every session poll. `reload` is stable.
+  const examError = examState.error;
+  const examStatus = examState.status;
+  const reloadExam = examState.reload;
+  const questionsEmptyState = useMemo(
+    () =>
+      examStatus === "error" ? (
+        <div className="pane-error" role="alert">
+          <p className="error-text">{strings.exam.questionsFailed(examError ?? "")}</p>
+          <button className="btn" onClick={reloadExam}>
+            {strings.questionPanel.retry}
+          </button>
+        </div>
+      ) : (
+        <p className="question-empty-note">{strings.exam.loadingQuestions}</p>
+      ),
+    [examStatus, examError, reloadExam],
+  );
 
   const desktopDownRef = useRef(false);
   const handleDesktopState = useCallback((state: string) => {
@@ -298,24 +325,11 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
       />
       <div className="exam-body">
         <QuestionPanel
-          questions={exam?.questions ?? []}
+          questions={questions}
           mode={session.mode}
           selectedId={selectedId}
           onSelect={setPickedId}
-          emptyState={
-            examState.status === "error" ? (
-              <div className="pane-error" role="alert">
-                <p className="error-text">
-                  {strings.exam.questionsFailed(examState.error ?? "")}
-                </p>
-                <button className="btn" onClick={examState.reload}>
-                  {strings.questionPanel.retry}
-                </button>
-              </div>
-            ) : (
-              <p className="question-empty-note">{strings.exam.loadingQuestions}</p>
-            )
-          }
+          emptyState={questionsEmptyState}
         />
         <PanelResizer panelId="question-panel" />
 

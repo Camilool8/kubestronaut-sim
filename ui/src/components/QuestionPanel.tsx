@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { getQuestion, type ExamQuestionInfo, type SessionMode } from "../api";
 import { useAsync } from "../lib/useAsync";
 import { desktopClipboard } from "../lib/desktopClipboard";
@@ -27,7 +27,7 @@ interface QuestionPanelProps {
   mode?: SessionMode;
 }
 
-export function QuestionPanel({
+function QuestionPanelBody({
   questions,
   selectedId,
   onSelect,
@@ -225,6 +225,13 @@ export function QuestionPanel({
     </section>
   );
 }
+
+// A session poll runs every 10 seconds and re-renders the whole exam with a
+// fresh `fetchedAt`. Without this, react-markdown re-parsed the question body
+// through remark, mdast and hast on every one of them, for the whole of a
+// two-hour attempt. Exam keeps each prop referentially stable so the default
+// shallow comparison actually holds.
+export const QuestionPanel = memo(QuestionPanelBody);
 
 function TaskChips({
   question,
