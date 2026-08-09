@@ -7,6 +7,17 @@ UI=http://localhost:8080
 
 json_field() { python3 -c "import json,sys; print(json.load(sys.stdin).get('$1',''))" 2>/dev/null || true; }
 
+# `docker info --format` fills every top-level field with its zero value
+# (0, "") even when the daemon is unreachable, AND still exits non-zero --
+# so "$(docker info ... || echo fallback)" doubles up into two lines: the
+# empty/zero real output plus the fallback. That breaks anything expecting
+# a single value (arithmetic on "0\n0" is a syntax error). Keep only the
+# last line of whatever printed; callers validate/fall back from there.
+# The trailing `|| true` keeps a failing `docker info` (or a missing
+# `docker` binary entirely, exit 127) from tripping `set -o pipefail` and
+# aborting doctor under `set -e` -- doctor's whole job is to survive that.
+docker_info_field() { docker info --format "$1" 2>/dev/null | tail -n1 || true; }
+
 case "$cmd" in
   up)
 
@@ -149,7 +160,8 @@ case "$cmd" in
     printf 'docker            : '; docker version --format '{{.Server.Version}}' 2>/dev/null || echo "NOT REACHABLE"
     printf 'compose           : '; docker compose version --short 2>/dev/null || echo "MISSING"
     printf 'container OS      : '
-    ostype=$(docker info --format '{{.OSType}}' 2>/dev/null || echo unknown)
+    ostype=$(docker_info_field '{{.OSType}}')
+    [ -n "$ostype" ] || ostype=unknown
     if [ "$ostype" = "linux" ]; then
       echo "linux   ok"
     else
@@ -157,7 +169,10 @@ case "$cmd" in
     fi
     printf 'python3           : '; python3 --version 2>/dev/null || echo "MISSING (./sim up needs it)"
 
-    mem=$(docker info --format '{{.MemTotal}}' 2>/dev/null || echo 0)
+    mem=$(docker_info_field '{{.MemTotal}}')
+    case "$mem" in
+      ''|*[!0-9]*) mem=0 ;;
+    esac
     memgb=$(( mem / 1024 / 1024 / 1024 ))
     printf 'RAM to docker     : %sGB' "$memgb"
     if [ "$memgb" -lt 8 ]; then
@@ -175,7 +190,8 @@ case "$cmd" in
     if [ "$avail" != "?" ] && [ "$avail" -lt 25 ]; then echo "   << LOW: images alone are ~10GB"; else echo "   ok"; fi
 
     printf 'cgroup version    : '
-    cg=$(docker info --format '{{.CgroupVersion}}' 2>/dev/null || echo "unknown")
+    cg=$(docker_info_field '{{.CgroupVersion}}')
+    [ -n "$cg" ] || cg=unknown
     if [ "$cg" = "1" ]; then
       echo "1   << the instances need cgroup v2 (compose sets cgroup: host)"
     else
@@ -183,7 +199,10 @@ case "$cmd" in
     fi
 
     printf 'warm volumes      : '
-    warm=$(docker volume ls -q --filter name=kubestronaut-sim 2>/dev/null | wc -l | tr -d ' ')
+    warm=$(docker volume ls -q --filter name=kubestronaut-sim 2>/dev/null | wc -l | tr -d ' ') || true
+    case "$warm" in
+      ''|*[!0-9]*) warm=0 ;;
+    esac
     if [ "$warm" = "0" ]; then
       echo "none — this will be a cold first boot (slowest path)"
     else
