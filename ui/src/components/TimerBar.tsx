@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { SessionSnapshot } from "../api";
 import { formatClock, formatClockSpoken, formatElapsed } from "../lib/format";
+import { Icon } from "./Icon";
 import { NavBar } from "./NavBar";
-import { NavMenuItem, NavMenuSection } from "./NavMenu";
+import { NavMenuSection } from "./NavMenu";
+import { HEADER_COMPACT_QUERY, useMediaQuery } from "../lib/useMediaQuery";
 import { strings } from "../strings";
 import { toastStore } from "./toastStore";
 
@@ -35,6 +37,7 @@ export function TimerBar({
 }: TimerBarProps) {
   const [now, setNow] = useState(() => Date.now());
   const firedRef = useRef<Set<number>>(new Set());
+  const compact = useMediaQuery(HEADER_COMPACT_QUERY);
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000);
@@ -70,15 +73,9 @@ export function TimerBar({
       home={false}
       trail={[{ label: title }]}
       menuExtra={
-        <NavMenuSection label={strings.header.menuExam}>
-          {extras}
-          <NavMenuItem
-            icon="send"
-            label={strings.exam.endAttempt(session.mode)}
-            onSelect={onEndClick}
-            danger
-          />
-        </NavMenuSection>
+        extras ? (
+          <NavMenuSection label={strings.header.menuExam}>{extras}</NavMenuSection>
+        ) : undefined
       }
     >
       {barExtras}
@@ -100,6 +97,18 @@ export function TimerBar({
           </>
         )}
       </div>
+      <button
+        type="button"
+        className="btn btn-primary navbar-submit"
+        onClick={onEndClick}
+        // Set unconditionally so the accessible name does not depend on the
+        // viewport: at compact widths the visible label is dropped and the
+        // icon carries the button alone.
+        aria-label={strings.exam.endAttempt(session.mode)}
+      >
+        <Icon name="send" />
+        {!compact && strings.exam.endAttempt(session.mode)}
+      </button>
     </NavBar>
   );
 }

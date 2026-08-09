@@ -127,14 +127,14 @@ describe("McqExam answering", () => {
     const user = userEvent.setup();
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
-    await user.click(await screen.findByRole("checkbox", { name: /etcd/ }));
+    await user.click(await screen.findByRole("radio", { name: /etcd/ }));
 
     await waitFor(() => {
       const put = log.find((e) => e.method === "PUT" && e.url.endsWith("/answer"));
       expect(put?.url).toBe("/api/questions/q01/answer");
       expect(put?.body).toEqual({ selected: [1] });
     });
-    expect(screen.getByRole("checkbox", { name: /etcd/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /etcd/ })).toBeChecked();
   });
 
   test("single-answer questions swap the selection instead of stacking it", async () => {
@@ -142,32 +142,33 @@ describe("McqExam answering", () => {
     const user = userEvent.setup();
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
-    await user.click(await screen.findByRole("checkbox", { name: /etcd/ }));
-    await user.click(screen.getByRole("checkbox", { name: /kube-proxy/ }));
+    await user.click(await screen.findByRole("radio", { name: /etcd/ }));
+    await user.click(screen.getByRole("radio", { name: /kube-proxy/ }));
 
     await waitFor(() => {
       const puts = log.filter((e) => e.method === "PUT" && e.url.endsWith("/answer"));
       expect(puts).toHaveLength(2);
       expect(puts[1].body).toEqual({ selected: [2] });
     });
-    expect(screen.getByRole("checkbox", { name: /etcd/ })).not.toBeChecked();
-    expect(screen.getByRole("checkbox", { name: /kube-proxy/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /etcd/ })).not.toBeChecked();
+    expect(screen.getByRole("radio", { name: /kube-proxy/ })).toBeChecked();
   });
 
-  test("re-clicking the selected option clears the answer", async () => {
-    const log = stubFetch({ q01: [1] });
+  test("single-answer options are radios and multi-select options are checkboxes", async () => {
+    stubFetch();
     const user = userEvent.setup();
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
-    const option = await screen.findByRole("checkbox", { name: /etcd/ });
-    await waitFor(() => expect(option).toBeChecked());
-    await user.click(option);
+    // q01 declares multi: false — a radio, which is what makes an answered
+    // question unclearable: a second click cannot transition `checked`, so no
+    // change event fires and the empty selection is unreachable by construction.
+    expect(await screen.findByRole("radio", { name: /etcd/ })).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /etcd/ })).toBeNull();
 
-    await waitFor(() => {
-      const put = log.find((e) => e.method === "PUT" && e.url.endsWith("/answer"));
-      expect(put?.body).toEqual({ selected: [] });
-    });
-    expect(option).not.toBeChecked();
+    // q02 declares multi: true — still a checkbox, still accumulating.
+    await user.click(screen.getByRole("button", { name: /next question/i }));
+    expect(await screen.findByRole("checkbox", { name: /CRI/ })).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: /CRI/ })).toBeNull();
   });
 
   test("multi-select accumulates selections", async () => {
@@ -193,7 +194,7 @@ describe("McqExam answering", () => {
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
     await waitFor(() =>
-      expect(screen.getByRole("checkbox", { name: /etcd/ })).toBeChecked(),
+      expect(screen.getByRole("radio", { name: /etcd/ })).toBeChecked(),
     );
   });
 
@@ -202,7 +203,7 @@ describe("McqExam answering", () => {
     const user = userEvent.setup();
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
-    const option = await screen.findByRole("checkbox", { name: /etcd/ });
+    const option = await screen.findByRole("radio", { name: /etcd/ });
     await user.click(option);
 
     await waitFor(() => expect(option).not.toBeChecked());
@@ -239,6 +240,16 @@ describe("McqExam answering", () => {
     await user.click(screen.getByRole("button", { name: /submit session/i }));
     expect(await screen.findByRole("dialog")).toHaveAccessibleName(/training/i);
     expect(screen.queryByText(/cannot be undone/i)).not.toBeInTheDocument();
+  });
+
+  test("Submit exam is in the bar on every question, not just the last", async () => {
+    stubFetch();
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+
+    // q01 is the first of two, so the footer still shows Next here.
+    await screen.findByText("Which component persists cluster state?");
+    expect(await screen.findByRole("button", { name: "Submit exam" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /next question/i })).toBeInTheDocument();
   });
 });
 
@@ -298,6 +309,31 @@ describe("McqExam attempt state", () => {
     expect(toastStore.list()).toHaveLength(0);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
+
+  test("the menu doesn't show an empty 'This attempt' header when there's nothing under it", async () => {
+    // session is exam-mode, not training, and the exam fetch fails, so
+    // questions stays empty: extras must resolve to undefined rather than
+    // a fragment whose children are all false, or the section header
+    // ("This attempt") renders with nothing underneath it.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/api/exam")) {
+          return new Response(JSON.stringify({ error: "exam failed" }), { status: 500 });
+        }
+        if (url.includes("/api/answers")) {
+          return new Response(JSON.stringify({ answers: {} }), { status: 200 });
+        }
+        return new Response("{}", { status: 200 });
+      }),
+    );
+    const user = userEvent.setup();
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+
+    await openMenu(user);
+    expect(screen.queryByText(strings.header.menuExam)).not.toBeInTheDocument();
+  });
 });
 
 describe("McqExam navigator", () => {
@@ -322,7 +358,7 @@ describe("McqExam navigator", () => {
     );
     await screen.findByText("Which component persists cluster state?");
 
-    await user.click(screen.getByRole("checkbox", { name: /etcd/i }));
+    await user.click(screen.getByRole("radio", { name: /etcd/i }));
     expect(document.activeElement?.tagName).toBe("INPUT");
 
     await user.keyboard("g");
@@ -384,7 +420,9 @@ describe("McqExam footer navigation", () => {
   test("the last question's footer shows Submit exam instead of Next, and it opens the confirm dialog", async () => {
     stubFetch();
     const user = userEvent.setup();
-    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+    const { container } = render(
+      <McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />,
+    );
 
     await screen.findByText("Which component persists cluster state?");
     expect(screen.getByRole("button", { name: /next question/i })).toBeInTheDocument();
@@ -393,7 +431,12 @@ describe("McqExam footer navigation", () => {
     await screen.findByText("Which are container interface standards? Choose all that apply.");
 
     expect(screen.queryByRole("button", { name: /next question/i })).not.toBeInTheDocument();
-    const submitButtons = screen.getAllByRole("button", { name: /submit exam/i });
+
+    // The bar's Submit is present on every question (see the "on every
+    // question" test above), so scope to the footer to find the one that
+    // only appears here, at the end of the paper.
+    const footer = within(container.querySelector(".mcq-footer")!);
+    const submitButtons = footer.getAllByRole("button", { name: /submit exam/i });
     expect(submitButtons).toHaveLength(1);
 
     await user.click(submitButtons[0]);
@@ -428,10 +471,12 @@ describe("McqExam on a phone", () => {
     expect(screen.getByRole("timer")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: strings.header.menuLabel })).toBeInTheDocument();
 
-    expect(screen.queryByRole("button", { name: "Submit exam" })).toBeNull();
+    // Submit is in the bar at every width — that is the point of it being
+    // there rather than one layer down in the menu.
+    expect(screen.getByRole("button", { name: "Submit exam" })).toBeInTheDocument();
   });
 
-  test("the menu holds the attempt's progress and its one irreversible action", async () => {
+  test("the menu holds the attempt's progress, and no longer its irreversible action", async () => {
     stubFetch({ q01: [1] });
     const user = userEvent.setup();
     renderCompact();
@@ -440,22 +485,20 @@ describe("McqExam on a phone", () => {
     await openMenu(user);
     const panel = screen.getByRole("group", { name: strings.header.menuLabel });
     expect(within(panel).getByText(/Answered 1/)).toBeInTheDocument();
-    expect(within(panel).getByRole("button", { name: "Submit exam" })).toBeInTheDocument();
-
     expect(within(panel).getByRole("button", { name: /Theme/ })).toBeInTheDocument();
+
+    expect(within(panel).queryByRole("button", { name: "Submit exam" })).toBeNull();
   });
 
-  test("submitting from the menu opens the confirmation", async () => {
+  test("submitting from the bar opens the confirmation", async () => {
     stubFetch();
     const user = userEvent.setup();
     renderCompact();
     await screen.findByText(/persists cluster state/);
 
-    await openMenu(user);
     await user.click(screen.getByRole("button", { name: "Submit exam" }));
 
     expect(await screen.findByRole("dialog", { name: /submit/i })).toBeInTheDocument();
-    expect(screen.queryByRole("group", { name: strings.header.menuLabel })).toBeNull();
   });
 
   test("the action bar drops its labels but keeps every accessible name", async () => {

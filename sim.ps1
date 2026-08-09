@@ -93,6 +93,25 @@ function Invoke-DockerSafe {
   }
 }
 
+# Same trap as Invoke-DockerSafe, same fix, for git instead of docker: a
+# missing `git` (GitHub Desktop's bundled copy never lands on PATH; a ZIP
+# download has no git at all) raises a *terminating* CommandNotFoundException
+# under $ErrorActionPreference = 'Stop' that 2>$null cannot suppress -- there
+# is no process yet to redirect. On Windows PowerShell 5.1, `git rev-parse`
+# outside a work tree hits the same NativeCommandError trap: it writes to
+# stderr while stderr is redirected. Repair-LineEndings and Invoke-Doctor's
+# line-endings check both depend on "git missing or outside a work tree"
+# failing safely (non-zero exit, no throw) to keep their documented "no-op
+# outside a git work tree" contract instead of aborting `up`/`doctor` on
+# their very first line.
+function Invoke-GitSafe {
+  try {
+    & git @args 2>$null
+  } catch {
+    $global:LASTEXITCODE = 1
+  }
+}
+
 function Set-Env([string]$Name, $Value) {
   # Assigning $null to $env:X is not portable across 5.1 and 7; this removes it.
   [Environment]::SetEnvironmentVariable($Name, $Value, 'Process')
@@ -105,7 +124,67 @@ function Get-Budget([int]$Param, [string]$EnvName, [int]$Default) {
   return $Default
 }
 
+# Shared by Repair-LineEndings and Invoke-Doctor so both agree on what "has
+# CRLF" means: a lone CR (mid-line, or as a file's final byte) is not
+# something the collapse loop below rewrites, so a predicate that only checks
+# "does byte 13 appear anywhere" would make doctor report N script(s) have
+# CRLF on the same tree the repair just reported 0 script(s) for.
+function Test-HasCrlfPair([byte[]]$Bytes) {
+  for ($i = 0; $i -lt $Bytes.Length - 1; $i++) {
+    if ($Bytes[$i] -eq 13 -and $Bytes[$i + 1] -eq 10) { return $true }
+  }
+  return $false
+}
+
+# Mirrors normalize_line_endings() in sim -- see the long comment there for why
+# a Windows clone keeps CRLF forever and what it breaks. Byte-level CRLF -> LF
+# rather than Get-Content/Set-Content: Set-Content re-encodes on write and
+# would put the CRLFs straight back on Windows, and would add a BOM under 5.1.
+function Repair-LineEndings {
+  $null = Invoke-GitSafe rev-parse --is-inside-work-tree
+  if ($LASTEXITCODE -ne 0) { return 0 }
+
+  $listed = Invoke-GitSafe ls-files -- 'sim' '*.sh' 'images/k8s-env/preload.txt'
+  if ($LASTEXITCODE -ne 0 -or -not $listed) { return 0 }
+
+  $fixed = 0
+  foreach ($rel in $listed) {
+    if (-not (Test-Path -LiteralPath $rel)) { continue }
+    # Resolve once, up front, and read/write that same absolute path.
+    # [System.IO.File]::ReadAllBytes/WriteAllBytes resolve a relative path
+    # against [Environment]::CurrentDirectory, which Set-Location
+    # $PSScriptRoot (above) does NOT update -- so on a real Windows
+    # PowerShell that started elsewhere and cd'd into the repo, Test-Path
+    # (which DOES follow Set-Location) passes here while a bare
+    # ReadAllBytes($rel) throws MethodInvocationException: "Could not find
+    # file". Reproduced empirically: Test-Path -LiteralPath "sim" = True,
+    # ReadAllBytes("sim") THREW "Could not find file
+    # '<CurrentDirectory>\sim'". Resolve-Path follows Set-Location like
+    # Test-Path does, so resolving first keeps every byte-level call below
+    # looking at the file the guard above just confirmed exists.
+    $full = (Resolve-Path -LiteralPath $rel).Path
+    $bytes = [System.IO.File]::ReadAllBytes($full)
+    if (-not (Test-HasCrlfPair $bytes)) { continue }
+    $out = New-Object System.Collections.Generic.List[byte]
+    for ($i = 0; $i -lt $bytes.Length; $i++) {
+      if ($bytes[$i] -eq 13 -and $i + 1 -lt $bytes.Length -and $bytes[$i + 1] -eq 10) { continue }
+      $out.Add($bytes[$i])
+    }
+    # Belt-and-suspenders against Test-HasCrlfPair and this loop ever
+    # disagreeing again: only write, and only count as fixed, if the byte
+    # count actually shrank.
+    if ($out.Count -eq $bytes.Length) { continue }
+    [System.IO.File]::WriteAllBytes($full, $out.ToArray())
+    $fixed++
+  }
+  return $fixed
+}
+
 function Invoke-Up([string]$Bank) {
+  $repaired = Repair-LineEndings
+  if ($repaired -gt 0) {
+    Write-Host "Repaired CRLF line endings in $repaired script(s) - they cannot run inside the containers."
+  }
   if ($Bind) { Set-Env 'SIM_BIND' $Bind }
 
   $previousBank = [Environment]::GetEnvironmentVariable('BANK', 'Process')
@@ -294,6 +373,28 @@ function Invoke-Doctor {
   Write-Host ''
   Write-Host ('host              : Windows ({0})' -f $PSVersionTable.PSEdition)
   Write-Host ('powershell        : {0}' -f $PSVersionTable.PSVersion)
+
+  $crlf = 0
+  $null = Invoke-GitSafe rev-parse --is-inside-work-tree
+  if ($LASTEXITCODE -eq 0) {
+    $listed = Invoke-GitSafe ls-files -- 'sim' '*.sh' 'images/k8s-env/preload.txt'
+    foreach ($rel in $listed) {
+      if (-not (Test-Path -LiteralPath $rel)) { continue }
+      # Same predicate Repair-LineEndings uses to decide what it would
+      # actually rewrite -- see Test-HasCrlfPair -- so this never reports a
+      # count `.\sim.ps1 up` wouldn't also report as repaired. And the same
+      # CurrentDirectory trap as Repair-LineEndings applies here too: resolve
+      # before reading, or ReadAllBytes throws for anyone who cd'd in rather
+      # than starting a shell already rooted at the repo.
+      $full = (Resolve-Path -LiteralPath $rel).Path
+      if (Test-HasCrlfPair ([System.IO.File]::ReadAllBytes($full))) { $crlf++ }
+    }
+  }
+  if ($crlf -eq 0) {
+    Write-Host 'line endings      : LF   ok'
+  } else {
+    Write-Host ("line endings      : {0} script(s) have CRLF   << they cannot run in the containers; .\sim.ps1 up repairs them" -f $crlf)
+  }
 
   $server = Invoke-DockerSafe version --format '{{.Server.Version}}'
   Write-Host ('docker            : {0}' -f $(if ($LASTEXITCODE -eq 0 -and $server) { $server } else { 'NOT REACHABLE' }))

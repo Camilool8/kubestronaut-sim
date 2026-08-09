@@ -317,6 +317,8 @@ jobs:
           exit $fail
       - name: No script carries CRLF
         run: sh tests/check-line-endings.sh
+      - name: CRLF repair
+        run: bash tests/check-crlf-repair.sh
       - name: Parse the PowerShell launcher
         shell: pwsh
         run: |
@@ -350,6 +352,16 @@ jobs:
         shell: pwsh
         run: |
           .\sim.ps1 help
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Windows PowerShell 5.1 repairs CRLF
+        shell: powershell
+        run: |
+          .\tests\check-crlf-repair.ps1
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: PowerShell 7 repairs CRLF
+        shell: pwsh
+        run: |
+          .\tests\check-crlf-repair.ps1
           if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: An unknown command exits 1
         shell: powershell

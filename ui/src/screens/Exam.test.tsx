@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Exam, ExamGateControls } from "./Exam";
 import type { SessionSnapshot } from "../api";
 import { clipboardSync } from "../lib/clipboardSync";
 import { marksStore } from "../components/marksStore";
 import { toastStore } from "../components/toastStore";
+import { strings } from "../strings";
 
 const runningSession: SessionSnapshot = {
   state: "running",
@@ -271,5 +272,34 @@ describe("Exam topbar and focus reporting", () => {
     expect(await screen.findByText("Namespaces & quotas")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(toastStore.list()).toHaveLength(0);
+  });
+
+  test("Submit exam is in the bar, not behind the menu", async () => {
+    // runningSession (state: "running") mounts the lazy DesktopViewport,
+    // which needs a real ResizeObserver; stub one so its connect effect
+    // doesn't throw mid-test once userEvent's extra async work gives its
+    // dynamic import time to resolve. See App.test.tsx's identical stub for
+    // the same reason.
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    const user = userEvent.setup();
+    render(<Exam session={runningSession} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+
+    const submit = await screen.findByRole("button", { name: "Submit exam" });
+    expect(submit).toBeInTheDocument();
+
+    // Open the menu and confirm Submit isn't duplicated there — modeled on
+    // McqExam.test.tsx's "the menu holds the attempt's progress, and no
+    // longer its irreversible action", which opens the panel rather than
+    // asserting on it unopened.
+    await user.click(screen.getByRole("button", { name: strings.header.menuLabel }));
+    const panel = screen.getByRole("group", { name: strings.header.menuLabel });
+    expect(within(panel).queryByRole("button", { name: "Submit exam" })).toBeNull();
   });
 });

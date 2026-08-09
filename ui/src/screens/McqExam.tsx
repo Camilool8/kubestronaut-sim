@@ -217,18 +217,20 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
         onEndClick={() => setConfirmOpen(true)}
 
         extras={
-          <>
-            {questions.length > 0 && (
-              <McqTally questions={questions} answeredCount={answeredCount} />
-            )}
-            {session.mode === "training" && (
-              <NavMenuItem
-                icon="check"
-                label={scoring ? strings.practice.scoring : strings.practice.scoreNow}
-                onSelect={() => void scoreNow()}
-              />
-            )}
-          </>
+          questions.length > 0 || session.mode === "training" ? (
+            <>
+              {questions.length > 0 && (
+                <McqTally questions={questions} answeredCount={answeredCount} />
+              )}
+              {session.mode === "training" && (
+                <NavMenuItem
+                  icon="check"
+                  label={scoring ? strings.practice.scoring : strings.practice.scoreNow}
+                  onSelect={() => void scoreNow()}
+                />
+              )}
+            </>
+          ) : undefined
         }
       />
 
@@ -402,9 +404,12 @@ function McqQuestion({
         ? selection.filter((n) => n !== optionIndex)
         : [...selection, optionIndex].sort((a, b) => a - b);
       onAnswer(info.id, next);
-    } else {
-      onAnswer(info.id, selection.includes(optionIndex) ? [] : [optionIndex]);
+      return;
     }
+    // A pick replaces a pick. Clearing back to unanswered existed only
+    // because this was a checkbox; a radio has no such gesture, and the
+    // real exam has none either.
+    onAnswer(info.id, [optionIndex]);
   };
 
   const closeJump = (returnFocus: boolean) => {
@@ -489,7 +494,7 @@ function McqQuestion({
                       className={`mcq-option${checked ? " mcq-option-on" : ""}`}
                     >
                       <input
-                        type="checkbox"
+                        type={info.multi ? "checkbox" : "radio"}
                         name={`answer-${info.id}`}
                         checked={checked}
                         onChange={() => toggleOption(i)}

@@ -25,6 +25,7 @@ import { Progress } from "./screens/Progress";
 import { Score } from "./screens/Score";
 import { DesktopRequired, gateOverridden, useDesktopGate } from "./components/DesktopRequired";
 import { NavBar, type Crumb, type NavItem } from "./components/NavBar";
+import { NavMenuItem, NavMenuSection } from "./components/NavMenu";
 import { BackgroundJobChip } from "./components/BackgroundJobChip";
 import { ControlProgress } from "./components/ControlProgress";
 import { ToastLayer } from "./components/Toast";
@@ -37,7 +38,7 @@ import { HostedStart } from "./screens/HostedStart";
 import { Review } from "./screens/Review";
 import { useHosted } from "./lib/useHosted";
 import type { Me } from "./api";
-import { useRoute } from "./lib/useHashRoute";
+import { navigate, useRoute } from "./lib/useHashRoute";
 import { useSeatLanding } from "./lib/useSeatLanding";
 import { strings } from "./strings";
 
@@ -482,7 +483,29 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
         <NavBar
           trail={trail}
           nav={nav}
-
+          // An ended attempt pins this screen to <Score> only when it is not
+          // showing a review route: reviewId (above) wins over "ended", so a
+          // hosted seat that finishes an attempt and then browses back into
+          // #/history/<id> lands on <Review>, where a live wordmark link
+          // still goes somewhere. Lock it only when <Score> is actually the
+          // screen, the way an attempt in progress already does.
+          home={session.state !== "ended" || reviewId !== null}
+          menuExtra={
+            session.state === "ended" ? (
+              <NavMenuSection label={strings.header.menuNextAttempt}>
+                <NavMenuItem
+                  icon="grid"
+                  label={strings.control.newAttempt}
+                  onSelect={() => {
+                    // Clears a stale #/results/<qid> so the reset lands on the
+                    // exam list rather than a solutions URL.
+                    navigate("/exams");
+                    handleNewAttempt();
+                  }}
+                />
+              </NavMenuSection>
+            ) : undefined
+          }
           session={
             hosted
               ? {

@@ -253,6 +253,14 @@
   color: var(--accent-strong);
 }
 
+.navbar-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .nav-menu {
   position: relative;
   flex-shrink: 0;
