@@ -125,20 +125,49 @@ case "$cmd" in
 
     echo "kubestronaut-sim preflight"
     echo
+    os=$(uname -s)
+    case "$os" in
+      Darwin) host="macOS" ;;
+      Linux)
+        if grep -qi microsoft /proc/version 2>/dev/null; then host="WSL"; else host="Linux"; fi ;;
+      *) host="$os" ;;
+    esac
+    printf 'host              : %s\n' "$host"
     printf 'docker            : '; docker version --format '{{.Server.Version}}' 2>/dev/null || echo "NOT REACHABLE"
     printf 'compose           : '; docker compose version --short 2>/dev/null || echo "MISSING"
+    printf 'container OS      : '
+    ostype=$(docker info --format '{{.OSType}}' 2>/dev/null || echo unknown)
+    if [ "$ostype" = "linux" ]; then
+      echo "linux   ok"
+    else
+      echo "${ostype}   << must be linux — switch Docker Desktop to Linux containers"
+    fi
     printf 'python3           : '; python3 --version 2>/dev/null || echo "MISSING (./sim up needs it)"
 
     mem=$(docker info --format '{{.MemTotal}}' 2>/dev/null || echo 0)
     memgb=$(( mem / 1024 / 1024 / 1024 ))
     printf 'RAM to docker     : %sGB' "$memgb"
-    if [ "$memgb" -lt 8 ]; then echo "   << LOW: the desktop plus a 2-node cluster wants ~9GB"; else echo "   ok"; fi
+    if [ "$memgb" -lt 8 ]; then
+      case "$host" in
+        WSL) echo "   << LOW: raise it in %UserProfile%\\.wslconfig (memory=10GB), then wsl --shutdown" ;;
+        *)   echo "   << LOW: the desktop plus a 2-node cluster wants ~9GB" ;;
+      esac
+    else
+      echo "   ok"
+    fi
 
-    avail=$(docker run --rm -v /var/lib/docker alpine:3.21 df -Pk /var/lib/docker 2>/dev/null | awk 'NR==2{print int($4/1024/1024)}' || echo "?")
+    avail=$(docker run --rm -v /var/lib/docker alpine:3.21 \
+      sh -c 'df -Pk /var/lib/docker | awk "NR==2{print int(\$4/1024/1024)}"' 2>/dev/null || echo "?")
     printf 'disk for images   : %sGB' "$avail"
     if [ "$avail" != "?" ] && [ "$avail" -lt 25 ]; then echo "   << LOW: images alone are ~10GB"; else echo "   ok"; fi
 
-    printf 'cgroup version    : '; docker info --format '{{.CgroupVersion}}' 2>/dev/null || echo "unknown"
+    printf 'cgroup version    : '
+    cg=$(docker info --format '{{.CgroupVersion}}' 2>/dev/null || echo "unknown")
+    if [ "$cg" = "1" ]; then
+      echo "1   << the instances need cgroup v2 (compose sets cgroup: host)"
+    else
+      echo "$cg"
+    fi
 
     printf 'warm volumes      : '
     warm=$(docker volume ls -q --filter name=kubestronaut-sim 2>/dev/null | wc -l | tr -d ' ')
@@ -146,6 +175,22 @@ case "$cmd" in
       echo "none — this will be a cold first boot (slowest path)"
     else
       echo "${warm} present — boot will resume rather than rebuild"
+    fi
+
+    if [ "$host" = "WSL" ]; then
+      printf 'clone location    : '
+      case "$PWD" in
+        /mnt/*) echo "on the Windows filesystem — bind mounts will be slow; clone inside ~/ instead" ;;
+        *)      echo "WSL filesystem   ok" ;;
+      esac
+    fi
+    if [ "$host" = "Linux" ]; then
+      printf 'docker access     : '
+      if docker info >/dev/null 2>&1; then
+        echo "ok"
+      else
+        echo "cannot reach the daemon as $(id -un) — add yourself to the docker group, or use sudo"
+      fi
     fi
 
     printf 'exam UI           : '
