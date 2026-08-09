@@ -69,14 +69,22 @@ function Invoke-Docker {
   }
 }
 
-# doctor must degrade gracefully, never crash, when docker isn't even on
-# PATH -- that's the single most likely reason someone runs it. Under
-# $ErrorActionPreference = 'Stop', a missing docker.exe raises a terminating
-# CommandNotFoundException that 2>$null cannot suppress (there is no child
-# process yet to redirect), so every probe below goes through this instead
-# of a bare "& docker ...". Basic function, same reasoning as Invoke-Docker:
-# no param() block, so dashed probe args (--format, -v, -f, -q) are never
-# parameter-binding candidates.
+# Two 5.1-only failure modes converge on the same fix, so both use this:
+#   1. doctor must degrade gracefully, never crash, when docker isn't even
+#      on PATH -- that's the single most likely reason someone runs it.
+#   2. On Windows PowerShell 5.1, a native command that writes to stderr
+#      WHILE stderr is redirected (exactly what "2>$null" does) raises a
+#      terminating NativeCommandError under $ErrorActionPreference = 'Stop'.
+#      purge's project-name lookup, label read, and volume removal all
+#      redirect stderr for a command that can legitimately fail (an in-use
+#      volume's "docker volume rm" ALWAYS writes to stderr) -- without this,
+#      5.1 would abort mid-loop instead of printing the friendly "still in
+#      use?" message and moving on to the next volume, the way sim does.
+# In both cases 2>$null cannot suppress the error itself (case 1: no child
+# process ever existed to redirect; case 2: the redirection is what
+# triggers it), so it has to be caught. Basic function, same reasoning as
+# Invoke-Docker: no param() block, so dashed probe args (--format, -v, -f,
+# -q) are never parameter-binding candidates.
 function Invoke-DockerSafe {
   try {
     & docker @args 2>$null
@@ -194,7 +202,7 @@ function Invoke-Purge([string]$Mode) {
   if ($Mode) { Write-Host 'usage: .\sim.ps1 purge [--all]' ; exit 1 }
 
   $project = ''
-  $raw = (& docker compose config --format json 2>$null) -join "`n"
+  $raw = (Invoke-DockerSafe compose config --format json) -join "`n"
   if ($LASTEXITCODE -eq 0 -and $raw) {
     $project = Get-Field ($raw | ConvertFrom-Json) 'name'
   }
@@ -221,14 +229,18 @@ function Invoke-Purge([string]$Mode) {
     # embedded double quote, so 5.1's plain wrap-in-quotes is safe; decoding
     # the label map ourselves sidesteps the native templating quoting
     # entirely.
-    $labelsRaw = & docker volume inspect -f '{{json .Labels}}' $vol 2>$null
+    $labelsRaw = Invoke-DockerSafe volume inspect -f '{{json .Labels}}' $vol
     $key = ''
     if ($LASTEXITCODE -eq 0 -and $labelsRaw) {
       $labels = ($labelsRaw -join '') | ConvertFrom-Json
       $key = Get-Field $labels 'com.docker.compose.volume'
     }
     if ($key -eq 'state') { $kept = $true; continue }
-    & docker volume rm $vol > $null 2>&1
+    # An in-use volume ALWAYS makes "docker volume rm" write to stderr --
+    # exactly the case Invoke-DockerSafe exists to survive on 5.1, and
+    # exactly the case the line below exists to report instead of crashing
+    # the whole loop out from under the remaining volumes.
+    Invoke-DockerSafe volume rm $vol | Out-Null
     if ($LASTEXITCODE -ne 0) { Write-Host "  could not remove ${vol} (still in use?)" }
   }
 
@@ -280,6 +292,7 @@ function Invoke-Doctor {
   Write-Host ('compose           : {0}' -f $(if ($LASTEXITCODE -eq 0 -and $compose) { $compose } else { 'MISSING' }))
 
   $ostype = Invoke-DockerSafe info --format '{{.OSType}}'
+  if (-not $ostype) { $ostype = 'unknown' }
   if ($ostype -eq 'linux') {
     Write-Host 'container OS      : linux   ok'
   } else {
@@ -305,7 +318,12 @@ function Invoke-Doctor {
   # container's own shell from expanding it.
   $awkArg = 'df -Pk /var/lib/docker | awk ''NR==2{print int($4/1024/1024)}'''
   $avail = Invoke-DockerSafe run --rm -v /var/lib/docker alpine:3.21 sh -c $awkArg
-  if ($LASTEXITCODE -ne 0 -or -not $avail) { $avail = '?' }
+  if ($avail -is [array]) { $avail = $avail -join '' }
+  # Guard the [int] cast, not just the exit code: multi-line or otherwise
+  # non-numeric output would otherwise throw under $ErrorActionPreference =
+  # 'Stop' and take doctor down -- the one tool meant to survive things
+  # already being broken.
+  if ($LASTEXITCODE -ne 0 -or $avail -notmatch '^\d+$') { $avail = '?' }
   if ($avail -ne '?' -and [int]$avail -lt 25) {
     Write-Host ("disk for images   : {0}GB   << LOW: images alone are ~10GB" -f $avail)
   } else {
