@@ -150,7 +150,20 @@ function Repair-LineEndings {
   $fixed = 0
   foreach ($rel in $listed) {
     if (-not (Test-Path -LiteralPath $rel)) { continue }
-    $bytes = [System.IO.File]::ReadAllBytes($rel)
+    # Resolve once, up front, and read/write that same absolute path.
+    # [System.IO.File]::ReadAllBytes/WriteAllBytes resolve a relative path
+    # against [Environment]::CurrentDirectory, which Set-Location
+    # $PSScriptRoot (above) does NOT update -- so on a real Windows
+    # PowerShell that started elsewhere and cd'd into the repo, Test-Path
+    # (which DOES follow Set-Location) passes here while a bare
+    # ReadAllBytes($rel) throws MethodInvocationException: "Could not find
+    # file". Reproduced empirically: Test-Path -LiteralPath "sim" = True,
+    # ReadAllBytes("sim") THREW "Could not find file
+    # '<CurrentDirectory>\sim'". Resolve-Path follows Set-Location like
+    # Test-Path does, so resolving first keeps every byte-level call below
+    # looking at the file the guard above just confirmed exists.
+    $full = (Resolve-Path -LiteralPath $rel).Path
+    $bytes = [System.IO.File]::ReadAllBytes($full)
     if (-not (Test-HasCrlfPair $bytes)) { continue }
     $out = New-Object System.Collections.Generic.List[byte]
     for ($i = 0; $i -lt $bytes.Length; $i++) {
@@ -161,7 +174,7 @@ function Repair-LineEndings {
     # disagreeing again: only write, and only count as fixed, if the byte
     # count actually shrank.
     if ($out.Count -eq $bytes.Length) { continue }
-    [System.IO.File]::WriteAllBytes((Resolve-Path -LiteralPath $rel).Path, $out.ToArray())
+    [System.IO.File]::WriteAllBytes($full, $out.ToArray())
     $fixed++
   }
   return $fixed
@@ -369,8 +382,12 @@ function Invoke-Doctor {
       if (-not (Test-Path -LiteralPath $rel)) { continue }
       # Same predicate Repair-LineEndings uses to decide what it would
       # actually rewrite -- see Test-HasCrlfPair -- so this never reports a
-      # count `.\sim.ps1 up` wouldn't also report as repaired.
-      if (Test-HasCrlfPair ([System.IO.File]::ReadAllBytes($rel))) { $crlf++ }
+      # count `.\sim.ps1 up` wouldn't also report as repaired. And the same
+      # CurrentDirectory trap as Repair-LineEndings applies here too: resolve
+      # before reading, or ReadAllBytes throws for anyone who cd'd in rather
+      # than starting a shell already rooted at the repo.
+      $full = (Resolve-Path -LiteralPath $rel).Path
+      if (Test-HasCrlfPair ([System.IO.File]::ReadAllBytes($full))) { $crlf++ }
     }
   }
   if ($crlf -eq 0) {
