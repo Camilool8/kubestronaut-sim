@@ -400,5 +400,5 @@ switch ($Command) {
   }
   'status' { & docker compose ps; exit $LASTEXITCODE }
   'grade'  { & docker compose exec facilitator /entrypoint.sh grade; exit $LASTEXITCODE }
-  'help'   { Write-Host $USAGE }
+  'help'   { Write-Host $USAGE; exit 0 }
 }
