@@ -1,7 +1,8 @@
 # CLI and configuration
 
 `./sim` is a bash wrapper around `docker compose`: nine subcommands and
-five configuration variables.
+five configuration variables. `.\sim.ps1` is the same nine subcommands in
+PowerShell for Windows — see [install.md](install.md).
 
 Everything after `./sim up` can also be done in the browser at
 `http://localhost:8080`.
@@ -12,14 +13,17 @@ Everything after `./sim up` can also be done in the browser at
 |---|---|
 | Docker Engine or Docker Desktop | Every service is a container |
 | Docker Compose v2 (`docker compose`) | The stack is one compose project |
-| `python3` | `./sim up` and `./sim reset` read JSON with it |
+| `python3` | `./sim up` and `./sim reset` read JSON with it. **Not needed by `.\sim.ps1`**, which parses JSON natively |
 | `curl` | `up`, `reset` and `doctor` poll the facilitator |
-| `bash` | `./sim` uses `$SECONDS` and `set -o pipefail` |
+| `bash`, or PowerShell 5.1+ on Windows | `./sim` uses `$SECONDS` and `set -o pipefail`; `.\sim.ps1` is the Windows equivalent |
 | ~9GB RAM available to Docker | Desktop plus a two-node cluster |
 | ~25GB free disk | The images alone are ~10GB |
 
-> **`python3` is not optional.** Without it every `/api/boot` poll
-> yields an empty state, no phase line prints, and `up` spins until
+Obtaining each of these differs by operating system —
+[install.md](install.md) has the steps.
+
+> **`python3` is not optional for `./sim`.** Without it every `/api/boot`
+> poll yields an empty state, no phase line prints, and `up` spins until
 > `SIM_BOOT_BUDGET` expires.
 
 ## Commands

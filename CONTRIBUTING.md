@@ -41,6 +41,10 @@ for m in conductor facilitator proxy hub images/desktop/opener; do (cd $m && go 
 
 If you touched `site/`, also run `bash site/build.sh --check`.
 
+If you touched `sim`, also run `bash tests/check-sim-parity.sh` — the
+Windows launcher `sim.ps1` must offer the same nine subcommands, and CI
+fails when the two drift.
+
 ### What each gate proves
 
 | Gate | Proves |
@@ -51,6 +55,7 @@ If you touched `site/`, also run `bash site/build.sh --check`.
 | `bank-hints.sh` | Every hinted question has both tiers, and no hint shares 120 consecutive characters with its solution |
 | `bank-mcq.sh` | Six invariants over every `examType: mcq` bank, including a non-degenerate answer key |
 | `site/build.sh --check` | The generated mirrors are current, the page's figures match `banks/*/exam.yaml`, and its cert marks match `CertMark.tsx` |
+| `check-sim-parity.sh` | `sim` and `sim.ps1` offer the same subcommands and the same usage string |
 
 ### What CI cannot run
 

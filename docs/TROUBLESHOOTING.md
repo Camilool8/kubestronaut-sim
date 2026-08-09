@@ -24,6 +24,9 @@ first boot on a new machine.
 | `disk for images : NGB << LOW` | Under 25GB free. The images alone are ~10GB | Free space, or `./sim purge` to drop an old install's volumes |
 | `warm volumes : none` | Not a fault — this is a cold first boot | Expect several minutes. Later boots resume |
 | `env: 'bash\r': No such file or directory` or `exec /entrypoint.sh: no such file or directory` | A Windows clone made before `.gitattributes` existed checked out `sim` and the `.sh` scripts as CRLF, and the images were built from them | Re-clone the repo, then rebuild: `docker compose up -d --build`. Re-cloning alone is not enough — the corrupt scripts are already baked into the images you built before |
+| `.\sim.ps1 cannot be loaded because running scripts is disabled` | Windows blocks unsigned scripts by default | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, or `powershell -ExecutionPolicy Bypass -File .\sim.ps1 up` |
+| `container OS : windows` | Docker Desktop is in Windows-containers mode | Right-click the tray icon → *Switch to Linux containers* |
+| `RAM to docker : NGB << LOW` on Windows | WSL2 allocates itself a fraction of host RAM | Create `%UserProfile%\.wslconfig` with `memory=10GB`, then `wsl --shutdown` |
 
 ## During a boot
 
