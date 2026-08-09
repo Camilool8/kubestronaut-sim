@@ -315,6 +315,8 @@ jobs:
             bash -n "$f" || { echo "syntax error: $f"; fail=1; }
           done
           exit $fail
+      - name: No script carries CRLF
+        run: sh tests/check-line-endings.sh
       - name: Writes into /shared are atomic
         run: |
           if grep -rnE '>>?[[:space:]]*/shared/' images/ proxy/; then
