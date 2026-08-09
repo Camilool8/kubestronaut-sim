@@ -24,6 +24,11 @@ param(
 # Recover it here, same as sim's own "${2:-}" would.
 if (-not $Argument -and $args.Count -gt 0) { $Argument = [string]$args[0] }
 
+# Mirrors sim's `cmd=${1:-help}`: an explicitly empty first argument -- a
+# wrapper passing "$cmd" with $cmd unset -- is the help path there, not an
+# unknown command, and the two launchers must exit the same way for it.
+if (-not $Command) { $Command = 'help' }
+
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 

@@ -2,7 +2,12 @@
 
 `./sim` is a bash wrapper around `docker compose`: nine subcommands and
 five configuration variables. `.\sim.ps1` is the same nine subcommands in
-PowerShell for Windows — see [install.md](install.md).
+PowerShell for Windows — see [install.md](install.md). CI holds the two to
+the same subcommand names, the same usage string, and the same exit code for
+argv either one refuses, `purge --all` and its casing included
+(`tests/check-sim-parity.sh`). The configuration is where they differ on
+purpose: the environment variables below have `sim.ps1` flags, listed
+alongside them.
 
 Everything after `./sim up` can also be done in the browser at
 `http://localhost:8080`.

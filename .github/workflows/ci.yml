@@ -343,6 +343,12 @@ jobs:
           if ($errors) { $errors | ForEach-Object { $_.Message }; exit 1 }
           Write-Host "sim.ps1 parses clean"
       - name: The two launchers agree
+        env:
+          # The gate runs both launchers over a table of bad argv and compares
+          # exit codes. Without a PowerShell it can only compare the two files
+          # as text and says so; this makes a missing pwsh a failure instead of
+          # a silent half-run. The step above already proves pwsh is here.
+          PWSH_REQUIRED: "1"
         run: bash tests/check-sim-parity.sh
       - name: Writes into /shared are atomic
         run: |
