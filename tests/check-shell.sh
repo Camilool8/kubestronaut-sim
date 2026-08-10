@@ -33,6 +33,24 @@ for f in "${files[@]}"; do
   bash -n "$f" || { echo "syntax error: $f"; fail=1; }
 done
 
+# An ERR trap is not inherited by shell functions unless errtrace is on, so a
+# script that installs one without -E reports the failures that happen at its
+# top level and silently misses every failure inside a function. That is not a
+# style point: images/k8s-env/bootstrap.sh shipped this way, and a failed image
+# preload exited the script without ever recording it, leaving boot.json on
+# "booting" and `./sim up` polling a dead boot until its budget ran out.
+trapped=0
+for f in "${files[@]}"; do
+  grep -qE '^[[:space:]]*trap[[:space:]].*[[:space:]]ERR([[:space:]]|$)' "$f" || continue
+  trapped=$((trapped + 1))
+  grep -qE '^[[:space:]]*set[[:space:]]+-[a-zA-Z]*E|^[[:space:]]*set[[:space:]]+-o[[:space:]]+errtrace' "$f" && continue
+  echo "$f installs an ERR trap but does not set -E (errtrace)." >&2
+  echo "    Without it the trap never fires for a failure inside a function," >&2
+  echo "    so the script dies under -e with the failure unrecorded." >&2
+  echo "    Add -E to its set line, or drop the trap." >&2
+  fail=1
+done
+
 # -x follows the `# shellcheck source=` directives in images/k8s-env, which
 # would otherwise sit in the tree doing nothing.
 if command -v shellcheck >/dev/null 2>&1; then
@@ -49,7 +67,7 @@ fi
 
 if [ "$fail" = "0" ]; then
   if [ "$linted" = "1" ]; then
-    echo "check-shell: ${#files[@]} scripts parse and lint clean at severity=${SEVERITY}"
+    echo "check-shell: ${#files[@]} scripts parse and lint clean at severity=${SEVERITY}; ${trapped} install an ERR trap, all with -E"
   else
     echo "check-shell: ${#files[@]} scripts parse — NOT linted, see above"
   fi

@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# -E matters as much as -e here. Without it bash does not inherit the ERR trap
+# into shell functions, so a failure inside preload_images, load_image or
+# preload_bank_images killed the script under -e without ever reaching
+# boot_failed: bootstrap exited 1 while boot.json still read {"state":"booting"},
+# and `./sim up` then polled a dead boot until SIM_BOOT_BUDGET expired an hour
+# later. The failure has to be recorded, not just suffered.
+set -Eeuo pipefail
 # shellcheck source=phase.sh
 . /opt/sim/phase.sh
 trap 'boot_failed "step failed: ${BASH_COMMAND} (exit $?)"' ERR
