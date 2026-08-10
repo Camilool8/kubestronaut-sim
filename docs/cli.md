@@ -14,22 +14,13 @@ Everything after `./sim up` can also be done in the browser at
 
 ## Prerequisites
 
-| Requirement | Needed by |
-|---|---|
-| Docker Engine or Docker Desktop | Every service is a container |
-| Docker Compose v2 (`docker compose`) | The stack is one compose project |
-| `python3` | `./sim up` and `./sim reset` read JSON with it. **Not needed by `.\sim.ps1`**, which parses JSON natively |
-| `curl` | `up`, `reset` and `doctor` poll the facilitator |
-| `bash`, or PowerShell 5.1+ on Windows | `./sim` uses `$SECONDS` and `set -o pipefail`; `.\sim.ps1` is the Windows equivalent |
-| ~9GB RAM available to Docker | Desktop plus a two-node cluster |
-| ~25GB free disk | The images alone are ~10GB |
+Docker, Compose v2, RAM, disk, and the three host tools `./sim` shells
+out to. The list, what each is needed for, and how to obtain it on each
+operating system are all in
+[install.md](install.md#prerequisites) — including why `python3` and
+`curl` are not optional for `./sim`, and why `.\sim.ps1` needs neither.
 
-Obtaining each of these differs by operating system —
-[install.md](install.md) has the steps.
-
-> **`python3` is not optional for `./sim`.** Without it every `/api/boot`
-> poll yields an empty state, no phase line prints, and `up` spins until
-> `SIM_BOOT_BUDGET` expires.
+`./sim doctor` checks every one of them.
 
 ## Commands
 
@@ -149,11 +140,10 @@ published port in `docker-compose.yaml`. Neither launcher sets it —
 `-Bind` only exports `SIM_BIND` when you pass it — so a direct `docker
 compose up` binds loopback too.
 
-There is no authentication anywhere in the stack, and a published port
-is forwarded past the `INPUT` chain, so `ufw` and `firewalld` do not
-cover one: `0.0.0.0` hands the whole LAN everything, whatever your host
-firewall says. Only opt in on a network you control. See
-[SECURITY.md](../SECURITY.md).
+What that default is defending, and what you take on by changing it, is
+[SECURITY.md](../SECURITY.md#sim_bind). Read it before `0.0.0.0`: there
+is no authentication anywhere in this stack, and your host firewall does
+not cover a published port.
 
 ### SIM_BOOT_BUDGET
 

@@ -55,7 +55,7 @@ body:
       options:
         - Exam
         - Training
-        - Speed
+        - Mastery
         - Not in an attempt
     validations:
       required: false

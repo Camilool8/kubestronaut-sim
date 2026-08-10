@@ -4,7 +4,7 @@ The simulator is eight containers and a two-node Kubernetes cluster. What
 differs by operating system is the shell that runs the launcher, the way
 memory reaches Docker, and whether `python3` is needed at all.
 
-## What every OS needs
+## Prerequisites
 
 | Requirement | Why |
 |---|---|
@@ -13,9 +13,18 @@ memory reaches Docker, and whether `python3` is needed at all.
 | ~9GB RAM available to Docker | The desktop plus a two-node cluster |
 | ~25GB free disk | The images alone are ~10GB |
 | cgroup v2 | The instances run with `cgroup: host` |
+| `python3` | `./sim up` and `./sim reset` read JSON with it. **Not needed by `.\sim.ps1`**, which parses JSON natively |
+| `curl` | `up`, `reset` and `doctor` poll the facilitator |
+| `bash`, or PowerShell 5.1+ on Windows | `./sim` uses `$SECONDS` and `set -o pipefail`; `.\sim.ps1` is the Windows equivalent |
 
 `./sim doctor` — `.\sim.ps1 doctor` on Windows — checks every one of these
 and flags what needs attention.
+
+The last three are where the operating systems differ, and how to obtain
+them is in the per-OS sections below. Neither `python3` nor `curl` is
+optional for `./sim`, and a missing one fails quietly rather than loudly
+— [what that looks like for `python3`](#4-python3) and [for
+`curl`](#5-curl) is worth reading before blaming a slow boot on Docker.
 
 ## Windows
 
