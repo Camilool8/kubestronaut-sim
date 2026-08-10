@@ -363,7 +363,7 @@ the question declares none — which most do.
   allowlist proxy and never sees this endpoint.
 - An entry whose URL is not `https`, or does not parse, is dropped at
   bank load with a log line rather than failing the boot. A mistyped
-  study link must not stop someone sitting an exam.
+  study link must not stop someone taking an exam.
 
 | Code | When |
 |---|---|
@@ -989,7 +989,7 @@ otherwise lie (`facilitator/internal/history/record.go`):
 
 | Clause | Rejects |
 |---|---|
-| `session.Recorded(mode)` | Training — practice with the solutions open is not a sitting. Never fires on the recording path; it is there for an *imported* record, which came from a document this build did not write. |
+| `session.Recorded(mode)` | Training — practice with the solutions open is not an attempt. Never fires on the recording path; it is there for an *imported* record, which came from a document this build did not write. |
 | No `domainFilter` | A domain drill. 100% on a ten-task drill of one domain is a good session and is not a CKAD pass. |
 | `questionCount >= the bank's declared length` | A short draw. Fewer questions is an easier exam, and a bank's passing score was set against its declared length. |
 
@@ -1071,7 +1071,7 @@ Every attempt, most recent first, plus the cross-exam summary. Always
 | Field | Behaviour |
 |---|---|
 | `attempts` | Marshals as `[]`, never `null` |
-| `id` | The session's own attempt token. This is what makes recording idempotent — a recovery re-grade of the same attempt updates nothing rather than showing the candidate the same sitting twice |
+| `id` | The session's own attempt token. This is what makes recording idempotent — a recovery re-grade of the same attempt updates nothing rather than showing the candidate the same attempt twice |
 | `weakDomains` | Weakest first, ranked on **raw** points earned over points available |
 
 `weakDomains` ranks a candidate's own domains against each other. How
@@ -1441,9 +1441,9 @@ everything whose truth outlives one session — and **proxies** everything
 else to the candidate's own session Pod, where the facilitator described
 above is unchanged and unaware any of this exists.
 
-Every route below except `/healthz`, `GET /api/me` and the OAuth pair
-requires a signed session cookie and answers `401 {"error":"not signed
-in"}` without one.
+Every route below except `/healthz`, `GET /api/me`, `GET /hub/exams` and
+the OAuth pair requires a signed session cookie and answers `401
+{"error":"not signed in"}` without one.
 
 ### The catch-all proxy
 
@@ -1495,6 +1495,58 @@ It is **server truth**, set by the hub rather than remembered from a
 click, so it is still correct after a reload lands mid-rebuild. A
 client's own memory of having pressed "New attempt" would not survive
 that reload.
+
+### GET /hub/exams
+
+The exam list the lobby renders before anyone has a session
+(`ui/src/api.ts`). Always 200, and signed out too: someone deciding
+whether to sign in is entitled to see what they would be signing in for.
+A hub with no bank index configured answers `{"exams": []}` rather than
+an error.
+
+```json
+{
+  "exams": [
+    {
+      "id": "ckad-mock-01",
+      "title": "CKAD Mock Exam",
+      "certification": "CKAD",
+      "description": "Developer-track exercises...",
+      "examType": "hands-on",
+      "durationSeconds": 7200,
+      "passingScore": 66,
+      "kubernetesVersion": "1.35",
+      "questionCount": 17,
+      "poolCount": 44,
+      "nodes": 2,
+      "available": true,
+      "kind": "practical"
+    }
+  ]
+}
+```
+
+Each row is a `GET /api/control/banks` entry with two fields added, so
+every field documented under [that endpoint](#get-apicontrolbanks)
+applies unchanged (`hub/internal/catalog/catalog.go`).
+
+| Field | Means |
+|---|---|
+| `nodes` | `spec.environment.nodes`, so the lobby can say how large a cluster the seat will build |
+| `kind` | Which seat pool this bank draws from: `mcq` for an `examType: mcq` bank, `practical` for every other (`hub/internal/session/session.go`, `KindOf`) |
+
+`kind` exists because the two pools are capped separately and a
+candidate picks a bank, not a pool — the lobby has to know which counter
+a choice will spend before it sends `POST /api/session/start`.
+
+There is no `active` field, and that is the difference from the
+conductor's version: a hub holds no bank of its own. Every candidate's
+Pod loads whichever bank they chose, so "the active bank" is a question
+only their own session can answer.
+
+Hidden banks are absent, so `smoke-01` is never offered a seat. A
+coming-soon or unrunnable bank is still listed, `available: false` with
+its `note`, for the same reason the local catalog lists one.
 
 ### POST /api/session/start
 

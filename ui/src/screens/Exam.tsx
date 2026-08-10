@@ -18,7 +18,9 @@ import {
   type SessionSnapshot,
 } from "../api";
 import { useAsync } from "../lib/useAsync";
+import { useExamClock } from "../lib/useExamClock";
 import { TimerBar } from "../components/TimerBar";
+import { TimerReadout } from "../components/TimerReadout";
 import { QuestionPanel } from "../components/QuestionPanel";
 import { Dialog } from "../components/Dialog";
 import { NavMenuItem } from "../components/NavMenu";
@@ -34,7 +36,6 @@ import { PanelResizer } from "../components/PanelResizer";
 import { PendingBar } from "../components/Pending";
 import { toastStore } from "../components/toastStore";
 import { marksStore } from "../components/marksStore";
-import { formatClock, formatClockSpoken, formatElapsed } from "../lib/format";
 import { isTypingTarget } from "../lib/typing";
 import { strings } from "../strings";
 
@@ -55,23 +56,10 @@ interface ExamProps {
 }
 
 export function ExamGateControls({ session, fetchedAt, onSessionChange }: ExamProps) {
-  const [now, setNow] = useState(() => Date.now());
   const [ending, setEnding] = useState(false);
   const [endError, setEndError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, []);
-
-  const remaining = Math.max(
-    0,
-    session.remainingSeconds - Math.floor((now - fetchedAt) / 1000),
-  );
-
-  const untimed = session.untimed;
-  const startedMs = session.startedAt ? Date.parse(session.startedAt) : NaN;
-  const elapsed = Number.isNaN(startedMs) ? 0 : Math.max(0, now - startedMs);
+  const { remaining, elapsed, untimed } = useExamClock(session, fetchedAt);
 
   const end = async () => {
     setEnding(true);
@@ -94,19 +82,7 @@ export function ExamGateControls({ session, fetchedAt, onSessionChange }: ExamPr
     <div className="gate-session">
       <p className="gate-session-timer">
         <span className="timer" role="timer">
-          {untimed ? (
-            <>
-              <span aria-hidden="true">{formatElapsed(elapsed)}</span>
-              <span className="sr-only">{strings.exam.timeElapsed(formatElapsed(elapsed))}</span>
-            </>
-          ) : (
-            <>
-              <span aria-hidden="true">{formatClock(remaining)}</span>
-              <span className="sr-only">
-                {strings.exam.timeRemaining(formatClockSpoken(remaining))}
-              </span>
-            </>
-          )}
+          <TimerReadout untimed={untimed} remaining={remaining} elapsed={elapsed} />
         </span>
       </p>
       <p>{untimed ? strings.mobile.sessionRunningUntimed : strings.mobile.sessionRunning}</p>

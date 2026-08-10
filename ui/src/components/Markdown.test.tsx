@@ -9,17 +9,23 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// The renderer is loaded through React.lazy, so the first paint of any
+// <Markdown> is the Suspense fallback. Every assertion below therefore waits on
+// something the renderer must have produced before it looks for what must be
+// absent -- an absence assertion made against the fallback's empty div would
+// pass no matter what the renderer does.
+
 describe("Markdown", () => {
-  test("inline code becomes a copy button", () => {
+  test("inline code becomes a copy button", async () => {
     render(<Markdown>{"Label the Namespace `team=aurora` first."}</Markdown>);
-    expect(screen.getByRole("button", { name: /team=aurora/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /team=aurora/ })).toBeInTheDocument();
   });
 
-  test("a fenced block is a code block, not a copy button", () => {
+  test("a fenced block is a code block, not a copy button", async () => {
     render(<Markdown>{"```yaml\nkind: Pod\n```"}</Markdown>);
 
+    expect(await screen.findByText("yaml")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /kind: Pod/ })).not.toBeInTheDocument();
-    expect(screen.getByText("yaml")).toBeInTheDocument();
   });
 
   test("a fenced block copies its whole body to the desktop", async () => {
@@ -27,63 +33,150 @@ describe("Markdown", () => {
     const copy = vi.spyOn(desktopClipboard, "copy").mockResolvedValue("desktop");
     render(<Markdown>{"```bash\nkubectl get pods\nkubectl get svc\n```"}</Markdown>);
 
-    await user.click(screen.getByRole("button", { name: /copy/i }));
+    await user.click(await screen.findByRole("button", { name: /copy/i }));
 
     expect(copy).toHaveBeenCalledWith("kubectl get pods\nkubectl get svc");
   });
 
-  test("a fenced block with no language still renders as a block", () => {
+  test("a fenced block with no language still renders as a block", async () => {
     render(<Markdown>{"```\nplain listing\n```"}</Markdown>);
+
+    expect(await screen.findByText("text")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /plain listing/ })).not.toBeInTheDocument();
-    expect(screen.getByText("text")).toBeInTheDocument();
   });
 
-  test("two fenced blocks on one screen get distinguishable accessible names", () => {
+  test("two fenced blocks on one screen get distinguishable accessible names", async () => {
     render(
       <Markdown>
         {"```yaml\nkind: Pod\n```\n\n```bash\nkubectl get pods\n```"}
       </Markdown>,
     );
 
-    expect(screen.getByRole("button", { name: /copy yaml code block/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /copy yaml code block/i }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy bash code block/i })).toBeInTheDocument();
   });
 
-  test("a document's own h1 renders one level down, under the app's", () => {
+  test("a document's own h1 renders one level down, under the app's", async () => {
     render(<Markdown>{"# Question 8 | Route two Services\n\nDo the thing."}</Markdown>);
+
     expect(
-      screen.getByRole("heading", { level: 2, name: /route two services/i }),
+      await screen.findByRole("heading", { level: 2, name: /route two services/i }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
   });
 
-  test("the shift keeps the rest of the ramp in order", () => {
+  test("the shift keeps the rest of the ramp in order", async () => {
     render(<Markdown>{"# Title\n\n## Section\n\n### Detail"}</Markdown>);
-    expect(screen.getByRole("heading", { level: 2, name: "Title" })).toBeInTheDocument();
+
+    expect(await screen.findByRole("heading", { level: 2, name: "Title" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 3, name: "Section" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 4, name: "Detail" })).toBeInTheDocument();
   });
 
-  test("a wide table scrolls inside itself rather than pushing the page sideways", () => {
-    const { container } = render(
-      <Markdown>{"| Name | Value |\n| --- | --- |\n| a | b |"}</Markdown>,
-    );
-    const table = container.querySelector("table");
-    expect(table?.parentElement).toHaveClass("md-table-scroll");
+  test("a wide table scrolls inside itself rather than pushing the page sideways", async () => {
+    render(<Markdown>{"| Name | Value |\n| --- | --- |\n| a | b |"}</Markdown>);
+
+    const table = await screen.findByRole("table");
+    expect(table.parentElement).toHaveClass("md-table-scroll");
   });
 
-  test("copyable={false} renders inline code as a value, not a control", () => {
+  test("copyable={false} renders inline code as a value, not a control", async () => {
     const { container } = render(
       <Markdown copyable={false}>{"Set `runAsNonRoot: true` on the container."}</Markdown>,
     );
+
+    expect(await screen.findByText("runAsNonRoot: true")).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(container.querySelector("code")?.textContent).toBe("runAsNonRoot: true");
   });
 
-  test("copyable={false} leaves fenced blocks alone", () => {
+  test("copyable={false} leaves fenced blocks alone", async () => {
     render(<Markdown copyable={false}>{"```yaml\nkind: Pod\n```"}</Markdown>);
 
-    expect(screen.getByRole("button", { name: /copy yaml code block/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /copy yaml code block/i }),
+    ).toBeInTheDocument();
+  });
+});
+
+// Bank markdown is authored content that reaches the renderer verbatim, and the
+// exam tab holds the VNC session plus every piece of in-memory attempt state.
+// The three properties below are what keep that tab intact. Two of them held
+// only by default -- react-markdown drops raw HTML nodes because no rehype-raw
+// is configured, and rewrites hostile schemes because defaultUrlTransform is
+// not overridden. Adding rehype-raw or replacing that transform fails these.
+describe("Markdown is a hostile-content boundary, not just a formatter", () => {
+  test("raw HTML in the source never becomes an element, so a script cannot mount", async () => {
+    const { container } = render(
+      <Markdown>
+        {[
+          "Apply the manifest.",
+          "",
+          "<script>window.__pwned = true;</script>",
+          "",
+          '<img src="x" onerror="window.__pwned = true">',
+          "",
+          "Then verify it.",
+        ].join("\n")}
+      </Markdown>,
+    );
+
+    expect(await screen.findByText("Apply the manifest.")).toBeInTheDocument();
+    expect(screen.getByText("Then verify it.")).toBeInTheDocument();
+
+    expect(container.querySelector("script")).toBeNull();
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("[onerror]")).toBeNull();
+
+    // Escaped to inert text rather than parsed: that is the whole of the
+    // guarantee, and the only observable difference a rehype-raw pass makes.
+    expect(container.textContent).toContain("<script>window.__pwned = true;</script>");
+    expect(container.textContent).toContain('<img src="x" onerror="window.__pwned = true">');
+  });
+
+  test("an inline raw tag stays text without swallowing the prose around it", async () => {
+    const { container } = render(
+      <Markdown>{"Scale the <b>Deployment</b> to three replicas."}</Markdown>,
+    );
+
+    expect(await screen.findByText(/Scale the/)).toBeInTheDocument();
+    expect(container.querySelector("b")).toBeNull();
+    expect(container.textContent).toBe("Scale the <b>Deployment</b> to three replicas.");
+  });
+
+  test("a javascript: href is neutralised rather than handed to the anchor", async () => {
+    const { container } = render(<Markdown>{"[read the docs](javascript:alert(1))"}</Markdown>);
+
+    expect(await screen.findByText("read the docs")).toBeInTheDocument();
+    const link = container.querySelector("a");
+    expect(link).not.toBeNull();
+    expect(link?.getAttribute("href")).not.toMatch(/javascript:/i);
+    expect(link?.getAttribute("href")).toBe("");
+    // An emptied href is not even exposed as a link to reach by keyboard.
+    expect(screen.queryByRole("link")).toBeNull();
+  });
+
+  test("a bank's link opens out of tab, so clicking it cannot discard the attempt", async () => {
+    const href = "https://kubernetes.io/docs/concepts/services-networking/service/";
+    render(<Markdown>{`See [the Service docs](${href}) for the field list.`}</Markdown>);
+
+    const link = await screen.findByRole("link", { name: "the Service docs" });
+    expect(link).toHaveAttribute("href", href);
+    // Without target="_blank" this click replaces the document that owns the
+    // VNC session and the unsaved attempt state. rel closes the two doors that
+    // opening a new context otherwise leaves ajar.
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  test("the anchor is hardened on the static variant too, not only the copyable one", async () => {
+    render(<Markdown copyable={false}>{"[the Service docs](https://kubernetes.io/docs/)"}</Markdown>);
+
+    const link = await screen.findByRole("link", { name: "the Service docs" });
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 });
 

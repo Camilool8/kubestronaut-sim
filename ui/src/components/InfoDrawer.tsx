@@ -4,10 +4,9 @@ import { strings } from "../strings";
 
 interface InfoDrawerProps {
   onClose: () => void;
-  onShowIntro?: () => void;
 }
 
-export function InfoDrawer({ onClose, onShowIntro }: InfoDrawerProps) {
+export function InfoDrawer({ onClose }: InfoDrawerProps) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
   useFocusTrap(ref, onClose);
@@ -81,20 +80,6 @@ export function InfoDrawer({ onClose, onShowIntro }: InfoDrawerProps) {
             ))}
           </ul>
         </section>
-
-        {onShowIntro && (
-          <section>
-            <button
-              className="btn"
-              onClick={() => {
-                onShowIntro();
-                onClose();
-              }}
-            >
-              {s.howItWorks}
-            </button>
-          </section>
-        )}
       </div>
     </div>
   );

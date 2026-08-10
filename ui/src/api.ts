@@ -296,8 +296,8 @@ async function request(path: string, opts: RequestOptions = {}): Promise<Respons
   const { signal, timeoutMs = FETCH_TIMEOUT_MS, headers, ...init } = opts;
 
   // Mutations only. Reads are either driven by useAsync, which raises the bar
-  // itself, or they are polls — pollSession alone runs a GET every second for
-  // the life of the app, and counting those would pin the bar on permanently.
+  // itself, or they are polls — usePoll keeps several GETs running for the
+  // life of the app, and counting those would pin the bar on permanently.
   const tracked = init.method !== undefined && init.method !== "GET";
   if (tracked) progressStore.start();
 
@@ -507,39 +507,6 @@ export async function getResults(signal?: AbortSignal): Promise<ResultsResponse>
     throw await apiError(res);
   }
   return { status: "ready", results: (await res.json()) as Results };
-}
-
-export function pollSession(
-  onUpdate: (session: SessionSnapshot, fetchedAt: number) => void,
-  onError: (err: unknown) => void,
-  intervalMs = 10_000,
-): () => void {
-  let cancelled = false;
-
-  const tick = () => {
-    getSession()
-      .then((session) => {
-        if (!cancelled) {
-          onUpdate(session, Date.now());
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          onError(err);
-        }
-      });
-  };
-
-  tick();
-  const interval = window.setInterval(tick, intervalMs);
-  const onFocus = () => tick();
-  window.addEventListener("focus", onFocus);
-
-  return () => {
-    cancelled = true;
-    window.clearInterval(interval);
-    window.removeEventListener("focus", onFocus);
-  };
 }
 
 export type AnswerResponse =

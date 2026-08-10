@@ -46,7 +46,7 @@ function fromQuestions(questions: QuestionResult[]): DomainRow[] {
   return [...byDomain.values()].map((r) => ({ ...r, percent: percentOf(r.earned, r.total) }));
 }
 
-function percentOf(earned: number, total: number): number {
+export function percentOf(earned: number, total: number): number {
   return total === 0 ? 0 : Math.round((earned / total) * 100);
 }
 

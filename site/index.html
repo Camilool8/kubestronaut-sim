@@ -311,8 +311,12 @@
             <p class="stat-note">
               A fresh environment must score 0 and the reference solutions must
               score 100%. <code>tests/smoke.sh</code> asserts both against a
-              real stack; CI cannot run it, so it is run by hand for any change
-              that could affect grading.
+              real stack, and
+              <a
+                href="https://github.com/Camilool8/kubestronaut-sim/blob/main/CONTRIBUTING.md#what-ci-cannot-run"
+                >CONTRIBUTING.md</a
+              >
+              says why CI cannot run it and when it has to be run by hand.
             </p>
           </li>
         </ul>
@@ -357,7 +361,7 @@
               full CKAD curriculum: workloads and multi-container design,
               deployments and configuration, security contexts,
               observability, and services, ingress and network policy. The
-              draw is mixed across three levels, so a sitting is not a wall
+              draw is mixed across three levels, so an attempt is not a wall
               of long multi-step tasks. Two instances, kind-backed cluster,
               Kubernetes 1.35.
             </p>
@@ -590,6 +594,14 @@
             paused: at zero the exam ends and grading starts by itself. Training
             is the untimed opt-out, which is how this meets WCAG 2.2.1.
           </p>
+          <p>
+            Mode is chosen when the attempt starts and cannot change after
+            that. The three are defined in
+            <a
+              href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/api.md#attempt-modes"
+              >the API reference</a
+            >, down to the wire ids and the gate each one closes.
+          </p>
         </div>
 
         <figure class="shot shot-wide">
@@ -661,13 +673,11 @@
             </dl>
 
             <p class="run-note">
-              A password field on a single-user tool you cloned yourself would
-              be theatre. The only real control is which interface it binds
-              to, so it binds loopback: <code>./sim up</code> answers on the
+              <code>./sim up</code> binds loopback, so it answers on the
               machine you ran it on and nowhere else. Reaching it from another
-              machine is an opt-in, <code>SIM_BIND=0.0.0.0 ./sim up</code>
-              (<code>.\sim.ps1 up -Bind 0.0.0.0</code> on Windows), for a
-              network you control.
+              machine is one deliberate setting, and there is no
+              authentication behind it either way.
+              <a href="#limits">What that means is set out below.</a>
             </p>
           </article>
 
@@ -761,9 +771,13 @@
                 A password field on a single-user tool you cloned yourself would
                 be theatre. The only real control is which interface it binds
                 to, so it binds loopback by default and nothing off your
-                machine can reach it. <code>SIM_BIND=0.0.0.0 ./sim up</code>
-                (<code>.\sim.ps1 up -Bind 0.0.0.0</code> on Windows) opts into
-                your LAN, where no host firewall covers a published port.
+                machine can reach it. Opting into your LAN is one setting, and
+                not one your host firewall covers —
+                <a
+                  href="https://github.com/Camilool8/kubestronaut-sim/blob/main/SECURITY.md#sim_bind"
+                  >SECURITY.md</a
+                >
+                sets out that whole boundary.
               </dd>
             </div>
             <div class="limit">
@@ -958,7 +972,7 @@
             <h2 class="footer-title">kubestronaut-sim</h2>
             <p class="footer-text">
               Open source, run locally, and honest about the difference between
-              this and a real sitting.
+              this and a real exam.
             </p>
             <p class="footer-byline">
               Built by <a href="https://cjoga.cloud">Camilo Joga</a>.

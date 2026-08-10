@@ -104,7 +104,7 @@ Where the optional keys go:
 | `metadata.hidden` | Keeps the bank out of the exam selector while leaving it a legal `switch` target. Exists for `smoke-01`; a bank worth shipping is worth listing |
 | `spec.examType` | `hands-on` (the default when absent, [catalog.go](../conductor/internal/catalog/catalog.go)) or `mcq`; any other value lists the bank disabled with a "no engine yet" note |
 | `spec.duration` | The Exam clock. Enforced: the facilitator ends the session at 0:00 |
-| `spec.speedDuration` | The clock for the `speed` mode — shown to candidates as Mastery — defaulting to half `spec.duration` ([exam.go](../facilitator/internal/exam/exam.go)). A malformed value fails the load |
+| `spec.speedDuration` | The clock for the `speed` mode, defaulting to half `spec.duration` ([exam.go](../facilitator/internal/exam/exam.go)). A malformed value fails the load. What `speed` is called on screen, and what else it changes, is in [api.md](api.md#attempt-modes) |
 | `spec.passingScore` | Percent. Enforced by the facilitator's `Results.Passed` |
 | `spec.kubernetesVersion` | Informational; shown on the catalog card |
 | `spec.domainWeights` | The certification's published weights, and a runtime value in three places: `exam.Load` builds `Exam.Domains` from it, `exam.Draw` stratifies a pooled or filtered draw by it, and both graders weight the final score by it. [bank-weights.sh](../tests/bank-weights.sh) still gates it too. Getting it wrong now moves real scores, not just a build check |
@@ -167,7 +167,7 @@ Rules, all enforced by [exam.go](../facilitator/internal/exam/exam.go):
 - `url` must be `https://` and must parse. **A bad entry is dropped and
   logged, never fatal** — every other load error refuses the bank because
   every other one is about the exam, while a mistyped study link must
-  never stop someone sitting one. The rest of the list still loads.
+  never stop someone taking one. The rest of the list still loads.
 - Omit the key entirely when there is no single obviously-right page.
   Absent is the default and the response omits the field, which the UI
   renders as nothing at all. **A wrong link on a study tool is worse than
@@ -210,7 +210,7 @@ For an author:
   moved four minutes of seeding from the boot screen to the moment the
   candidate presses Start, and gained almost no variety for it.
 
-`ckad-mock-01` pools 44 down to 17 for both reasons. **Holding the sitting
+`ckad-mock-01` pools 44 down to 17 for both reasons. **Holding the attempt
 to the right length** comes first: the real CKAD is 15-20 tasks in two
 hours, and 17 is its midpoint.
 
@@ -288,7 +288,7 @@ The mix is guaranteed, not likely.
 
 [bank-weights.sh](../tests/bank-weights.sh) replays that walk and fails
 the bank when a tier lands more than one question from its share, prints
-a domain-by-tier depth table, and checks the drawn sitting against the
+a domain-by-tier depth table, and checks the drawn attempt against the
 clock: 0.85 to 1.05 of `spec.duration`, because a bank that wastes the
 clock and one nobody finishes are both miscalibrated. `ckad-mock-01`
 currently draws 5 quick, 8 core and 4 deep for 115 minutes of task time
@@ -705,7 +705,7 @@ diff.**
 |---|---|
 | NetworkPolicy is enforced — the CNI is Calico, not kind's kindnet | [images/k8s-env/bootstrap.sh](../images/k8s-env/bootstrap.sh), before any `setup.sh` |
 | An ingress controller: ingress-nginx, IngressClass `nginx`, pinned to the control-plane node | [images/k8s-env/bootstrap.sh](../images/k8s-env/bootstrap.sh), before any `setup.sh` |
-| A Helm repo named `sim`, serving [banks/\_charts/](../banks/_charts) from `k8s-env:8879` | Packaged and served by [images/k8s-env/start.sh](../images/k8s-env/start.sh) before bootstrap runs; each instance adds it in [images/instance/entrypoint.sh](../images/instance/entrypoint.sh) |
+| A Helm repo named `sim`, serving [banks/\_charts/](../banks/_charts) from `k8s-env:8879` | Served by [images/k8s-env/start.sh](../images/k8s-env/start.sh) before bootstrap runs, and repackaged only when it has to be: one SHA-256 over the chart sources, the repo URL and the `helm` binary is stamped inside the published directory, so a restart that still matches it reuses the repo and runs no `helm package` at all. Each instance adds it in [images/instance/entrypoint.sh](../images/instance/entrypoint.sh) |
 | A registry at `registry:5000` — plain HTTP, no auth | A compose service ([docker-compose.yaml](../docker-compose.yaml)) |
 
 - **Calico** is the difference between a policy question that can only
@@ -815,7 +815,7 @@ question: how to sit **this** exam quickly. Typical contents:
 - When to give up on a question and move on.
 
 It is bank data, not UI copy, on the same reasoning that governs
-`spec.environment.nodes`: what makes a CKAD sitting fast is not what
+`spec.environment.nodes`: what makes a CKAD attempt fast is not what
 makes a KCNA one fast, and a panel of strings in the client would have to
 claim one of them was the other. CKA and CKS will each ship their own.
 

@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# -E matters as much as -e here. Without it bash does not inherit the ERR trap
+# into shell functions, so a failure inside preload_images, load_image or
+# preload_bank_images killed the script under -e without ever reaching
+# boot_failed: bootstrap exited 1 while boot.json still read {"state":"booting"},
+# and `./sim up` then polled a dead boot until SIM_BOOT_BUDGET expired an hour
+# later. The failure has to be recorded, not just suffered.
+set -Eeuo pipefail
 # shellcheck source=phase.sh
 . /opt/sim/phase.sh
 trap 'boot_failed "step failed: ${BASH_COMMAND} (exit $?)"' ERR
@@ -79,6 +85,53 @@ preload_bank_images() {
   done < /opt/sim/preload.txt
 }
 
+ingress_prep_pid=""
+ingress_prep_log=""
+
+# Neither of these depends on anything Calico does: the label is a scheduling
+# hint for a Deployment that does not exist yet, and the preload only fills
+# the nodes' image cache. Run them alongside the Calico rollout instead of
+# after it, and collect the result at the join point below.
+#
+# Nothing in here may write to /shared. phase.sh stages every write through
+# "${BOOT_FILE}.$$", and $$ is the *parent's* PID inside a subshell, so two
+# writers would race on one temp path and on boot.json itself; worse, this
+# job's copy of _boot_phase is a fork-time snapshot ("cni"), so a late write
+# would drag the UI back to a phase the boot had already left. detail() is
+# therefore stubbed out here (it is only reached when an image has to be
+# pulled, i.e. when the image was not prebaked). stdout is buffered to a log
+# and replayed at the join point, which keeps the container log in exactly
+# the order it has always been in.
+start_ingress_prep() {
+  ingress_prep_log=$(mktemp /tmp/ingress-prep.XXXXXX)
+  (
+    # Deliberately not the outer trap: boot_failed writes /shared. Name the
+    # failing command into the job's own log instead, and let the join point
+    # do the reporting.
+    trap 'echo "step failed: ${BASH_COMMAND} (exit $?)" >&2' ERR
+    detail() { :; }
+    kubectl label node sim-control-plane ingress-ready=true --overwrite
+    preload_images /opt/sim/ingress-nginx.yaml
+  ) > "${ingress_prep_log}" 2>&1 &
+  ingress_prep_pid=$!
+}
+
+# `set -e` does not reach into a background job and the ERR trap does not fire
+# for one, so the status has to be read back by hand: a preload that failed
+# silently would surface much later as a question stuck on a cold image cache.
+# `wait` hands back the job's own exit status.
+finish_ingress_prep() {
+  local status=0
+  wait "${ingress_prep_pid}" || status=$?
+  ingress_prep_pid=""
+  cat "${ingress_prep_log}" || true
+  rm -f "${ingress_prep_log}"
+  if [ "$status" -ne 0 ]; then
+    boot_failed "preparing the ingress controller failed (exit ${status}) — see the output above"
+    exit 1
+  fi
+}
+
 nodes=$(yq -r '.spec.environment.nodes // 2' "${BANK_DIR}/exam.yaml")
 case "$nodes" in
   ''|*[!0-9]*|0) echo "spec.environment.nodes must be a positive integer, got '${nodes}'"; exit 1 ;;
@@ -115,6 +168,7 @@ done
 phase cni "Installing the pod network" 5
 echo "installing Calico (NetworkPolicy enforcement)..."
 preload_images /opt/sim/calico.yaml
+start_ingress_prep
 kubectl apply -f /opt/sim/calico.yaml
 kubectl -n kube-system rollout status daemonset/calico-node --timeout=300s
 
@@ -122,8 +176,7 @@ kubectl wait --for=condition=Ready nodes --all --timeout=180s
 
 phase ingress "Installing the ingress controller" 6
 echo "installing ingress-nginx..."
-kubectl label node sim-control-plane ingress-ready=true --overwrite
-preload_images /opt/sim/ingress-nginx.yaml
+finish_ingress_prep
 kubectl apply -f /opt/sim/ingress-nginx.yaml
 kubectl -n ingress-nginx wait --for=condition=Available \
   deployment/ingress-nginx-controller --timeout=300s

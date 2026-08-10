@@ -14,7 +14,6 @@ export const strings = {
     wordmark: "kubestronaut",
     wordmarkTail: "-sim",
     navLabel: "Sections",
-    backToExams: "Exams",
 
     crumbLobby: "Choose an exam",
     crumbResults: "Results",
@@ -124,7 +123,7 @@ export const strings = {
     drawPooled: (drawn: number, pool: number) =>
       `${drawn} drawn at random from ${pool}, weighted to the published domain split. A different set every attempt.`,
     drawPooledMixed: (drawn: number, pool: number) =>
-      `${drawn} drawn at random from ${pool}, weighted to the published domain split and mixed across three levels, so a sitting is not a wall of long tasks. A different set every attempt.`,
+      `${drawn} drawn at random from ${pool}, weighted to the published domain split and mixed across three levels, so an attempt is not a wall of long tasks. A different set every attempt.`,
     drawAll: (n: number) =>
       `All ${n}, every attempt. This bank has no larger pool behind it yet, so the set does not change between sessions.`,
 
@@ -136,7 +135,7 @@ export const strings = {
     allDomains: "All domains",
 
     filteredNote: (chosen: number, total: number) =>
-      `Drawing from ${chosen} of ${total} domains. A narrowed draw is practice, not a sitting: it is graded and kept in your history, but it is never reported as a pass and it does not count toward your path.`,
+      `Drawing from ${chosen} of ${total} domains. A narrowed draw is practice, not a full exam: it is graded and kept in your history, but it is never reported as a pass and it does not count toward your path.`,
 
     domainsPool: "Domains in the pool",
     domainsExam: "Domains in this exam",
@@ -170,8 +169,6 @@ export const strings = {
 
     endAttempt: (mode: string) => (mode === "training" ? "Submit session" : "Submit exam"),
     ending: "Ending…",
-
-    moreLabel: "Exam controls",
 
     positionShort: (n: number, total: number) => `${n}/${total}`,
 
@@ -399,13 +396,11 @@ export const strings = {
       "Typefaces: IBM Plex Sans and IBM Plex Mono in the app, JetBrains Mono on the exam desktop (SIL Open Font License)",
       "Desktop client: built on noVNC (MPL 2.0)",
     ],
-    howItWorks: "How this exam works",
     footerLine: "Independent study tool. Not affiliated with CNCF, The Linux Foundation, or PSI.",
   },
 
   theme: {
     labels: { system: "Auto", light: "Light", dark: "Dark" } as Record<string, string>,
-    ariaLabel: (current: string) => `Theme: ${current}. Activate to change.`,
 
     menuLabel: "Theme",
   },
@@ -473,7 +468,6 @@ export const strings = {
     docsOpened: (label: string) => `${label} is open in the exam desktop's browser.`,
     docsFailed: (detail: string) => `Couldn't open that page on the exam desktop (${detail}).`,
     reseedFailed: (detail: string) => `Couldn't reset that question (${detail}).`,
-    examOnly: "Hints are available in Training mode.",
     failed: (detail: string) => `Couldn't load that hint (${detail}).`,
   },
 
@@ -483,8 +477,6 @@ export const strings = {
     selectAll: "Select all that apply",
 
     questionNumber: (n: number) => `Q${n}`,
-
-    optionLabel: (letter: string, text: string) => `${letter}. ${text}`,
 
     saveFailed: (detail: string) =>
       `Couldn't save that answer (${detail}). It is not recorded; pick it again to retry.`,
@@ -697,7 +689,6 @@ export const strings = {
     ],
     stillAvailable: "You can still browse the exam catalog and read past scores here.",
     continueAnyway: "Continue anyway",
-    startDisabled: "Open this on a desktop to start the exam.",
 
     needsDesktop: "Needs a desktop",
     catalogNote:
@@ -724,6 +715,9 @@ export const strings = {
 
     retryFailed: (detail: string) =>
       `Couldn't ask the facilitator to grade again (${detail}). Check the stack is up with \`docker compose ps\`, then retry.`,
+
+    gradingTimedOut: (detail: string) =>
+      `Gave up waiting for the facilitator to finish grading (${detail}). Check the stack is up with \`docker compose ps\`, then retry.`,
 
     eyebrowSeparator: " · ",
     listSeparator: ", ",
@@ -812,7 +806,7 @@ export const strings = {
     nextDrill: "Drill these domains",
 
     nextDrillHint:
-      "Rebuilds the environment first, then opens the mode screen with these domains picked. A drill is not a sitting — it will not set a best score.",
+      "Rebuilds the environment first, then opens the mode screen with these domains picked. A drill is not a full exam — it will not set a best score.",
 
     verdictsTitle: "Task verdicts",
 
@@ -1051,7 +1045,7 @@ export const strings = {
     startLead:
       "Pick the exam you want to sit. A hands-on session builds you a real cluster and takes a few minutes to come up; multiple choice is ready immediately.",
 
-    examFallbackBody: "A full sitting, graded the way the real exam is.",
+    examFallbackBody: "A full attempt, graded the way the real exam is.",
 
     noExams: "This deployment has no seats configured, so there is nothing to start here yet.",
 

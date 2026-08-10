@@ -76,26 +76,6 @@
   margin-bottom: var(--space-2);
 }
 
-.theme-toggle {
-  background: transparent;
-  border: 1px solid var(--border-strong);
-  color: var(--text-muted);
-  border-radius: var(--radius-pill);
-  padding: 0.25em 0.9em;
-  font-size: var(--text-s);
-  cursor: pointer;
-}
-
-.theme-toggle:hover {
-  background: var(--surface-hover);
-  color: var(--text);
-}
-
-.theme-toggle:active {
-  background: var(--surface-hover);
-  transform: translateY(1px);
-}
-
 .navbar {
   display: flex;
   align-items: center;
@@ -1046,12 +1026,6 @@ button.nav-menu-item:hover {
 
 .mode-card-on .mode-start {
   border-top-color: var(--accent);
-}
-
-.mode-blocked {
-  margin: var(--space-3) 0 0;
-  color: var(--text-muted);
-  font-size: var(--text-s);
 }
 
 .draw-panel {
@@ -2834,7 +2808,6 @@ button.nav-menu-item:hover {
     row-gap: var(--space-2);
   }
 
-  .tv-domain,
   .tv-weight,
   .tv-time,
   .tv-verdict {
@@ -3801,7 +3774,6 @@ button.nav-menu-item:hover {
 
 @media (any-pointer: coarse) {
   .info-button,
-  .theme-toggle,
   .toast-dismiss,
   .drawer-close,
   .code-block-copy,
@@ -3980,7 +3952,6 @@ button.nav-menu-item:hover {
 @media (prefers-reduced-motion: no-preference) {
 
   .btn,
-  .theme-toggle,
   .info-button,
   .question-mark,
   .job-chip,
@@ -4196,14 +4167,6 @@ button.nav-menu-item:hover {
   height: 100%;
   display: flex;
   flex-direction: column;
-}
-
-.mcq-tally {
-  margin-left: auto;
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 .mcq-rail {
@@ -4534,10 +4497,6 @@ button.nav-menu-item:hover {
   .mcq-footer > .btn:first-child {
     flex-shrink: 0;
     padding-inline: var(--space-3);
-  }
-
-  .mcq-footer > .btn:first-child .btn-label {
-    display: none;
   }
 
   .mcq-review-option {
@@ -5357,11 +5316,6 @@ button.nav-menu-item:hover {
   padding: var(--space-4);
 }
 
-.signin-chrome {
-  display: flex;
-  justify-content: flex-end;
-}
-
 .signin-main {
   width: min(27rem, 100%);
   margin: auto;
@@ -5604,12 +5558,6 @@ button.nav-menu-item:hover {
   color: var(--text-muted);
 }
 
-.session-cluster {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
 .session-chip {
   display: flex;
   align-items: center;
@@ -5721,31 +5669,6 @@ button.nav-menu-item:hover {
   .question-mark:active,
   .info-button:active {
     background: var(--raised-hover);
-  }
-}
-
-@media (max-width: 640px) {
-  .app-header-wordmark {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-    border: 0;
-  }
-
-  .theme-toggle-label {
-    display: none;
-  }
-
-  .app-header .theme-toggle {
-    width: var(--tap-min);
-    padding: 0;
-    justify-content: center;
-    border-radius: var(--radius-pill);
   }
 }
 

@@ -2,11 +2,10 @@
 
 ## Setup
 
-**You need:** Docker Desktop (or docker + compose v2), python3 — not
-needed on Windows, where `sim.ps1` parses JSON natively — and ~9GB of
-free RAM. For the code itself: Go 1.26 and Node 22 — or Docker alone. On
-Windows, run `sim.ps1` instead of `sim` — see
-[docs/install.md](docs/install.md) for the PowerShell steps.
+**You need:** everything under
+[docs/install.md](docs/install.md#prerequisites) to run the stack, and
+for the code itself Go 1.26 and Node 22 — or Docker alone. On Windows,
+run `sim.ps1` instead of `sim`; install.md has the PowerShell steps.
 
 ```bash
 git clone git@github.com:Camilool8/kubestronaut-sim.git
@@ -38,7 +37,9 @@ Run these. They need no Docker and take seconds:
 ```bash
 tests/bank-weights.sh && tests/check-lint.sh && tests/check-lib.sh \
   && tests/check-evidence.sh && tests/next-version.sh \
-  && tests/bank-hints.sh && tests/bank-mcq.sh && tests/check-shell.sh
+  && tests/bank-hints.sh && tests/bank-mcq.sh && tests/check-shell.sh \
+  && tests/check-figures.sh && sh tests/check-preload.sh \
+  && bash tests/check-k8s-pins.sh
 for m in conductor facilitator proxy hub images/desktop/opener; do (cd $m && go test ./... && go vet ./...); done
 (cd ui && npm ci && npx tsc --noEmit && npm run lint && npm test)
 ```
@@ -64,14 +65,17 @@ gate green precisely because nothing ran it.
 
 | Gate | Proves |
 |---|---|
-| `bank-weights.sh` | Each question's `weight:` equals the sum of its `# points:` headers, `exam.yaml` and the `q*/` directories agree, and the domain balance matches the curriculum. For a bank declaring `spec.difficultyMix`, also that every question's level matches its `targetSeconds` band, that the pool is deep enough per domain and level to hold the mix, and that a drawn sitting fits the clock |
+| `bank-weights.sh` | Each question's `weight:` equals the sum of its `# points:` headers, `exam.yaml` and the `q*/` directories agree, and the domain balance matches the curriculum. For a bank declaring `spec.difficultyMix`, also that every question's level matches its `targetSeconds` band, that the pool is deep enough per domain and level to hold the mix, and that a drawn attempt fits the clock |
 | `check-lint.sh` | No validator grades spelling instead of behaviour, and every check carries an exact `# points: N` header |
 | `check-lib.sh` | The `banks/_lib/checks.sh` helpers still treat `0.1` and `100m`, or `1Gi` and `1024Mi`, as the same answer |
 | `check-evidence.sh` | Drives real `validate.d` scripts against a stubbed `kubectl` to prove what a **failing** check reports: a failure never arrives without an `actual` pane, and a name the candidate did not use is named, not shown as an empty field. `tests/solutions/` only ever walks the happy path, which is how a check came to report `runAsUser='', want 10001` for a whole release |
 | `next-version.sh` | `.github/scripts/next-version.py` computes the release tag from the commit log, so this pins the arithmetic: which prefixes are a patch, that the largest bump wins, and that a breaking change on 0.x is a minor rather than v1.0.0 |
 | `bank-hints.sh` | Every hinted question has both tiers, and no hint shares 120 consecutive characters with its solution |
 | `bank-mcq.sh` | Six invariants over every `examType: mcq` bank, including a non-degenerate answer key |
-| `site/build.sh --check` | The generated mirrors are current, the page's figures match `banks/*/exam.yaml`, and its cert marks match `CertMark.tsx` |
+| `site/build.sh --check` | The generated mirrors are current, the page's question totals and drawn/pool stats match `banks/*/exam.yaml`, and its cert marks match `CertMark.tsx` |
+| `check-figures.sh` | Every other published exam figure — the clock, the passing score, the domain weights, the mode table's per-certification clocks — agrees with the `exam.yaml` that owns it, across `README.md`, `site/index.html`, `docs/api.md` and each bank's own README and tips page. The API samples are parsed rather than grepped, so a neighbouring sample's draw of 10 is never read as this bank's pool. A listable bank that no page states a figure for is a failure rather than a skip, and a pass prints how many comparisons it made |
+| `check-preload.sh` | The two image tags two questions depend on *not* resolving are still absent from `images/k8s-env/preload.txt`. It reads that tag list out of the prose under [Rules that are not negotiable](#rules-that-are-not-negotiable) rather than keeping a second copy, and confirms each tag against the question the prose attributes it to — so a wrong question number fails the gate rather than surviving in the document, which is how issue #88 stood until someone corrected it by hand |
+| `check-k8s-pins.sh` | The Kubernetes **minor** agrees across every `banks/*/exam.yaml`, `images/k8s-env/Dockerfile` and `images/instance/Dockerfile`. The patch levels differ on purpose and are not compared. A cutover that raises three pins and forgets the fourth builds a cluster whose kubectl, whose node image and whose catalog card disagree, and nothing else in CI notices |
 | `check-sim-parity.sh` | `sim` and `sim.ps1` offer the same subcommands, the same usage string, and behave the same. `sim.ps1`'s `switch` arms must match its `$COMMANDS` declaration — a command declared but not dispatched prints nothing and exits 0 — and both launchers must return the same exit code for every row of a shared bad-argv table, including `DOCTOR`/`Purge` and `purge --ALL`, whose case-sensitivity is the contract that keeps `--ALL` from deleting every graded attempt. Both run with a stub `docker`/`curl`/`python3`/`git` first on `PATH` that records any call and exits 97, so a row that reaches docker is reported rather than executed, and the gate is safe to run with an exam live. Without a PowerShell the behaviour half says loudly that it skipped; CI sets `PWSH_REQUIRED=1`, which makes a missing one a failure instead |
 | `check-shell.sh` | Every shell script git knows about — not a curated glob, so nothing falls outside it — parses under `bash -n` and passes ShellCheck at **severity `warning`**. `info` and `style` add 63 and 71 findings that are not defects, so the floor sits above them. Without ShellCheck installed the lint pass says loudly that it skipped; CI sets `SHELLCHECK_REQUIRED=1`, which makes a missing binary a failure instead |
 
@@ -229,6 +233,13 @@ Both questions are built on those tags *not* resolving. Preloading them
 breaks two questions silently, and only a smoke run on a cold cache
 would notice.
 
+The two bullets above are machine-read. `tests/check-preload.sh` takes
+its tag list from them rather than keeping a second copy, and checks
+each tag against the question cited beside it. Reword them freely;
+unbullet them, drop a tag's backticks, or remove a question number and
+the gate goes red, which is what keeps the rule and the check from
+drifting apart.
+
 **All user-facing copy belongs in `ui/src/strings.ts`.**
 
 **Every surface that names a certification carries the non-affiliation
@@ -236,7 +247,7 @@ notice.** See [SECURITY.md](SECURITY.md#brand-and-affiliation).
 
 **A bank that cannot produce a meaningful score is not offered at all.**
 Too few questions belongs in the catalog as coming soon, not in the exam
-list looking like a sitting.
+list looking like a full attempt.
 
 ## Writing questions
 

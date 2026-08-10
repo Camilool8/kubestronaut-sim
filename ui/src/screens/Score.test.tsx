@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Score } from "./Score";
+import { GRADING_POLL_MAX_ATTEMPTS, GRADING_POLL_MS, Score } from "./Score";
 import { marksStore } from "../components/marksStore";
+import { formatElapsed } from "../lib/format";
 import { strings } from "../strings";
 
 const results = {
@@ -239,6 +240,95 @@ describe("Score results poll", () => {
     await screen.findByText("q01", {}, { timeout: 6_000 });
     expect(screen.queryByText(/still trying to reach the facilitator/i)).toBeNull();
   }, 10_000);
+
+  test("a grader that never finishes gives up in the end instead of spinning forever", async () => {
+    vi.useFakeTimers();
+    let polls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/api/results")) {
+          polls++;
+
+          return new Response(JSON.stringify({ state: "grading" }), { status: 202 });
+        }
+        return new Response(JSON.stringify({}), { status: 200 });
+      }),
+    );
+
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+
+    await vi.advanceTimersByTimeAsync(GRADING_POLL_MS * (GRADING_POLL_MAX_ATTEMPTS + 5));
+
+    expect(polls).toBe(GRADING_POLL_MAX_ATTEMPTS);
+
+    // The screen has to say something, and offer a way on.
+    expect(
+      screen.getByRole("heading", { level: 1, name: strings.score.gradingFailedTitle }),
+    ).toBeInTheDocument();
+    // A first timeout has never asked for a grade twice, so it must not borrow
+    // the retry copy and claim it failed to "grade again".
+    expect(
+      screen.getByText(
+        strings.score.gradingTimedOut(formatElapsed(GRADING_POLL_MS * GRADING_POLL_MAX_ATTEMPTS)),
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/grade again/i)).toBeNull();
+    expect(screen.getByRole("button", { name: strings.score.retry })).toBeInTheDocument();
+    expect(screen.queryByText(/evaluating your exam/i)).toBeNull();
+
+    // And the poll really has stopped: more time buys no more requests.
+    await vi.advanceTimersByTimeAsync(GRADING_POLL_MS * 50);
+    expect(polls).toBe(GRADING_POLL_MAX_ATTEMPTS);
+
+    vi.useRealTimers();
+  }, 20_000);
+
+  test("the ceiling is generous enough for a slow grader, not just a wedged one", () => {
+    // A full bank grades in well under a minute; anything that trips this cap
+    // has stopped answering, not merely taken its time.
+    expect(GRADING_POLL_MS * GRADING_POLL_MAX_ATTEMPTS).toBeGreaterThanOrEqual(5 * 60_000);
+  });
+
+  test("the poll pauses in a background tab and resumes when the candidate comes back", async () => {
+    vi.useFakeTimers();
+    let polls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/api/results")) {
+          polls++;
+          return new Response(JSON.stringify({ state: "grading" }), { status: 202 });
+        }
+        return new Response(JSON.stringify({}), { status: 200 });
+      }),
+    );
+
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+
+    await vi.advanceTimersByTimeAsync(GRADING_POLL_MS * 3);
+    expect(polls).toBe(4);
+    const whileWatching = polls;
+
+    Object.defineProperty(document, "hidden", { configurable: true, value: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    await vi.advanceTimersByTimeAsync(GRADING_POLL_MS * 20);
+    expect(polls).toBe(whileWatching);
+
+    Object.defineProperty(document, "hidden", { configurable: true, value: false });
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(polls).toBe(whileWatching + 1);
+
+    await vi.advanceTimersByTimeAsync(GRADING_POLL_MS * 2);
+    expect(polls).toBe(whileWatching + 3);
+
+    Reflect.deleteProperty(document, "hidden");
+    vi.useRealTimers();
+  });
 });
 
 describe("Score review rows", () => {

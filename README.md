@@ -39,19 +39,10 @@ Then open <http://localhost:8080> and pick an exam. Everything after
 
 > **There is no authentication in this stack.** Ports bind to loopback
 > only, so a plain `./sim up` is reachable from this machine and nowhere
-> else. Sitting the exam from another machine is an opt-in, for a
-> network you control:
->
-> ```bash
-> SIM_BIND=0.0.0.0 ./sim up
-> ```
->
-> ```powershell
-> .\sim.ps1 up -Bind 0.0.0.0
-> ```
->
-> A published port is not covered by `ufw` — see
-> [SECURITY.md](SECURITY.md) before you do that.
+> else. Taking the exam from another machine is a deliberate opt-in, and
+> not one your host firewall covers —
+> [SECURITY.md](SECURITY.md#sim_bind) has the setting, what it exposes,
+> and what stands in for authentication when you use it.
 
 Nothing is built until you choose an exam. Picking a certification is
 what creates its cluster, and the page shows each phase as it completes.
@@ -65,9 +56,10 @@ what creates its cluster, and the page shows each phase as it completes.
 
 - Every draw is stratified to the published curriculum weights.
 - CKAD also mixes the draw across three levels — quick, core and deep, set
-  by how long a task should take — so a sitting is not a wall of long
+  by how long a task should take — so an attempt is not a wall of long
   multi-step tasks.
-- CKAD runs against a two-node Kubernetes 1.35 cluster.
+- CKAD runs against a two-node kind cluster, at the Kubernetes version
+  its bank pins.
 - KCNA ships a full explanation for every question.
 - CKA, KCSA and CKS appear in the catalog as coming soon.
 
@@ -75,15 +67,14 @@ Hands-on questions are graded on **behaviour**, not on the shape of your
 YAML — a policy that actually denies, an Ingress the controller really
 routes.
 
-## Sitting an exam
+## Taking an exam
 
 1. **Exams** — pick a certification. Each card shows duration, draw
    size, passing score and engine. Choosing one that is not loaded
    rebuilds the environment, and asks first.
-2. **Mode** — pick one:
-   - *Training* — untimed, two-tier hints, solutions on demand.
-   - *Mastery* — half the clock, no help.
-   - *Exam* — the bank's duration, no help.
+2. **Mode** — Training, Mastery or Exam. They differ in the clock, in
+   what help is allowed, and in whether the run is kept as an attempt.
+   [docs/api.md](docs/api.md#attempt-modes) is the table.
 
    <picture>
      <source media="(prefers-color-scheme: dark)" srcset="site/shots/mode-dark.webp" />

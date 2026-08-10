@@ -1,0 +1,54 @@
+name: Curriculum watch
+
+# Once a week, ask whether the certification curricula published upstream have
+# moved ahead of the Kubernetes version this repository declares, and open an
+# issue when they have.
+#
+# Issue #105 asked for a watch on one move, CKAD to 1.36. This is the general
+# form of it: nothing here or in the script it runs names a version or a
+# certification. The declared side is read out of the tree by
+# tests/check-k8s-pins.sh and the upstream side out of whatever cncf/curriculum
+# publishes, so 1.37, 1.38 and a CKA bank that does not exist yet are all
+# covered without an edit.
+#
+# The script fails the job rather than reporting "nothing to do" when it cannot
+# read either side. A watcher that quietly finds nothing is indistinguishable
+# from one that found nothing to report, and only one of those is useful.
+
+on:
+  schedule:
+    # Mondays, 06:17 UTC. Weekly is proportionate: a curriculum moves a few
+    # times a year, and the cutover takes longer than the wait for the next run.
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Compare and print the issue, but do not open it"
+        type: boolean
+        required: false
+        default: false
+
+# Read the tree, write an issue. Nothing else.
+permissions:
+  contents: read
+  issues: write
+
+# Two runs at once would both find no existing issue and both open one. The
+# script's own title search closes most of that window; this closes the rest.
+concurrency:
+  group: curriculum-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    name: Upstream curriculum versus declared
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compare upstream curricula against the declared pins
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CURRICULUM_WATCH_DRY_RUN: ${{ inputs.dry-run && '1' || '' }}
+        run: bash .github/scripts/curriculum-watch.sh

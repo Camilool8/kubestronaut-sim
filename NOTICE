@@ -45,6 +45,57 @@ Third-party components distributed with this product:
 
 --------------------------------------------------------------------------
 
+Third-party components baked into the published container images. Every
+version below is the pin it is built from — the build arguments in
+images/k8s-env/Dockerfile and images/instance/Dockerfile — so a bump
+there is a change here:
+
+  Calico v3.32.1 — Apache License 2.0
+  https://github.com/projectcalico/calico
+
+  ingress-nginx controller-v1.15.1 — Apache License 2.0
+  https://github.com/kubernetes/ingress-nginx
+
+  kind v0.32.0, and the kindest/node:v1.35.5 image it builds the
+  cluster from — Apache License 2.0
+  https://github.com/kubernetes-sigs/kind
+
+  Helm v3.21.3 — Apache License 2.0
+  https://github.com/helm/helm
+
+  kubectl v1.35.6 on the cluster host, v1.35.0 on the exam instances —
+  Apache License 2.0
+  https://github.com/kubernetes/kubernetes
+
+  Podman, as packaged by Debian 13 — Apache License 2.0
+  https://github.com/containers/podman
+
+  yq v4.45.1 — MIT License
+  https://github.com/mikefarah/yq
+
+The images are built on docker:27-dind (Docker Engine, Apache License
+2.0, https://github.com/moby/moby) and debian:13-slim (Debian 13, a
+distribution of packages under their own separate licences,
+https://www.debian.org/legal/licenses/).
+
+The k8s-env image also preloads three upstream images, listed in
+images/k8s-env/preload.txt, so that questions do not depend on a
+registry at exam time:
+
+  busybox:1.37 — GNU General Public License, version 2 only
+  https://busybox.net
+  Redistributed unmodified, as pulled from Docker Hub. The GPL entitles
+  anyone who receives this image to the corresponding source, which
+  BusyBox publishes at https://busybox.net/downloads/ and
+  https://git.busybox.net/busybox/. Ask via the repository's issue
+  tracker if you need the exact revision a published image was built
+  from.
+
+  nginx:1.27-alpine and nginx:1.29-alpine — BSD 2-Clause License
+  https://nginx.org
+
+--------------------------------------------------------------------------
+
 kubestronaut-sim is an independent open-source study tool. It is not
 affiliated with, endorsed by, or associated with the Cloud Native
 Computing Foundation, The Linux Foundation, or PSI. Kubernetes and the

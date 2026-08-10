@@ -28,21 +28,50 @@ if [ -f /opt/sim/images/_node.tar ] && ! docker image inspect "${NODE_IMAGE%%@*}
   docker load -q -i /opt/sim/images/_node.tar >/dev/null
 fi
 
+HELM_REPO_URL="http://k8s-env:${HELM_REPO_PORT}"
+HELM_REPO_STAMP=/shared/helm-repo/.charts-stamp
+
+# Everything the packaged repository is derived from, in one hash: the chart
+# sources (content and path, so an edit, a rename, an addition and a deletion
+# all move it), the URL baked into index.yaml by `helm repo index`, and the
+# helm that did the packaging — /shared outlives the image, so an upgraded
+# helm must not keep serving the old repo's output. Anything unreadable
+# hashes to a value that simply will not match the stamp, and an unmatched
+# stamp only ever means "rebuild".
+charts_fingerprint() {
+  {
+    printf 'url=%s\n' "${HELM_REPO_URL}"
+    helm version --short 2>/dev/null || echo "helm=unknown"
+    find /banks/_charts -type f -exec sha256sum {} + 2>/dev/null || true
+  } | sort | sha256sum | cut -d' ' -f1
+}
+
 phase helm-repo "Publishing the local Helm repository" 2
 mkdir -p /shared/helm-repo
 if [ -d /banks/_charts ]; then
-  echo "packaging local Helm charts..."
-  rm -rf /shared/helm-repo
-  mkdir -p /shared/helm-repo
-  for chart in /banks/_charts/*/; do
-    [ -f "${chart}Chart.yaml" ] || continue
-    helm package "$chart" -d /shared/helm-repo >/dev/null
-  done
-  helm repo index /shared/helm-repo --url "http://k8s-env:${HELM_REPO_PORT}"
+  want=$(charts_fingerprint)
+  # The stamp is written last and lives *inside* the directory it describes,
+  # so it cannot outlive the thing it vouches for: the rebuild wipes the
+  # directory first, and a rebuild that dies part-way leaves no stamp at all.
+  # index.yaml is checked too, because that is the one file helm actually
+  # fetches and the only one not produced by `helm package`.
+  if [ -f /shared/helm-repo/index.yaml ] && [ "$(cat "${HELM_REPO_STAMP}" 2>/dev/null || true)" = "$want" ]; then
+    echo "local Helm charts unchanged; reusing the packaged repository"
+  else
+    echo "packaging local Helm charts..."
+    rm -rf /shared/helm-repo
+    mkdir -p /shared/helm-repo
+    for chart in /banks/_charts/*/; do
+      [ -f "${chart}Chart.yaml" ] || continue
+      helm package "$chart" -d /shared/helm-repo >/dev/null
+    done
+    helm repo index /shared/helm-repo --url "${HELM_REPO_URL}"
+    printf '%s\n' "$want" > "${HELM_REPO_STAMP}.tmp" && mv "${HELM_REPO_STAMP}.tmp" "${HELM_REPO_STAMP}"
+  fi
 fi
 httpd -p "${HELM_REPO_PORT}" -h /shared/helm-repo
 echo "helm repo on :${HELM_REPO_PORT}"
-helm repo add sim "http://k8s-env:${HELM_REPO_PORT}" --force-update >/dev/null 2>&1 || true
+helm repo add sim "${HELM_REPO_URL}" --force-update >/dev/null 2>&1 || true
 helm repo update >/dev/null 2>&1 || true
 
 start_control_sshd() {

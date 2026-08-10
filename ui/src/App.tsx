@@ -5,7 +5,6 @@ import {
   getExam,
   getSession,
   isEnvironmentStarting,
-  pollSession,
   startControlReset,
   startControlSwitch,
   type BanksResponse,
@@ -39,6 +38,7 @@ import { Review } from "./screens/Review";
 import { useHosted } from "./lib/useHosted";
 import type { Me } from "./api";
 import { navigate, useRoute } from "./lib/useHashRoute";
+import { usePoll } from "./lib/usePoll";
 import { useSeatLanding } from "./lib/useSeatLanding";
 import { strings } from "./strings";
 
@@ -48,6 +48,10 @@ const CONTROL_POLL_IDLE_MS = 15_000;
 const BOOT_POLL_MS = 2_000;
 
 const PREPARE_POLL_MS = 1_000;
+
+const SESSION_POLL_MS = 10_000;
+
+const EXAM_RETRY_MS = 3_000;
 
 export interface Hosted {
   me: Me;
@@ -157,23 +161,18 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
     gateVerdict === "blocked" || (gateVerdict === "narrow" && !gateOverridden());
 
   const [exam, setExam] = useState<ExamInfo | null>(null);
-  useEffect(() => {
-    let stopped = false;
-    let timer = 0;
-    const tick = async () => {
-      try {
-        const loaded = await getExam();
-        if (!stopped) setExam(loaded);
-      } catch {
-        if (!stopped) timer = window.setTimeout(tick, 3000);
-      }
-    };
-    tick();
-    return () => {
-      stopped = true;
-      window.clearTimeout(timer);
-    };
-  }, [catalogVersion]);
+
+  // One fetch per catalog version. The cadence is a retry, not a poll: the
+  // loop ends the moment the facilitator answers.
+  const examVersion = useRef(-1);
+  usePoll(
+    async () => {
+      setExam(await getExam());
+      examVersion.current = catalogVersion;
+    },
+    () => (examVersion.current === catalogVersion ? null : EXAM_RETRY_MS),
+    { restartKey: catalogVersion },
+  );
   const isMcq = exam?.examType === "mcq";
 
   const applySession = useCallback((next: SessionSnapshot) => {
@@ -200,26 +199,22 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
     });
   }, []);
 
-  useEffect(() => {
-    return pollSession(applySession, handlePollError);
-  }, [applySession, handlePollError]);
+  usePoll(async () => {
+    try {
+      applySession(await getSession());
+    } catch (err) {
+      handlePollError(err);
+    }
+  }, SESSION_POLL_MS);
 
   const preparing = session?.preparing !== undefined;
-  useEffect(() => {
-    if (!preparing) return;
-    let stopped = false;
-    const timer = window.setInterval(() => {
-      getSession()
-        .then((next) => {
-          if (!stopped) applySession(next);
-        })
-        .catch(() => {});
-    }, PREPARE_POLL_MS);
-    return () => {
-      stopped = true;
-      window.clearInterval(timer);
-    };
-  }, [preparing, applySession]);
+  usePoll(
+    async () => {
+      applySession(await getSession());
+    },
+    PREPARE_POLL_MS,
+    { enabled: preparing },
+  );
 
   const prepareError = session?.prepareError;
   useEffect(() => {
@@ -231,53 +226,31 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
     });
   }, [prepareError]);
 
-  useEffect(() => {
-    if (boot?.state === "ready") return;
-    let stopped = false;
-    let timer = 0;
-    const tick = async () => {
-      try {
-        const next = await getBoot();
-        if (stopped) return;
-        setBoot(next);
-        if (next.state === "ready") return;
-      } catch {}
-      if (!stopped) timer = window.setTimeout(tick, BOOT_POLL_MS);
-    };
-    tick();
-    return () => {
-      stopped = true;
-      window.clearTimeout(timer);
-    };
-  }, [boot?.state]);
+  usePoll(
+    async () => {
+      setBoot(await getBoot());
+    },
+    BOOT_POLL_MS,
+    { enabled: boot?.state !== "ready" },
+  );
 
-  useEffect(() => {
-    let stopped = false;
-    let timer = 0;
-    const tick = async () => {
-      let next: ControlStatus | null = null;
-      try {
-        next = await getControlStatus();
-      } catch {}
-      if (stopped) return;
-      if (next) {
-        setControl(next);
+  usePoll(
+    async () => {
+      const next = await getControlStatus().catch(() => null);
+      if (!next) return;
+      setControl(next);
 
-        if (wasBusy.current && !next.busy) {
-          getSession().then(applySession).catch(() => {});
-          setCatalogVersion((v) => v + 1);
-        }
-        wasBusy.current = next.busy;
+      if (wasBusy.current && !next.busy) {
+        getSession().then(applySession).catch(() => {});
+        setCatalogVersion((v) => v + 1);
       }
-      const busyish = next ? next.busy : wasBusy.current;
-      timer = window.setTimeout(tick, busyish ? CONTROL_POLL_BUSY_MS : CONTROL_POLL_IDLE_MS);
-    };
-    tick();
-    return () => {
-      stopped = true;
-      window.clearTimeout(timer);
-    };
-  }, [applySession, jobNonce]);
+      wasBusy.current = next.busy;
+    },
+    // A failed status read leaves wasBusy where it was, so a busy job keeps
+    // its fast cadence across a blip instead of dropping to the idle one.
+    () => (wasBusy.current ? CONTROL_POLL_BUSY_MS : CONTROL_POLL_IDLE_MS),
+    { restartKey: jobNonce },
+  );
 
   const applyControlResult = useCallback(async (result: ControlActionResponse) => {
     if (result.ok) {

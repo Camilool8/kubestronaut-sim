@@ -3,6 +3,8 @@ import { getControlLog, type ControlJob, type ControlPhase } from "../api";
 import { controlJobHint, controlJobTitle } from "../lib/controlJob";
 import { formatElapsed } from "../lib/format";
 import { useFocusTrap } from "../lib/useFocusTrap";
+import { usePoll } from "../lib/usePoll";
+import { useTick } from "../lib/useTick";
 import { Icon } from "./Icon";
 import { strings } from "../strings";
 
@@ -61,12 +63,7 @@ export function ControlProgress({
   );
   useFocusTrap(dialogRef, onEscape);
 
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (failed) return;
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, [failed]);
+  const now = useTick(!failed);
 
   const title = controlJobTitle(job, bankTitle);
   const running = job.phases.find((p) => p.state === "running");
@@ -78,28 +75,15 @@ export function ControlProgress({
 
   const logStickRef = useRef(true);
 
-  useEffect(() => {
-    if (!logOpen || reconnecting) return;
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const log = await getControlLog();
-        if (!cancelled) setLogLines(log.lines);
-      } catch {}
-    };
-    void load();
-
-    if (failed) {
-      return () => {
-        cancelled = true;
-      };
-    }
-    const id = window.setInterval(() => void load(), LOG_POLL_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, [logOpen, failed, reconnecting]);
+  usePoll(
+    async () => {
+      const log = await getControlLog();
+      setLogLines(log.lines);
+    },
+    // A finished job's log is finished with it: read it once and stop.
+    () => (failed ? null : LOG_POLL_MS),
+    { enabled: logOpen && !reconnecting, restartKey: failed },
+  );
 
   useEffect(() => {
     const pane = logPaneRef.current;
