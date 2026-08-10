@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   endSession,
   getExam,
@@ -18,11 +18,19 @@ import { drillHref } from "../lib/attemptHistory";
 import { formatElapsed } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 import { navigate, useRoute } from "../lib/useHashRoute";
+import { usePoll } from "../lib/usePoll";
 import { useTick } from "../lib/useTick";
 import { strings } from "../strings";
 import { Explain } from "./Explain";
 
-const GRADING_POLL_MS = 3000;
+export const GRADING_POLL_MS = 3000;
+
+// Grading lands in well under a minute, and the poll only runs while the tab
+// is in front of the candidate, so this is five minutes of watched waiting —
+// far past any real run, and short of forever. Without it a facilitator that
+// answers 202 and then wedges leaves this screen spinning for the rest of the
+// day with nothing to click.
+export const GRADING_POLL_MAX_ATTEMPTS = 100;
 
 interface ScoreProps {
   onNewAttempt: () => void;
@@ -36,7 +44,12 @@ export function Score({ onNewAttempt, endReason, mode }: ScoreProps) {
   const [response, setResponse] = useState<ResultsResponse>({ status: "grading" });
 
   const [pollError, setPollError] = useState<string | null>(null);
-  const intervalRef = useRef<number | null>(null);
+  const [polling, setPolling] = useState(true);
+
+  // Counted rather than timed: the poll pauses in a background tab, so a
+  // candidate who alt-tabs away spends none of the allowance.
+  const attempts = useRef(0);
+  const lastError = useRef<string | null>(null);
 
   const [startedAt] = useState(() => Date.now());
 
@@ -45,34 +58,34 @@ export function Score({ onNewAttempt, endReason, mode }: ScoreProps) {
   const [tipsOpen, setTipsOpen] = useState(false);
   const hasTips = useAsync((signal) => getExam(signal), []).data?.hasTips === true;
 
-  const clearPoll = () => {
-    if (intervalRef.current !== null) {
-      window.clearInterval(intervalRef.current);
-      intervalRef.current = null;
+  const load = async () => {
+    attempts.current += 1;
+    try {
+      const r = await getResults();
+      lastError.current = null;
+      setPollError(null);
+      setResponse(r);
+      if (r.status === "ready" || r.status === "error") {
+        setPolling(false);
+        return;
+      }
+    } catch (err: unknown) {
+      lastError.current = String(err);
+      setPollError(String(err));
+    }
+
+    if (attempts.current >= GRADING_POLL_MAX_ATTEMPTS) {
+      setPolling(false);
+      setResponse({
+        status: "error",
+        message: strings.score.gradingTimedOut(
+          lastError.current ?? formatElapsed(GRADING_POLL_MS * GRADING_POLL_MAX_ATTEMPTS),
+        ),
+      });
     }
   };
 
-  const load = () =>
-    getResults()
-      .then((r) => {
-        setPollError(null);
-        setResponse(r);
-        if (r.status === "ready" || r.status === "error") {
-          clearPoll();
-        }
-      })
-
-      .catch((err: unknown) => {
-        setPollError(String(err));
-      });
-
-  useEffect(() => {
-    load();
-    intervalRef.current = window.setInterval(load, GRADING_POLL_MS);
-    return clearPoll;
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  usePoll(load, GRADING_POLL_MS, { enabled: polling });
 
   const handleRetry = async () => {
     setResponse({ status: "grading" });
@@ -83,14 +96,15 @@ export function Score({ onNewAttempt, endReason, mode }: ScoreProps) {
         setResponse({ status: "error", message: strings.score.retryFailed(result.error) });
         return;
       }
-      await load();
     } catch (err) {
       setResponse({ status: "error", message: strings.score.retryFailed(String(err)) });
       return;
     }
-    if (intervalRef.current === null) {
-      intervalRef.current = window.setInterval(load, GRADING_POLL_MS);
-    }
+
+    // A retry is a fresh wait, not a continuation of the one that ran out.
+    attempts.current = 0;
+    lastError.current = null;
+    setPolling(true);
   };
 
   const handleNewAttempt = () => {

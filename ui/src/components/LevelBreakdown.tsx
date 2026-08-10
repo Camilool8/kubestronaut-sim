@@ -1,12 +1,9 @@
 import type { LevelResult } from "../api";
+import { percentOf } from "./resultsModel";
 import { strings } from "../strings";
 
 interface LevelBreakdownProps {
   levels?: LevelResult[];
-}
-
-function percentOf(earned: number, total: number): number {
-  return total > 0 ? Math.round((earned / total) * 100) : 0;
 }
 
 // Reads the shape rather than the ranking, so the rows stay in tier order: the

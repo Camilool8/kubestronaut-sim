@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { getMe, type Me } from "../api";
+import { usePoll } from "./usePoll";
 
 export type HostedState =
   | { status: "unknown"; error: string | null }
@@ -23,42 +24,36 @@ export function useHosted(): { state: HostedState; refresh: () => void } {
   const [state, setState] = useState<HostedState>({ status: "unknown", error: null });
   const [nonce, setNonce] = useState(0);
 
-  const local = useRef(false);
+  // Written by the run that has just finished, read by the poll to pick the
+  // next wait. null ends the loop: a facilitator with no hub behind it is
+  // never going to grow one.
+  const cadence = useRef<number | null>(POLL_RETRY_MS);
 
   const refresh = useCallback(() => setNonce((n) => n + 1), []);
 
-  useEffect(() => {
-    if (local.current) return;
-    let stopped = false;
-    let timer = 0;
-
-    const tick = async () => {
-      let next = POLL_RETRY_MS;
+  usePoll(
+    async () => {
+      cadence.current = POLL_RETRY_MS;
       try {
         const me = await getMe();
-        if (stopped) return;
         if (me === null) {
-          local.current = true;
+          cadence.current = null;
           setState({ status: "local" });
           return;
         }
         setState({ status: "hosted", me });
-        next = cadenceFor(me);
+        cadence.current = cadenceFor(me);
       } catch (err) {
-        if (stopped) return;
         setState((prev) =>
           prev.status === "unknown" ? { status: "unknown", error: String(err) } : prev,
         );
       }
-      if (!stopped) timer = window.setTimeout(tick, next);
-    };
-
-    tick();
-    return () => {
-      stopped = true;
-      window.clearTimeout(timer);
-    };
-  }, [nonce]);
+    },
+    () => cadence.current,
+    // Once the app knows it is local, a refresh must not start it polling a
+    // hub that is not there.
+    { enabled: state.status !== "local", restartKey: nonce },
+  );
 
   return { state, refresh };
 }

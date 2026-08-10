@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { SessionSnapshot } from "../api";
-import { formatClock, formatClockSpoken, formatElapsed } from "../lib/format";
+import { useExamClock } from "../lib/useExamClock";
 import { Icon } from "./Icon";
 import { NavBar } from "./NavBar";
 import { NavMenuSection } from "./NavMenu";
+import { TimerReadout } from "./TimerReadout";
 import { HEADER_COMPACT_QUERY, useMediaQuery } from "../lib/useMediaQuery";
 import { strings } from "../strings";
 import { toastStore } from "./toastStore";
@@ -35,22 +36,11 @@ export function TimerBar({
   barExtras,
   extras,
 }: TimerBarProps) {
-  const [now, setNow] = useState(() => Date.now());
   const firedRef = useRef<Set<number>>(new Set());
   const compact = useMediaQuery(HEADER_COMPACT_QUERY);
 
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, []);
-
-  const elapsedSincePoll = Math.floor((now - fetchedAt) / 1000);
-  const remaining = Math.max(0, session.remainingSeconds - elapsedSincePoll);
-  const untimed = session.untimed;
+  const { remaining, elapsed, untimed } = useExamClock(session, fetchedAt);
   const isLow = !untimed && remaining < LOW_TIME_THRESHOLD_SECONDS;
-
-  const startedMs = session.startedAt ? Date.parse(session.startedAt) : NaN;
-  const elapsed = Number.isNaN(startedMs) ? 0 : Math.max(0, now - startedMs);
 
   useEffect(() => {
     if (untimed) return;
@@ -83,19 +73,7 @@ export function TimerBar({
         <span className="mode-chip">{strings.modes[session.mode].label}</span>
       )}
       <div className={`timer${isLow ? " timer-low" : ""}`} role="timer">
-        {untimed ? (
-          <>
-            <span aria-hidden="true">{formatElapsed(elapsed)}</span>
-            <span className="sr-only">{strings.exam.timeElapsed(formatElapsed(elapsed))}</span>
-          </>
-        ) : (
-          <>
-            <span aria-hidden="true">{formatClock(remaining)}</span>
-            <span className="sr-only">
-              {strings.exam.timeRemaining(formatClockSpoken(remaining))}
-            </span>
-          </>
-        )}
+        <TimerReadout untimed={untimed} remaining={remaining} elapsed={elapsed} />
       </div>
       <button
         type="button"
