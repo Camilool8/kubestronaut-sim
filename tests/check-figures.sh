@@ -193,10 +193,20 @@ for bank in banks:
              f"exam.yaml says {want!r}")
 
     compared += 1
-    if f"{bank['passing']}% to pass" not in card:
-        got = re.findall(r"(\d+)% to pass", card)
-        fail(f"site/index.html: the {bank['id']} card says {got or ['nothing']} "
+    want_pass = str(bank["passing"])
+    m = re.search(r'class="fact fact-pass">(?:<[^>]*>|[^<])*?(\d+)% to pass', card)
+    if m is None:
+        fail(f"site/index.html: the {bank['id']} card has no passing-score chip")
+    elif m.group(1) != want_pass:
+        fail(f"site/index.html: the {bank['id']} card says {m.group(1)}% "
              f"to pass, exam.yaml says {bank['passing']}%")
+
+    # Any other "% to pass" figure in the card's prose must agree with the
+    # chip too — a whole-card substring search let a second, contradictory
+    # mention slip past.
+    for got in re.findall(r"(\d+)% to pass", card):
+        check("site/index.html", want_pass, got,
+              f"the {bank['id']} card's passing score")
 
     # A hands-on card describes a cluster, so it must name the pinned minor.
     stated = re.findall(r"Kubernetes (\d+\.\d+)", card)

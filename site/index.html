@@ -270,7 +270,7 @@ spec:
             <div class="cli-card"><span class="cli-name">up</span><div class="cli-desc">stack up; nothing is built until you pick an exam</div></div>
             <div class="cli-card"><span class="cli-name">down</span><div class="cli-desc">stop; attempt state survives</div></div>
             <div class="cli-card"><span class="cli-name">reset</span><div class="cli-desc">fresh attempt on the same bank</div></div>
-            <div class="cli-card"><span class="cli-name">purge</span><div class="cli-desc">reclaim disk; attempt history survives <code>--all</code> alone destroys it</div></div>
+            <div class="cli-card"><span class="cli-name">purge</span><div class="cli-desc">reclaim disk; attempt history survives — <code>--all</code> alone destroys it</div></div>
             <div class="cli-card"><span class="cli-name">doctor</span><div class="cli-desc">preflight: Docker, RAM, disk, cgroups, line endings</div></div>
             <div class="cli-card"><span class="cli-name">ssh</span><div class="cli-desc">shell on an instance, default instance-1</div></div>
             <div class="cli-card"><span class="cli-name">status</span><div class="cli-desc">docker compose ps</div></div>
@@ -324,8 +324,10 @@ spec:
         const applyTheme = (t) => {
           if (t === "system") document.documentElement.removeAttribute("data-theme");
           else document.documentElement.setAttribute("data-theme", t);
-          $$("[data-set-theme]").forEach((b) =>
-            b.classList.toggle("is-active", b.dataset.setTheme === t));
+          $$("[data-set-theme]").forEach((b) => {
+            b.classList.toggle("is-active", b.dataset.setTheme === t);
+            b.setAttribute("aria-pressed", String(b.dataset.setTheme === t));
+          });
           if (KS.orbitSync) KS.orbitSync();
         };
         let theme = "system";
@@ -500,7 +502,7 @@ spec:
             orb.onTap = () => {
               if (!orb.hover) return;
               const el = document.getElementById("exams");
-              if (el) el.scrollIntoView({ behavior: "smooth" });
+              if (el) el.scrollIntoView({ behavior: window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
             };
             canvas.addEventListener("mousemove", orb.onMove);
             canvas.addEventListener("mouseleave", orb.onLeave);
@@ -841,7 +843,7 @@ spec:
 
         /* ---- lightbox ---- */
         const lb = $("#ks-lb"), lbImg = $("#lb-img");
-        let shots = [], shotI = 0, lbY = 0;
+        let shots = [], shotI = 0, lbY = 0, lastShotBtn = null;
         const lbRender = () => {
           const sh = shots[shotI];
           lbImg.src = sh.src; lbImg.alt = sh.alt;
@@ -856,6 +858,7 @@ spec:
           lbRender();
         };
         const openShot = (btn) => {
+          lastShotBtn = btn;
           const cards = $$("[data-shot]");
           shots = cards.map((c) => {
             const img = $$("img", c).find((el) => getComputedStyle(el).display !== "none");
@@ -884,6 +887,7 @@ spec:
           document.documentElement.style.overflowY = "";
           document.body.style.paddingRight = "";
           window.scrollTo({ top: lbY, behavior: "instant" });
+          if (lastShotBtn) lastShotBtn.focus({ preventScroll: true });
         };
         $$("[data-shot]").forEach((c) => c.addEventListener("click", () => openShot(c)));
         lb.addEventListener("click", closeShot);
