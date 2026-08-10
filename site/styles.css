@@ -404,6 +404,7 @@ svg[hidden] { display: none; }
 .t-cmd { color: #f0f4fa; }
 .t-note { display: var(--term-note); color: #5d6b7f; }
 .t-url { color: #8fd6a8; }
+.t-cursor { display: inline-block; width: 8px; height: 15px; background: #8fd6a8; vertical-align: -2px; animation: ksBlink 1.2s steps(1) infinite; }
 
 .hero-reqs {
   font-size: 13px;
