@@ -1,0 +1,103 @@
+<!--
+  Static freeze-frame of the landing page's canvas "orbit" (site/index.html,
+  initOrbit/buildOrbGrads/renderOrbit): same -16deg tilt, same y-squash
+  K=0.3, same five ring radii (252/344/436/478/520) and the same blue
+  palette, redrawn once as plain SVG so the OG card carries the motif
+  without canvas or JS. No <text> element: an <img>-loaded SVG cannot pull
+  in webfonts, and the card's own chips already name the certs.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 740" aria-hidden="true">
+  <defs>
+    <radialGradient id="og-neb-a" gradientUnits="userSpaceOnUse" cx="-270" cy="120" r="320">
+      <stop offset="0%" stop-color="rgb(96,132,255)" stop-opacity="0.09"/>
+      <stop offset="100%" stop-color="rgb(96,132,255)" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="og-neb-b" gradientUnits="userSpaceOnUse" cx="250" cy="-100" r="300">
+      <stop offset="0%" stop-color="rgb(120,190,255)" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="rgb(120,190,255)" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="og-neb-c" gradientUnits="userSpaceOnUse" cx="-40" cy="-230" r="260">
+      <stop offset="0%" stop-color="rgb(110,150,250)" stop-opacity="0.065"/>
+      <stop offset="100%" stop-color="rgb(110,150,250)" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="og-comet-ckad" gradientUnits="userSpaceOnUse" x1="-241.9" y1="21.2" x2="-159.6" y2="58.5">
+      <stop offset="0%" stop-color="rgb(186,212,255)" stop-opacity="0"/>
+      <stop offset="100%" stop-color="rgb(186,212,255)" stop-opacity="0.85"/>
+    </linearGradient>
+    <linearGradient id="og-comet-kcna" gradientUnits="userSpaceOnUse" x1="164.2" y1="-90.7" x2="-35.2" y2="-102.7">
+      <stop offset="0%" stop-color="rgb(186,212,255)" stop-opacity="0"/>
+      <stop offset="100%" stop-color="rgb(186,212,255)" stop-opacity="0.85"/>
+    </linearGradient>
+  </defs>
+
+  <!-- sparse star sprinkle, underneath the orbit itself -->
+  <g fill="#e6edfb">
+    <circle cx="776.2" cy="37.5" r="0.9" opacity="0.4"/>
+    <circle cx="884.8" cy="493.7" r="1.6" opacity="0.31"/>
+    <circle cx="532.6" cy="40.9" r="0.8" opacity="0.58"/>
+    <circle cx="885.9" cy="401.5" r="0.8" opacity="0.63"/>
+    <circle cx="966.6" cy="24.5" r="1.5" opacity="0.7"/>
+    <circle cx="441.1" cy="128.8" r="1.7" opacity="0.47"/>
+    <circle cx="1051.9" cy="442.6" r="1.5" opacity="0.72"/>
+    <circle cx="660.6" cy="701.2" r="1" opacity="0.61"/>
+    <circle cx="988.9" cy="453" r="1.5" opacity="0.63"/>
+    <circle cx="849.1" cy="52.1" r="0.9" opacity="0.44"/>
+    <circle cx="424.8" cy="214.6" r="1.3" opacity="0.49"/>
+    <circle cx="474.6" cy="166.7" r="0.9" opacity="0.86"/>
+    <circle cx="785.8" cy="446.4" r="0.8" opacity="0.72"/>
+    <circle cx="1171.2" cy="468" r="1.2" opacity="0.69"/>
+    <circle cx="1004" cy="563.2" r="0.9" opacity="0.27"/>
+    <circle cx="413.3" cy="207.4" r="0.8" opacity="0.86"/>
+    <circle cx="1041.5" cy="240.3" r="1.3" opacity="0.51"/>
+    <circle cx="1084.3" cy="341.2" r="0.9" opacity="0.41"/>
+    <circle cx="688.7" cy="203.9" r="1.2" opacity="0.83"/>
+    <circle cx="507.3" cy="173.5" r="1.7" opacity="0.58"/>
+    <circle cx="432.1" cy="459.2" r="1.5" opacity="0.52"/>
+    <circle cx="1176.7" cy="390.4" r="1.7" opacity="0.81"/>
+    <circle cx="72.9" cy="497.2" r="1.2" opacity="0.42"/>
+    <circle cx="777.9" cy="98.1" r="1.1" opacity="0.54"/>
+  </g>
+
+  <!-- soft blue nebula glow, tilted+squashed the same as buildOrbGrads' dark blobs -->
+  <g transform="translate(760,380) rotate(-16) scale(1,0.5)">
+    <circle cx="-270" cy="120" r="320" fill="url(#og-neb-a)"/>
+    <circle cx="250" cy="-100" r="300" fill="url(#og-neb-b)"/>
+    <circle cx="-40" cy="-230" r="260" fill="url(#og-neb-c)"/>
+  </g>
+
+  <!-- three coming-soon rings: CKA 436, KCSA 478, CKS 520 -->
+  <g transform="translate(760,380) rotate(-16)" fill="none">
+    <ellipse rx="436" ry="130.8" stroke="rgba(152,174,226,0.13)" stroke-width="1"/>
+    <ellipse rx="478" ry="143.4" stroke="rgba(152,174,226,0.16)" stroke-width="1"/>
+    <ellipse rx="520" ry="156" stroke="rgba(152,174,226,0.19)" stroke-width="1"/>
+  </g>
+
+  <!-- two live rings: CKAD 252, KCNA 344 -->
+  <g transform="translate(760,380) rotate(-16)" fill="none">
+    <ellipse rx="252" ry="75.6" stroke="rgba(168,196,255,0.36)" stroke-width="1.4"/>
+    <ellipse rx="344" ry="103.2" stroke="rgba(160,188,255,0.3)" stroke-width="1.2"/>
+  </g>
+
+  <!-- hollow markers on the coming-soon rings -->
+  <g transform="translate(760,380) rotate(-16)" fill="none" stroke="rgba(150,166,206,0.8)" stroke-width="1.4">
+    <circle cx="-204.7" cy="115.5" r="3.2"/>
+    <circle cx="-123.7" cy="-138.5" r="3.2"/>
+    <circle cx="18.1" cy="-155.9" r="3.2"/>
+  </g>
+
+  <!-- CKAD satellite: comet trail + glowing dot -->
+  <g transform="translate(760,380) rotate(-16)">
+    <path d="M -241.9,21.2 A 252,75.6 0 0,0 -159.6,58.5" fill="none" stroke="url(#og-comet-ckad)" stroke-width="2.2" stroke-linecap="round"/>
+    <circle cx="-159.6" cy="58.5" r="9" fill="rgb(150,190,255)" opacity="0.16"/>
+    <circle cx="-159.6" cy="58.5" r="4.5" fill="rgb(190,215,255)" opacity="0.4"/>
+    <circle cx="-159.6" cy="58.5" r="2.1" fill="rgb(248,251,255)"/>
+  </g>
+
+  <!-- KCNA satellite: comet trail + glowing dot -->
+  <g transform="translate(760,380) rotate(-16)">
+    <path d="M 164.2,-90.7 A 344,103.2 0 0,0 -35.2,-102.7" fill="none" stroke="url(#og-comet-kcna)" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="-35.2" cy="-102.7" r="9" fill="rgb(150,190,255)" opacity="0.16"/>
+    <circle cx="-35.2" cy="-102.7" r="4.5" fill="rgb(190,215,255)" opacity="0.4"/>
+    <circle cx="-35.2" cy="-102.7" r="2.1" fill="rgb(248,251,255)"/>
+  </g>
+</svg>

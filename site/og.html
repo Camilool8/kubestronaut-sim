@@ -16,6 +16,8 @@
         -webkit-font-smoothing: antialiased;
       }
       .og-stars { position: absolute; inset: 0; fill: var(--star); }
+      .og-orbit { position: absolute; top: -95px; right: -420px; width: 1280px; height: auto; z-index: 0; }
+      .og-mark, .og-title, .og-desc, .og-chips { position: relative; z-index: 1; }
       .og-mark { display: flex; align-items: center; gap: 12px;
         font-size: 26px; font-weight: 600; letter-spacing: -0.015em; color: var(--text); }
       .og-mark span { color: var(--secondary); }
@@ -46,6 +48,7 @@
         <circle cx="900" cy="90" r="1.5"/><circle cx="60" cy="380" r="1.2"/>
         <circle cx="960" cy="560" r="1.4"/><circle cx="300" cy="470" r="1"/>
       </svg>
+      <img class="og-orbit" src="og-orbit.svg" alt="" width="1280" height="789" />
       <div class="og-mark">
         <img src="favicon.svg" alt="" width="30" height="30" />
         kubestronaut<span>-sim</span>

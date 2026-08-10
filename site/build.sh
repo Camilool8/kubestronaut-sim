@@ -132,7 +132,7 @@ if not src.exists():
 
 want = (1200, 630)
 if not png.exists():
-    fail.append("site/og.png is missing, but index.html points og:image at it")
+    fail.append("site/og.png is missing, but index.html points og:image at it -- run site/og.sh")
 else:
     head = png.read_bytes()[:24]
     if head[:8] != b"\x89PNG\r\n\x1a\n" or head[12:16] != b"IHDR":
