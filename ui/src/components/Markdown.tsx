@@ -1,7 +1,6 @@
 import type { ReactElement, ReactNode } from "react";
-import { useEffect, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Suspense, lazy, useEffect, useState } from "react";
+import type { MarkdownComponents } from "./MarkdownRenderer";
 import { desktopClipboard } from "../lib/desktopClipboard";
 import { pasteChordLabel } from "../lib/desktopKeymap";
 import { highlightTo } from "../lib/highlight";
@@ -98,6 +97,17 @@ interface CodeChildProps {
 }
 
 const SHARED_COMPONENTS = {
+  // A bank author's `[label](https://…)` must never replace the exam document:
+  // the tab holds the VNC session and every piece of in-memory attempt state,
+  // and a same-tab navigation destroys the running attempt. Opening out of tab
+  // also makes the new context opener-less and referrer-less, matching the
+  // hardening on the other two link paths (Explain.tsx, DocsTray.tsx).
+  a: ({ href, children }: { href?: string; children?: ReactNode }) => (
+    <a href={href} target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  ),
+
   h1: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
   h2: ({ children }: { children?: ReactNode }) => <h3>{children}</h3>,
   h3: ({ children }: { children?: ReactNode }) => <h4>{children}</h4>,
@@ -136,7 +146,7 @@ const COMPONENTS_STATIC = {
   code: ({ children, className }: CodeChildProps) => <code className={className}>{children}</code>,
 };
 
-const PLUGINS = [remarkGfm];
+const MarkdownRenderer = lazy(() => import("./MarkdownRenderer"));
 
 export function Markdown({
   children,
@@ -145,14 +155,12 @@ export function Markdown({
   children: string;
   copyable?: boolean;
 }) {
+  const components: MarkdownComponents = copyable ? COMPONENTS : COMPONENTS_STATIC;
   return (
     <div className="md">
-      <ReactMarkdown
-        components={copyable ? COMPONENTS : COMPONENTS_STATIC}
-        remarkPlugins={PLUGINS}
-      >
-        {children}
-      </ReactMarkdown>
+      <Suspense fallback={null}>
+        <MarkdownRenderer components={components}>{children}</MarkdownRenderer>
+      </Suspense>
     </div>
   );
 }
