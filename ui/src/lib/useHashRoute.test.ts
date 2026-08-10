@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { act, renderHook } from "@testing-library/react";
-import { navigate, parseRoute, useHashRoute, useRoute } from "./useHashRoute";
+import { navigate, parseRoute, useRoute } from "./useHashRoute";
 
 beforeEach(() => {
   window.history.replaceState(null, "", window.location.pathname);
@@ -117,17 +117,5 @@ describe("navigate", () => {
     const before = window.history.length;
     act(() => navigate("/exams"));
     expect(window.history.length).toBe(before);
-  });
-});
-
-describe("useHashRoute", () => {
-  test("returns the route and a navigate that keeps its identity", () => {
-    const { result, rerender } = renderHook(() => useHashRoute());
-    const [, go] = result.current;
-    rerender();
-    expect(result.current[1]).toBe(go);
-
-    act(() => go("/results/q04"));
-    expect(result.current[0].segments).toEqual(["results", "q04"]);
   });
 });

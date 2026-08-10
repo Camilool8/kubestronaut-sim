@@ -51,7 +51,3 @@ export function useRoute(): Route {
   const hash = useSyncExternalStore(subscribe, readHash, readHashOnServer);
   return parseRoute(hash);
 }
-
-export function useHashRoute(): [Route, typeof navigate] {
-  return [useRoute(), navigate];
-}

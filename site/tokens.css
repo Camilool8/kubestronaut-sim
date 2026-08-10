@@ -70,7 +70,6 @@
 
   --shadow-accent: 0 6px 20px rgba(43, 95, 217, 0.14);
 
-  --shadow-machine: 0 22px 54px rgba(0, 0, 0, 0.55);
 
   --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
@@ -148,12 +147,10 @@
   --machine-raised: #161d2b;
   --machine-chrome: #1b2331;
   --machine-border: #232e40;
-  --machine-border-strong: #2a3546;
   --machine-text: #c3ccd9;
   --machine-muted: #9aa7ba;
   --machine-faint: #8593a8;
   --machine-dim: #6b7a90;
-  --machine-comment: #5d6b7f;
   --machine-green: #63d68a;
   --machine-green-soft: #8fd6a8;
   --machine-blue: #6f9cf8;
@@ -242,7 +239,6 @@
   --shadow-2: 0 8px 26px rgba(0, 0, 0, 0.55);
   --shadow-3: 0 18px 40px rgba(0, 0, 0, 0.62);
   --shadow-accent: 0 6px 20px rgba(43, 95, 217, 0.4);
-  --shadow-machine: 0 22px 54px rgba(0, 0, 0, 0.6);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -308,6 +304,5 @@
     --shadow-2: 0 8px 26px rgba(0, 0, 0, 0.55);
     --shadow-3: 0 18px 40px rgba(0, 0, 0, 0.62);
     --shadow-accent: 0 6px 20px rgba(43, 95, 217, 0.4);
-    --shadow-machine: 0 22px 54px rgba(0, 0, 0, 0.6);
   }
 }

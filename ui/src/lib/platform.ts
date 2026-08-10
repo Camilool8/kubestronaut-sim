@@ -4,7 +4,3 @@ export function isMac(): boolean {
   if (platform) return /^Mac/i.test(platform);
   return /Mac OS X/i.test(navigator.userAgent || "");
 }
-
-export function modifierGlyph(): string {
-  return isMac() ? "⌘" : "Ctrl";
-}
