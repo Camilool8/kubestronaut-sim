@@ -138,7 +138,97 @@
         </div>
         <div class="orbit-caption">KCNA + CKAD in flight · <span class="banks-live">2 of 5</span> banks live</div>
       </section>
+
+      <section id="sitting" class="section-sitting">
+        <div class="sitting-inner">
+          <div data-reveal="1" class="section-eyebrow">ONE SITTING, END TO END</div>
+          <h2 data-reveal="1" class="sitting-title">Pick an exam. Pick how hard. Sit it. Read the verdicts.</h2>
+          <div class="sitting-grid">
+            <div data-reveal="1">
+              <button type="button" class="shot-card" data-shot="1" title="View full size">
+                <div class="shot-frame">
+                  <img class="shot-dark" src="shots/mode-dark.webp" alt="Mode screen: Training, Mastery and Exam side by side with domain chips to narrow the draw" width="1600" height="1000">
+                  <img class="shot-light" src="shots/mode-light.webp" alt="" aria-hidden="true" width="1600" height="1000">
+                </div>
+              </button>
+              <p class="shot-caption"><b>01 · Choose the clock.</b> Training is untimed with two-tier hints and solutions on demand. Mastery is half the real clock. Exam is the real thing: full duration, no help, graded when you submit. Chips narrow the draw to the domains you want to drill.</p>
+            </div>
+            <div data-reveal="1">
+              <button type="button" class="shot-card" data-shot="1" title="View full size">
+                <div class="shot-frame">
+                  <img class="shot-dark" src="shots/exam-dark.webp" alt="Exam view: task on the left, Linux desktop with terminal and Kubernetes docs on the right" width="1600" height="1000">
+                  <img class="shot-light" src="shots/exam-light.webp" alt="" aria-hidden="true" width="1600" height="1000">
+                </div>
+              </button>
+              <p class="shot-caption"><b>02 · Work like the day itself.</b> The task on the left; a full Linux desktop on the right, terminal already open on the instance the question names. Firefox reaches the allowlisted documentation and nothing else. Clipboard works both ways.</p>
+            </div>
+            <div data-reveal="1">
+              <button type="button" class="shot-card" data-shot="1" title="View full size">
+                <div class="shot-frame">
+                  <img class="shot-dark" src="shots/score-dark.webp" alt="Score screen: pass against threshold, domain breakdown weakest first, per-task verdicts" width="1600" height="1000">
+                  <img class="shot-light" src="shots/score-light.webp" alt="" aria-hidden="true" width="1600" height="1000">
+                </div>
+              </button>
+              <p class="shot-caption"><b>03 · Get a score you can act on.</b> Weighted to the published curriculum, domain breakdown ordered weakest first, and every task carries the checks that scored it — with full solutions to review.</p>
+            </div>
+            <div data-reveal="1">
+              <button type="button" class="shot-card" data-shot="1" title="View full size">
+                <div class="shot-frame">
+                  <img class="shot-dark" src="shots/progress-dark.webp" alt="Progress screen: a card per certification, attempt history, weakest domains across attempts" width="1600" height="1040">
+                  <img class="shot-light" src="shots/progress-light.webp" alt="" aria-hidden="true" width="1600" height="1040">
+                </div>
+              </button>
+              <p class="shot-caption"><b>04 · Watch the weak domains close.</b> Every graded attempt is kept on its own volume. The weakest-domains list is built from all of them, and a drill is one click from there. <code>./sim down</code> then <code>up</code> resumes an attempt mid-sitting.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-verdict">
+        <div class="verdict-inner">
+          <div data-reveal="1" class="verdict-copy">
+            <div class="section-eyebrow">GRADED ON BEHAVIOUR</div>
+            <h2 class="verdict-title">When a check fails, it shows you why.</h2>
+            <p class="verdict-lede">Hands-on answers are graded on what the cluster does — a NetworkPolicy that actually denies (Calico, not kindnet), an Ingress the controller really routes — never on the shape of your YAML.</p>
+            <p class="verdict-lede">A failed check puts your cluster state beside the expected one and explains the difference, so the review is where the learning happens.</p>
+            <p class="verdict-note">Every question ships a reference solution; a fresh environment must grade 0 and the references must grade 100%.</p>
+          </div>
+          <div data-reveal="1" class="verdict-panel">
+            <div class="verdict-head"><span class="verdict-badge">✕ FAILED</span> q19 · 10_service — selector is 'app=inventory-api', want app=inventory</div>
+            <div class="verdict-diff">
+              <div class="verdict-col">
+                <div class="verdict-label verdict-label-bad">YOUR CLUSTER STATE</div>
+                <pre class="verdict-pre">kind: Service
+spec:
+  selector:
+    <span class="verdict-hl-bad">app: inventory-api</span></pre>
+              </div>
+              <div class="verdict-col">
+                <div class="verdict-label verdict-label-good">EXPECTED</div>
+                <pre class="verdict-pre">kind: Service
+spec:
+  selector:
+    <span class="verdict-hl-good">app: inventory</span></pre>
+              </div>
+            </div>
+            <div class="verdict-why"><span class="verdict-why-label">WHY&nbsp;&nbsp;</span>A Service finds its Pods by label, never by name. While spec.selector matches no Pod, the Service has no endpoints at all.</div>
+          </div>
+        </div>
+      </section>
     </main>
+
+    <div id="ks-lb" class="ks-lb" role="dialog" aria-modal="true" aria-label="Screenshot gallery" hidden>
+      <div class="lb-body">
+        <img id="lb-img" class="lb-img" src="" alt="">
+        <div class="lb-caption">
+          <div class="lb-meta"><span id="lb-title"></span><span id="lb-count" class="lb-count"></span></div>
+          <div id="lb-desc" class="lb-desc"></div>
+        </div>
+      </div>
+      <button type="button" id="lb-prev" class="lb-nav lb-prev" aria-label="Previous screenshot"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+      <button type="button" id="lb-next" class="lb-nav lb-next" aria-label="Next screenshot"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></button>
+      <button type="button" id="ks-lb-close" class="lb-close" aria-label="Close"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+    </div>
 
     <script>
       (() => {
@@ -640,6 +730,99 @@
 
         KS.orbitSync = orbitSync;
         initOrbit();
+
+        /* ---- reveal ---- */
+        let _io = null;
+        const setupReveal = () => {
+          if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+          if (!("IntersectionObserver" in window)) return;
+          const els = Array.from(document.querySelectorAll("[data-reveal]"));
+          const io = new IntersectionObserver((entries) => {
+            entries.forEach((e) => {
+              if (e.isIntersecting) {
+                e.target.style.opacity = "1";
+                e.target.style.transform = "none";
+                io.unobserve(e.target);
+              }
+            });
+          }, { threshold: 0.12, rootMargin: "0px 0px -6% 0px" });
+          els.forEach((el) => {
+            if (el.getBoundingClientRect().top < window.innerHeight * 0.9) return;
+            el.style.opacity = "0";
+            el.style.transform = "translateY(18px)";
+            el.style.transition = "opacity 0.65s ease, transform 0.65s ease";
+            io.observe(el);
+          });
+          _io = io;
+        };
+
+        /* ---- lightbox ---- */
+        const lb = $("#ks-lb"), lbImg = $("#lb-img");
+        let shots = [], shotI = 0, lbY = 0;
+        const lbRender = () => {
+          const sh = shots[shotI];
+          lbImg.src = sh.src; lbImg.alt = sh.alt;
+          lbImg.style.animation = "none"; void lbImg.offsetWidth; lbImg.style.animation = "";
+          $("#lb-title").textContent = sh.title;
+          $("#lb-count").textContent = " " + (shotI + 1) + " / " + shots.length;
+          $("#lb-desc").textContent = sh.desc;
+        };
+        const lbGo = (d) => {
+          if (lb.hidden || !shots.length) return;
+          shotI = (shotI + d + shots.length) % shots.length;
+          lbRender();
+        };
+        const openShot = (btn) => {
+          const cards = $$("[data-shot]");
+          shots = cards.map((c) => {
+            const img = $$("img", c).find((el) => getComputedStyle(el).display !== "none");
+            const p = c.parentElement ? c.parentElement.querySelector("p") : null;
+            const bEl = p ? p.querySelector("b") : null;
+            const title = bEl ? bEl.textContent.trim() : "";
+            const full = p ? p.textContent.trim() : "";
+            return { src: img ? (img.currentSrc || img.src) : "",
+                     alt: img ? (img.alt || "Screenshot") : "", title,
+                     desc: title && full.indexOf(title) === 0 ? full.slice(title.length).trim() : full };
+          }).filter((sh) => sh.src);
+          if (!shots.length) return;
+          shotI = Math.max(0, cards.indexOf(btn));
+          lbRender();
+          lb.hidden = false;
+          /* freeze <html>, not <body>: fixing the body de-sticks the header and drops
+             the scrollbar, reflowing the page behind the fading overlay */
+          lbY = window.scrollY;
+          const gutter = window.innerWidth - document.documentElement.clientWidth;
+          document.documentElement.style.overflowY = "hidden";
+          if (gutter > 0) document.body.style.paddingRight = gutter + "px";
+          requestAnimationFrame(() => $("#ks-lb-close").focus({ preventScroll: true }));
+        };
+        const closeShot = () => {
+          lb.hidden = true;
+          document.documentElement.style.overflowY = "";
+          document.body.style.paddingRight = "";
+          window.scrollTo({ top: lbY, behavior: "instant" });
+        };
+        $$("[data-shot]").forEach((c) => c.addEventListener("click", () => openShot(c)));
+        lb.addEventListener("click", closeShot);
+        $(".lb-body").addEventListener("click", (e) => e.stopPropagation());
+        $("#lb-prev").addEventListener("click", (e) => { e.stopPropagation(); lbGo(-1); });
+        $("#lb-next").addEventListener("click", (e) => { e.stopPropagation(); lbGo(1); });
+        $("#ks-lb-close").addEventListener("click", (e) => { e.stopPropagation(); closeShot(); });
+        document.addEventListener("keydown", (e) => {
+          if (lb.hidden) return;
+          if (e.key === "Escape") closeShot();
+          else if (e.key === "ArrowRight") lbGo(1);
+          else if (e.key === "ArrowLeft") lbGo(-1);
+        });
+        let x0 = null;
+        lb.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+        lb.addEventListener("touchend", (e) => {
+          if (x0 == null) return;
+          const dx = e.changedTouches[0].clientX - x0; x0 = null;
+          if (Math.abs(dx) > 48) lbGo(dx < 0 ? 1 : -1);
+        }, { passive: true });
+
+        setupReveal();
       })();
     </script>
   </body>
