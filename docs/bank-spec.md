@@ -753,8 +753,9 @@ has something to test against too.
 Ports are also mapped out to the host — `:8081` ingress HTTP, `:8443` ingress
 HTTPS, `:30080-30082` NodePorts — so a candidate can open their own Ingress in a
 browser while learning. No `validate.d` check may depend on that path: it is
-outside the cluster and off under a loopback `SIM_BIND`
-([SECURITY.md](../SECURITY.md)), and grading must not vary with either.
+outside the cluster, and which interface it answers on is the candidate's to
+change with `SIM_BIND` ([SECURITY.md](../SECURITY.md)) — grading must not vary
+with either.
 
 ## Runtime environment provided to scripts
 

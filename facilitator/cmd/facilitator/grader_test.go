@@ -89,9 +89,7 @@ func TestGradeSequentialRunsRecordResultsAndClearInFlight(t *testing.T) {
 	if len(results) == 0 {
 		t.Error("results is empty after a successful grade")
 	}
-	if g.inFlight.Load() {
-		t.Fatal("inFlight still true after grading completed, want false (a re-grade must not be permanently blocked)")
-	}
+	waitForInFlightClear(t, g, "after grading completed")
 
 	g.Grade()
 	waitForCalls(t, &runner.calls, 2)
@@ -116,9 +114,7 @@ func TestGradePanicRecoveredAndAllowsRegrade(t *testing.T) {
 	if !strings.Contains(gradeErr, "panic") {
 		t.Errorf("gradeError = %q, want it to mention the panic", gradeErr)
 	}
-	if g.inFlight.Load() {
-		t.Fatal("inFlight still true after a panicking grade, want false (must allow a re-grade, not wedge forever)")
-	}
+	waitForInFlightClear(t, g, "after a panicking grade")
 
 	g.Grade()
 	waitForCalls(t, &runner.calls, 2)
@@ -134,6 +130,22 @@ func waitForGraded(t *testing.T, mgr *session.Manager) {
 		time.Sleep(time.Millisecond)
 	}
 	t.Fatal("grading did not complete within 2s")
+}
+
+// Grade() records its result from the goroutine's body and clears inFlight
+// from a defer that runs afterwards, so the flag is still true for an instant
+// after grading becomes observable. Reading it the moment waitForGraded returns
+// races that defer: it passes on an idle laptop and fails on a loaded CI runner.
+func waitForInFlightClear(t *testing.T, g *grader, when string) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if !g.inFlight.Load() {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatalf("inFlight still true 2s %s, want false (a re-grade must not be permanently blocked)", when)
 }
 
 func waitForCalls(t *testing.T, counter *atomic.Int32, want int32) {

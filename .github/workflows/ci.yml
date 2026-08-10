@@ -311,21 +311,34 @@ jobs:
   shell:
     name: Shell syntax
     runs-on: ubuntu-latest
+    env:
+      # Pinned, not apt's: a runner-image bump that shipped a newer ShellCheck
+      # would turn this job red on a pull request that changed no shell at all.
+      SHELLCHECK_VERSION: v0.11.0
+      SHELLCHECK_SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
     steps:
       - uses: actions/checkout@v7
-      - name: Parse every script
+      - name: Install ShellCheck
         run: |
-          fail=0
-          for f in sim tests/*.sh images/*/*.sh banks/_lib/*.sh \
-                   banks/*/q*/setup.sh banks/*/q*/validate.d/*.sh \
-                   tests/solutions/*/*.sh */entrypoint.sh; do
-            [ -e "$f" ] || continue
-            bash -n "$f" || { echo "syntax error: $f"; fail=1; }
-          done
-          exit $fail
+          url="https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          curl -fsSL -o /tmp/shellcheck.tar.xz "$url"
+          echo "${SHELLCHECK_SHA256}  /tmp/shellcheck.tar.xz" | sha256sum -c -
+          tar -xJf /tmp/shellcheck.tar.xz -C /tmp
+          sudo install -m 0755 "/tmp/shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
+          shellcheck --version
+      - name: Every script parses and lints
+        env:
+          SHELLCHECK_REQUIRED: "1"
+        run: bash tests/check-shell.sh
       - name: No script carries CRLF
         run: sh tests/check-line-endings.sh
       - name: CRLF repair
+        env:
+          # The static half of this gate runs anywhere; the functional half
+          # needs a PowerShell. A broken extraction reached CI once with every
+          # local gate green, which is why the functional half exists — so a
+          # missing pwsh here must fail rather than skip.
+          PWSH_REQUIRED: "1"
         run: bash tests/check-crlf-repair.sh
       - name: Parse the PowerShell launcher
         shell: pwsh
@@ -336,6 +349,12 @@ jobs:
           if ($errors) { $errors | ForEach-Object { $_.Message }; exit 1 }
           Write-Host "sim.ps1 parses clean"
       - name: The two launchers agree
+        env:
+          # The gate runs both launchers over a table of bad argv and compares
+          # exit codes. Without a PowerShell it can only compare the two files
+          # as text and says so; this makes a missing pwsh a failure instead of
+          # a silent half-run. The step above already proves pwsh is here.
+          PWSH_REQUIRED: "1"
         run: bash tests/check-sim-parity.sh
       - name: Writes into /shared are atomic
         run: |

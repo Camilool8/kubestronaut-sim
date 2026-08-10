@@ -3,6 +3,9 @@ package sshexec
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -43,7 +46,7 @@ func wipeLike() []string {
 }
 
 func TestArgsCarryKeyUserHostAndCommand(t *testing.T) {
-	c := New("/shared/ssh/id_ed25519", "")
+	c := &Client{keyPath: "/shared/ssh/id_ed25519", user: "root", controlPath: "/tmp/ssh-mux/%C"}
 	args := c.args("k8s-env", []string{"bash", "-c", "echo hi"})
 
 	joined := strings.Join(args, " ")
@@ -51,6 +54,9 @@ func TestArgsCarryKeyUserHostAndCommand(t *testing.T) {
 		"-o StrictHostKeyChecking=no",
 		"-o UserKnownHostsFile=/dev/null",
 		"-o BatchMode=yes",
+		"-o ControlMaster=auto",
+		"-o ControlPath=/tmp/ssh-mux/%C",
+		"-o ControlPersist=60s",
 		"-i /shared/ssh/id_ed25519",
 	} {
 		if !strings.Contains(joined, want) {
@@ -72,6 +78,68 @@ func TestArgsOmitsKeyFlagWhenNoKey(t *testing.T) {
 		if a == "-i" {
 			t.Fatal("args included -i with no key path")
 		}
+	}
+}
+
+func TestArgsWithoutAControlPathAreUnchanged(t *testing.T) {
+	c := &Client{keyPath: "/k", user: "root"}
+
+	want := []string{
+		"-o", "StrictHostKeyChecking=no",
+		"-o", "UserKnownHostsFile=/dev/null",
+		"-o", "LogLevel=ERROR",
+		"-o", "BatchMode=yes",
+		"-o", "ConnectTimeout=10",
+		"-i", "/k",
+		"root@instance-1", `'true'`,
+	}
+	if got := c.args("instance-1", []string{"true"}); !reflect.DeepEqual(got, want) {
+		t.Errorf("args = %#v, want %#v", got, want)
+	}
+}
+
+func TestControlPathCreatesADirectoryOnlyRootCanRead(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "ssh-mux")
+
+	got := controlPath(dir)
+
+	if want := filepath.Join(dir, "%C"); got != want {
+		t.Errorf("controlPath(%q) = %q, want %q", dir, got, want)
+	}
+	info, err := os.Stat(dir)
+	if err != nil {
+		t.Fatalf("control directory was not created: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o700 {
+		t.Errorf("control directory mode = %o, want 700", perm)
+	}
+}
+
+// An unusable ControlPath is not a fallback: ssh exits 255 rather than opening
+// an ordinary connection, so the exec would fail outright. Losing the directory
+// has to cost multiplexing, not the command.
+func TestControlPathIsEmptyWhenTheDirectoryCannotBeMade(t *testing.T) {
+	blocked := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(blocked, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := controlPath(filepath.Join(blocked, "ssh-mux")); got != "" {
+		t.Errorf("controlPath = %q, want \"\" so args leaves multiplexing out", got)
+	}
+	if args := controlArgs(""); args != nil {
+		t.Errorf("controlArgs(\"\") = %v, want nil", args)
+	}
+}
+
+// ssh binds the socket at ControlPath with %C expanded to a 40-character hash
+// and a random suffix appended while it connects, and an AF_UNIX address runs
+// out at about 104 bytes on some platforms.
+func TestControlDirLeavesRoomForTheSocketName(t *testing.T) {
+	const hashed, tempSuffix, unixPathMax = 40, 17, 104
+
+	if size := len(controlDir) + len("/") + hashed + tempSuffix; size >= unixPathMax {
+		t.Errorf("%q expands to a %d-byte socket path, want under %d", controlDir, size, unixPathMax)
 	}
 }
 

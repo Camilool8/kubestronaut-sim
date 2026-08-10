@@ -38,7 +38,7 @@ Run these. They need no Docker and take seconds:
 ```bash
 tests/bank-weights.sh && tests/check-lint.sh && tests/check-lib.sh \
   && tests/check-evidence.sh && tests/next-version.sh \
-  && tests/bank-hints.sh && tests/bank-mcq.sh
+  && tests/bank-hints.sh && tests/bank-mcq.sh && tests/check-shell.sh
 for m in conductor facilitator proxy hub images/desktop/opener; do (cd $m && go test ./... && go vet ./...); done
 (cd ui && npm ci && npx tsc --noEmit && npm run lint && npm test)
 ```
@@ -49,8 +49,16 @@ If you touched `site/`, also run `bash site/build.sh --check`. It diffs
 instead of quietly skipping that comparison.
 
 If you touched `sim` or `sim.ps1`, also run `bash tests/check-sim-parity.sh`
-— the Windows launcher must offer the same nine subcommands, and CI fails
-when the two drift.
+— the Windows launcher must offer the same nine subcommands, dispatch every
+one of them, and exit the same way `./sim` does on argv either would refuse.
+It runs both launchers for real, so install PowerShell (`brew install
+powershell`) if you want the half that compares behaviour; without it the
+gate says out loud that it skipped, and CI sets `PWSH_REQUIRED=1` so it
+cannot skip there. `bash tests/check-crlf-repair.sh` is worth running then
+too, and honours the same variable — its static half checks the wiring
+anywhere, but only a PowerShell can prove `Repair-LineEndings` still
+converts CRLF, and a broken extraction once reached CI with every local
+gate green precisely because nothing ran it.
 
 ### What each gate proves
 
@@ -64,13 +72,16 @@ when the two drift.
 | `bank-hints.sh` | Every hinted question has both tiers, and no hint shares 120 consecutive characters with its solution |
 | `bank-mcq.sh` | Six invariants over every `examType: mcq` bank, including a non-degenerate answer key |
 | `site/build.sh --check` | The generated mirrors are current, the page's figures match `banks/*/exam.yaml`, and its cert marks match `CertMark.tsx` |
-| `check-sim-parity.sh` | `sim` and `sim.ps1` offer the same subcommands and the same usage string |
+| `check-sim-parity.sh` | `sim` and `sim.ps1` offer the same subcommands, the same usage string, and behave the same. `sim.ps1`'s `switch` arms must match its `$COMMANDS` declaration — a command declared but not dispatched prints nothing and exits 0 — and both launchers must return the same exit code for every row of a shared bad-argv table, including `DOCTOR`/`Purge` and `purge --ALL`, whose case-sensitivity is the contract that keeps `--ALL` from deleting every graded attempt. Both run with a stub `docker`/`curl`/`python3`/`git` first on `PATH` that records any call and exits 97, so a row that reaches docker is reported rather than executed, and the gate is safe to run with an exam live. Without a PowerShell the behaviour half says loudly that it skipped; CI sets `PWSH_REQUIRED=1`, which makes a missing one a failure instead |
+| `check-shell.sh` | Every shell script git knows about — not a curated glob, so nothing falls outside it — parses under `bash -n` and passes ShellCheck at **severity `warning`**. `info` and `style` add 63 and 71 findings that are not defects, so the floor sits above them. Without ShellCheck installed the lint pass says loudly that it skipped; CI sets `SHELLCHECK_REQUIRED=1`, which makes a missing binary a failure instead |
 
 ### What CI cannot run
 
-CI runs everything above, plus the eight image builds, a shell syntax
-pass, and a Windows job that runs `sim.ps1` under both Windows PowerShell
-5.1 and PowerShell 7. It does **not** run `tests/smoke.sh`.
+CI runs everything above, plus the eight image builds and a Windows job
+that runs `sim.ps1` under both Windows PowerShell 5.1 and PowerShell 7.
+Its ShellCheck is pinned by version and SHA-256 rather than taken from
+the runner image, so a runner bump cannot turn the job red on a pull
+request that changed no shell. It does **not** run `tests/smoke.sh`.
 
 That means the two gates keeping the banks honest are never enforced by
 machine:

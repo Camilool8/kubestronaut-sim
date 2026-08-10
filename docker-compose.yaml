@@ -7,9 +7,9 @@ services:
     environment:
       BANK: ${BANK:-}
     ports:
-      - "${SIM_BIND:-0.0.0.0}:8081:80"
-      - "${SIM_BIND:-0.0.0.0}:8443:443"
-      - "${SIM_BIND:-0.0.0.0}:30080-30082:30080-30082"
+      - "${SIM_BIND:-127.0.0.1}:8081:80"
+      - "${SIM_BIND:-127.0.0.1}:8443:443"
+      - "${SIM_BIND:-127.0.0.1}:30080-30082:30080-30082"
     volumes:
       - shared:/shared
       - dind:/var/lib/docker
@@ -127,7 +127,7 @@ services:
       dockerfile: facilitator/Dockerfile
     hostname: facilitator
     ports:
-      - "${SIM_BIND:-0.0.0.0}:8080:8080"
+      - "${SIM_BIND:-127.0.0.1}:8080:8080"
     environment:
       BANK: ${BANK:-}
       SESSION_DURATION_OVERRIDE: ${SESSION_DURATION_OVERRIDE:-}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   getSolution,
   type CheckArtifact,
@@ -55,6 +55,12 @@ export function Explain({ results, questionId, basePath = "/results", live = tru
     return () => call.abort();
   }, [questionId, known, live]);
 
+  // Hooks run before the unknown-task bail-out below, so this is computed for
+  // every render. `checks` is the array carried on the results object, so it
+  // only changes identity when a new grading result arrives.
+  const checks = question?.checks;
+  const evidence = useMemo(() => collectEvidence(checks ?? []), [checks]);
+
   if (question === null) {
     return (
       <div className="explain">
@@ -84,8 +90,6 @@ export function Explain({ results, questionId, basePath = "/results", live = tru
   ]
     .filter((part): part is string => part !== null)
     .join(strings.explain.eyebrowSeparator);
-
-  const evidence = collectEvidence(question.checks);
 
   return (
     <div className="explain">
@@ -264,10 +268,17 @@ function collectEvidence(checks: CheckResult[]): Evidence[] {
 }
 
 function EvidenceSection({ evidence }: { evidence: Evidence[] }) {
-  const blocks = evidence.map((e) => ({
-    ...e,
-    diff: e.actual && e.expected ? diffDocuments(e.actual.body, e.expected.body) : null,
-  }));
+  // diffDocuments is an O(n·m) LCS that allocates an Int32Array of up to
+  // (MAX_LINES + 1)² entries. `evidence` is the only input, and it is itself
+  // memoized on the graded checks, so one pass per block per result.
+  const blocks = useMemo(
+    () =>
+      evidence.map((e) => ({
+        ...e,
+        diff: e.actual && e.expected ? diffDocuments(e.actual.body, e.expected.body) : null,
+      })),
+    [evidence],
+  );
 
   const marksAnything = blocks.some(
     (b) => b.diff !== null && b.diff.compared && b.diff.changedLines > 0,

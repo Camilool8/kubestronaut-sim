@@ -2,7 +2,12 @@
 
 `./sim` is a bash wrapper around `docker compose`: nine subcommands and
 five configuration variables. `.\sim.ps1` is the same nine subcommands in
-PowerShell for Windows — see [install.md](install.md).
+PowerShell for Windows — see [install.md](install.md). CI holds the two to
+the same subcommand names, the same usage string, and the same exit code for
+argv either one refuses, `purge --all` and its casing included
+(`tests/check-sim-parity.sh`). The configuration is where they differ on
+purpose: the environment variables below have `sim.ps1` flags, listed
+alongside them.
 
 Everything after `./sim up` can also be done in the browser at
 `http://localhost:8080`.
@@ -115,7 +120,7 @@ machine pulls that image.
 
 | Variable | Default | `sim.ps1` flag | Purpose |
 |---|---|---|---|
-| `SIM_BIND` | `0.0.0.0` | `up -Bind <address>` | Host interface every published port binds to |
+| `SIM_BIND` | `127.0.0.1` | `up -Bind <address>` | Host interface every published port binds to |
 | `SIM_BOOT_BUDGET` | `3600` | `up <bank> -BootBudget <seconds>` | Seconds `./sim up <bank>` waits for an environment |
 | `SIM_SHELL_BUDGET` | `300` | `up -ShellBudget <seconds>` | Seconds a bare `./sim up` waits for the shell |
 | `BANK` | unset | `up <bank>` | Bank to activate, first boot only |
@@ -130,17 +135,25 @@ in their own sections below.
 ### SIM_BIND
 
 ```bash
-./sim up                        # default: 0.0.0.0, reaches your whole LAN
-SIM_BIND=127.0.0.1 ./sim up     # loopback only
+./sim up                        # default: 127.0.0.1, this machine only
+SIM_BIND=0.0.0.0 ./sim up       # opt in, reaches your whole LAN
 ```
 
 ```powershell
-.\sim.ps1 up                       # default: 0.0.0.0, reaches your whole LAN
-.\sim.ps1 up -Bind 127.0.0.1       # loopback only
+.\sim.ps1 up                       # default: 127.0.0.1, this machine only
+.\sim.ps1 up -Bind 0.0.0.0         # opt in, reaches your whole LAN
 ```
 
-There is no authentication anywhere in the stack. On a network you do
-not control, bind to loopback. See [SECURITY.md](../SECURITY.md).
+The default is set in one place, `${SIM_BIND:-127.0.0.1}` on every
+published port in `docker-compose.yaml`. Neither launcher sets it —
+`-Bind` only exports `SIM_BIND` when you pass it — so a direct `docker
+compose up` binds loopback too.
+
+There is no authentication anywhere in the stack, and a published port
+is forwarded past the `INPUT` chain, so `ufw` and `firewalld` do not
+cover one: `0.0.0.0` hands the whole LAN everything, whatever your host
+firewall says. Only opt in on a network you control. See
+[SECURITY.md](../SECURITY.md).
 
 ### SIM_BOOT_BUDGET
 
@@ -212,6 +225,8 @@ uses it to exercise auto-expiry.
 | `8443` | `k8s-env:443` | ingress-nginx over HTTPS |
 | `30080-30082` | `k8s-env:30080-30082` | NodePort Services on those three ports |
 
+- Every one of them binds `127.0.0.1` unless you set
+  [`SIM_BIND`](#sim_bind), so they answer on this machine only.
 - Ports 80 and 443 inside `k8s-env` are the kind control-plane node's
   own published ports, bound by ingress-nginx via `hostPort`.
 - The `30080-30082` band is offset on the host so it never contends

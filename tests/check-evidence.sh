@@ -8,7 +8,7 @@
 #   1. a failure never arrives without an `actual` pane
 #   2. a name the candidate did not use is reported as that, not as an empty field
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 root=$PWD
 . banks/_lib/checks.sh   # for ARTIFACT_EMPTY
 

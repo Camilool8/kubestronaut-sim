@@ -22,17 +22,22 @@ Two controls stand between that and a stranger, and neither is
 authentication:
 
 - **Which interface it listens on.** This is the whole defence against
-  someone else on the network.
+  someone else on the network, and it defaults to loopback: a plain
+  `./sim up` publishes on `127.0.0.1` only, so nothing off the machine
+  reaches the stack at all.
+
+  Reaching it from another machine is a deliberate opt-in:
 
   ```bash
-  SIM_BIND=127.0.0.1 ./sim up     # loopback only
+  SIM_BIND=0.0.0.0 ./sim up       # reachable on your LAN
   ```
 
   ```powershell
-  .\sim.ps1 up -Bind 127.0.0.1    # loopback only
+  .\sim.ps1 up -Bind 0.0.0.0      # reachable on your LAN
   ```
 
-  Use that on any network you do not control.
+  Do that only on a network you control, and read [SIM_BIND](#sim_bind)
+  first — your host firewall does not cover a published port.
 
 - **An origin check on every state-changing route.** The facilitator
   refuses a state-changing request that carries a cross-site `Origin` or
@@ -44,7 +49,7 @@ authentication:
 The second exists because the first does not address the attacker who
 matters here. A page in another tab can send a `POST` to `:8080` from
 the candidate's own browser: the request originates on the machine
-running the stack, so `SIM_BIND=127.0.0.1` does not touch it. Without
+running the stack, so the loopback default does not touch it. Without
 the origin check, any site the candidate visits could end a live attempt
 or trigger a reset. The response is opaque to the caller either way, so
 the risk was always destruction, never disclosure.
@@ -73,8 +78,20 @@ the cluster's ingress on `8081`/`8443`, and NodePorts `30080-30082`.
 
 | Value | Effect |
 |---|---|
-| `0.0.0.0` (default) | Reachable on your LAN. Lets you build on a desktop and sit the exam from a laptop. |
-| `127.0.0.1` | Loopback only. |
+| `127.0.0.1` (default) | Loopback only. Nothing off the machine can reach it. |
+| `0.0.0.0` | Reachable on your LAN. Lets you build on a desktop and sit the exam from a laptop, or a KCNA attempt from a phone. |
+
+The default lives in exactly one place — `${SIM_BIND:-127.0.0.1}` on
+every published port in [docker-compose.yaml](docker-compose.yaml).
+Neither launcher sets it, so a direct `docker compose up` gets the same
+default as `./sim up`.
+
+**Your host firewall does not cover a published port.** Traffic to one
+is forwarded to the container rather than delivered to the host, so it
+traverses Docker's own `DOCKER-USER` and `DOCKER` chains and never
+reaches the `INPUT` chain that `ufw` and `firewalld` manage. `ufw deny
+8080` does not close a port published on `0.0.0.0`; only a rule in
+`DOCKER-USER`, or binding to loopback, does.
 
 ## Container privileges
 
@@ -108,7 +125,8 @@ We are not migrating, and the reason is what this cluster is:
   taking.
 - No untrusted traffic reaches it. Its clients are the candidate's own
   shells, their own desktop browser, and their own host on `:8081` and
-  `:8443` — and under a loopback `SIM_BIND`, not even that.
+  `:8443` — and on the default loopback bind, that host is the only
+  machine that can reach either port.
 - The CKAD competency is *"use Ingress rules to expose applications"*.
   The Ingress **API** is not deprecated and is fully supported. One
   controller implementation retired; nothing a candidate learns here
@@ -176,7 +194,10 @@ Three gates exist for fidelity with the real exam:
 
 None of them is a security control:
 
-- Every `solution.md` sits unencrypted in `banks/` the whole time.
+- Every `solution.md` sits unencrypted in `banks/` the whole time. That
+  is fine locally, where the only person you can cheat is yourself, and
+  it still holds on a hosted deployment where the person is a stranger —
+  see [Hosted deployments](#hosted-deployments).
 - The pointer gate is measured by the client, because no server can see
   a pointer type. An absent header is deliberately not treated as
   touch-only, so `./sim`, `tests/smoke.sh` and `curl` keep working.
@@ -258,6 +279,23 @@ container with a root shell in it.
 | The documentation allowlist stops being a network boundary | A Pod is one network namespace and a NetworkPolicy selects Pods, not containers. The desktop and the candidate's shells share one egress, and the shells need theirs. The allowlist still governs the browser. |
 | One candidate cannot reach another | Each session is its own Pod, addressed from the verified cookie. History is stored per user, scoped to the owner's directory. |
 | The one credential is `COOKIE_KEY` | It signs login cookies and, under a *derived* key, the per-Pod ticket a session uses to record an attempt. A ticket read out of a Pod spec can never be spent as that candidate's login. |
+| The answer key is inside the Pod, next to the candidate's root shell | `images/banks/Dockerfile` ships the whole bank tree — 145 `solution.md` and 44 `hints.md` — and the `banks` initContainer copies it into an `emptyDir` that both instances mount. So `cat /banks/ckad-mock-01/q03/solution.md` succeeds mid-attempt, while `GET /api/questions/q03/solution` correctly returns `403`. Assume a hosted candidate can read every answer. |
+
+The instances mount `/banks` because that is where the work happens:
+grading runs `validate.d/` from it over SSH, and a question's `setup.sh`
+seeds the environment from its `files/`. The facilitator mounts it for a
+different reason — it serves `solution.md` and `hints.md` to the API. One
+volume serves both needs, so the instances receive the facilitator's half
+too. Filtering it needs two `emptyDir`s and two copies — a restructure of
+the Pod spec for a threat this product does not otherwise defend against,
+and so deliberately not done.
+
+The [solutions gate](#the-session-gates-are-not-security) is therefore a
+fidelity control here, exactly as it is locally: it keeps the answer out
+of the *app* until the attempt ends. It is not a boundary, and a hosted
+deployment should not be sold as one. `./tests` is correctly absent from
+the hosted manifest, which is why the 44 worked solution scripts do not
+ship with it.
 
 The MCQ flavour has none of this: no cluster, no shell, no privilege.
 

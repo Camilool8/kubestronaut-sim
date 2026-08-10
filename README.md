@@ -37,16 +37,21 @@ On Windows the launcher is PowerShell, and needs no `python3`:
 Then open <http://localhost:8080> and pick an exam. Everything after
 `up` happens in the browser.
 
-> **There is no authentication in this stack.** Ports bind to all
-> interfaces by default. On a network you do not control:
+> **There is no authentication in this stack.** Ports bind to loopback
+> only, so a plain `./sim up` is reachable from this machine and nowhere
+> else. Sitting the exam from another machine is an opt-in, for a
+> network you control:
 >
 > ```bash
-> SIM_BIND=127.0.0.1 ./sim up
+> SIM_BIND=0.0.0.0 ./sim up
 > ```
 >
 > ```powershell
-> .\sim.ps1 up -Bind 127.0.0.1
+> .\sim.ps1 up -Bind 0.0.0.0
 > ```
+>
+> A published port is not covered by `ufw` — see
+> [SECURITY.md](SECURITY.md) before you do that.
 
 Nothing is built until you choose an exam. Picking a certification is
 what creates its cluster, and the page shows each phase as it completes.

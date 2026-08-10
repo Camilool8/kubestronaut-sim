@@ -2,7 +2,7 @@
 # The release tag is computed, not typed, so the thing that computes it is worth
 # testing before it decides a version nobody can take back.
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 SCRIPT=.github/scripts/next-version.py
 

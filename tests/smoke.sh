@@ -181,11 +181,11 @@ done
 [ "$ing_ok" = "1" ] || fail "Ingress did not answer on the published host port :8081"
 docker compose exec k8s-env kubectl delete namespace ingress-smoke --wait=false >/dev/null
 
-echo "== published ports bind every interface (SIM_BIND default) =="
-docker compose port facilitator 8080 | grep -q '^0\.0\.0\.0:' \
-  || fail "facilitator should publish on 0.0.0.0 by default (SIM_BIND)"
-docker compose port k8s-env 80 | grep -q '^0\.0\.0\.0:' \
-  || fail "the ingress host port should publish on 0.0.0.0 by default (SIM_BIND)"
+echo "== published ports bind loopback only (SIM_BIND default) =="
+docker compose port facilitator 8080 | grep -q '^127\.0\.0\.1:' \
+  || fail "facilitator should publish on 127.0.0.1 by default (SIM_BIND), got '$(docker compose port facilitator 8080)'"
+docker compose port k8s-env 80 | grep -q '^127\.0\.0\.1:' \
+  || fail "the ingress host port should publish on 127.0.0.1 by default (SIM_BIND), got '$(docker compose port k8s-env 80)'"
 
 echo "== facilitator: healthz, exam metadata, built UI, desktop only via :8080 =="
 status=$(req GET /healthz)
@@ -531,7 +531,7 @@ case ",${listed}," in
 esac
 
 ./sim grade | tee /tmp/grade-smoke0.txt
-read -r _ se0 st0 _ < <(grep '^RESULT ' /tmp/grade-smoke0.txt)
+read -r _ se0 _ _ < <(grep '^RESULT ' /tmp/grade-smoke0.txt)
 [ "$se0" = "0" ] || fail "fresh smoke env should score 0, got ${se0}"
 
 docker compose exec instance-1 su - candidate -c 'bash /tests/solutions/smoke-01/q01.sh'
