@@ -171,7 +171,7 @@ def site_clock(mins):
 
 page = read("site/index.html")
 cards = dict(re.findall(
-    r'<li[^>]*\bdata-bank="([^"]+)"[^>]*>(.*?)</li>', page, re.S))
+    r'<li(?=[^>]*\bclass="[^"]*\bexam-card\b[^"]*")[^>]*\bdata-bank="([^"]+)"[^>]*>(.*?)</li>', page, re.S))
 if not cards:
     fail('site/index.html: no <li class="exam-card"> on the page — the parse '
          "is wrong")

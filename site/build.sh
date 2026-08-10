@@ -60,7 +60,6 @@ import pathlib, re, sys
 
 repo = pathlib.Path(sys.argv[1])
 page = (repo / "site" / "index.html").read_text()
-flat = re.sub(r"\s+", " ", page)
 
 banks = []
 for path in sorted((repo / "banks").glob("*/exam.yaml")):
@@ -87,7 +86,7 @@ elif int(m.group(1)) != total:
 # One card per sittable bank, keyed by data-bank; its draw is one
 # `<span class="fact fact-draw">17 of 44 drawn</span>`.
 cards = dict(re.findall(
-    r'<li[^>]*\bdata-bank="([^"]+)"[^>]*>(.*?)</li>', page, re.S))
+    r'<li(?=[^>]*\bclass="[^"]*\bexam-card\b[^"]*")[^>]*\bdata-bank="([^"]+)"[^>]*>(.*?)</li>', page, re.S))
 if not cards:
     fail.append('no <li class="exam-card"> on the page -- the parse is wrong')
 
