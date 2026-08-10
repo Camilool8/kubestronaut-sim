@@ -54,7 +54,11 @@ one of them, and exit the same way `./sim` does on argv either would refuse.
 It runs both launchers for real, so install PowerShell (`brew install
 powershell`) if you want the half that compares behaviour; without it the
 gate says out loud that it skipped, and CI sets `PWSH_REQUIRED=1` so it
-cannot skip there.
+cannot skip there. `bash tests/check-crlf-repair.sh` is worth running then
+too, and honours the same variable — its static half checks the wiring
+anywhere, but only a PowerShell can prove `Repair-LineEndings` still
+converts CRLF, and a broken extraction once reached CI with every local
+gate green precisely because nothing ran it.
 
 ### What each gate proves
 

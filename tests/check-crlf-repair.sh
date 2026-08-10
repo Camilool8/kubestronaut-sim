@@ -67,11 +67,22 @@ psh=""
 for candidate in pwsh powershell; do
   if command -v "$candidate" >/dev/null 2>&1; then psh="$candidate"; break; fi
 done
-if [ -z "$psh" ]; then
-  echo "check-crlf-repair: SKIPPED the PowerShell functional test (no pwsh or powershell on PATH)"
-else
+verified=0
+if [ -n "$psh" ]; then
   "$psh" -NoProfile -File tests/check-crlf-repair.ps1 || fail=1
+  verified=1
+elif [ -n "${PWSH_REQUIRED:-}" ]; then
+  echo "check-crlf-repair: PWSH_REQUIRED is set and neither pwsh nor powershell is on PATH" >&2
+  fail=1
+else
+  echo "check-crlf-repair: no pwsh/powershell on PATH — the functional test was SKIPPED." >&2
+  echo "                   CI sets PWSH_REQUIRED and will not skip it." >&2
+  echo "                   Install it: brew install powershell | https://aka.ms/powershell" >&2
 fi
 
 [ "$fail" = 0 ] || exit 1
-echo "check-crlf-repair: bash repair works; PowerShell mirror wired and verified"
+if [ "$verified" = 1 ]; then
+  echo "check-crlf-repair: bash repair works; PowerShell mirror wired and verified"
+else
+  echo "check-crlf-repair: bash repair works; PowerShell mirror wired — NOT verified, see above"
+fi

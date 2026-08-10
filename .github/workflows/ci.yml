@@ -333,6 +333,12 @@ jobs:
       - name: No script carries CRLF
         run: sh tests/check-line-endings.sh
       - name: CRLF repair
+        env:
+          # The static half of this gate runs anywhere; the functional half
+          # needs a PowerShell. A broken extraction reached CI once with every
+          # local gate green, which is why the functional half exists — so a
+          # missing pwsh here must fail rather than skip.
+          PWSH_REQUIRED: "1"
         run: bash tests/check-crlf-repair.sh
       - name: Parse the PowerShell launcher
         shell: pwsh
