@@ -5,7 +5,6 @@ set -eu
 here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 repo=$(dirname "$here")
 
-TOKENS_SRC="$repo/ui/src/styles/tokens.css"
 FAVICON_SRC="$repo/ui/public/favicon.svg"
 FONT_SRC="$repo/ui/node_modules/@fontsource"
 
@@ -19,24 +18,12 @@ ibm-plex-sans/files/ibm-plex-sans-latin-600-normal.woff2
 ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2
 ibm-plex-mono/files/ibm-plex-mono-latin-600-normal.woff2"
 
-banner() {
-  cat <<EOF
-/* GENERATED FILE - DO NOT EDIT.
-   Verbatim copy of $1, written by site/build.sh.
-   Edit the source and re-run the script; \`site/build.sh --check\` fails
-   the moment these two disagree. */
-
-EOF
-}
-
 generate() {
   out=$1
 
-  [ -f "$TOKENS_SRC" ] || { echo "build.sh: missing $TOKENS_SRC" >&2; exit 1; }
   [ -f "$FAVICON_SRC" ] || { echo "build.sh: missing $FAVICON_SRC" >&2; exit 1; }
 
   mkdir -p "$out/fonts"
-  { banner "ui/src/styles/tokens.css"; cat "$TOKENS_SRC"; } > "$out/tokens.css"
 
   sed -n '/<svg/,$p' "$FAVICON_SRC" > "$out/favicon.svg"
 
@@ -357,12 +344,10 @@ if [ "${1:-}" = "--check" ]; then
   check_og || status=1
   check_shots || status=1
   check_cert_marks || status=1
-  for f in tokens.css favicon.svg; do
-    if ! diff -q "$tmp/$f" "$here/$f" >/dev/null 2>&1; then
-      echo "build.sh: site/$f is out of date - run site/build.sh" >&2
-      status=1
-    fi
-  done
+  if ! diff -q "$tmp/favicon.svg" "$here/favicon.svg" >/dev/null 2>&1; then
+    echo "build.sh: site/favicon.svg is out of date - run site/build.sh" >&2
+    status=1
+  fi
 
   if [ -d "$FONT_SRC" ]; then
     for f in $FONT_FILES; do
@@ -386,4 +371,4 @@ if [ "${1:-}" = "--check" ]; then
 fi
 
 generate "$here"
-echo "build.sh: wrote site/tokens.css, site/favicon.svg and site/fonts/."
+echo "build.sh: wrote site/favicon.svg and site/fonts/."
