@@ -29,6 +29,12 @@ jobs:
         run: bash tests/bank-hints.sh
       - name: MCQ banks
         run: bash tests/bank-mcq.sh
+      - name: Published figures match the banks that own them
+        run: bash tests/check-figures.sh
+      - name: Preload exclusions
+        run: sh tests/check-preload.sh
+      - name: Kubernetes pins agree
+        run: bash tests/check-k8s-pins.sh
       - uses: actions/setup-node@v7
         with:
           node-version: "22"
