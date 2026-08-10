@@ -20,7 +20,7 @@
       .og-mark, .og-title, .og-desc, .og-chips { position: relative; z-index: 1; }
       .og-mark { display: flex; align-items: center; gap: 12px;
         font-size: 26px; font-weight: 600; letter-spacing: -0.015em; color: var(--text); }
-      .og-mark span { color: var(--secondary); }
+      .og-mark-dim { color: var(--secondary); }
       .og-title { margin: 30px 0 0; max-width: 17ch; font-size: 62px; line-height: 1.06;
         font-weight: 600; letter-spacing: -0.025em; color: var(--text); text-wrap: balance; }
       .og-desc { margin: 26px 0 0; max-width: 52ch; font-size: 23px; line-height: 1.5;
@@ -51,7 +51,7 @@
       <img class="og-orbit" src="og-orbit.svg" alt="" width="1280" height="789" />
       <div class="og-mark">
         <img src="favicon.svg" alt="" width="30" height="30" />
-        kubestronaut<span>-sim</span>
+        <span class="og-mark-text">kubestronaut<span class="og-mark-dim">-sim</span></span>
       </div>
       <h1 class="og-title">Rehearse the Kubernetes exams on a real cluster.</h1>
       <p class="og-desc">A timed sitting, a real Linux desktop, and a score graded
