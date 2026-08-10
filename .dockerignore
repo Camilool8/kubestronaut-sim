@@ -1,6 +1,10 @@
 .git
 .claude
+.superpowers
+.impeccable
+**/.DS_Store
 docs
+site
 images
 banks
 tests

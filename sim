@@ -7,6 +7,50 @@ UI=http://localhost:8080
 
 json_field() { python3 -c "import json,sys; print(json.load(sys.stdin).get('$1',''))" 2>/dev/null || true; }
 
+# One interpreter per poll, not one per field. `up` reads state, label and
+# detail out of the same /api/boot document every 3 seconds, so at one
+# python3 per field a 20-minute cold boot spent ~1,200 process starts on
+# three fields it had already fetched together. jq would be a single process
+# too, but a stock macOS has no jq and does have python3 -- the language is
+# right, the granularity was not.
+#
+# Values come back one per line, in the order asked for, so a caller reads
+# them with one `read` each. A field that is absent, null or not a scalar
+# comes back empty, and so does every field of a document that will not
+# parse: identical to what json_field returned for those cases. python3
+# missing entirely still prints nothing and exits 0, which leaves the caller
+# with empty fields and a poll loop that keeps polling -- the behaviour
+# install.md documents.
+#
+# A newline inside a value would shift every later field up a line, which
+# for `state` would mean a boot that never finishes; none of the boot fields
+# can contain one, and flattening makes that structural rather than assumed.
+json_fields() {
+  python3 -c '
+import json, sys
+try:
+    doc = json.load(sys.stdin)
+except Exception:
+    doc = None
+if not isinstance(doc, dict):
+    doc = {}
+for name in sys.argv[1:]:
+    value = doc.get(name, "")
+    if value is None or isinstance(value, (dict, list)):
+        value = ""
+    print(str(value).replace("\r", " ").replace("\n", " "))
+' "$@" 2>/dev/null || true
+}
+
+# Sets state/label/detail from one boot document, in one python3.
+read_boot_fields() {
+  state=""; label=""; detail=""
+  { IFS= read -r state || :
+    IFS= read -r label || :
+    IFS= read -r detail || :
+  } < <(printf '%s' "$1" | json_fields state label detail)
+}
+
 # `docker info --format` fills every top-level field with its zero value
 # (0, "") even when the daemon is unreachable, AND still exits non-zero --
 # so "$(docker info ... || echo fallback)" doubles up into two lines: the
@@ -65,8 +109,7 @@ case "$cmd" in
           exit 1
         fi
         boot=$(curl -fsS --max-time 5 "${UI}/api/boot" 2>/dev/null) || { sleep 2; continue; }
-        state=$(printf '%s' "$boot" | json_field state)
-        label=$(printf '%s' "$boot" | json_field label)
+        read_boot_fields "$boot"
         if [ -n "$label" ] && [ "$label" != "$last" ]; then
           echo "  $label"
           last="$label"
@@ -101,9 +144,7 @@ case "$cmd" in
       fi
 
       boot=$(curl -fsS --max-time 5 "${UI}/api/boot" 2>/dev/null) || { sleep 3; continue; }
-      state=$(printf '%s' "$boot" | json_field state)
-      label=$(printf '%s' "$boot" | json_field label)
-      detail=$(printf '%s' "$boot" | json_field detail)
+      read_boot_fields "$boot"
 
       line="$label"
       [ -n "$detail" ] && line="$label — $detail"
