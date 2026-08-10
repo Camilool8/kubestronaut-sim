@@ -4,148 +4,63 @@
     <meta charset="utf-8" />
     <meta name="robots" content="noindex, nofollow" />
     <title>og.png source — kubestronaut-sim</title>
-
-    <link rel="stylesheet" href="tokens.css" />
-    <link rel="stylesheet" href="fonts.css" />
     <link rel="stylesheet" href="styles.css" />
-
     <style>
-
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-        background: var(--bg);
-      }
-
+      html, body { margin: 0; padding: 0; background: var(--bg); }
       .og {
-        box-sizing: border-box;
-        width: 1200px;
-        height: 630px;
-        display: grid;
-        grid-template-columns: 1fr 420px;
-        align-items: center;
-        gap: var(--space-8);
-        padding: 72px;
-        background: var(--bg);
-        font-family: var(--font-sans);
+        box-sizing: border-box; width: 1200px; height: 630px;
+        position: relative; overflow: hidden;
+        display: flex; flex-direction: column; justify-content: center;
+        padding: 72px 76px; background: var(--bg);
+        font-family: "IBM Plex Sans", system-ui, sans-serif;
         -webkit-font-smoothing: antialiased;
       }
-
-      .og-mark {
-        font-size: 26px;
-        font-weight: 600;
-        letter-spacing: var(--tracking-tight);
-        color: var(--text);
-      }
-
-      .og-mark span {
-        color: var(--text-secondary);
-      }
-
-      .og-title {
-        margin: 28px 0 0;
-        font-size: 58px;
-        line-height: 1.08;
-        font-weight: 600;
-        letter-spacing: -0.025em;
-        color: var(--text);
-        text-wrap: balance;
-      }
-
-      .og-desc {
-        margin: 26px 0 0;
-        max-width: 540px;
-        font-size: 24px;
-        line-height: 1.45;
-        color: var(--text-muted);
-        text-wrap: pretty;
-      }
-
-      .og .orbit-svg {
-        max-width: none;
-        width: 420px;
-      }
-
-      .og .orbit-track {
-        animation: none !important;
-      }
-
-      .og .orbit-label {
-        font-size: 13px;
-      }
+      .og-stars { position: absolute; inset: 0; fill: var(--star); }
+      .og-orbit { position: absolute; top: -95px; right: -420px; width: 1280px; height: auto; z-index: 0; }
+      .og-mark, .og-title, .og-desc, .og-chips { position: relative; z-index: 1; }
+      .og-mark { display: flex; align-items: center; gap: 12px;
+        font-size: 26px; font-weight: 600; letter-spacing: -0.015em; color: var(--text); }
+      .og-mark-dim { color: var(--secondary); }
+      .og-title { margin: 30px 0 0; max-width: 17ch; font-size: 62px; line-height: 1.06;
+        font-weight: 600; letter-spacing: -0.025em; color: var(--text); text-wrap: balance; }
+      .og-desc { margin: 26px 0 0; max-width: 52ch; font-size: 23px; line-height: 1.5;
+        color: var(--secondary); }
+      .og-chips { display: flex; gap: 12px; margin: 34px 0 0; }
+      .og-chip { display: inline-flex; align-items: center; gap: 9px;
+        font: 600 15px "IBM Plex Mono", monospace; letter-spacing: 0.05em;
+        color: var(--text); background: var(--surface);
+        border: 1px solid var(--border); border-radius: 999px; padding: 10px 18px; }
+      .og-chip b { color: var(--success); font-weight: 600; }
+      .og-chip.soon { color: var(--muted); }
+      .og-chip .cert-mark { width: 18px; height: 18px; }
     </style>
   </head>
-
   <body>
     <div class="og">
-      <div>
-        <p class="og-mark">kubestronaut<span>-sim</span></p>
-        <p class="og-title">An exam simulator you run yourself.</p>
-        <p class="og-desc">
-          A timed rehearsal for the Kubernetes certifications, run locally. Two
-          of the five have a bank you can sit today.
-        </p>
-      </div>
-
-      <svg
-        class="orbit-svg"
-        viewBox="0 0 320 320"
-        role="img"
-        aria-label="Five orbits, one per certification on the Kubestronaut path. KCNA and CKAD are drawn solid: each has a question bank you can sit today. KCSA, CKA and CKS are drawn dashed: they appear in the catalog but no bank is written for them."
-      >
-        <g class="orbit-ring" data-ring="kcna" data-engine="mcq" data-state="live">
-          <circle class="orbit-path" cx="160" cy="160" r="48" />
-          <g class="orbit-track">
-            <g transform="rotate(40 160 160)">
-              <circle class="orbit-body" cx="160" cy="112" r="7" />
-            </g>
-          </g>
-          <text class="orbit-label" x="160" y="212">KCNA</text>
-        </g>
-
-        <g class="orbit-ring" data-ring="kcsa" data-engine="soon" data-state="soon">
-          <circle class="orbit-path" cx="160" cy="160" r="71" />
-          <g class="orbit-track">
-            <g transform="rotate(200 160 160)">
-              <circle class="orbit-body" cx="160" cy="89" r="5" />
-            </g>
-          </g>
-          <text class="orbit-label" x="210" y="114">KCSA</text>
-        </g>
-
-        <g class="orbit-ring" data-ring="cka" data-engine="soon" data-state="soon">
-          <circle class="orbit-path" cx="160" cy="160" r="94" />
-          <g class="orbit-track">
-            <g transform="rotate(60 160 160)">
-              <circle class="orbit-body" cx="160" cy="66" r="5" />
-            </g>
-          </g>
-          <text class="orbit-label" x="94" y="231">CKA</text>
-        </g>
-
-        <g class="orbit-ring" data-ring="ckad" data-state="live">
-          <circle class="orbit-path" cx="160" cy="160" r="117" />
-          <g class="orbit-track">
-            <g transform="rotate(250 160 160)">
-              <circle class="orbit-body" cx="160" cy="43" r="7" />
-            </g>
-          </g>
-          <text class="orbit-label" x="277" y="164">CKAD</text>
-        </g>
-
-        <g class="orbit-ring" data-ring="cks" data-engine="soon" data-state="soon">
-          <circle class="orbit-path" cx="160" cy="160" r="140" />
-          <g class="orbit-track">
-            <g transform="rotate(130 160 160)">
-              <circle class="orbit-body" cx="160" cy="20" r="5" />
-            </g>
-          </g>
-          <text class="orbit-label" x="45" y="84">CKS</text>
-        </g>
-
-        <circle class="orbit-core" cx="160" cy="160" r="16" />
+      <svg class="og-stars" viewBox="0 0 1200 630" aria-hidden="true">
+        <circle cx="80" cy="90" r="1.4"/><circle cx="310" cy="40" r="1"/>
+        <circle cx="540" cy="120" r="1.6"/><circle cx="760" cy="60" r="1"/>
+        <circle cx="980" cy="140" r="1.4"/><circle cx="1130" cy="70" r="1"/>
+        <circle cx="180" cy="300" r="1"/><circle cx="1050" cy="330" r="1.6"/>
+        <circle cx="880" cy="480" r="1"/><circle cx="120" cy="520" r="1.4"/>
+        <circle cx="420" cy="580" r="1"/><circle cx="700" cy="540" r="1.2"/>
+        <circle cx="200" cy="150" r="1"/><circle cx="450" cy="70" r="1.3"/>
+        <circle cx="900" cy="90" r="1.5"/><circle cx="60" cy="380" r="1.2"/>
+        <circle cx="960" cy="560" r="1.4"/><circle cx="300" cy="470" r="1"/>
       </svg>
+      <img class="og-orbit" src="og-orbit.svg" alt="" width="1280" height="789" />
+      <div class="og-mark">
+        <img src="favicon.svg" alt="" width="30" height="30" />
+        <span class="og-mark-text">kubestronaut<span class="og-mark-dim">-sim</span></span>
+      </div>
+      <h1 class="og-title">Rehearse the Kubernetes exams on a real cluster.</h1>
+      <p class="og-desc">A timed sitting, a real Linux desktop, and a score graded
+        on what your cluster actually does — on your own machine, no account.</p>
+      <div class="og-chips">
+        <span class="og-chip">CKAD <b>LIVE</b></span>
+        <span class="og-chip">KCNA <b>LIVE</b></span>
+        <span class="og-chip soon">CKA · KCSA · CKS soon</span>
+      </div>
     </div>
   </body>
 </html>

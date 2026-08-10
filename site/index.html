@@ -6,7 +6,7 @@
     <title>kubestronaut-sim — a local exam simulator for the Kubestronaut certifications</title>
     <meta
       name="description"
-      content="An open-source exam simulator for the Kubestronaut certifications, run locally as a Docker Compose stack. Two banks ship today: CKAD hands-on and KCNA multiple-choice."
+      content="An open-source exam simulator for the Kubestronaut certifications. One command builds the exam environment on your own machine — a timed sitting, a real Linux desktop, and a score graded on what your cluster actually does."
     />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 
@@ -17,7 +17,7 @@
     <meta property="og:title" content="kubestronaut-sim" />
     <meta
       property="og:description"
-      content="A timed rehearsal for the Kubernetes certifications, on a real cluster on your own machine. Deliberately harder than the real exams."
+      content="A timed sitting, a real Linux desktop, and a score graded on what your cluster actually does — on your own machine, no account. CKAD and KCNA have full banks today."
     />
     <meta property="og:url" content="https://camilool8.github.io/kubestronaut-sim/" />
     <meta
@@ -29,12 +29,10 @@
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="kubestronaut-sim. An exam simulator you run yourself. Five orbits, one per certification on the Kubestronaut path, with KCNA and CKAD drawn solid because each has a question bank you can sit today."
+      content="kubestronaut-sim. Rehearse the Kubernetes exams on a real cluster. Five tilted orbits circle the wordmark — CKAD and KCNA lit and live, CKA, KCSA and CKS still dark and coming soon."
     />
     <meta name="twitter:card" content="summary_large_image" />
 
-    <link rel="stylesheet" href="tokens.css" />
-    <link rel="stylesheet" href="fonts.css" />
     <link rel="stylesheet" href="styles.css" />
   </head>
 
@@ -42,1005 +40,876 @@
     <a class="skip-link" href="#main">Skip to content</a>
 
     <header class="site-header">
-      <div class="shell site-header-inner">
-        <span class="brand">
-          <img class="brand-mark" src="favicon.svg" alt="" width="26" height="26" />
+      <div class="site-header-inner">
+        <a href="#top" class="brand">
+          <img src="favicon.svg" alt="" width="24" height="24" />
           <span class="brand-word">kubestronaut<span class="brand-word-tail">-sim</span></span>
-        </span>
-        <nav aria-label="Project">
-          <ul class="site-nav">
-            <li><a href="#run">Run it</a></li>
-            <li><a href="#track">Exams</a></li>
-            <li><a href="#limits">Limits</a></li>
-            <li><a href="#docs">Docs</a></li>
-            <li class="site-nav-repo">
-              <a href="https://github.com/Camilool8/kubestronaut-sim">GitHub</a>
-            </li>
-          </ul>
+        </a>
+        <nav class="site-nav" aria-label="Primary">
+          <div class="nav-links">
+            <a class="nav-link" href="#quickstart">Quickstart</a>
+            <a class="nav-link" href="#sitting">A sitting</a>
+            <a class="nav-link" href="#exams">Exams</a>
+            <a class="nav-link" href="#docs">Docs</a>
+          </div>
+          <span class="theme-pill" role="group" aria-label="Theme">
+            <button type="button" class="theme-btn" data-set-theme="system" aria-label="Follow system theme" title="Follow system theme">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg>
+            </button>
+            <button type="button" class="theme-btn" data-set-theme="light" aria-label="Light theme" title="Light theme">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+            </button>
+            <button type="button" class="theme-btn" data-set-theme="dark" aria-label="Dark theme" title="Dark theme">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"></path></svg>
+            </button>
+          </span>
+          <a class="gh-link" href="https://github.com/Camilool8/kubestronaut-sim">
+            <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"></path></svg>
+            <span class="gh-label">GitHub</span>
+            <span id="gh-stars" class="gh-stars" hidden></span>
+          </a>
+          <button type="button" id="menu-btn" class="menu-btn" aria-label="Menu">
+            <span id="menu-icon-open"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg></span>
+            <span id="menu-icon-close" hidden><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+          </button>
         </nav>
       </div>
-
-      <span class="scroll-depth" aria-hidden="true"></span>
+      <div id="mobile-menu" class="mobile-menu" hidden>
+        <a class="mobile-menu-link" href="#quickstart">Quickstart</a>
+        <a class="mobile-menu-link" href="#sitting">A sitting</a>
+        <a class="mobile-menu-link" href="#exams">Exams</a>
+        <a class="mobile-menu-link" href="#docs">Docs</a>
+        <div class="mobile-theme-row">
+          <span class="mobile-theme-label">Theme</span>
+          <span class="theme-pill-lg" role="group" aria-label="Theme">
+            <button type="button" class="theme-btn-lg" data-set-theme="system">Auto</button>
+            <button type="button" class="theme-btn-lg" data-set-theme="light">Light</button>
+            <button type="button" class="theme-btn-lg" data-set-theme="dark">Dark</button>
+          </span>
+        </div>
+      </div>
     </header>
 
     <main id="main">
-      <section class="hero shell" aria-labelledby="hero-title">
-        <div class="hero-copy">
-          <h1 id="hero-title">An exam simulator you run yourself.</h1>
-          <p class="lede">
-            A timed rehearsal for the Kubernetes certifications, on a real
-            cluster on your own machine. Deliberately harder than the real
-            exams.
-          </p>
-
-          <p class="hero-actions">
-            <a class="btn btn-primary" href="https://github.com/Camilool8/kubestronaut-sim"
-              >View the repository</a
-            >
-            <a
-              class="btn"
-              href="https://github.com/Camilool8/kubestronaut-sim/tree/main/docs"
-              >Documentation</a
-            >
-          </p>
+      <div id="top" class="top-anchor"></div>
+      <section id="quickstart" class="hero">
+        <svg class="starfield" viewBox="0 0 1200 640" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          <g data-anim="1" class="star-group-a">
+            <circle cx="80" cy="90" r="1.4"></circle><circle cx="310" cy="40" r="1"></circle><circle cx="540" cy="120" r="1.6"></circle><circle cx="760" cy="60" r="1"></circle><circle cx="980" cy="140" r="1.4"></circle><circle cx="1130" cy="70" r="1"></circle><circle cx="180" cy="300" r="1"></circle><circle cx="1050" cy="330" r="1.6"></circle><circle cx="880" cy="480" r="1"></circle><circle cx="120" cy="520" r="1.4"></circle><circle cx="420" cy="580" r="1"></circle><circle cx="700" cy="540" r="1.2"></circle>
+          </g>
+          <g data-anim="1" class="star-group-b">
+            <circle cx="200" cy="150" r="1"></circle><circle cx="450" cy="70" r="1.3"></circle><circle cx="660" cy="180" r="1"></circle><circle cx="900" cy="90" r="1.5"></circle><circle cx="1160" cy="220" r="1"></circle><circle cx="60" cy="380" r="1.2"></circle><circle cx="960" cy="560" r="1.4"></circle><circle cx="300" cy="470" r="1"></circle><circle cx="580" cy="420" r="1"></circle><circle cx="1120" cy="470" r="1.2"></circle>
+          </g>
+        </svg>
+        <div class="orbit-wrap" aria-hidden="true">
+          <div class="orbit-inner">
+            <canvas id="ks-orbit" class="orbit-canvas"></canvas>
+          </div>
         </div>
-
-        <figure class="orbit">
-          <p class="orbit-title">The Kubestronaut path</p>
-
-          <svg
-            class="orbit-svg"
-            viewBox="0 0 320 320"
-            role="img"
-            aria-label="Five orbits, one per certification on the Kubestronaut path. KCNA and CKAD are drawn solid: each has a question bank you can sit today. KCSA, CKA and CKS are drawn dashed: they appear in the catalog but no bank is written for them."
-          >
-            <g class="orbit-ring" data-ring="kcna" data-engine="mcq" data-state="live">
-              <circle class="orbit-path" cx="160" cy="160" r="48" />
-              <g class="orbit-track">
-                <g transform="rotate(40 160 160)">
-                  <circle class="orbit-body" cx="160" cy="112" r="7" />
-                </g>
-              </g>
-              <text class="orbit-label" x="160" y="212">KCNA</text>
-            </g>
-
-            <g class="orbit-ring" data-ring="kcsa" data-engine="soon" data-state="soon">
-              <circle class="orbit-path" cx="160" cy="160" r="71" />
-              <g class="orbit-track">
-                <g transform="rotate(200 160 160)">
-                  <circle class="orbit-body" cx="160" cy="89" r="5" />
-                </g>
-              </g>
-              <text class="orbit-label" x="210" y="114">KCSA</text>
-            </g>
-
-            <g class="orbit-ring" data-ring="cka" data-engine="soon" data-state="soon">
-              <circle class="orbit-path" cx="160" cy="160" r="94" />
-              <g class="orbit-track">
-                <g transform="rotate(60 160 160)">
-                  <circle class="orbit-body" cx="160" cy="66" r="5" />
-                </g>
-              </g>
-              <text class="orbit-label" x="94" y="231">CKA</text>
-            </g>
-
-            <g class="orbit-ring" data-ring="ckad" data-state="live">
-              <circle class="orbit-path" cx="160" cy="160" r="117" />
-              <g class="orbit-track">
-                <g transform="rotate(250 160 160)">
-                  <circle class="orbit-body" cx="160" cy="43" r="7" />
-                </g>
-              </g>
-              <text class="orbit-label" x="277" y="164">CKAD</text>
-            </g>
-
-            <g class="orbit-ring" data-ring="cks" data-engine="soon" data-state="soon">
-              <circle class="orbit-path" cx="160" cy="160" r="140" />
-              <g class="orbit-track">
-                <g transform="rotate(130 160 160)">
-                  <circle class="orbit-body" cx="160" cy="20" r="5" />
-                </g>
-              </g>
-              <text class="orbit-label" x="45" y="84">CKS</text>
-            </g>
-
-            <circle class="orbit-core" cx="160" cy="160" r="16" />
-          </svg>
-
-          <figcaption class="orbit-caption">
-            A Kubestronaut has passed all five. Two of them have a bank here
-            you can sit today — KCNA and CKAD. The three drawn dashed are in
-            the catalog with the reason they cannot be sat, rather than as
-            five working exams.
-          </figcaption>
-        </figure>
+        <div class="hero-inner">
+          <div class="hero-copy">
+            <div class="hero-badge">OPEN SOURCE · APACHE-2.0 · NO ACCOUNT, NO SERVICE</div>
+            <h1 class="hero-title">Rehearse the Kubernetes exams on a real cluster.</h1>
+            <p class="hero-lede">One command builds the exam environment on your own machine — a timed sitting, a real Linux desktop, and a score graded on what your cluster actually does. CKAD and KCNA have full banks today.</p>
+            <div class="hero-ctas">
+              <a class="btn-primary" href="https://github.com/Camilool8/kubestronaut-sim">Get it on GitHub</a>
+              <a class="btn-secondary" href="https://github.com/Camilool8/kubestronaut-sim/tree/main/docs">Read the docs</a>
+            </div>
+            <div class="term">
+              <div class="term-head">
+                <span class="term-dots" aria-hidden="true"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span></span>
+                <span class="term-controls">
+                  <span class="os-tabs" role="group" aria-label="Show commands for">
+                    <button type="button" class="os-tab" data-set-os="win" aria-pressed="false" aria-label="Windows commands"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M0,0H11.377V11.372H0ZM12.623,0H24V11.372H12.623ZM0,12.623H11.377V24H0Zm12.623,0H24V24H12.623"></path></svg><span class="os-tab-label">Windows</span></button>
+                    <button type="button" class="os-tab" data-set-os="mac" aria-pressed="false" aria-label="macOS commands"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"></path></svg><span class="os-tab-label">macOS</span></button>
+                    <button type="button" class="os-tab" data-set-os="linux" aria-pressed="false" aria-label="Linux commands"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.132 1.884 1.071.771-.06 1.592-.536 2.257-1.306.631-.765 1.683-1.084 2.378-1.503.348-.199.629-.469.649-.853.023-.4-.2-.811-.714-1.376v-.097l-.003-.003c-.17-.2-.25-.535-.338-.926-.085-.401-.182-.786-.492-1.046h-.003c-.059-.054-.123-.067-.188-.135a.357.357 0 00-.19-.064c.431-1.278.264-2.55-.173-3.694-.533-1.41-1.465-2.638-2.175-3.483-.796-1.005-1.576-1.957-1.56-3.368.026-2.152.236-6.133-3.544-6.139zm.529 3.405h.013c.213 0 .396.062.584.198.19.135.33.332.438.533.105.259.158.459.166.724 0-.02.006-.04.006-.06v.105a.086.086 0 01-.004-.021l-.004-.024a1.807 1.807 0 01-.15.706.953.953 0 01-.213.335.71.71 0 00-.088-.042c-.104-.045-.198-.064-.284-.133a1.312 1.312 0 00-.22-.066c.05-.06.146-.133.183-.198.053-.128.082-.264.088-.402v-.02a1.21 1.21 0 00-.061-.4c-.045-.134-.101-.2-.183-.333-.084-.066-.167-.132-.267-.132h-.016c-.093 0-.176.03-.262.132a.8.8 0 00-.205.334 1.18 1.18 0 00-.09.4v.019c.002.089.008.179.02.267-.193-.067-.438-.135-.607-.202a1.635 1.635 0 01-.018-.2v-.02a1.772 1.772 0 01.15-.768c.082-.22.232-.406.43-.533a.985.985 0 01.594-.2zm-2.962.059h.036c.142 0 .27.048.399.135.146.129.264.288.344.465.09.199.14.4.153.667v.004c.007.134.006.2-.002.266v.08c-.03.007-.056.018-.083.024-.152.055-.274.135-.393.2.012-.09.013-.18.003-.267v-.015c-.012-.133-.04-.2-.082-.333a.613.613 0 00-.166-.267.248.248 0 00-.183-.064h-.021c-.071.006-.13.04-.186.132a.552.552 0 00-.12.27.944.944 0 00-.023.33v.015c.012.135.037.2.08.334.046.134.098.2.166.268.01.009.02.018.034.024-.07.057-.117.07-.176.136a.304.304 0 01-.131.068 2.62 2.62 0 01-.275-.402 1.772 1.772 0 01-.155-.667 1.759 1.759 0 01.08-.668 1.43 1.43 0 01.283-.535c.128-.133.26-.2.418-.2zm1.37 1.706c.332 0 .733.065 1.216.399.293.2.523.269 1.052.468h.003c.255.136.405.266.478.399v-.131a.571.571 0 01.016.47c-.123.31-.516.643-1.063.842v.002c-.268.135-.501.333-.775.465-.276.135-.588.292-1.012.267a1.139 1.139 0 01-.448-.067 3.566 3.566 0 01-.322-.198c-.195-.135-.363-.332-.612-.465v-.005h-.005c-.4-.246-.616-.512-.686-.71-.07-.268-.005-.47.193-.6.224-.135.38-.271.483-.336.104-.074.143-.102.176-.131h.002v-.003c.169-.202.436-.47.839-.601.139-.036.294-.065.466-.065zm2.8 2.142c.358 1.417 1.196 3.475 1.735 4.473.286.534.855 1.659 1.102 3.024.156-.005.33.018.513.064.646-1.671-.546-3.467-1.089-3.966-.22-.2-.232-.335-.123-.335.59.534 1.365 1.572 1.646 2.757.13.535.16 1.104.021 1.67.067.028.135.06.205.067 1.032.534 1.413.938 1.23 1.537v-.043c-.06-.003-.12 0-.18 0h-.016c.151-.467-.182-.825-1.065-1.224-.915-.4-1.646-.336-1.77.465-.008.043-.013.066-.018.135-.068.023-.139.053-.209.064-.43.268-.662.669-.793 1.187-.13.533-.17 1.156-.205 1.869v.003c-.02.334-.17.838-.319 1.35-1.5 1.072-3.58 1.538-5.348.334a2.645 2.645 0 00-.402-.533 1.45 1.45 0 00-.275-.333c.182 0 .338-.03.465-.067a.615.615 0 00.314-.334c.108-.267 0-.697-.345-1.163-.345-.467-.931-.995-1.788-1.521-.63-.4-.986-.87-1.15-1.396-.165-.534-.143-1.085-.015-1.645.245-1.07.873-2.11 1.274-2.763.107-.065.037.135-.408.974-.396.751-1.14 2.497-.122 3.854a8.123 8.123 0 01.647-2.876c.564-1.278 1.743-3.504 1.836-5.268.048.036.217.135.289.202.218.133.38.333.59.465.21.201.477.335.876.335.039.003.075.006.11.006.412 0 .73-.134.997-.268.29-.134.52-.334.74-.4h.005c.467-.135.835-.402 1.044-.7zm2.185 8.958c.037.6.343 1.245.882 1.377.588.134 1.434-.333 1.791-.765l.211-.01c.315-.007.577.01.847.268l.003.003c.208.199.305.53.391.876.085.4.154.78.409 1.066.486.527.645.906.636 1.14l.003-.007v.018l-.003-.012c-.015.262-.185.396-.498.595-.63.401-1.746.712-2.457 1.57-.618.737-1.37 1.14-2.036 1.191-.664.053-1.237-.2-1.574-.898l-.005-.003c-.21-.4-.12-1.025.056-1.69.176-.668.428-1.344.463-1.897.037-.714.076-1.335.195-1.814.12-.465.308-.797.641-.984l.045-.022zm-10.814.049h.01c.053 0 .105.005.157.014.376.055.706.333 1.023.752l.91 1.664.003.003c.243.533.754 1.064 1.189 1.637.434.598.77 1.131.729 1.57v.006c-.057.744-.48 1.148-1.125 1.294-.645.135-1.52.002-2.395-.464-.968-.536-2.118-.469-2.857-.602-.369-.066-.61-.2-.723-.4-.11-.2-.113-.602.123-1.23v-.004l.002-.003c.117-.334.03-.752-.027-1.118-.055-.401-.083-.71.043-.94.16-.334.396-.4.69-.533.294-.135.64-.202.915-.47h.002v-.002c.256-.268.445-.601.668-.838.19-.201.38-.336.663-.336zm7.159-9.074c-.435.201-.945.535-1.488.535-.542 0-.97-.267-1.28-.466-.154-.134-.28-.268-.373-.335-.164-.134-.144-.333-.074-.333.109.016.129.134.199.2.096.066.215.2.36.333.292.2.68.467 1.167.467.485 0 1.053-.267 1.398-.466.195-.135.445-.334.648-.467.156-.136.149-.267.279-.267.128.016.034.134-.147.332a8.097 8.097 0 01-.69.468zm-1.082-1.583V5.64c-.006-.02.013-.042.029-.05.074-.043.18-.027.26.004.063 0 .16.067.15.135-.006.049-.085.066-.135.066-.055 0-.092-.043-.141-.068-.052-.018-.146-.008-.163-.065zm-.551 0c-.02.058-.113.049-.166.066-.047.025-.086.068-.14.068-.05 0-.13-.02-.136-.068-.01-.066.088-.133.15-.133.08-.031.184-.047.259-.005.019.009.036.03.03.05v.02h.003z"></path></svg><span class="os-tab-label">Linux</span></button>
+                  </span>
+                  <button type="button" id="copy-btn" class="copy-btn"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg><span id="copy-label">copy</span></button>
+                </span>
+              </div>
+              <div class="term-body">
+                <div class="term-line"><span class="t-prompt">$ </span><span class="t-cmd" id="cmd-doctor">./sim doctor</span><span class="t-note"> # preflight: RAM, disk, cgroups</span></div>
+                <div class="term-line"><span class="t-prompt">$ </span><span class="t-cmd" id="cmd-up">./sim up</span><span class="t-note"> # up in seconds</span></div>
+                <div class="term-line"><span class="t-prompt">$ </span><span class="t-cmd" id="cmd-open">xdg-open </span><span class="t-url">http://localhost:8080</span><span class="t-cursor" aria-hidden="true"></span></div>
+              </div>
+            </div>
+            <div class="hero-reqs">Docker + ~9GB free RAM · Windows, macOS, Linux · nothing is built until you pick an exam</div>
+          </div>
+        </div>
+        <div class="orbit-caption">KCNA + CKAD in flight · <span class="banks-live">2 of 5</span> banks live</div>
       </section>
 
-      <section class="section quickstart" aria-labelledby="quickstart-title">
-        <div class="shell">
-          <div class="section-head">
-            <h2 id="quickstart-title">Three commands</h2>
-            <p class="section-lede">
-              Everything after <code>up</code> happens in the browser. A
-              countdown that cannot be paused. A real Linux desktop with
-              terminals, on a real cluster built for the exam you picked. A
-              per-check score with full solutions afterwards, and a record of
-              every attempt to measure the next one against.
-            </p>
-          </div>
-
-          <div class="quickstart-run">
-            <fieldset class="os-tabs">
-              <legend class="sr-only">Choose your operating system</legend>
-
-              <input class="os-radio sr-only" type="radio" name="os" id="os-win" />
-              <label class="os-tab" for="os-win">
-                <svg class="os-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path d="M0,0H11.377V11.372H0ZM12.623,0H24V11.372H12.623ZM0,12.623H11.377V24H0Zm12.623,0H24V24H12.623" />
-                </svg>
-                Windows
-              </label>
-
-              <input class="os-radio sr-only" type="radio" name="os" id="os-mac" checked />
-              <label class="os-tab" for="os-mac">
-                <svg class="os-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701" />
-                </svg>
-                macOS
-              </label>
-
-              <input class="os-radio sr-only" type="radio" name="os" id="os-linux" />
-              <label class="os-tab" for="os-linux">
-                <svg class="os-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.132 1.884 1.071.771-.06 1.592-.536 2.257-1.306.631-.765 1.683-1.084 2.378-1.503.348-.199.629-.469.649-.853.023-.4-.2-.811-.714-1.376v-.097l-.003-.003c-.17-.2-.25-.535-.338-.926-.085-.401-.182-.786-.492-1.046h-.003c-.059-.054-.123-.067-.188-.135a.357.357 0 00-.19-.064c.431-1.278.264-2.55-.173-3.694-.533-1.41-1.465-2.638-2.175-3.483-.796-1.005-1.576-1.957-1.56-3.368.026-2.152.236-6.133-3.544-6.139zm.529 3.405h.013c.213 0 .396.062.584.198.19.135.33.332.438.533.105.259.158.459.166.724 0-.02.006-.04.006-.06v.105a.086.086 0 01-.004-.021l-.004-.024a1.807 1.807 0 01-.15.706.953.953 0 01-.213.335.71.71 0 00-.088-.042c-.104-.045-.198-.064-.284-.133a1.312 1.312 0 00-.22-.066c.05-.06.146-.133.183-.198.053-.128.082-.264.088-.402v-.02a1.21 1.21 0 00-.061-.4c-.045-.134-.101-.2-.183-.333-.084-.066-.167-.132-.267-.132h-.016c-.093 0-.176.03-.262.132a.8.8 0 00-.205.334 1.18 1.18 0 00-.09.4v.019c.002.089.008.179.02.267-.193-.067-.438-.135-.607-.202a1.635 1.635 0 01-.018-.2v-.02a1.772 1.772 0 01.15-.768c.082-.22.232-.406.43-.533a.985.985 0 01.594-.2zm-2.962.059h.036c.142 0 .27.048.399.135.146.129.264.288.344.465.09.199.14.4.153.667v.004c.007.134.006.2-.002.266v.08c-.03.007-.056.018-.083.024-.152.055-.274.135-.393.2.012-.09.013-.18.003-.267v-.015c-.012-.133-.04-.2-.082-.333a.613.613 0 00-.166-.267.248.248 0 00-.183-.064h-.021c-.071.006-.13.04-.186.132a.552.552 0 00-.12.27.944.944 0 00-.023.33v.015c.012.135.037.2.08.334.046.134.098.2.166.268.01.009.02.018.034.024-.07.057-.117.07-.176.136a.304.304 0 01-.131.068 2.62 2.62 0 01-.275-.402 1.772 1.772 0 01-.155-.667 1.759 1.759 0 01.08-.668 1.43 1.43 0 01.283-.535c.128-.133.26-.2.418-.2zm1.37 1.706c.332 0 .733.065 1.216.399.293.2.523.269 1.052.468h.003c.255.136.405.266.478.399v-.131a.571.571 0 01.016.47c-.123.31-.516.643-1.063.842v.002c-.268.135-.501.333-.775.465-.276.135-.588.292-1.012.267a1.139 1.139 0 01-.448-.067 3.566 3.566 0 01-.322-.198c-.195-.135-.363-.332-.612-.465v-.005h-.005c-.4-.246-.616-.512-.686-.71-.07-.268-.005-.47.193-.6.224-.135.38-.271.483-.336.104-.074.143-.102.176-.131h.002v-.003c.169-.202.436-.47.839-.601.139-.036.294-.065.466-.065zm2.8 2.142c.358 1.417 1.196 3.475 1.735 4.473.286.534.855 1.659 1.102 3.024.156-.005.33.018.513.064.646-1.671-.546-3.467-1.089-3.966-.22-.2-.232-.335-.123-.335.59.534 1.365 1.572 1.646 2.757.13.535.16 1.104.021 1.67.067.028.135.06.205.067 1.032.534 1.413.938 1.23 1.537v-.043c-.06-.003-.12 0-.18 0h-.016c.151-.467-.182-.825-1.065-1.224-.915-.4-1.646-.336-1.77.465-.008.043-.013.066-.018.135-.068.023-.139.053-.209.064-.43.268-.662.669-.793 1.187-.13.533-.17 1.156-.205 1.869v.003c-.02.334-.17.838-.319 1.35-1.5 1.072-3.58 1.538-5.348.334a2.645 2.645 0 00-.402-.533 1.45 1.45 0 00-.275-.333c.182 0 .338-.03.465-.067a.615.615 0 00.314-.334c.108-.267 0-.697-.345-1.163-.345-.467-.931-.995-1.788-1.521-.63-.4-.986-.87-1.15-1.396-.165-.534-.143-1.085-.015-1.645.245-1.07.873-2.11 1.274-2.763.107-.065.037.135-.408.974-.396.751-1.14 2.497-.122 3.854a8.123 8.123 0 01.647-2.876c.564-1.278 1.743-3.504 1.836-5.268.048.036.217.135.289.202.218.133.38.333.59.465.21.201.477.335.876.335.039.003.075.006.11.006.412 0 .73-.134.997-.268.29-.134.52-.334.74-.4h.005c.467-.135.835-.402 1.044-.7zm2.185 8.958c.037.6.343 1.245.882 1.377.588.134 1.434-.333 1.791-.765l.211-.01c.315-.007.577.01.847.268l.003.003c.208.199.305.53.391.876.085.4.154.78.409 1.066.486.527.645.906.636 1.14l.003-.007v.018l-.003-.012c-.015.262-.185.396-.498.595-.63.401-1.746.712-2.457 1.57-.618.737-1.37 1.14-2.036 1.191-.664.053-1.237-.2-1.574-.898l-.005-.003c-.21-.4-.12-1.025.056-1.69.176-.668.428-1.344.463-1.897.037-.714.076-1.335.195-1.814.12-.465.308-.797.641-.984l.045-.022zm-10.814.049h.01c.053 0 .105.005.157.014.376.055.706.333 1.023.752l.91 1.664.003.003c.243.533.754 1.064 1.189 1.637.434.598.77 1.131.729 1.57v.006c-.057.744-.48 1.148-1.125 1.294-.645.135-1.52.002-2.395-.464-.968-.536-2.118-.469-2.857-.602-.369-.066-.61-.2-.723-.4-.11-.2-.113-.602.123-1.23v-.004l.002-.003c.117-.334.03-.752-.027-1.118-.055-.401-.083-.71.043-.94.16-.334.396-.4.69-.533.294-.135.64-.202.915-.47h.002v-.002c.256-.268.445-.601.668-.838.19-.201.38-.336.663-.336zm7.159-9.074c-.435.201-.945.535-1.488.535-.542 0-.97-.267-1.28-.466-.154-.134-.28-.268-.373-.335-.164-.134-.144-.333-.074-.333.109.016.129.134.199.2.096.066.215.2.36.333.292.2.68.467 1.167.467.485 0 1.053-.267 1.398-.466.195-.135.445-.334.648-.467.156-.136.149-.267.279-.267.128.016.034.134-.147.332a8.097 8.097 0 01-.69.468zm-1.082-1.583V5.64c-.006-.02.013-.042.029-.05.074-.043.18-.027.26.004.063 0 .16.067.15.135-.006.049-.085.066-.135.066-.055 0-.092-.043-.141-.068-.052-.018-.146-.008-.163-.065zm-.551 0c-.02.058-.113.049-.166.066-.047.025-.086.068-.14.068-.05 0-.13-.02-.136-.068-.01-.066.088-.133.15-.133.08-.031.184-.047.259-.005.019.009.036.03.03.05v.02h.003z" />
-                </svg>
-                Linux
-              </label>
-
-              <div class="os-panels">
-                <div class="os-panel" data-os="win">
-                  <figure class="term">
-                    <figcaption class="term-bar">
-                      <span class="term-bar-dot" aria-hidden="true"></span>
-                      <span class="term-bar-title">PowerShell — quickstart</span>
-                    </figcaption>
-                    <pre class="term-body"><code><span class="term-line"><span class="term-prompt" aria-hidden="true">&gt; </span>.\sim.ps1 doctor    <span class="term-note"># optional preflight</span></span>
-<span class="term-line"><span class="term-prompt" aria-hidden="true">&gt; </span>.\sim.ps1 up        <span class="term-note"># brings the app up in seconds</span></span>
-<span class="term-line"><span class="term-prompt" aria-hidden="true">&gt; </span>start <span class="term-url">http://localhost:8080</span></span></code></pre>
-                  </figure>
-                  <p class="quickstart-note">
-                    Requires Docker Desktop on the WSL2 backend and about 9GB of
-                    free RAM. The PowerShell launcher reads JSON natively, so
-                    python3 is not needed here.
-                  </p>
+      <section id="sitting" class="section-sitting">
+        <div class="sitting-inner">
+          <div data-reveal="1" class="section-eyebrow">ONE SITTING, END TO END</div>
+          <h2 data-reveal="1" class="sitting-title">Pick an exam. Pick how hard. Sit it. Read the verdicts.</h2>
+          <div class="sitting-grid">
+            <div data-reveal="1">
+              <button type="button" class="shot-card" data-shot="1" title="View full size">
+                <div class="shot-frame">
+                  <img class="shot-dark" src="shots/mode-dark.webp" alt="Mode screen: Training, Mastery and Exam side by side with domain chips to narrow the draw" width="1600" height="1000">
+                  <img class="shot-light" src="shots/mode-light.webp" alt="" aria-hidden="true" width="1600" height="1000">
                 </div>
-
-                <div class="os-panel" data-os="mac">
-                  <figure class="term">
-                    <figcaption class="term-bar">
-                      <span class="term-bar-dot" aria-hidden="true"></span>
-                      <span class="term-bar-title">bash — quickstart</span>
-                    </figcaption>
-                    <pre class="term-body"><code><span class="term-line"><span class="term-prompt" aria-hidden="true">$ </span>./sim doctor    <span class="term-note"># optional preflight</span></span>
-<span class="term-line"><span class="term-prompt" aria-hidden="true">$ </span>./sim up        <span class="term-note"># brings the app up in seconds</span></span>
-<span class="term-line"><span class="term-prompt" aria-hidden="true">$ </span>open <span class="term-url">http://localhost:8080</span></span></code></pre>
-                  </figure>
-                  <p class="quickstart-note">
-                    Requires Docker Desktop, python3, and about 9GB of free RAM.
-                  </p>
+              </button>
+              <p class="shot-caption"><b>01 · Choose the clock.</b> Training is untimed with two-tier hints and solutions on demand. Mastery is half the real clock. Exam is the real thing: full duration, no help, graded when you submit. Chips narrow the draw to the domains you want to drill.</p>
+            </div>
+            <div data-reveal="1">
+              <button type="button" class="shot-card" data-shot="1" title="View full size">
+                <div class="shot-frame">
+                  <img class="shot-dark" src="shots/exam-dark.webp" alt="Exam view: task on the left, Linux desktop with terminal and Kubernetes docs on the right" width="1600" height="1000">
+                  <img class="shot-light" src="shots/exam-light.webp" alt="" aria-hidden="true" width="1600" height="1000">
                 </div>
-
-                <div class="os-panel" data-os="linux">
-                  <figure class="term">
-                    <figcaption class="term-bar">
-                      <span class="term-bar-dot" aria-hidden="true"></span>
-                      <span class="term-bar-title">bash — quickstart</span>
-                    </figcaption>
-                    <pre class="term-body"><code><span class="term-line"><span class="term-prompt" aria-hidden="true">$ </span>./sim doctor    <span class="term-note"># optional preflight</span></span>
-<span class="term-line"><span class="term-prompt" aria-hidden="true">$ </span>./sim up        <span class="term-note"># brings the app up in seconds</span></span>
-<span class="term-line"><span class="term-prompt" aria-hidden="true">$ </span>xdg-open <span class="term-url">http://localhost:8080</span></span></code></pre>
-                  </figure>
-                  <p class="quickstart-note">
-                    Requires docker + compose v2, python3, cgroup v2, and about
-                    9GB of free RAM.
-                  </p>
+              </button>
+              <p class="shot-caption"><b>02 · Work like the day itself.</b> The task on the left; a full Linux desktop on the right, terminal already open on the instance the question names. Firefox reaches the allowlisted documentation and nothing else. Clipboard works both ways.</p>
+            </div>
+            <div data-reveal="1">
+              <button type="button" class="shot-card" data-shot="1" title="View full size">
+                <div class="shot-frame">
+                  <img class="shot-dark" src="shots/score-dark.webp" alt="Score screen: pass against threshold, domain breakdown weakest first, per-task verdicts" width="1600" height="1000">
+                  <img class="shot-light" src="shots/score-light.webp" alt="" aria-hidden="true" width="1600" height="1000">
                 </div>
-              </div>
-            </fieldset>
-            <p class="quickstart-note">
-              The XFCE desktop is inside that memory figure. Nothing is built
-              until you pick an exam.
-            </p>
+              </button>
+              <p class="shot-caption"><b>03 · Get a score you can act on.</b> Weighted to the published curriculum, domain breakdown ordered weakest first, and every task carries the checks that scored it — with full solutions to review.</p>
+            </div>
+            <div data-reveal="1">
+              <button type="button" class="shot-card" data-shot="1" title="View full size">
+                <div class="shot-frame">
+                  <img class="shot-dark" src="shots/progress-dark.webp" alt="Progress screen: a card per certification, attempt history, weakest domains across attempts" width="1600" height="1040">
+                  <img class="shot-light" src="shots/progress-light.webp" alt="" aria-hidden="true" width="1600" height="1040">
+                </div>
+              </button>
+              <p class="shot-caption"><b>04 · Watch the weak domains close.</b> Every graded attempt is kept on its own volume. The weakest-domains list is built from all of them, and a drill is one click from there. <code>./sim down</code> then <code>up</code> resumes an attempt mid-sitting.</p>
+            </div>
           </div>
-
-          <figure class="shot shot-wide">
-            <figcaption class="term-bar">
-              <span class="term-bar-dot" aria-hidden="true"></span>
-              <span class="term-bar-title">Exam view — CKAD, exam mode</span>
-            </figcaption>
-            <picture>
-              <source
-                media="(prefers-color-scheme: dark)"
-                srcset="shots/exam-dark.webp"
-              />
-              <img
-                class="shot-img"
-                src="shots/exam-light.webp"
-                width="1600"
-                height="1000"
-                loading="lazy"
-                decoding="async"
-                alt="The exam view: the task on the left, and on the right a Linux desktop where a terminal on instance-1 lists the namespaces the task asked for, with the Kubernetes documentation open behind it."
-              />
-            </picture>
-            <p class="shot-caption">
-              The task, and the machine you answer it on. The terminal is
-              already open on the instance the question names, and Firefox
-              reaches the allowlisted documentation and nothing else.
-            </p>
-          </figure>
         </div>
       </section>
 
-      <section class="shell stats" aria-labelledby="stats-title">
-        <h2 id="stats-title" class="sr-only">The numbers behind it</h2>
-        <ul class="stat-grid">
-          <li class="stat">
-            <p class="stat-figure">141</p>
-            <h3 class="stat-label">Questions written</h3>
-            <p class="stat-note">
-              44 hands-on for CKAD and 97 multiple-choice for KCNA, counted from
-              the <code>spec.questions</code> list in each bank's
-              <code>exam.yaml</code> file. All original: no third-party exam
-              dump may be committed here, because CC BY-SA 4.0 requires the
-              banks to be ours to license.
-            </p>
-          </li>
-          <li class="stat">
-            <p class="stat-figure">2 <span class="stat-figure-of">of 5</span></p>
-            <h3 class="stat-label">Certifications with a bank</h3>
-            <p class="stat-note">
-              The other three are shown in the catalog with the reason they
-              cannot be sat, rather than as five working exams. A bank that
-              cannot produce a meaningful score is not offered at all.
-            </p>
-          </li>
-          <li class="stat">
-            <p class="stat-figure">0 <span class="stat-figure-of">/ 100%</span></p>
-            <h3 class="stat-label">The two grading gates</h3>
-            <p class="stat-note">
-              A fresh environment must score 0 and the reference solutions must
-              score 100%. <code>tests/smoke.sh</code> asserts both against a
-              real stack, and
-              <a
-                href="https://github.com/Camilool8/kubestronaut-sim/blob/main/CONTRIBUTING.md#what-ci-cannot-run"
-                >CONTRIBUTING.md</a
-              >
-              says why CI cannot run it and when it has to be run by hand.
-            </p>
-          </li>
-        </ul>
-      </section>
-
-      <section class="shell section" id="track" aria-labelledby="track-title">
-        <div class="section-head">
-          <h2 id="track-title">The certification track</h2>
-          <p class="section-lede">
-            One bank is loaded at a time, because a bank is a Kubernetes cluster
-            seeded for its questions — so choosing another one is a destructive
-            2-4 minute rebuild, and the app asks first. Your attempt record sits
-            on its own volume and survives it.
-          </p>
-        </div>
-
-        <h3 class="subhead subhead-first">Exams you can sit</h3>
-
-        <ul class="exam-grid">
-          <li class="exam-card">
-            <div class="exam-card-head">
-              <span class="exam-avatar" aria-hidden="true"><svg class="cert-mark" data-cert="CKAD" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3.4l8.2 4.4L12 12.2 3.8 7.8z"/><path d="M3.8 12l8.2 4.4L20.2 12"/><path d="M3.8 16.2l8.2 4.4 8.2-4.4"/></svg></span>
-              <div class="exam-card-name">
-                <h4>CKAD Mock Exam</h4>
-                <p>Certified Kubernetes Application Developer</p>
-              </div>
-              <span class="exam-badge exam-badge-live">Live</span>
-            </div>
-
-            <dl class="exam-stats">
-              <div><dt>Duration</dt><dd>2h</dd></div>
-              <div>
-                <dt>Drawn / pool</dt>
-                <dd>17 <span class="exam-stat-of">/ 44</span></dd>
-              </div>
-              <div><dt>To pass</dt><dd>66%</dd></div>
-              <div><dt>Engine</dt><dd class="exam-stat-engine">Practical</dd></div>
-            </dl>
-
-            <p class="exam-desc">
-              17 tasks drawn each attempt from a 44-task pool, across the
-              full CKAD curriculum: workloads and multi-container design,
-              deployments and configuration, security contexts,
-              observability, and services, ingress and network policy. The
-              draw is mixed across three levels, so an attempt is not a wall
-              of long multi-step tasks. Two instances, kind-backed cluster,
-              Kubernetes 1.35.
-            </p>
-
-            <div class="domains">
-              <p class="domains-title">Domains, at the published weights</p>
-              <ul class="tag-row" aria-label="Curriculum domains and their weights">
-                <li class="tag">Application Design and Build <b>20%</b></li>
-                <li class="tag">Application Deployment <b>20%</b></li>
-                <li class="tag">
-                  Application Environment, Configuration and Security <b>25%</b>
-                </li>
-                <li class="tag">
-                  Application Observability and Maintenance <b>15%</b>
-                </li>
-                <li class="tag">Services and Networking <b>20%</b></li>
-              </ul>
-            </div>
-          </li>
-
-          <li class="exam-card" data-engine="mcq">
-            <div class="exam-card-head">
-              <span class="exam-avatar" aria-hidden="true"><svg class="cert-mark" data-cert="KCNA" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="6.3"/><circle cx="12" cy="5.7" r="2.15" fill="currentColor" stroke="none"/></svg></span>
-              <div class="exam-card-name">
-                <h4>KCNA Mock Exam</h4>
-                <p>Kubernetes and Cloud Native Associate</p>
-              </div>
-              <span class="exam-badge exam-badge-live">Live</span>
-            </div>
-
-            <dl class="exam-stats">
-              <div><dt>Duration</dt><dd>1h 30m</dd></div>
-              <div>
-                <dt>Drawn / pool</dt>
-                <dd>65 <span class="exam-stat-of">/ 97</span></dd>
-              </div>
-              <div><dt>To pass</dt><dd>75%</dd></div>
-              <div><dt>Engine</dt><dd class="exam-stat-engine">MCQ</dd></div>
-            </dl>
-
-            <p class="exam-desc">
-              65 questions drawn each attempt from a 97-question pool, in the
-              real exam's shape: 90 minutes, 75% to pass, weighted across the
-              four KCNA curriculum domains on every draw. Single-answer and
-              select-all-that-apply items, each with a full explanation for
-              review. No cluster involved, so an attempt starts before the
-              environment finishes booting and works on a phone.
-            </p>
-
-            <div class="domains">
-              <p class="domains-title">Domains, at the published weights</p>
-              <ul class="tag-row" aria-label="Curriculum domains and their weights">
-                <li class="tag">Kubernetes Fundamentals <b>44%</b></li>
-                <li class="tag">Container Orchestration <b>28%</b></li>
-                <li class="tag">Cloud Native Application Delivery <b>16%</b></li>
-                <li class="tag">Cloud Native Architecture <b>12%</b></li>
-              </ul>
-            </div>
-          </li>
-        </ul>
-
-        <h3 class="subhead">Not runnable yet</h3>
-        <p class="section-lede section-lede-tight">
-          These three complete the path. Each says in the catalog why it cannot
-          be sat — a refusal with a reason, not a disabled button.
-        </p>
-
-        <ul class="exam-grid exam-grid-soon">
-          <li class="exam-card exam-card-soon" data-engine="soon">
-            <div class="exam-card-head">
-              <span class="exam-avatar" aria-hidden="true"><svg class="cert-mark" data-cert="CKA" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="11.6" r="3.1" fill="currentColor" stroke="none"/><circle cx="12" cy="3.7" r="2.2"/><circle cx="19.1" cy="17.6" r="2.2"/><circle cx="4.9" cy="17.6" r="2.2"/><path d="M12 8.5V5.9M14.6 13.4l2.6 2.5M9.4 13.4l-2.6 2.5"/></svg></span>
-              <div class="exam-card-name">
-                <h4>CKA</h4>
-              </div>
-              <span class="exam-badge">Soon</span>
-            </div>
-          </li>
-          <li class="exam-card exam-card-soon" data-engine="soon">
-            <div class="exam-card-head">
-              <span class="exam-avatar" aria-hidden="true"><svg class="cert-mark" data-cert="KCSA" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4.4" y="10.6" width="15.2" height="10.2" rx="2.4"/><path d="M7.9 10.6V7.9a4.1 4.1 0 0 1 8.2 0v2.7"/><circle cx="12" cy="15.7" r="1.7" fill="currentColor" stroke="none"/></svg></span>
-              <div class="exam-card-name">
-                <h4>KCSA</h4>
-              </div>
-              <span class="exam-badge">Soon</span>
-            </div>
-          </li>
-          <li class="exam-card exam-card-soon" data-engine="soon">
-            <div class="exam-card-head">
-              <span class="exam-avatar" aria-hidden="true"><svg class="cert-mark" data-cert="CKS" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 2.9l7.4 2.8v6c0 4.7-3.2 7.1-7.4 8.4-4.2-1.3-7.4-3.7-7.4-8.4v-6z"/><path d="M9.1 11.9l2 2 3.8-3.9"/></svg></span>
-              <div class="exam-card-name">
-                <h4>CKS</h4>
-              </div>
-              <span class="exam-badge">Soon</span>
-            </div>
-          </li>
-        </ul>
-      </section>
-
-      <section class="shell section" aria-labelledby="cluster-title">
-        <div class="section-head">
-          <h2 id="cluster-title">Why the score means something</h2>
-          <p class="section-lede">
-            Hands-on questions are graded on behaviour wherever behaviour is the
-            point — a policy that actually denies, an Ingress the controller
-            really routes — not on the shape of your YAML. That is only possible
-            because the environment is complete enough to test an answer the way
-            the real exam expects.
-          </p>
-        </div>
-
-        <dl class="evidence">
-          <div class="evidence-row">
-            <dt>Calico, not kindnet</dt>
-            <dd>
-              NetworkPolicies are genuinely enforced, so a policy question can
-              be graded on whether traffic is actually denied.
-            </dd>
+      <section class="section-verdict">
+        <div class="verdict-inner">
+          <div data-reveal="1" class="verdict-copy">
+            <div class="section-eyebrow">GRADED ON BEHAVIOUR</div>
+            <h2 class="verdict-title">When a check fails, it shows you why.</h2>
+            <p class="verdict-lede">Hands-on answers are graded on what the cluster does — a NetworkPolicy that actually denies (Calico, not kindnet), an Ingress the controller really routes — never on the shape of your YAML.</p>
+            <p class="verdict-lede">A failed check puts your cluster state beside the expected one and explains the difference, so the review is where the learning happens.</p>
+            <p class="verdict-note">Every question ships a reference solution; a fresh environment must grade 0 and the references must grade 100%.</p>
           </div>
-          <div class="evidence-row">
-            <dt>ingress-nginx</dt>
-            <dd>
-              An Ingress question has a controller behind it, so the route
-              either resolves or it does not.
-            </dd>
+          <div data-reveal="1" class="verdict-panel">
+            <div class="verdict-head"><span class="verdict-badge">✕ FAILED</span> q19 · 10_service — selector is 'app=inventory-api', want app=inventory</div>
+            <div class="verdict-diff">
+              <div class="verdict-col">
+                <div class="verdict-label verdict-label-bad">YOUR CLUSTER STATE</div>
+                <pre class="verdict-pre">kind: Service
+spec:
+  selector:
+    <span class="verdict-hl-bad">app: inventory-api</span></pre>
+              </div>
+              <div class="verdict-col">
+                <div class="verdict-label verdict-label-good">EXPECTED</div>
+                <pre class="verdict-pre">kind: Service
+spec:
+  selector:
+    <span class="verdict-hl-good">app: inventory</span></pre>
+              </div>
+            </div>
+            <div class="verdict-why"><span class="verdict-why-label">WHY&nbsp;&nbsp;</span>A Service finds its Pods by label, never by name. While spec.selector matches no Pod, the Service has no endpoints at all.</div>
           </div>
-          <div class="evidence-row">
-            <dt>A local Helm repository and registry</dt>
-            <dd>
-              Plain HTTP, on the cluster network, so the image-building and
-              packaging half of the curriculum is answerable offline.
-            </dd>
-          </div>
-          <div class="evidence-row">
-            <dt>Weights the build checks, and the grader applies</dt>
-            <dd>
-              A domain's share of an exam's points is its published curriculum
-              weight, and <code>tests/bank-weights.sh</code> fails the build if
-              any domain drifts more than two points from it.
-            </dd>
-          </div>
-        </dl>
-
-        <figure class="shot shot-wide">
-          <figcaption class="term-bar">
-            <span class="term-bar-dot" aria-hidden="true"></span>
-            <span class="term-bar-title">Score — one graded CKAD attempt</span>
-          </figcaption>
-          <picture>
-            <source
-              media="(prefers-color-scheme: dark)"
-              srcset="shots/score-dark.webp"
-            />
-            <img
-              class="shot-img"
-              src="shots/score-light.webp"
-              width="1600"
-              height="1000"
-              loading="lazy"
-              decoding="async"
-              alt="The score screen: a pass against the threshold, a domain breakdown ordered weakest first with two domains flagged below threshold, and a table of per-task verdicts with the points each one earned."
-            />
-          </picture>
-          <p class="shot-caption">
-            Every task carries the checks that scored it. The breakdown is
-            ordered weakest first, and names the two domains that came in
-            under the threshold rather than leaving you to find them.
-          </p>
-        </figure>
-      </section>
-
-      <section class="shell section" aria-labelledby="modes-title">
-        <div class="section-head">
-          <h2 id="modes-title">Three ways to run an attempt</h2>
-          <p class="section-lede">
-            Offered gentlest first. Being recorded is one of these permissions,
-            not a separate setting: a Mastery or Exam run is kept as an attempt,
-            a Training run is not.
-          </p>
-        </div>
-
-        <table class="mode-table">
-          <caption class="sr-only">
-            What each mode permits, compared across Training, Mastery and Exam
-          </caption>
-          <thead>
-            <tr>
-              <td></td>
-              <th scope="col">Training</th>
-              <th scope="col">Mastery</th>
-              <th scope="col">Exam</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <th scope="row">Clock</th>
-              <td data-label="Clock">None. Untimed.</td>
-              <td data-label="Clock">
-                Half the bank's duration
-                <span class="mode-sub">60 min CKAD, 45 min KCNA</span>
-              </td>
-              <td data-label="Clock">
-                The bank's full duration
-                <span class="mode-sub">120 min CKAD, 90 min KCNA</span>
-              </td>
-            </tr>
-            <tr>
-              <th scope="row">Help</th>
-              <td data-label="Help">Two-tier hints, and solutions on demand</td>
-              <td data-label="Help">None</td>
-              <td data-label="Help">None</td>
-            </tr>
-            <tr>
-              <th scope="row">Scoring</th>
-              <td data-label="Scoring">Does not end the attempt</td>
-              <td data-label="Scoring">Ends the attempt</td>
-              <td data-label="Scoring">Ends the attempt</td>
-            </tr>
-            <tr>
-              <th scope="row">Kept as an attempt</th>
-              <td data-label="Kept as an attempt">No</td>
-              <td data-label="Kept as an attempt">Yes</td>
-              <td data-label="Kept as an attempt">Yes</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div class="mode-notes">
-          <p>
-            The timer is server-side, not in the tab. In Exam mode it cannot be
-            paused: at zero the exam ends and grading starts by itself. Training
-            is the untimed opt-out, which is how this meets WCAG 2.2.1.
-          </p>
-          <p>
-            Mode is chosen when the attempt starts and cannot change after
-            that. The three are defined in
-            <a
-              href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/api.md#attempt-modes"
-              >the API reference</a
-            >, down to the wire ids and the gate each one closes.
-          </p>
-        </div>
-
-        <figure class="shot shot-wide">
-          <figcaption class="term-bar">
-            <span class="term-bar-dot" aria-hidden="true"></span>
-            <span class="term-bar-title">Choosing a mode — CKAD</span>
-          </figcaption>
-          <picture>
-            <source
-              media="(prefers-color-scheme: dark)"
-              srcset="shots/mode-dark.webp"
-            />
-            <img
-              class="shot-img"
-              src="shots/mode-light.webp"
-              width="1600"
-              height="1000"
-              loading="lazy"
-              decoding="async"
-              alt="The mode screen: Training, Mastery and Exam side by side, each listing its clock and what help it allows, with chips below for narrowing the draw to particular domains."
-            />
-          </picture>
-          <p class="shot-caption">
-            The same table the app offers, gentlest first. The chips below it
-            narrow the draw to the domains you want to drill.
-          </p>
-        </figure>
-      </section>
-
-      <section class="shell section" id="run" aria-labelledby="run-title">
-        <div class="section-head">
-          <h2 id="run-title">Two ways to run it</h2>
-          <p class="section-lede">
-            Both of them are things you run. There is no service here to sign
-            up for and no account to make: the local product is the reference,
-            and the hosted shape is the same simulator with a door in front of
-            it. If you want the uncapped one, clone this and run it.
-          </p>
-        </div>
-
-        <div class="run-grid">
-          <article class="run-card" aria-labelledby="run-local">
-            <div class="run-card-head">
-              <h3 id="run-local">On your machine</h3>
-              <p class="run-card-sub">One candidate, no configuration</p>
-            </div>
-
-            <figure class="term term-inline">
-              <pre class="term-body"><code><span class="term-prompt" aria-hidden="true">$ </span>./sim up</code></pre>
-            </figure>
-
-            <dl class="run-facts">
-              <div>
-                <dt>Identity</dt>
-                <dd>None, permanently</dd>
-              </div>
-              <div>
-                <dt>At once</dt>
-                <dd>Uncapped</dd>
-              </div>
-              <div>
-                <dt>History</dt>
-                <dd>A local volume</dd>
-              </div>
-              <div>
-                <dt>Asks for</dt>
-                <dd>Docker, ~9GB of RAM</dd>
-              </div>
-            </dl>
-
-            <p class="run-note">
-              <code>./sim up</code> binds loopback, so it answers on the
-              machine you ran it on and nowhere else. Reaching it from another
-              machine is one deliberate setting, and there is no
-              authentication behind it either way.
-              <a href="#limits">What that means is set out below.</a>
-            </p>
-          </article>
-
-          <article class="run-card" aria-labelledby="run-hosted">
-            <div class="run-card-head">
-              <h3 id="run-hosted">For a group</h3>
-              <p class="run-card-sub">Sign-in, a capped pool, durable history</p>
-            </div>
-
-            <figure class="term term-inline">
-              <pre class="term-body"><code><span class="term-prompt" aria-hidden="true">$ </span>helm install kubestronaut-sim <span class="term-cont">\</span>
-    deploy/helm/kubestronaut-sim <span class="term-cont">\</span>
-    --values my-values.yaml</code></pre>
-            </figure>
-
-            <dl class="run-facts">
-              <div>
-                <dt>Identity</dt>
-                <dd>GitHub, a trusted header, or none</dd>
-              </div>
-              <div>
-                <dt>At once</dt>
-                <dd>3 hands-on, 30 multiple-choice</dd>
-              </div>
-              <div>
-                <dt>History</dt>
-                <dd>Per user, outlives the Pod</dd>
-              </div>
-              <div>
-                <dt>Asks for</dt>
-                <dd>Nodes you are willing to rebuild</dd>
-              </div>
-            </dl>
-
-            <p class="run-note">
-              One hub is reachable from the internet and does identity, seats,
-              the queue and history. Each candidate gets the whole
-              <code>./sim up</code> stack as a single Pod, and the facilitator
-              inside it has no authentication and gains none: it is simply
-              never reachable except through the hub. That is what lets the
-              local product stay untouched.
-            </p>
-          </article>
-        </div>
-
-
-        <aside class="run-warning" aria-labelledby="run-warning-title">
-          <h3 class="run-warning-title" id="run-warning-title">
-            A hands-on session runs a privileged container
-          </h3>
-          <p>
-            It builds a real Kubernetes cluster inside itself and hands a
-            stranger a root shell next to it. Deploy it only on nodes you are
-            willing to rebuild. A NetworkPolicy that walls a session off from
-            the cluster hosting it ships on by default.
-          </p>
-          <p class="run-warning-more">
-            <a
-              href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/hosting.md"
-              >The hosting guide</a
-            >
-            covers seats, sizing, credentials and what hosted mode does
-            differently. Multiple-choice sessions are unprivileged and tiny.
-          </p>
-        </aside>
-      </section>
-
-      <section class="limits" id="limits" aria-labelledby="limits-title">
-        <div class="shell">
-          <div class="section-head">
-            <h2 id="limits-title">What this is not</h2>
-            <p class="section-lede">
-              Stated rather than implied, because the alternative is letting a
-              reader infer something the software does not do.
-            </p>
-          </div>
-
-          <dl class="limit-list">
-            <div class="limit">
-              <dt>Not a replacement for the rest of your preparation.</dt>
-              <dd>
-                It does not replace working a problem out for yourself, the lab
-                you build at home, or the Linux Foundation's own training. What
-                it adds is a timed rehearsal on a real cluster and a score you
-                can trust.
-              </dd>
-            </div>
-            <div class="limit">
-              <dt>No accounts, and no authentication anywhere.</dt>
-              <dd>
-                A password field on a single-user tool you cloned yourself would
-                be theatre. The only real control is which interface it binds
-                to, so it binds loopback by default and nothing off your
-                machine can reach it. Opting into your LAN is one setting, and
-                not one your host firewall covers —
-                <a
-                  href="https://github.com/Camilool8/kubestronaut-sim/blob/main/SECURITY.md#sim_bind"
-                  >SECURITY.md</a
-                >
-                sets out that whole boundary.
-              </dd>
-            </div>
-            <div class="limit">
-              <dt>Hosting it is your job, not ours.</dt>
-              <dd>
-                There is no service to sign up for. The Helm chart that puts it
-                in front of a group is something you deploy, on your hardware,
-                under your own identity provider.
-                <a href="#run">Both shapes are set out above.</a>
-              </dd>
-            </div>
-            <div class="limit">
-              <dt>No pass-rate claims, and no percentile.</dt>
-              <dd>
-                A score here measures practice progress; it does not predict a
-                real exam result. Your record describes your own progress and
-                never a population's, so nothing compares you to other
-                candidates.
-              </dd>
-            </div>
-            <div class="limit">
-              <dt>No third-party exam dumps.</dt>
-              <dd>
-                Every question is original. The banks are CC BY-SA 4.0, which
-                requires them to be ours to license.
-              </dd>
-            </div>
-            <div class="limit">
-              <dt>No hands-on exam on a phone.</dt>
-              <dd>
-                The answer surface is a real remote desktop, so small screens
-                get an explanation instead of a broken layout. A KCNA attempt
-                does work on a phone.
-              </dd>
-            </div>
-          </dl>
         </div>
       </section>
 
-      <section class="shell section" id="docs" aria-labelledby="docs-title">
-        <div class="section-head">
-          <h2 id="docs-title">Where to go next</h2>
-          <p class="section-lede">
-            Start with the README if you want to run an exam. The rest is for
-            changing the thing, or for writing questions for it.
-          </p>
+      <section id="exams" class="section-exams">
+        <div class="exams-inner">
+          <div data-reveal="1" class="exams-head">
+            <h2 class="exams-title">An honest draw, every attempt</h2>
+            <div class="exams-total">All <b class="qtotal">141</b> questions original — no exam dumps. Banks are CC BY-SA 4.0.</div>
+          </div>
+          <ul class="exam-grid">
+            <li data-reveal="1" class="exam-card" data-bank="ckad-mock-01">
+              <div class="exam-card-head">
+                <div class="exam-card-id"><svg class="cert-mark" data-cert="CKAD" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3.4l8.2 4.4L12 12.2 3.8 7.8z"/><path d="M3.8 12l8.2 4.4L20.2 12"/><path d="M3.8 16.2l8.2 4.4 8.2-4.4"/></svg><span class="exam-card-name">CKAD</span></div>
+                <div class="exam-card-live">LIVE</div>
+              </div>
+              <div class="exam-facts">
+                <span class="fact fact-clock"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>2h</span>
+                <span class="fact fact-draw"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"></path><path d="M9 7h6M9 11h6M9 15h4"></path></svg>17 of 44 drawn</span>
+                <span class="fact fact-pass"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>66% to pass</span>
+              </div>
+              <p class="exam-card-desc">Hands-on, on a two-node Kubernetes 1.35 cluster. Each draw is stratified to the published domain weights and mixed across quick, core and deep tasks — so a sitting is never a wall of long multi-step questions.</p>
+            </li>
+            <li data-reveal="1" class="exam-card" data-bank="kcna-mock">
+              <div class="exam-card-head">
+                <div class="exam-card-id"><svg class="cert-mark" data-cert="KCNA" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="6.3"/><circle cx="12" cy="5.7" r="2.15" fill="currentColor" stroke="none"/></svg><span class="exam-card-name">KCNA</span></div>
+                <div class="exam-card-live">LIVE</div>
+              </div>
+              <div class="exam-facts">
+                <span class="fact fact-clock"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>90m</span>
+                <span class="fact fact-draw"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"></path><path d="M9 7h6M9 11h6M9 15h4"></path></svg>65 of 97 drawn</span>
+                <span class="fact fact-pass"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>75% to pass</span>
+              </div>
+              <p class="exam-card-desc">Multiple-choice in the real exam's shape, weighted across the four KCNA domains on every draw. Every answer explained. No cluster involved, so it starts instantly and works on a phone.</p>
+            </li>
+            <li data-reveal="1" class="exam-soon">
+              <div class="exam-soon-eyebrow">COMPLETING THE PATH</div>
+              <div class="exam-soon-chips">
+                <span class="cert-chip" data-cert="CKA"><svg class="cert-mark" data-cert="CKA" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="11.6" r="3.1" fill="currentColor" stroke="none"/><circle cx="12" cy="3.7" r="2.2"/><circle cx="19.1" cy="17.6" r="2.2"/><circle cx="4.9" cy="17.6" r="2.2"/><path d="M12 8.5V5.9M14.6 13.4l2.6 2.5M9.4 13.4l-2.6 2.5"/></svg>CKA</span>
+                <span class="cert-chip" data-cert="KCSA"><svg class="cert-mark" data-cert="KCSA" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4.4" y="10.6" width="15.2" height="10.2" rx="2.4"/><path d="M7.9 10.6V7.9a4.1 4.1 0 0 1 8.2 0v2.7"/><circle cx="12" cy="15.7" r="1.7" fill="currentColor" stroke="none"/></svg>KCSA</span>
+                <span class="cert-chip" data-cert="CKS"><svg class="cert-mark" data-cert="CKS" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 2.9l7.4 2.8v6c0 4.7-3.2 7.1-7.4 8.4-4.2-1.3-7.4-3.7-7.4-8.4v-6z"/><path d="M9.1 11.9l2 2 3.8-3.9"/></svg>CKS</span>
+              </div>
+              <div class="exam-soon-note">In the catalog with the reason each can't be sat yet. The <a href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/bank-spec.md">bank format is documented</a> — write one, and the same gates that check ours check yours.</div>
+            </li>
+          </ul>
         </div>
+      </section>
 
-        <div class="docs-index">
-          <section class="docs-group" aria-labelledby="docs-run">
-            <h3 class="docs-group-title" id="docs-run">Running it</h3>
-            <dl>
-              <div class="docs-entry">
-                <dt>
-                  <a
-                    href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/install.md"
-                    >install.md</a
-                  >
-                </dt>
-                <dd>Per-OS prerequisites and setup, for Windows, macOS and Linux.</dd>
-              </div>
-              <div class="docs-entry">
-                <dt>
-                  <a href="https://github.com/Camilool8/kubestronaut-sim#readme"
-                    >README</a
-                  >
-                </dt>
-                <dd>The quickstart, the requirements, and one attempt end to end.</dd>
-              </div>
-              <div class="docs-entry">
-                <dt>
-                  <a
-                    href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/cli.md"
-                    >CLI reference</a
-                  >
-                </dt>
-                <dd>
-                  Every <code>./sim</code> subcommand, environment variable, and
-                  published port.
-                </dd>
-              </div>
-              <div class="docs-entry">
-                <dt>
-                  <a
-                    href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/hosting.md"
-                    >Hosting</a
-                  >
-                </dt>
-                <dd>
-                  The Helm chart, seats, sizing and credentials, for running it
-                  for other people.
-                </dd>
-              </div>
-              <div class="docs-entry">
-                <dt>
-                  <a
-                    href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/TROUBLESHOOTING.md"
-                    >Troubleshooting</a
-                  >
-                </dt>
-                <dd>
-                  Symptoms and fixes, from the preflight through boot, an
-                  attempt, and grading.
-                </dd>
-              </div>
-            </dl>
-          </section>
-
-          <section class="docs-group" aria-labelledby="docs-understand">
-            <h3 class="docs-group-title" id="docs-understand">Understanding it</h3>
-            <dl>
-              <div class="docs-entry">
-                <dt>
-                  <a
-                    href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/api.md"
-                    >HTTP API</a
-                  >
-                </dt>
-                <dd>
-                  Every endpoint the facilitator, the conductor and the hub
-                  serve, with the state each one expects.
-                </dd>
-              </div>
-              <div class="docs-entry">
-                <dt>
-                  <a
-                    href="https://github.com/Camilool8/kubestronaut-sim/blob/main/SECURITY.md"
-                    >Threat model</a
-                  >
-                </dt>
-                <dd>
-                  What is defended, what is not, and why the conductor is the
-                  only real boundary.
-                </dd>
-              </div>
-            </dl>
-          </section>
-
-          <section class="docs-group" aria-labelledby="docs-build">
-            <h3 class="docs-group-title" id="docs-build">Changing it</h3>
-            <dl>
-              <div class="docs-entry">
-                <dt>
-                  <a
-                    href="https://github.com/Camilool8/kubestronaut-sim/blob/main/CONTRIBUTING.md"
-                    >Contributing</a
-                  >
-                </dt>
-                <dd>
-                  Set up, build, and the non-obvious rules that will otherwise
-                  cost you an afternoon.
-                </dd>
-              </div>
-              <div class="docs-entry">
-                <dt>
-                  <a
-                    href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/bank-spec.md"
-                    >Bank format</a
-                  >
-                </dt>
-                <dd>
-                  The question bank schema and the validator contract, for
-                  writing your own.
-                </dd>
-              </div>
-            </dl>
-          </section>
-        </div>
-
-        <div class="closing">
-          <p class="closing-line">
-            Clone it, run <code>./sim up</code> and sit your first exam.
-          </p>
-          <p class="hero-actions">
-            <a class="btn btn-primary" href="https://github.com/Camilool8/kubestronaut-sim"
-              >View the repository</a
-            >
-            <a
-              class="btn"
-              href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/cli.md"
-              >Read the CLI reference</a
-            >
-          </p>
+      <section class="section-cli">
+        <div class="cli-inner">
+          <div data-reveal="1" class="cli-head">
+            <h2 class="cli-title">The whole CLI is nine subcommands</h2>
+            <div class="cli-note">Sitting, grading, resets and progress happen in the browser — the CLI is for the stack itself.</div>
+          </div>
+          <div data-reveal="1" class="cli-grid">
+            <div class="cli-card"><span class="cli-name">up</span><div class="cli-desc">stack up; nothing is built until you pick an exam</div></div>
+            <div class="cli-card"><span class="cli-name">down</span><div class="cli-desc">stop; attempt state survives</div></div>
+            <div class="cli-card"><span class="cli-name">reset</span><div class="cli-desc">fresh attempt on the same bank</div></div>
+            <div class="cli-card"><span class="cli-name">purge</span><div class="cli-desc">reclaim disk; attempt history survives — <code>--all</code> alone destroys it</div></div>
+            <div class="cli-card"><span class="cli-name">doctor</span><div class="cli-desc">preflight: Docker, RAM, disk, cgroups, line endings</div></div>
+            <div class="cli-card"><span class="cli-name">ssh</span><div class="cli-desc">shell on an instance, default instance-1</div></div>
+            <div class="cli-card"><span class="cli-name">status</span><div class="cli-desc">docker compose ps</div></div>
+            <div class="cli-card"><span class="cli-name">grade</span><div class="cli-desc">read-only scoreboard, as the environment stands</div></div>
+            <div class="cli-card"><span class="cli-name">help</span><div class="cli-desc">usage; also the default with no argument</div></div>
+          </div>
         </div>
       </section>
     </main>
 
-    <footer class="site-footer">
-      <div class="shell">
-        <div class="footer-cols">
-          <div class="footer-col">
-            <h2 class="footer-title">kubestronaut-sim</h2>
-            <p class="footer-text">
-              Open source, run locally, and honest about the difference between
-              this and a real exam.
-            </p>
-            <p class="footer-byline">
-              Built by <a href="https://cjoga.cloud">Camilo Joga</a>.
-            </p>
-          </div>
-
-          <div class="footer-col">
-            <h2 class="footer-title">Repository</h2>
-            <ul class="footer-links">
-              <li>
-                <a href="https://github.com/Camilool8/kubestronaut-sim">Source</a>
-              </li>
-              <li>
-                <a href="https://github.com/Camilool8/kubestronaut-sim/issues"
-                  >Issues</a
-                >
-              </li>
-              <li>
-                <a
-                  href="https://github.com/Camilool8/kubestronaut-sim/tree/main/docs"
-                  >Documentation</a
-                >
-              </li>
-            </ul>
-          </div>
-
-          <div class="footer-col">
-            <h2 class="footer-title">Licensing</h2>
-            <p class="footer-text">
-              Simulator code: Apache License 2.0.<br />
-              Question banks: Creative Commons BY-SA 4.0.
-            </p>
-          </div>
+    <footer id="docs" class="site-footer">
+      <div data-reveal="1" class="footer-inner">
+        <div class="footer-cta">Sit your first mock exam tonight.</div>
+        <div class="footer-buttons">
+          <a class="btn-primary" href="https://github.com/Camilool8/kubestronaut-sim">Clone the repository</a>
+          <a class="btn-secondary" href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/install.md">Install guide</a>
         </div>
-
-        <div class="disclaimer">
-          <h2 class="disclaimer-title">Independent project</h2>
-          <p>
-            Kubestronaut Sim is an independent open-source study tool. It is not
-            affiliated with, endorsed by, or associated with the Cloud Native
-            Computing Foundation, The Linux Foundation, or PSI. Kubernetes and
-            the certification names (CKA, CKAD, CKS, KCNA, KCSA) are trademarks
-            of The Linux Foundation.
-          </p>
+        <div class="footer-links">
+          <a class="footer-link" href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/install.md">install.md</a>
+          <a class="footer-link" href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/cli.md">cli.md</a>
+          <a class="footer-link" href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/api.md">api.md</a>
+          <a class="footer-link" href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/hosting.md">hosting.md</a>
+          <a class="footer-link" href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/bank-spec.md">bank-spec.md</a>
+          <a class="footer-link" href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/TROUBLESHOOTING.md">TROUBLESHOOTING.md</a>
         </div>
+        <div class="footer-legal">Built by <a href="https://cjoga.cloud">Camilo Joga</a>. An independent open-source study tool — not affiliated with, endorsed by, or associated with the CNCF, The Linux Foundation, or PSI. Kubernetes and the certification names are trademarks of The Linux Foundation. Simulator: Apache-2.0 · Question banks: CC BY-SA 4.0.</div>
       </div>
     </footer>
 
-    <script>
-      (function () {
-        var orbit = document.querySelector(".orbit-svg");
-        if (!orbit || !window.IntersectionObserver) return;
-        new IntersectionObserver(function (entries) {
-          orbit.toggleAttribute("data-idle", !entries[0].isIntersecting);
-        }).observe(orbit);
-      })();
+    <div id="ks-lb" class="ks-lb" role="dialog" aria-modal="true" aria-label="Screenshot gallery" hidden>
+      <div class="lb-body">
+        <img id="lb-img" class="lb-img" src="" alt="">
+        <div class="lb-caption">
+          <div class="lb-meta"><span id="lb-title"></span><span id="lb-count" class="lb-count"></span></div>
+          <div id="lb-desc" class="lb-desc"></div>
+        </div>
+      </div>
+      <button type="button" id="lb-prev" class="lb-nav lb-prev" aria-label="Previous screenshot"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+      <button type="button" id="lb-next" class="lb-nav lb-next" aria-label="Next screenshot"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></button>
+      <button type="button" id="ks-lb-close" class="lb-close" aria-label="Close"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+    </div>
 
-      (function () {
-        var p =
-          (navigator.userAgentData && navigator.userAgentData.platform) ||
-          navigator.platform ||
-          "";
-        var id = null;
-        if (/win/i.test(p)) id = "os-win";
-        else if (/linux|x11|android|cros/i.test(p)) id = "os-linux";
-        if (!id) return;
-        var el = document.getElementById(id);
-        if (el) el.checked = true;
+    <script>
+      (() => {
+        "use strict";
+        const KS = (window.KS = {});
+        const $ = (s, el) => (el || document).querySelector(s);
+        const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
+
+        /* ---- theme ---- */
+        const applyTheme = (t) => {
+          if (t === "system") document.documentElement.removeAttribute("data-theme");
+          else document.documentElement.setAttribute("data-theme", t);
+          $$("[data-set-theme]").forEach((b) => {
+            b.classList.toggle("is-active", b.dataset.setTheme === t);
+            b.setAttribute("aria-pressed", String(b.dataset.setTheme === t));
+          });
+          if (KS.orbitSync) KS.orbitSync();
+        };
+        let theme = "system";
+        try { theme = localStorage.getItem("ks-theme") || "system"; } catch (e) {}
+        applyTheme(theme);
+        $$("[data-set-theme]").forEach((b) =>
+          b.addEventListener("click", () => {
+            theme = b.dataset.setTheme;
+            try { localStorage.setItem("ks-theme", theme); } catch (e) {}
+            applyTheme(theme);
+          }));
+        KS.isDark = () => {
+          const t = document.documentElement.getAttribute("data-theme");
+          if (t) return t === "dark";
+          return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        };
+
+        /* ---- os switcher ---- */
+        const OS = {
+          win:   { prompt: "PS> ", doctor: ".\\sim.ps1 doctor", up: ".\\sim.ps1 up", open: "start " },
+          mac:   { prompt: "$ ",   doctor: "./sim doctor",      up: "./sim up",      open: "open " },
+          linux: { prompt: "$ ",   doctor: "./sim doctor",      up: "./sim up",      open: "xdg-open " },
+        };
+        let os = /Windows/i.test(navigator.userAgent) ? "win"
+          : /Mac|iPhone|iPad/i.test(navigator.userAgent) ? "mac" : "linux";
+        const applyOs = () => {
+          const o = OS[os];
+          $$(".t-prompt").forEach((el) => (el.textContent = o.prompt));
+          $("#cmd-doctor").textContent = o.doctor;
+          $("#cmd-up").textContent = o.up;
+          $("#cmd-open").textContent = o.open;
+          $$("[data-set-os]").forEach((b) =>
+            b.setAttribute("aria-pressed", String(b.dataset.setOs === os)));
+        };
+        applyOs();
+        $$("[data-set-os]").forEach((b) =>
+          b.addEventListener("click", () => { os = b.dataset.setOs; applyOs(); }));
+
+        /* ---- copy ---- */
+        let copyT = 0;
+        $("#copy-btn").addEventListener("click", () => {
+          const win = os === "win";
+          const text = win ? ".\\sim.ps1 doctor\n.\\sim.ps1 up" : "./sim doctor\n./sim up";
+          const write = navigator.clipboard && navigator.clipboard.writeText
+            ? navigator.clipboard.writeText(text) : Promise.reject();
+          write.catch(() => {}).then(() => {
+            $("#copy-label").textContent = "copied";
+            clearTimeout(copyT);
+            copyT = setTimeout(() => { $("#copy-label").textContent = "copy"; }, 1600);
+          });
+        });
+
+        /* ---- mobile menu ---- */
+        const menuBtn = $("#menu-btn"), menu = $("#mobile-menu");
+        const setMenu = (open) => {
+          menu.hidden = !open;
+          $("#menu-icon-open").hidden = open;
+          $("#menu-icon-close").hidden = !open;
+        };
+        menuBtn.addEventListener("click", () => setMenu(menu.hidden));
+        $$("#mobile-menu a").forEach((a) => a.addEventListener("click", () => setMenu(false)));
+
+        /* ---- stars ---- */
+        fetch("https://api.github.com/repos/Camilool8/kubestronaut-sim")
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => {
+            if (!d || typeof d.stargazers_count !== "number") return;
+            const s = d.stargazers_count;
+            $("#gh-stars").textContent =
+              "★ " + (s >= 1000 ? (s / 1000).toFixed(1) + "k" : String(s));
+            $("#gh-stars").hidden = false;
+          })
+          .catch(() => {});
+
+        /* ---- orbit engine ---- */
+        let _orb = null;
+
+        const initOrbit = () => {
+          const canvas = document.getElementById("ks-orbit");
+          if (!canvas || !canvas.getContext) return;
+          const TILT = -16 * Math.PI / 180;
+          const orb = (_orb = {
+            canvas, ctx: canvas.getContext("2d"),
+            t: 60, last: 0, raf: 0, visible: true, dark: KS.isDark(),
+            on: true,
+            reduce: !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches),
+            scale: 1, parts: [], grads: null,
+            g: { TILT, K: 0.3, CX: 560, CY: 370, DW: 1240, DH: 740, RIN: 64, ROUT: 470, RH: 44, cosT: Math.cos(TILT), sinT: Math.sin(TILT) }
+          });
+          const stops = [[0, 255, 255, 255], [0.07, 225, 236, 255], [0.22, 150, 185, 255], [0.5, 96, 138, 244], [0.8, 64, 96, 210], [1, 44, 66, 160]];
+          const colorAt = (t) => {
+            let i = 1;
+            while (i < stops.length - 1 && stops[i][0] < t) i++;
+            const a = stops[i - 1], b = stops[i], f = (t - a[0]) / (b[0] - a[0]);
+            const mix = (x, y) => Math.round(x + (y - x) * f);
+            return "rgb(" + mix(a[1], b[1]) + "," + mix(a[2], b[2]) + "," + mix(a[3], b[3]) + ")";
+          };
+          const N = (canvas.clientWidth || 1340) < 870 ? 1400 : 2400;
+          const { RIN, ROUT } = orb.g;
+          for (let i = 0; i < N; i++) {
+            const r = RIN + (ROUT - RIN) * Math.pow(Math.random(), 1.55);
+            const tR = (r - RIN) / (ROUT - RIN);
+            orb.parts.push({
+              r, tR,
+              phi: Math.random() * Math.PI * 2,
+              om: 0.24 * Math.pow(RIN / r, 1.5),
+              h: (Math.random() + Math.random() + Math.random() - 1.5) * (2 + tR * 7),
+              a: (0.1 + 0.42 * Math.pow(1 - tR, 1.6)) * (0.55 + Math.random() * 0.45),
+              w: 0.9 + (1 - tR) * 0.9 + Math.random() * 0.4,
+              seed: Math.random() * Math.PI * 2,
+              col: colorAt(tR)
+            });
+          }
+          orb.sats = [
+            { label: "CKAD", live: true, r: 252, p0: 8.54, name: "Certified Kubernetes Application Developer", sub: "Bank live · hands-on · 2h · 66% to pass" },
+            { label: "KCNA", live: true, r: 344, p0: 4.61, name: "Kubernetes and Cloud Native Associate", sub: "Bank live · multiple-choice · 90m · 75% to pass" },
+            { label: "CKA", live: false, r: 436, p0: 7.23, name: "Certified Kubernetes Administrator", sub: "In the catalog · bank not sittable yet" },
+            { label: "KCSA", live: false, r: 478, p0: 7.64, name: "Kubernetes and Cloud Native Security Associate", sub: "In the catalog · bank not sittable yet" },
+            { label: "CKS", live: false, r: 520, p0: 3.37, name: "Certified Kubernetes Security Specialist", sub: "In the catalog · bank not sittable yet" }
+          ];
+          orb.sats.forEach((s) => { s.om = 0.78 * Math.pow(RIN / s.r, 1.5); });
+          orb.stars = [];
+          for (let i = 0; i < 130; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const rr = 90 + 530 * Math.pow(Math.random(), 0.7);
+            orb.stars.push({
+              u: Math.cos(a) * rr, v: Math.sin(a) * rr, rr,
+              sz: 0.6 + Math.random() * 1.1,
+              tw: Math.random() * Math.PI * 2,
+              sp: 0.3 + Math.random() * 1.2
+            });
+          }
+          orb.vx0 = -500; orb.vx1 = 500;
+          buildOrbGrads();
+          const resize = () => {
+            const { DW, DH, CX } = orb.g;
+            const cssW = canvas.clientWidth || 1340;
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            canvas.width = Math.max(1, Math.round(cssW * dpr));
+            canvas.height = Math.max(1, Math.round(cssW * (DH / DW) * dpr));
+            orb.scale = canvas.width / DW;
+            orb.labels = cssW >= 870;
+            const rect = canvas.getBoundingClientRect();
+            const sc = (rect.width || cssW) / DW;
+            orb.vx0 = Math.max(-CX, (8 - rect.left) / sc - CX);
+            orb.vx1 = Math.min(DW - CX, (window.innerWidth - 8 - rect.left) / sc - CX);
+            if (!orb.raf) renderOrbit();
+          };
+          resize();
+          orb.onWin = () => resize();
+          window.addEventListener("resize", orb.onWin);
+          if (window.matchMedia && window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+            canvas.style.pointerEvents = "auto";
+            let tip = document.getElementById("ks-tip");
+            if (!tip) {
+              tip = document.createElement("div");
+              tip.id = "ks-tip";
+              tip.setAttribute("aria-hidden", "true");
+              tip.style.cssText = "position:absolute;left:0;top:0;z-index:3;visibility:hidden;opacity:0;transition:opacity 0.16s ease;transform:translate(-50%,-100%);background:#0d1320;border:1px solid #2a3546;border-radius:8px;padding:9px 12px;pointer-events:none;box-shadow:0 10px 30px rgba(0,0,0,0.45);white-space:nowrap;";
+              tip.innerHTML = "<div style=\"font:600 12.5px 'IBM Plex Mono',monospace;color:#dfe5ee;\"></div><div style=\"font:400 11.5px 'IBM Plex Mono',monospace;color:#9aa7ba;margin-top:4px;\"></div>";
+              canvas.parentElement.appendChild(tip);
+            }
+            orb.tip = tip;
+            orb.onMove = (e) => {
+              const rect = canvas.getBoundingClientRect();
+              const sc = rect.width / orb.g.DW;
+              orb.mx = (e.clientX - rect.left) / sc - orb.g.CX;
+              orb.my = (e.clientY - rect.top) / sc - orb.g.CY;
+              orbitHover();
+            };
+            orb.onLeave = () => { orb.mx = null; orbitHover(); };
+            orb.onTap = () => {
+              if (!orb.hover) return;
+              const el = document.getElementById("exams");
+              if (el) el.scrollIntoView({ behavior: window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+            };
+            canvas.addEventListener("mousemove", orb.onMove);
+            canvas.addEventListener("mouseleave", orb.onLeave);
+            canvas.addEventListener("click", orb.onTap);
+          }
+          if ("ResizeObserver" in window) { orb.ro = new ResizeObserver(resize); orb.ro.observe(canvas); }
+          if ("IntersectionObserver" in window) {
+            orb.io = new IntersectionObserver((es) => { orb.visible = es[0].isIntersecting; orbitSync(); });
+            orb.io.observe(canvas);
+          }
+          if (window.matchMedia) {
+            orb.mq = window.matchMedia("(prefers-color-scheme: dark)");
+            orb.onMq = () => orbitSync();
+            if (orb.mq.addEventListener) orb.mq.addEventListener("change", orb.onMq);
+          }
+          orbitSync();
+        };
+
+        const buildOrbGrads = () => {
+          const orb = _orb, ctx = orb.ctx, dark = orb.dark;
+          orb.backR = dark ? 560 : 510;
+          const back = ctx.createRadialGradient(0, 0, 0, 0, 0, orb.backR);
+          if (dark) {
+            back.addColorStop(0, "rgba(6,11,26,0.55)"); back.addColorStop(0.45, "rgba(6,11,26,0.42)");
+            back.addColorStop(0.75, "rgba(6,11,26,0.18)"); back.addColorStop(1, "rgba(6,11,26,0)");
+          } else {
+            back.addColorStop(0, "rgba(8,13,31,0.94)"); back.addColorStop(0.6, "rgba(8,13,31,0.9)");
+            back.addColorStop(0.85, "rgba(10,16,38,0.6)"); back.addColorStop(1, "rgba(10,16,38,0)");
+          }
+          const photon = ctx.createLinearGradient(100, 0, -100, 0);
+          photon.addColorStop(0, "rgba(255,255,255,0.28)"); photon.addColorStop(0.45, "rgba(255,255,255,0.55)"); photon.addColorStop(1, "rgba(255,255,255,1)");
+          const rim = ctx.createLinearGradient(160, 0, -160, 0);
+          rim.addColorStop(0, "rgba(205,225,255,0.3)"); rim.addColorStop(1, "rgba(235,243,255,1)");
+          const { RH } = orb.g;
+          const shadow = ctx.createRadialGradient(0, 0, RH - 3, 0, 0, RH + 2.5);
+          shadow.addColorStop(0, "rgba(4,6,14,1)"); shadow.addColorStop(0.6, "rgba(4,6,14,1)"); shadow.addColorStop(1, "rgba(4,6,14,0)");
+          const blobs = dark
+            ? [[-270, 120, 320, "96,132,255", 0.055], [250, -100, 300, "120,190,255", 0.05], [-40, -230, 260, "110,150,250", 0.04]]
+            : [[-240, 110, 230, "96,132,255", 0.11], [220, -90, 210, "120,190,255", 0.09], [-30, -200, 180, "110,150,250", 0.07]];
+          const neb = blobs.map((b) => {
+            const g2 = ctx.createRadialGradient(b[0], b[1], 0, b[0], b[1], b[2]);
+            g2.addColorStop(0, "rgba(" + b[3] + "," + b[4] + ")");
+            g2.addColorStop(1, "rgba(" + b[3] + ",0)");
+            return { g: g2, x: b[0], y: b[1], r: b[2] };
+          });
+          orb.grads = { back, photon, rim, shadow, neb };
+        };
+
+        const renderOrbit = () => {
+          const orb = _orb;
+          if (!orb) return;
+          if (!orb.canvas.isConnected) {
+            const c = document.getElementById("ks-orbit");
+            if (!c) return;
+            teardownOrbit(); initOrbit(); return;
+          }
+          const dark = KS.isDark();
+          if (dark !== orb.dark) { orb.dark = dark; buildOrbGrads(); }
+          const { ctx, t, g, grads } = orb;
+          const { TILT, K, CX, CY, RIN, RH, cosT, sinT } = g;
+          ctx.setTransform(orb.scale, 0, 0, orb.scale, 0, 0);
+          ctx.clearRect(0, 0, g.DW, g.DH);
+          const sq = orb.dark ? 0.5 : 0.36;
+          ctx.save();
+          ctx.translate(CX, CY); ctx.rotate(TILT); ctx.scale(1, sq);
+          ctx.fillStyle = grads.back; ctx.fillRect(-orb.backR, -orb.backR, orb.backR * 2, orb.backR * 2);
+          ctx.globalCompositeOperation = "lighter";
+          for (let i = 0; i < grads.neb.length; i++) {
+            const b = grads.neb[i];
+            ctx.fillStyle = b.g;
+            ctx.fillRect(b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
+          }
+          ctx.restore();
+          ctx.save();
+          ctx.translate(CX, CY);
+          ctx.globalCompositeOperation = "lighter";
+          const smax = orb.dark ? 620 : 468;
+          ctx.fillStyle = orb.dark ? "#cfe0ff" : "#e6efff";
+          for (let i = 0; i < orb.stars.length; i++) {
+            const st = orb.stars[i];
+            if (st.rr > smax) continue;
+            const fade = 1 - (st.rr / smax) * (st.rr / smax);
+            ctx.globalAlpha = (orb.dark ? 0.5 : 0.85) * fade * (0.65 + 0.35 * Math.sin(t * st.sp + st.tw));
+            ctx.fillRect(st.u * cosT - st.v * sq * sinT - st.sz / 2, st.u * sinT + st.v * sq * cosT - st.sz / 2, st.sz, st.sz);
+          }
+          ctx.globalCompositeOperation = "source-over";
+          ctx.globalAlpha = 1;
+          ctx.lineCap = "round";
+          ctx.strokeStyle = orb.dark ? "rgba(152,174,226,0.13)" : "rgba(64,80,124,0.3)";
+          ctx.lineWidth = 1;
+          for (let i = 0; i < orb.sats.length; i++) {
+            if (orb.sats[i].live) continue;
+            ctx.save(); ctx.rotate(TILT); ctx.scale(1, K);
+            ctx.beginPath(); ctx.arc(0, 0, orb.sats[i].r, 0, 2 * Math.PI);
+            ctx.restore(); ctx.stroke();
+          }
+          ctx.globalCompositeOperation = "lighter";
+          const lightBoost = orb.dark ? 1 : 1.35;
+          const half = (far) => {
+            for (let i = 0; i < orb.parts.length; i++) {
+              const p = orb.parts[i];
+              const phi = p.phi - p.om * t;
+              const s1 = Math.sin(phi), c1 = Math.cos(phi);
+              if (far ? s1 >= 0 : s1 < 0) continue;
+              const dphi = Math.min(p.om * 1.8, 34 / p.r);
+              const s0 = Math.sin(phi + dphi), c0 = Math.cos(phi + dphi);
+              const u1 = p.r * c1, v1 = p.r * s1, u0 = p.r * c0, v0 = p.r * s0;
+              const boost = Math.min(1.95, Math.max(0.14, 1 - 0.9 * c1));
+              const flick = 0.86 + 0.18 * Math.sin(t * 1.3 + p.seed);
+              ctx.globalAlpha = Math.min(0.9, p.a * boost * flick * lightBoost);
+              ctx.strokeStyle = p.col;
+              ctx.lineWidth = p.w;
+              ctx.beginPath();
+              ctx.moveTo(u0 * cosT - v0 * K * sinT, u0 * sinT + v0 * K * cosT + p.h);
+              ctx.lineTo(u1 * cosT - v1 * K * sinT, u1 * sinT + v1 * K * cosT + p.h);
+              ctx.stroke();
+            }
+          };
+          const rimHalf = (a0, a1) => {
+            ctx.save();
+            ctx.rotate(TILT); ctx.scale(1, K);
+            ctx.beginPath(); ctx.arc(0, 0, RIN + 4, a0, a1);
+            ctx.restore();
+            ctx.strokeStyle = grads.rim;
+            [[14, 0.04], [6, 0.1], [2.2, 0.3]].forEach((p2) => { ctx.globalAlpha = p2[1]; ctx.lineWidth = p2[0]; ctx.stroke(); });
+          };
+          const ring = (r, a0, a1, passes, style) => {
+            ctx.strokeStyle = style;
+            for (let i = 0; i < passes.length; i++) {
+              ctx.globalAlpha = passes[i][1];
+              ctx.lineWidth = passes[i][0];
+              ctx.beginPath(); ctx.arc(0, 0, r, a0, a1); ctx.stroke();
+            }
+          };
+          const proj = (r, phi) => {
+            const u = r * Math.cos(phi), v = r * Math.sin(phi);
+            return [u * cosT - v * K * sinT, u * sinT + v * K * cosT];
+          };
+          const eFade = (x0, x1) => Math.max(0, Math.min(1, Math.min(orb.vx1 - x1, x0 - orb.vx0) / 55));
+          const sats = (far) => {
+            for (let i = 0; i < orb.sats.length; i++) {
+              const s = orb.sats[i];
+              const phi = s.p0 - s.om * t;
+              const sn = Math.sin(phi);
+              if (far ? sn >= 0 : sn < 0) continue;
+              const pos = proj(s.r, phi), x = pos[0], y = pos[1];
+              s.sx = x; s.sy = y;
+              if (s.live) {
+                ctx.globalCompositeOperation = "lighter";
+                for (let k = 12; k >= 1; k--) {
+                  const a = proj(s.r, phi + 0.6 * (k - 1) / 12), b = proj(s.r, phi + 0.6 * k / 12);
+                  ctx.globalAlpha = Math.min(0.9, 0.55 * (1.06 - k / 12) * lightBoost);
+                  ctx.strokeStyle = "rgb(186,212,255)";
+                  ctx.lineWidth = 0.7 + 2.2 * (1 - k / 12);
+                  ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+                }
+                const tw = 0.82 + 0.18 * Math.sin(t * 2.2 + s.r);
+                const glow = [[9, 0.16, "rgb(150,190,255)"], [4.5, 0.4, "rgb(190,215,255)"], [2.1, 1, "rgb(248,251,255)"]];
+                for (let k = 0; k < glow.length; k++) {
+                  ctx.globalAlpha = Math.min(1, glow[k][1] * tw * lightBoost);
+                  ctx.fillStyle = glow[k][2];
+                  ctx.beginPath(); ctx.arc(x, y, glow[k][0], 0, 2 * Math.PI); ctx.fill();
+                }
+                if (orb.labels) {
+                  ctx.globalCompositeOperation = "source-over";
+                  ctx.font = "600 13px 'IBM Plex Mono', monospace";
+                  if (!s.lw) s.lw = ctx.measureText(s.label).width;
+                  s.la = eFade(x - 10, x + 13 + s.lw);
+                  if (s.la > 0) {
+                    ctx.globalAlpha = s.la;
+                    ctx.lineWidth = 4; ctx.lineJoin = "round";
+                    ctx.strokeStyle = "rgba(4,8,20,0.55)";
+                    ctx.strokeText(s.label, x + 13, y - 10);
+                    ctx.fillStyle = "rgb(232,240,255)";
+                    ctx.fillText(s.label, x + 13, y - 10);
+                  }
+                } else s.la = 0;
+              } else {
+                ctx.globalCompositeOperation = "source-over";
+                if (orb.labels) {
+                  ctx.font = "500 11.5px 'IBM Plex Mono', monospace";
+                  const w = ctx.measureText(s.label).width + 20, h2 = 23, rx = x - w / 2, ry = y - h2 / 2;
+                  s.cw = w;
+                  s.la = eFade(x - w / 2, x + w / 2);
+                  if (s.la > 0) {
+                    ctx.globalAlpha = s.la;
+                    ctx.fillStyle = orb.dark ? "rgba(13,19,36,0.78)" : "rgba(9,14,32,0.85)";
+                    ctx.strokeStyle = orb.dark ? "rgba(134,152,196,0.42)" : "rgba(150,168,212,0.5)";
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    if (ctx.roundRect) ctx.roundRect(rx, ry, w, h2, 11.5); else ctx.rect(rx, ry, w, h2);
+                    ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = orb.dark ? "rgb(140,155,193)" : "rgb(164,178,214)";
+                    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                    ctx.fillText(s.label, x, y + 0.5);
+                    ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+                  }
+                } else {
+                  s.la = 0;
+                  ctx.globalAlpha = 1;
+                  ctx.strokeStyle = orb.dark ? "rgba(150,166,206,0.8)" : "rgba(52,66,108,0.75)";
+                  ctx.lineWidth = 1.4;
+                  ctx.beginPath(); ctx.arc(x, y, 3.2, 0, 2 * Math.PI); ctx.stroke();
+                }
+              }
+            }
+            ctx.globalCompositeOperation = "lighter";
+            ctx.globalAlpha = 1;
+          };
+          half(true);
+          sats(true);
+          rimHalf(Math.PI, 2 * Math.PI);
+          ring(RH + 15, 1.08 * Math.PI, 1.92 * Math.PI, [[16, 0.07], [8, 0.13], [3.4, 0.28], [1.6, 0.55]], grads.photon);
+          ring(RH + 9, 0.15 * Math.PI, 0.85 * Math.PI, [[10, 0.04], [4, 0.09], [1.6, 0.2]], grads.photon);
+          ctx.globalCompositeOperation = "source-over";
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = grads.shadow;
+          ctx.beginPath(); ctx.arc(0, 0, RH + 2.5, 0, 2 * Math.PI); ctx.fill();
+          ctx.globalCompositeOperation = "lighter";
+          ring(RH + 2, 0, 2 * Math.PI, [[7, 0.08], [3, 0.22], [1.3, 0.6]], grads.photon);
+          rimHalf(0, Math.PI);
+          half(false);
+          sats(false);
+          ctx.globalCompositeOperation = "source-over";
+          ctx.globalAlpha = 1;
+          ctx.restore();
+        };
+
+        const orbitSync = () => {
+          const orb = _orb;
+          if (!orb) return;
+          const run = orb.on && orb.visible && !orb.reduce;
+          if (run && !orb.raf) {
+            orb.last = 0;
+            const step = (ts) => {
+              orb.raf = 0;
+              const dt = orb.last ? Math.min((ts - orb.last) / 1000, 0.1) : 0.016;
+              orb.last = ts;
+              orb.t += dt;
+              renderOrbit();
+              if (orb.mx != null) orbitHover();
+              if (_orb === orb && orb.on && orb.visible && !orb.reduce) orb.raf = requestAnimationFrame(step);
+            };
+            orb.raf = requestAnimationFrame(step);
+          } else if (!run) {
+            if (orb.raf) { cancelAnimationFrame(orb.raf); orb.raf = 0; }
+            renderOrbit();
+          }
+        };
+
+        const orbitHover = () => {
+          const orb = _orb;
+          if (!orb || !orb.tip) return;
+          let hit = null;
+          if (orb.mx != null && orb.labels) {
+            for (let i = 0; i < orb.sats.length; i++) {
+              const s = orb.sats[i];
+              if (s.sx == null || !(s.la > 0.35)) continue;
+              const dx = orb.mx - s.sx, dy = orb.my - s.sy;
+              const inBody = dx * dx + dy * dy < 400;
+              const inLabel = s.live
+                ? (dx > 6 && dx < 19 + (s.lw || 40) && dy > -28 && dy < 8)
+                : (Math.abs(dx) < (s.cw || 34) / 2 + 6 && Math.abs(dy) < 17);
+              if (inBody || inLabel) { hit = s; break; }
+            }
+          }
+          if (hit !== orb.hover) {
+            orb.hover = hit;
+            orb.canvas.style.cursor = hit ? "pointer" : "";
+          }
+          orbitTip();
+        };
+
+        const orbitTip = () => {
+          const orb = _orb;
+          if (!orb || !orb.tip) return;
+          const s = orb.hover, tip = orb.tip;
+          if (!s) { tip.style.opacity = "0"; tip.style.visibility = "hidden"; return; }
+          tip.children[0].textContent = s.name;
+          tip.children[1].textContent = s.sub;
+          tip.children[1].style.color = s.live ? "#57d183" : "#9aa7ba";
+          const cr = orb.canvas.getBoundingClientRect();
+          const pr = orb.canvas.parentElement.getBoundingClientRect();
+          const sc = cr.width / orb.g.DW;
+          let px = cr.left - pr.left + (orb.g.CX + s.sx) * sc;
+          const py = cr.top - pr.top + (orb.g.CY + s.sy) * sc - 14;
+          tip.style.visibility = "visible"; tip.style.opacity = "1";
+          const hw = tip.offsetWidth / 2;
+          px = Math.max(-pr.left + hw + 8, Math.min(px, window.innerWidth - pr.left - hw - 8));
+          tip.style.left = px + "px";
+          tip.style.top = py + "px";
+        };
+
+        const teardownOrbit = () => {
+          const orb = _orb;
+          if (!orb) return;
+          if (orb.raf) cancelAnimationFrame(orb.raf);
+          if (orb.ro) orb.ro.disconnect();
+          if (orb.io) orb.io.disconnect();
+          if (orb.mq && orb.mq.removeEventListener) orb.mq.removeEventListener("change", orb.onMq);
+          if (orb.onWin) window.removeEventListener("resize", orb.onWin);
+          if (orb.onMove) {
+            orb.canvas.removeEventListener("mousemove", orb.onMove);
+            orb.canvas.removeEventListener("mouseleave", orb.onLeave);
+            orb.canvas.removeEventListener("click", orb.onTap);
+          }
+          if (orb.tip && orb.tip.parentElement) orb.tip.parentElement.removeChild(orb.tip);
+          _orb = null;
+        };
+
+        KS.orbitSync = orbitSync;
+        initOrbit();
+
+        /* ---- reveal ---- */
+        let _io = null;
+        const setupReveal = () => {
+          if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+          if (!("IntersectionObserver" in window)) return;
+          const els = Array.from(document.querySelectorAll("[data-reveal]"));
+          const io = new IntersectionObserver((entries) => {
+            entries.forEach((e) => {
+              if (e.isIntersecting) {
+                e.target.style.opacity = "1";
+                e.target.style.transform = "none";
+                io.unobserve(e.target);
+              }
+            });
+          }, { threshold: 0.12, rootMargin: "0px 0px -6% 0px" });
+          els.forEach((el) => {
+            if (el.getBoundingClientRect().top < window.innerHeight * 0.9) return;
+            el.style.opacity = "0";
+            el.style.transform = "translateY(18px)";
+            el.style.transition = "opacity 0.65s ease, transform 0.65s ease";
+            io.observe(el);
+          });
+          _io = io;
+        };
+
+        /* ---- lightbox ---- */
+        const lb = $("#ks-lb"), lbImg = $("#lb-img");
+        let shots = [], shotI = 0, lbY = 0, lastShotBtn = null;
+        const lbRender = () => {
+          const sh = shots[shotI];
+          lbImg.src = sh.src; lbImg.alt = sh.alt;
+          lbImg.style.animation = "none"; void lbImg.offsetWidth; lbImg.style.animation = "";
+          $("#lb-title").textContent = sh.title;
+          $("#lb-count").textContent = " " + (shotI + 1) + " / " + shots.length;
+          $("#lb-desc").textContent = sh.desc;
+        };
+        const lbGo = (d) => {
+          if (lb.hidden || !shots.length) return;
+          shotI = (shotI + d + shots.length) % shots.length;
+          lbRender();
+        };
+        const openShot = (btn) => {
+          lastShotBtn = btn;
+          const cards = $$("[data-shot]");
+          shots = cards.map((c) => {
+            const img = $$("img", c).find((el) => getComputedStyle(el).display !== "none");
+            const p = c.parentElement ? c.parentElement.querySelector("p") : null;
+            const bEl = p ? p.querySelector("b") : null;
+            const title = bEl ? bEl.textContent.trim() : "";
+            const full = p ? p.textContent.trim() : "";
+            return { src: img ? (img.currentSrc || img.src) : "",
+                     alt: img ? (img.alt || "Screenshot") : "", title,
+                     desc: title && full.indexOf(title) === 0 ? full.slice(title.length).trim() : full };
+          }).filter((sh) => sh.src);
+          if (!shots.length) return;
+          shotI = Math.max(0, cards.indexOf(btn));
+          lbRender();
+          lb.hidden = false;
+          /* freeze <html>, not <body>: fixing the body de-sticks the header and drops
+             the scrollbar, reflowing the page behind the fading overlay */
+          lbY = window.scrollY;
+          const gutter = window.innerWidth - document.documentElement.clientWidth;
+          document.documentElement.style.overflowY = "hidden";
+          if (gutter > 0) document.body.style.paddingRight = gutter + "px";
+          requestAnimationFrame(() => $("#ks-lb-close").focus({ preventScroll: true }));
+        };
+        const closeShot = () => {
+          lb.hidden = true;
+          document.documentElement.style.overflowY = "";
+          document.body.style.paddingRight = "";
+          window.scrollTo({ top: lbY, behavior: "instant" });
+          if (lastShotBtn) lastShotBtn.focus({ preventScroll: true });
+        };
+        $$("[data-shot]").forEach((c) => c.addEventListener("click", () => openShot(c)));
+        lb.addEventListener("click", closeShot);
+        $(".lb-body").addEventListener("click", (e) => e.stopPropagation());
+        $("#lb-prev").addEventListener("click", (e) => { e.stopPropagation(); lbGo(-1); });
+        $("#lb-next").addEventListener("click", (e) => { e.stopPropagation(); lbGo(1); });
+        $("#ks-lb-close").addEventListener("click", (e) => { e.stopPropagation(); closeShot(); });
+        document.addEventListener("keydown", (e) => {
+          if (lb.hidden) return;
+          if (e.key === "Escape") closeShot();
+          else if (e.key === "ArrowRight") lbGo(1);
+          else if (e.key === "ArrowLeft") lbGo(-1);
+        });
+        let x0 = null;
+        lb.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+        lb.addEventListener("touchend", (e) => {
+          if (x0 == null) return;
+          const dx = e.changedTouches[0].clientX - x0; x0 = null;
+          if (Math.abs(dx) > 48) lbGo(dx < 0 ? 1 : -1);
+        }, { passive: true });
+
+        setupReveal();
       })();
     </script>
   </body>

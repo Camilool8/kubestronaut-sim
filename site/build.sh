@@ -5,7 +5,6 @@ set -eu
 here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 repo=$(dirname "$here")
 
-TOKENS_SRC="$repo/ui/src/styles/tokens.css"
 FAVICON_SRC="$repo/ui/public/favicon.svg"
 FONT_SRC="$repo/ui/node_modules/@fontsource"
 
@@ -19,24 +18,12 @@ ibm-plex-sans/files/ibm-plex-sans-latin-600-normal.woff2
 ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2
 ibm-plex-mono/files/ibm-plex-mono-latin-600-normal.woff2"
 
-banner() {
-  cat <<EOF
-/* GENERATED FILE - DO NOT EDIT.
-   Verbatim copy of $1, written by site/build.sh.
-   Edit the source and re-run the script; \`site/build.sh --check\` fails
-   the moment these two disagree. */
-
-EOF
-}
-
 generate() {
   out=$1
 
-  [ -f "$TOKENS_SRC" ] || { echo "build.sh: missing $TOKENS_SRC" >&2; exit 1; }
   [ -f "$FAVICON_SRC" ] || { echo "build.sh: missing $FAVICON_SRC" >&2; exit 1; }
 
   mkdir -p "$out/fonts"
-  { banner "ui/src/styles/tokens.css"; cat "$TOKENS_SRC"; } > "$out/tokens.css"
 
   sed -n '/<svg/,$p' "$FAVICON_SRC" > "$out/favicon.svg"
 
@@ -75,78 +62,55 @@ fail = []
 if not banks:
     fail.append("found no listable bank under banks/ -- the parse is wrong")
 
+# The totals line: `All <b class="qtotal">141</b> questions`
 total = sum(pool for _, pool, _ in banks)
-block = next(
-    (b for b in re.findall(r'<li class="stat">.*?</li>', page, re.S)
-     if "Questions written" in b),
-    None,
-)
-if block is None:
-    fail.append('no <li class="stat"> block labelled "Questions written"')
-else:
-    shown = re.search(r'<p class="stat-figure">\s*(\d+)', block)
-    if shown is None:
-        fail.append("the questions stat has no figure")
-    elif int(shown.group(1)) != total:
-        fail.append(f"questions stat says {shown.group(1)}, banks hold {total}")
-    for name, pool, _ in banks:
-        if str(pool) not in block:
-            fail.append(f"{name} has {pool} questions, absent from the stat note")
+m = re.search(r'<b class="qtotal">(\d+)</b>', page)
+if m is None:
+    fail.append('no <b class="qtotal"> on the page -- the totals line has moved or gone')
+elif int(m.group(1)) != total:
+    fail.append(f"the page says {m.group(1)} questions, banks hold {total}")
 
-# A bank's draw is published in exactly one place: its exam card's
-# "Drawn / pool" stat, `<dd>17 <span class="exam-stat-of">/ 44</span></dd>`,
-# with the pool repeated in the card's prose as "44-task pool". Searching the
-# whole document with re.S instead paired a `17` inside the Tux logo's path
-# data with a `44` 10,550 characters later while the visible card said 26. So
-# the search is scoped to the card that carries the stat, and the match has to
-# be short enough to be that one stat rather than a span of unrelated markup.
-SPAN_LIMIT = 40  # a real "17 <span class="exam-stat-of">/ 44" match is 34
-
-# Split on the card opener: a card holds nested <li> and <ul>, so it cannot be
-# matched by a non-greedy close. Each slice ends at the first </ul> after it,
-# which is its own domain list, or at the grid's for a card without one.
-cards = [c.split("</ul>")[0] for c in page.split('<li class="exam-card')[1:]]
-stats = []
-for card in cards:
-    for dd in re.findall(r"<dd\b[^>]*>.*?</dd>", card, re.S):
-        if 'class="exam-stat-of"' in dd:
-            stats.append((card, dd))
-
+# One card per sittable bank, keyed by data-bank; its draw is one
+# `<span class="fact fact-draw">17 of 44 drawn</span>`.
+cards = dict(re.findall(
+    r'<li(?=[^>]*\bclass="[^"]*\bexam-card\b[^"]*")[^>]*\bdata-bank="([^"]+)"[^>]*>(.*?)</li>', page, re.S))
 if not cards:
     fail.append('no <li class="exam-card"> on the page -- the parse is wrong')
-elif not stats:
-    fail.append('no exam card carries a "exam-stat-of" stat -- the parse is wrong')
 
 for name, pool, drawn in banks:
-    if drawn is None:
+    card = cards.get(name)
+    if card is None:
+        fail.append(f'no exam card carries data-bank="{name}"')
         continue
-    if not any(
-        len(m.group(0)) <= SPAN_LIMIT
-        for m in (re.search(rf"\b{drawn}\b.*?\b{pool}\b", dd, re.S) for _, dd in stats)
-        if m is not None
-    ):
-        shown = "; ".join(
-            " ".join(re.findall(r"\d+", re.sub(r"<[^>]*>", " ", dd))) or "no figures"
-            for _, dd in stats
-        )
-        fail.append(
-            f"{name} draws {drawn} of {pool}, advertised by no exam card's "
-            f'"Drawn / pool" stat (the page shows: {shown or "nothing"})'
-        )
-
-# The card's prose repeats the pool. It is the same figure, so it goes stale
-# the same way -- and it is the sentence a reader believes.
-for card, dd in stats:
-    of = re.search(r'<span class="exam-stat-of">\s*/\s*(\d+)', dd)
-    if of is None:
-        fail.append("an exam-stat-of span carries no pool figure")
-        continue
+    card = re.sub(r"\s+", " ", card)
+    if drawn is not None:
+        m = re.search(r'class="fact fact-draw">(?:<[^>]*>|[^<])*?(\d+) of (\d+) drawn', card)
+        if m is None:
+            fail.append(f"the {name} card has no 'N of M drawn' fact")
+        elif (int(m.group(1)), int(m.group(2))) != (drawn, pool):
+            fail.append(f"{name} draws {drawn} of {pool}, the card says "
+                        f"{m.group(1)} of {m.group(2)}")
+    # Prose that repeats the pool goes stale the same way the stat does.
     for said in re.findall(r"(\d+)[-\s](?:task|question)s? pool", card):
-        if said != of.group(1):
-            fail.append(
-                f"an exam card's stat says a pool of {of.group(1)} while its "
-                f"description says {said}"
-            )
+        if int(said) != pool:
+            fail.append(f"the {name} card's prose says a {said}-question pool, "
+                        f"the bank holds {pool}")
+
+# The orbit caption's `2 of 5 banks live`: live == sittable banks,
+# the total == live + the coming-soon cert chips.
+chips = len(re.findall(r'<span class="cert-chip" data-cert="', page))
+m = re.search(r'<span class="banks-live">(\d+) of (\d+)</span> banks live', page)
+if m is None:
+    fail.append('no <span class="banks-live"> caption -- the badge has moved or gone')
+else:
+    if int(m.group(1)) != len(banks):
+        fail.append(f"the caption says {m.group(1)} banks live, "
+                    f"banks/ holds {len(banks)} listable")
+    if chips == 0:
+        fail.append("no cert-chip on the page -- the coming-soon parse is wrong")
+    elif int(m.group(2)) != len(banks) + chips:
+        fail.append(f"the caption says {m.group(2)} banks total, the page shows "
+                    f"{len(banks)} live + {chips} coming")
 
 for line in fail:
     print(f"build.sh: {line}", file=sys.stderr)
@@ -168,7 +132,7 @@ if not src.exists():
 
 want = (1200, 630)
 if not png.exists():
-    fail.append("site/og.png is missing, but index.html points og:image at it")
+    fail.append("site/og.png is missing, but index.html points og:image at it -- run site/og.sh")
 else:
     head = png.read_bytes()[:24]
     if head[:8] != b"\x89PNG\r\n\x1a\n" or head[12:16] != b"IHDR":
@@ -380,12 +344,10 @@ if [ "${1:-}" = "--check" ]; then
   check_og || status=1
   check_shots || status=1
   check_cert_marks || status=1
-  for f in tokens.css favicon.svg; do
-    if ! diff -q "$tmp/$f" "$here/$f" >/dev/null 2>&1; then
-      echo "build.sh: site/$f is out of date - run site/build.sh" >&2
-      status=1
-    fi
-  done
+  if ! diff -q "$tmp/favicon.svg" "$here/favicon.svg" >/dev/null 2>&1; then
+    echo "build.sh: site/favicon.svg is out of date - run site/build.sh" >&2
+    status=1
+  fi
 
   if [ -d "$FONT_SRC" ]; then
     for f in $FONT_FILES; do
@@ -409,4 +371,4 @@ if [ "${1:-}" = "--check" ]; then
 fi
 
 generate "$here"
-echo "build.sh: wrote site/tokens.css, site/favicon.svg and site/fonts/."
+echo "build.sh: wrote site/favicon.svg and site/fonts/."

@@ -44,14 +44,6 @@ def minutes(text):
     return int(m.group(1) or 0) * 60 + int(m.group(2) or 0)
 
 
-def clock(mins):
-    """The site's exam-card spelling of a duration: 120 -> 2h, 90 -> 1h 30m."""
-    h, r = divmod(mins, 60)
-    if not h:
-        return f"{r}m"
-    return f"{h}h" if not r else f"{h}h {r}m"
-
-
 UNITS = ("zero one two three four five six seven eight nine ten eleven twelve "
          "thirteen fourteen fifteen sixteen seventeen eighteen nineteen").split()
 TENS = "  twenty thirty forty fifty sixty seventy eighty ninety".split(" ")
@@ -168,78 +160,63 @@ for got in re.findall(r"Kubernetes (\d+\.\d+)", readme):
              f"(banks declare {sorted(pinned) or 'nothing'})")
 
 # ----------------------------------------------------------- site/index.html
-# The landing page's own figures. site/build.sh --check already pins the
-# question totals and the drawn/pool stat; these are the ones it does not
-# reach — the duration, the passing score, the domain weights, and the two
-# clocks the mode table quotes per certification.
+# The landing page's figures this file owns: the duration and passing-score
+# chips and the Kubernetes minor in the prose. site/build.sh --check pins the
+# totals and the drawn/pool stat. The page no longer publishes domain weights
+# or a per-mode clock table, so there is nothing of those to hold.
+def site_clock(mins):
+    """The redesign's chip spelling: 120 -> 2h, 90 -> 90m."""
+    return f"{mins // 60}h" if mins % 60 == 0 and mins >= 120 else f"{mins}m"
+
+
 page = read("site/index.html")
-flat = re.sub(r"\s+", " ", page)
-cards = [c.split("</ul>")[0] for c in page.split('<li class="exam-card')[1:]]
+cards = dict(re.findall(
+    r'<li(?=[^>]*\bclass="[^"]*\bexam-card\b[^"]*")[^>]*\bdata-bank="([^"]+)"[^>]*>(.*?)</li>', page, re.S))
 if not cards:
     fail('site/index.html: no <li class="exam-card"> on the page — the parse '
          "is wrong")
 
 for bank in banks:
-    mine = [c for c in cards if f"<h4>{bank['title']}</h4>" in re.sub(r"\s+", " ", c)]
-    if len(mine) != 1:
-        fail(f"site/index.html: {len(mine)} exam cards are headed "
-             f"{bank['title']!r}, want exactly 1")
+    raw = cards.get(bank["id"])
+    if raw is None:
+        fail(f'site/index.html: no exam card carries data-bank="{bank["id"]}"')
         continue
-    card = re.sub(r"\s+", " ", mine[0])
+    card = re.sub(r"\s+", " ", raw)
 
     compared += 1
-    if f"<dd>{clock(bank['duration'])}</dd>" not in card:
-        shown = re.findall(r"<dt>Duration</dt> ?<dd>(.*?)</dd>", card)
-        fail(f"site/index.html: the {bank['title']} card shows a duration of "
-             f"{shown or ['nothing']}, exam.yaml says {clock(bank['duration'])!r}")
+    want = site_clock(bank["duration"])
+    m = re.search(r'class="fact fact-clock">(?:<[^>]*>|[^<])*?(\d+h(?: \d+m)?|\d+m)<', card)
+    if m is None:
+        fail(f"site/index.html: the {bank['id']} card has no duration chip")
+    elif m.group(1) != want:
+        fail(f"site/index.html: the {bank['id']} card shows {m.group(1)!r}, "
+             f"exam.yaml says {want!r}")
 
     compared += 1
-    if f"<dt>To pass</dt><dd>{bank['passing']}%</dd>" not in card.replace("> <", "><"):
-        shown = re.findall(r"<dt>To pass</dt> ?<dd>(.*?)</dd>", card)
-        fail(f"site/index.html: the {bank['title']} card says {shown or ['nothing']} "
+    want_pass = str(bank["passing"])
+    m = re.search(r'class="fact fact-pass">(?:<[^>]*>|[^<])*?(\d+)% to pass', card)
+    if m is None:
+        fail(f"site/index.html: the {bank['id']} card has no passing-score chip")
+    elif m.group(1) != want_pass:
+        fail(f"site/index.html: the {bank['id']} card says {m.group(1)}% "
              f"to pass, exam.yaml says {bank['passing']}%")
 
-    # The Kubernetes minor, written out in the card's prose. A hands-on card
-    # has to state one — it is describing a cluster — so a card that quietly
-    # stopped naming a version is a failure, not a skip. tests/check-k8s-pins.sh
-    # holds the machine-readable pins to each other; this holds the prose to
-    # them, because that gate deliberately does not read English.
+    # Any other "% to pass" figure in the card's prose must agree with the
+    # chip too — a whole-card substring search let a second, contradictory
+    # mention slip past.
+    for got in re.findall(r"(\d+)% to pass", card):
+        check("site/index.html", want_pass, got,
+              f"the {bank['id']} card's passing score")
+
+    # A hands-on card describes a cluster, so it must name the pinned minor.
     stated = re.findall(r"Kubernetes (\d+\.\d+)", card)
     if bank["examType"] == "hands-on" and not stated:
-        fail(f"site/index.html: the {bank['title']} card describes a cluster "
+        fail(f"site/index.html: the {bank['id']} card describes a cluster "
              f"without naming a Kubernetes version, so nothing holds the page "
              f"to exam.yaml's {bank['k8s']}")
     for got in stated:
         check("site/index.html", bank["k8s"], got,
-              f"the {bank['title']} card's Kubernetes version")
-
-    if not bank["domains"]:
-        fail(f"{bank['id']}: exam.yaml declares no domainWeights, so the "
-             f"weights the landing page prints cannot be checked")
-    for domain, weight in bank["domains"].items():
-        compared += 1
-        if f"{domain} <b>{weight}%</b>" not in card:
-            got = re.findall(rf"{re.escape(domain)} <b>(\d+)%</b>", card)
-            fail(f"site/index.html: the {bank['title']} card weights "
-                 f"{domain!r} at {got or ['nothing']}, exam.yaml says {weight}%")
-
-modes = re.search(r'<table class="mode-table">.*?</table>', page, re.S)
-if modes is None:
-    fail('site/index.html: no <table class="mode-table"> — the mode table this '
-         "gate checks has moved or gone")
-else:
-    table = re.sub(r"\s+", " ", modes.group(0))
-    for bank in banks:
-        cert = bank["certification"]
-        if not cert or cert == "NONE":
-            continue
-        for mins, what in ((bank["speed"], "Mastery"), (bank["duration"], "Exam")):
-            compared += 1
-            if f"{mins} min {cert}" not in table:
-                got = re.findall(rf"(\d+) min {re.escape(cert)}", table)
-                fail(f"site/index.html: the mode table quotes {got or ['no']} "
-                     f"minute clocks for {cert}, and none of them is the "
-                     f"{what} clock of {mins} min")
+              f"the {bank['id']} card's Kubernetes version")
 
 # ---------------------------------------------------------------- docs/api.md
 # The samples are parsed rather than grepped, and each figure is read off
