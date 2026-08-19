@@ -1,8 +1,9 @@
 # Installing
 
-The simulator is eight containers and a two-node Kubernetes cluster. What
-differs by operating system is the shell that runs the launcher, the way
-memory reaches Docker, and whether `python3` is needed at all.
+The simulator is eight containers and a Kubernetes cluster sized by the
+exam you pick — two nodes for CKAD, five for CKA. What differs by
+operating system is the shell that runs the launcher, the way memory
+reaches Docker, and whether `python3` is needed at all.
 
 ## Prerequisites
 
@@ -10,7 +11,7 @@ memory reaches Docker, and whether `python3` is needed at all.
 |---|---|
 | Docker Engine or Docker Desktop | Every service is a container |
 | Docker Compose v2 (`docker compose`) | The stack is one compose project |
-| ~9GB RAM available to Docker | The desktop plus a two-node cluster |
+| ~9GB RAM available to Docker | The desktop plus a two-node cluster. **The CKA bank wants ~12GB**: its five-node cluster, plus about 1GB per aux-cluster question drawn — worst case ~15-16GB |
 | ~25GB free disk | The images alone are ~10GB |
 | cgroup v2 | The instances run with `cgroup: host` |
 | `python3` | `./sim up` and `./sim reset` read JSON with it. **Not needed by `.\sim.ps1`**, which parses JSON natively |
@@ -59,6 +60,9 @@ WSL2 allocates itself a fraction of your RAM, which is often under the
 [wsl2]
 memory=10GB
 ```
+
+Sitting the CKA bank? Its five-node cluster plus aux clusters wants
+~12GB free, worst case ~15-16GB — set `memory=13GB` or more instead.
 
 Then apply it:
 
@@ -110,7 +114,9 @@ Docker Desktop, and `python3` for the launcher.
 
 ### 1. Docker Desktop
 
-In **Settings → Resources**, raise the memory limit to at least 9GB.
+In **Settings → Resources**, raise the memory limit to at least 9GB —
+12GB or more if you plan to sit the CKA bank, whose five-node cluster
+plus aux clusters can want ~15-16GB at worst.
 
 ### 2. python3
 

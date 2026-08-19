@@ -17,7 +17,7 @@
     <meta property="og:title" content="kubestronaut-sim" />
     <meta
       property="og:description"
-      content="A timed sitting, a real Linux desktop, and a score graded on what your cluster actually does — on your own machine, no account. CKAD and KCNA have full banks today."
+      content="A timed sitting, a real Linux desktop, and a score graded on what your cluster actually does — on your own machine, no account. CKAD, CKA and KCNA have full banks today."
     />
     <meta property="og:url" content="https://camilool8.github.io/kubestronaut-sim/" />
     <meta
@@ -29,7 +29,7 @@
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="kubestronaut-sim. Rehearse the Kubernetes exams on a real cluster. Five tilted orbits circle the wordmark — CKAD and KCNA lit and live, CKA, KCSA and CKS still dark and coming soon."
+      content="kubestronaut-sim. Rehearse the Kubernetes exams on a real cluster. Five tilted orbits circle the wordmark — CKAD, CKA and KCNA lit and live, KCSA and CKS still dark and coming soon."
     />
     <meta name="twitter:card" content="summary_large_image" />
 
@@ -110,7 +110,7 @@
           <div class="hero-copy">
             <div class="hero-badge">OPEN SOURCE · APACHE-2.0 · NO ACCOUNT, NO SERVICE</div>
             <h1 class="hero-title">Rehearse the Kubernetes exams on a real cluster.</h1>
-            <p class="hero-lede">One command builds the exam environment on your own machine — a timed sitting, a real Linux desktop, and a score graded on what your cluster actually does. CKAD and KCNA have full banks today.</p>
+            <p class="hero-lede">One command builds the exam environment on your own machine — a timed sitting, a real Linux desktop, and a score graded on what your cluster actually does. CKAD, CKA and KCNA have full banks today.</p>
             <div class="hero-ctas">
               <a class="btn-primary" href="https://github.com/Camilool8/kubestronaut-sim">Get it on GitHub</a>
               <a class="btn-secondary" href="https://github.com/Camilool8/kubestronaut-sim/tree/main/docs">Read the docs</a>
@@ -133,10 +133,10 @@
                 <div class="term-line"><span class="t-prompt">$ </span><span class="t-cmd" id="cmd-open">xdg-open </span><span class="t-url">http://localhost:8080</span><span class="t-cursor" aria-hidden="true"></span></div>
               </div>
             </div>
-            <div class="hero-reqs">Docker + ~9GB free RAM · Windows, macOS, Linux · nothing is built until you pick an exam</div>
+            <div class="hero-reqs">Docker + ~9GB free RAM (~12GB for the CKA bank) · Windows, macOS, Linux · nothing is built until you pick an exam</div>
           </div>
         </div>
-        <div class="orbit-caption">KCNA + CKAD in flight · <span class="banks-live">2 of 5</span> banks live</div>
+        <div class="orbit-caption">KCNA + CKAD + CKA in flight · <span class="banks-live">3 of 5</span> banks live</div>
       </section>
 
       <section id="sitting" class="section-sitting">
@@ -220,7 +220,7 @@ spec:
         <div class="exams-inner">
           <div data-reveal="1" class="exams-head">
             <h2 class="exams-title">An honest draw, every attempt</h2>
-            <div class="exams-total">All <b class="qtotal">141</b> questions original — no exam dumps. Banks are CC BY-SA 4.0.</div>
+            <div class="exams-total">All <b class="qtotal">167</b> questions original — no exam dumps. Banks are CC BY-SA 4.0.</div>
           </div>
           <ul class="exam-grid">
             <li data-reveal="1" class="exam-card" data-bank="ckad-mock-01">
@@ -234,6 +234,18 @@ spec:
                 <span class="fact fact-pass"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>66% to pass</span>
               </div>
               <p class="exam-card-desc">Hands-on, on a two-node Kubernetes 1.35 cluster. Each draw is stratified to the published domain weights and mixed across quick, core and deep tasks — so a sitting is never a wall of long multi-step questions.</p>
+            </li>
+            <li data-reveal="1" class="exam-card" data-bank="cka-mock-01">
+              <div class="exam-card-head">
+                <div class="exam-card-id"><svg class="cert-mark" data-cert="CKA" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="11.6" r="3.1" fill="currentColor" stroke="none"/><circle cx="12" cy="3.7" r="2.2"/><circle cx="19.1" cy="17.6" r="2.2"/><circle cx="4.9" cy="17.6" r="2.2"/><path d="M12 8.5V5.9M14.6 13.4l2.6 2.5M9.4 13.4l-2.6 2.5"/></svg><span class="exam-card-name">CKA</span></div>
+                <div class="exam-card-live">LIVE</div>
+              </div>
+              <div class="exam-facts">
+                <span class="fact fact-clock"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>2h</span>
+                <span class="fact fact-draw"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"></path><path d="M9 7h6M9 11h6M9 15h4"></path></svg>16 of 26 drawn</span>
+                <span class="fact fact-pass"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>66% to pass</span>
+              </div>
+              <p class="exam-card-desc">Hands-on, on a five-node Kubernetes 1.35 cluster with root ssh to every node — control plane included. Disruptive tasks (scheduler repair, CNI install, kubeadm upgrade, etcd restore) get their own auxiliary clusters, and Gateway API routes are graded through a real controller.</p>
             </li>
             <li data-reveal="1" class="exam-card" data-bank="kcna-mock">
               <div class="exam-card-head">
@@ -250,7 +262,6 @@ spec:
             <li data-reveal="1" class="exam-soon">
               <div class="exam-soon-eyebrow">COMPLETING THE PATH</div>
               <div class="exam-soon-chips">
-                <span class="cert-chip" data-cert="CKA"><svg class="cert-mark" data-cert="CKA" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="11.6" r="3.1" fill="currentColor" stroke="none"/><circle cx="12" cy="3.7" r="2.2"/><circle cx="19.1" cy="17.6" r="2.2"/><circle cx="4.9" cy="17.6" r="2.2"/><path d="M12 8.5V5.9M14.6 13.4l2.6 2.5M9.4 13.4l-2.6 2.5"/></svg>CKA</span>
                 <span class="cert-chip" data-cert="KCSA"><svg class="cert-mark" data-cert="KCSA" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4.4" y="10.6" width="15.2" height="10.2" rx="2.4"/><path d="M7.9 10.6V7.9a4.1 4.1 0 0 1 8.2 0v2.7"/><circle cx="12" cy="15.7" r="1.7" fill="currentColor" stroke="none"/></svg>KCSA</span>
                 <span class="cert-chip" data-cert="CKS"><svg class="cert-mark" data-cert="CKS" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 2.9l7.4 2.8v6c0 4.7-3.2 7.1-7.4 8.4-4.2-1.3-7.4-3.7-7.4-8.4v-6z"/><path d="M9.1 11.9l2 2 3.8-3.9"/></svg>CKS</span>
               </div>
@@ -444,7 +455,7 @@ spec:
           orb.sats = [
             { label: "CKAD", live: true, r: 252, p0: 8.54, name: "Certified Kubernetes Application Developer", sub: "Bank live · hands-on · 2h · 66% to pass" },
             { label: "KCNA", live: true, r: 344, p0: 4.61, name: "Kubernetes and Cloud Native Associate", sub: "Bank live · multiple-choice · 90m · 75% to pass" },
-            { label: "CKA", live: false, r: 436, p0: 7.23, name: "Certified Kubernetes Administrator", sub: "In the catalog · bank not sittable yet" },
+            { label: "CKA", live: true, r: 436, p0: 7.23, name: "Certified Kubernetes Administrator", sub: "Bank live · hands-on · 2h · 66% to pass" },
             { label: "KCSA", live: false, r: 478, p0: 7.64, name: "Kubernetes and Cloud Native Security Associate", sub: "In the catalog · bank not sittable yet" },
             { label: "CKS", live: false, r: 520, p0: 3.37, name: "Certified Kubernetes Security Specialist", sub: "In the catalog · bank not sittable yet" }
           ];

@@ -241,10 +241,10 @@ question's weight's share of the bank's clock, which is what a bank
 setting no `spec.questions[].targetSeconds` gets. It is omitted rather
 than sent as `false`, so it appears only on a derived figure.
 
-- The two shipped banks differ. `ckad-mock-01` authors one on every
-  question, because `spec.difficultyMix` makes the tier a time band and
-  a band cannot be derived; `kcna-mock` sets none, so all 97 of its
-  figures are derived.
+- The shipped banks differ. `ckad-mock-01` and `cka-mock-01` author one
+  on every question, because `spec.difficultyMix` makes the tier a time
+  band and a band cannot be derived; `kcna-mock` sets none, so all 97 of
+  its figures are derived.
 - The flag exists because the two are different claims: an author's
   judgement of the work, versus arithmetic about weights. A display that
   cannot tell them apart states the second with the first's confidence.
@@ -514,16 +514,18 @@ the background (`facilitator/internal/api/api.go`).
 
 ### Preparing an attempt
 
-Only a **pooled hands-on bank** produces this, and no bank in this repo is
-one — every bank here takes the 200 path. It exists because such a bank's
-cluster is deliberately empty at boot: the draw decides what to seed, so
-seeding cannot happen until the draw has.
+Only a **pooled hands-on bank** produces this — which both hands-on
+banks in this repo now are: `ckad-mock-01` draws 17 of 44 and
+`cka-mock-01` draws 16 of 26, so every hands-on attempt here begins
+with a 202, and only an mcq bank takes the 200 path directly. It exists
+because a pooled bank's cluster is deliberately empty at boot: the draw
+decides what to seed, so seeding cannot happen until the draw has.
 
-Two reference implementations handle it, and both are exercised only by
-the branch being dormant: `startSession` plus the poller in
-`ui/src/App.tsx`, and `start_session` in `tests/smoke.sh`. A client that
-branches on the body's shape instead of the status code will pass every
-test in this repo and break on the first bank that pools.
+Two reference implementations handle it: `startSession` plus the poller
+in `ui/src/App.tsx`, and `start_session` in `tests/smoke.sh`. A client
+that branches on the body's shape instead of the status code reads the
+202 as a session and shows an attempt with a zero clock — see the
+warning below.
 
 The 202 body is a preparation, not a session:
 
@@ -1385,6 +1387,7 @@ The exam catalog the exam selector renders. Always 200.
   "active": "ckad-mock-01",
   "banks": [
     {"id": "ckad-mock-01", "title": "CKAD Mock Exam", "certification": "CKAD", "description": "Developer-track exercises...", "examType": "hands-on", "durationSeconds": 7200, "passingScore": 66, "kubernetesVersion": "1.35", "questionCount": 17, "poolCount": 44, "available": true},
+    {"id": "cka-mock-01", "title": "CKA Mock Exam", "certification": "CKA", "description": "Administrator-track exercises...", "examType": "hands-on", "durationSeconds": 7200, "passingScore": 66, "kubernetesVersion": "1.35", "questionCount": 16, "poolCount": 26, "available": true},
     {"id": "kcna-mock", "title": "KCNA Mock Exam", "certification": "KCNA", "description": "65 questions drawn each attempt...", "examType": "mcq", "durationSeconds": 5400, "passingScore": 75, "questionCount": 65, "poolCount": 97, "available": true},
     {"id": "cks-mock", "title": "CKS Mock Exam", "certification": "CKS", "examType": "hands-on", "available": false, "comingSoon": true, "note": "Requires security add-ons not in the kind environment yet"}
   ]
@@ -1397,7 +1400,7 @@ The exam catalog the exam selector renders. Always 200.
 | `poolCount` | How many the bank authors |
 
 - They differ only for a pooled bank, and the exam card prints them as a
-  pair (`65 / 97`) only when they do. A card reading `26 / 26` would
+  pair (`65 / 97`) only when they do. A card reading `12 / 12` would
   advertise a pool that is not one.
 - The facilitator knows both for the *active* bank, but the catalog is
   the only place that knows them for the others — and the exam selector
@@ -1519,6 +1522,21 @@ an error.
       "questionCount": 17,
       "poolCount": 44,
       "nodes": 2,
+      "available": true,
+      "kind": "practical"
+    },
+    {
+      "id": "cka-mock-01",
+      "title": "CKA Mock Exam",
+      "certification": "CKA",
+      "description": "Administrator-track exercises...",
+      "examType": "hands-on",
+      "durationSeconds": 7200,
+      "passingScore": 66,
+      "kubernetesVersion": "1.35",
+      "questionCount": 16,
+      "poolCount": 26,
+      "nodes": 5,
       "available": true,
       "kind": "practical"
     }

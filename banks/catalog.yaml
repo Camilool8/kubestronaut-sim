@@ -1,9 +1,4 @@
 comingSoon:
-  - id: cka-mock
-    title: CKA Mock Exam
-    certification: CKA
-    examType: hands-on
-    note: Administrator-track bank not written yet
   - id: kcsa-mock
     title: KCSA Mock Exam
     certification: KCSA
