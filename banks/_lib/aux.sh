@@ -65,7 +65,9 @@ _aux_import_node_tar() {
 # for it — no bank but CKA pays its load time.
 _aux_ensure_node_image() {
   local ref=$1 baked
-  if docker image inspect "$ref" >/dev/null 2>&1; then
+  # Label-guarded like start.sh's twin: the inner dockerd outlives image
+  # upgrades, and a same-tag pre-ssh image must lose to the baked tar.
+  if [ "$(docker image inspect -f '{{index .Config.Labels "sim.node-ssh"}}' "$ref" 2>/dev/null)" = "1" ]; then
     return 0
   fi
   baked=$(cat /opt/sim/aux-node-image 2>/dev/null || true)
@@ -74,7 +76,9 @@ _aux_ensure_node_image() {
     _aux_import_node_tar /opt/sim/images/_aux_node.tar "$ref"
     return 0
   fi
-  docker pull "$ref"
+  if ! docker image inspect "$ref" >/dev/null 2>&1; then
+    docker pull "$ref"
+  fi
 }
 
 # Is the image already in the cluster node's containerd store? Loading is the
@@ -172,7 +176,12 @@ aux_up() {
         ["kind: ClusterConfiguration\napiServer:\n  certSANs:\n    - \"k8s-env\"\n    - \"localhost\"\n    - \"127.0.0.1\"\n"])
     ' "$cfg"
     echo "creating the ${cluster} cluster"
-    kind create cluster --name "$cluster" --config "$cfg" --image "$image"
+    # --kubeconfig keeps kind from switching root's current-context to the new
+    # aux cluster: the seed job runs every drawn question's setup.sh in this
+    # shell environment sequentially, and a hijacked ambient context would make
+    # a later question seed into the wrong cluster.
+    kind create cluster --name "$cluster" --config "$cfg" --image "$image" \
+      --kubeconfig "/tmp/aux-${name}.kubeconfig"
     rm -f "$cfg"
   else
     # Warm path. kind lists clusters by container, running or not; after an

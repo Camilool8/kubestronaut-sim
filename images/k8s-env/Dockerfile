@@ -200,7 +200,8 @@ RUN if [ "$PRELOAD" = "full" ]; then \
                  (if (.config.User // "") != "" then "USER \(.config.User)" else empty end), \
                  (if (.config.StopSignal // "") != "" then "STOPSIGNAL \(.config.StopSignal)" else empty end), \
                  ((.config.Volumes // {}) | keys[] | "VOLUME \(.)")' \
-        > "$2" && grep -q '^ENTRYPOINT ' "$2"; \
+        > "$2" && grep -q '^ENTRYPOINT ' "$2" \
+        && printf 'LABEL sim.node-ssh=1\n' >> "$2"; \
       } && \
       mv /stage/_node.tar /out/_node.tar && \
       mv /stage/_aux_node.tar /out/_aux_node.tar && \

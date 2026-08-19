@@ -39,7 +39,15 @@ import_node_tar() {
   docker import "${args[@]}" "$tar" "$ref" >/dev/null
 }
 
-if [ -f /opt/sim/images/_node.tar ] && ! docker image inspect "${NODE_IMAGE%%@*}" >/dev/null 2>&1; then
+# The guard checks the sim.node-ssh label, not bare tag existence: the inner
+# dockerd's volume outlives image upgrades, so a pre-ssh install has the same
+# tag pointing at the pristine upstream image, and a tag-only guard would keep
+# it forever. Importing over the tag untags the stale one; the running cluster
+# still needs one reset/switch to rebuild its nodes from the new image.
+node_image_current() {
+  [ "$(docker image inspect -f '{{index .Config.Labels "sim.node-ssh"}}' "$1" 2>/dev/null)" = "1" ]
+}
+if [ -f /opt/sim/images/_node.tar ] && ! node_image_current "${NODE_IMAGE%%@*}"; then
   detail "loading the Kubernetes node image"
   import_node_tar /opt/sim/images/_node.tar "${NODE_IMAGE%%@*}"
 fi
