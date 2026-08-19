@@ -210,7 +210,7 @@ and, where files are produced, a `/opt/course/<n>/` path. ⚙ = needs M0 infrast
 | q23 | WaitForFirstConsumer | Storage | core | 8 | mensa | Create a no-provisioner StorageClass with `WaitForFirstConsumer`, a matching local PV, a PVC, and a Pod consuming it. Crits: SC fields, PVC Bound only via the Pod, mount path in Pod. |
 | q24 | Rescue the retained PV | Storage | deep | 7 | norma | A Released PV (Retain) holds data. Clear its claimRef, create a PVC that binds exactly it, remount into the Deployment. Crits: same PV re-Bound, data file still readable via exec, gate: PV not deleted/recreated. |
 | q25 | Dynamic provisioning | Storage | quick | 5 | crater | New StorageClass using the local-path provisioner with `reclaimPolicy: Retain`; PVC on it; mount into a Deployment. Crits: SC fields, PVC Bound + provisioned PV's reclaim policy, mount. |
-| q26 | etcd backup and restore ⚙ | Cluster | deep | 5 | — (aux-etcd) | `setup.sh` creates single-node `aux-etcd` with seeded objects. `ssh cka-aux-etcd`: `etcdctl snapshot save` (certs/endpoints), delete a seeded object, restore the snapshot to a new `--data-dir`, repoint the etcd static pod, apiserver recovers. Apiserver downtime mid-task is fine — it is the candidate's own cluster to break. Crits (aux kubeconfig, `--request-timeout`): snapshot file is a valid etcd snapshot, cluster healthy post-restore, the deleted object is back. Flagged in question.md as *legacy: removed from the Feb-2025 blueprint, kept for full-experience/killer.sh parity*. |
+| q26 | etcd backup and restore ⚙ | Cluster | deep | 5 | — (aux-etcd) | `setup.sh` creates single-node `aux-etcd` with seeded objects; `etcdctl`/`etcdutl` binaries are staged **on the node itself** (q13's staged-binaries pattern) because the restore happens while the apiserver is down, so `kubectl exec` into the etcd pod is not a reliable path. `ssh cka-aux-etcd`: `etcdctl snapshot save` (certs/endpoints), delete a seeded object, restore the snapshot to a new `--data-dir`, repoint the etcd static pod, apiserver recovers. Apiserver downtime mid-task is fine — it is the candidate's own cluster to break. Crits (aux kubeconfig, `--request-timeout`): snapshot file is a valid etcd snapshot (the one documented node-read exception — see the grading note below the diagram), cluster healthy post-restore, the deleted object is back. Flagged in question.md as *legacy: removed from the Feb-2025 blueprint, kept for full-experience/killer.sh parity*. |
 
 Every question also ships: `question.md` (body only), idempotent `setup.sh`, two-tier `hints.md`
 (all-or-nothing rule — all 26 get hints), `solution.md`, `expected/` docs generated from
@@ -227,7 +227,14 @@ real exam. etcd (q26) is weight-5 and flagged legacy since the Feb-2025 blueprin
 **Cut only for pool size (v1.1 expansion candidates — the pool is designed to grow like CKAD's
 44):** logs/events-to-file (container output streams), Pod-Pending resource-math triage, new-user
 kubeconfig via CSR, static Pod on a worker, PSA restricted namespace, StatefulSet+headless,
-topology spread across workers.
+topology spread across workers, and a **quick-tier etcd snapshot question** (`etcdctl snapshot
+save` + `etcdctl snapshot status` only, no restore). That last one is not a cut — it's a density
+lever: q26 sits in a 7-deep Cluster pool drawing 4, so etcd appears in only ~57 % of sittings,
+and the engine has no pinned-draw mechanism, so adding a second etcd question is the honest way
+to raise the odds a candidate meets etcd. Snapshot-save is non-disruptive (read-only against
+etcd), so it can target the **main control plane** over `ssh sim-control-plane` — no new aux
+cluster — but its snapshot-file crit needs the same node-read justification as q26 (or must
+require the snapshot copied to an instance-visible path).
 
 ## Exam setup diagram
 
@@ -271,7 +278,13 @@ flowchart LR
 Grading never runs on the nodes — candidates ssh anywhere (main control plane included, with
 root), but every check reads an API from an instance (main kubeconfig or the question's
 `~/.kube/aux-*` with `--request-timeout`), which keeps the 30-second grader budget and the
-allowedInstances contract intact. Reserved workers and aux clusters exist for **setup-time
+allowedInstances contract intact. **One documented exception:** q26's snapshot-file crit — the
+snapshot lives on the aux-etcd node's filesystem, which no API exposes. That check still
+*executes* on `instance-1/2` (allowedInstances intact) but shells to the node over the candidate
+ssh plumbing (`ssh -o ConnectTimeout=5 cka-aux-etcd 'etcdctl snapshot status …'`), with the ssh
+hop's own timeout nested inside the 30-second budget. This is the only check in the bank allowed
+to read node state directly; any future question wanting the same must either justify it here or
+require the artifact in an API/instance-visible location instead. Reserved workers and aux clusters exist for **setup-time
 independence** (each disruptive task owns its starting state), never to fence the candidate in;
 a candidate who breaks shared state fails the checks that depended on it and can purge for a
 fresh attempt.
@@ -300,9 +313,10 @@ fresh attempt.
    map its node's sshd onto a reserved port (2211+), write its kubeconfig to
    `/shared/kubeconfig-aux-<qid>` (instance entrypoint copies it to `~candidate/.kube/aux-<qid>`
    and adds the ssh-config Host entry), and stage assets on the node (Calico manifest+images for
-   q12, v1.35 kubeadm/kubelet/kubectl binaries for q13; etcdctl already ships in the etcd image
-   for q26). Prebake the **v1.34 node image** and staged binaries into the k8s-env image (size
-   cost ~+1–1.5 GB). Aux creation happens during the 202 seed job (~60 s each when drawn, worst
+   q12, v1.35 kubeadm/kubelet/kubectl binaries for q13, `etcdctl`/`etcdutl` binaries on the node's
+   PATH for q26 — the etcd image's copy is unreachable via `kubectl exec` once the candidate takes
+   the apiserver down mid-restore). Prebake the **v1.34 node image** and staged binaries into the
+   k8s-env image (size cost ~+1–1.5 GB). Aux creation happens during the 202 seed job (~60 s each when drawn, worst
    case ~+4 min prep); it is idempotent across re-seeds and must survive `./sim down/up` like the
    main cluster.
 4. **Sizing**: `nodes: 5` verified locally; README RAM guidance (~12 GB local, ~+1 GB per drawn
@@ -351,8 +365,9 @@ draws) → tune `targetSeconds` if TIME_BAND fails → UI browser pass on the ne
    16) are seeded, solved by `tests/solutions/`, and graded — including q07's resume trap
    (`./sim down && ./sim up` mid-attempt must not self-heal the disabled kubelet), aux clusters
    surviving down/up with their broken state intact, q06's drain not disturbing any other
-   question's seeded workloads, and seed-job duration with all four aux questions drawn staying
-   acceptable.
+   question's seeded workloads, seed-job duration with all four aux questions drawn staying
+   acceptable, and q26's snapshot-file check (the one node-read exception) both passing after the
+   reference solution and staying inside the 30-second budget when `aux-etcd` is unreachable.
 6. Freedom & purge test: mid-attempt, deliberately wreck the main cluster from a node shell
    (e.g. corrupt the main kube-apiserver manifest over `ssh sim-control-plane`) — confirm nothing
    blocks it, dependent checks score failed rather than erroring the grader, and the hard-reset
