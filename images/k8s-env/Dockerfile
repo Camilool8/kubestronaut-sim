@@ -111,9 +111,13 @@ RUN ARCH=$(uname -m); case "$ARCH" in x86_64) ARCH=amd64 ;; aarch64) ARCH=arm64 
 # ends by tarring its own rootfs; the preload stage ships that tar and start.sh
 # / banks/_lib/aux.sh `docker import` it under the pristine tag inside the
 # inner dockerd, reapplying the image config recorded in the .changes file.
-# --one-file-system keeps the build-time /proc, /sys, /dev and the bind-mounted
-# /etc/resolv.conf & friends out of the tar (docker provides all of them at
-# run time).
+# The virtual filesystems are excluded by name, not just by --one-file-system:
+# tar still archives a foreign mount point's own directory entry, and sysfs's
+# mtime churns mid-read ("./sys: file changed as we read it", exit 1). Leaving
+# them out entirely is safe — docker/runc create missing mount destinations,
+# which is how FROM-scratch images run. --one-file-system still covers the
+# bind-mounted /etc/resolv.conf & friends (docker provides all of them at run
+# time).
 FROM ${NODE_IMAGE} AS node-ssh
 COPY --from=fetch /pkg/etcdctl /pkg/etcdutl /usr/local/bin/
 COPY --from=sim /opt/sim/calico.yaml /opt/packages/calico.yaml
@@ -125,7 +129,8 @@ RUN apt-get update \
     && printf 'PermitRootLogin prohibit-password\n' > /etc/ssh/sshd_config.d/10-sim.conf \
     && mkdir -p /root/.ssh && chmod 700 /root/.ssh
 RUN tar --numeric-owner --xattrs --one-file-system \
-      --exclude=./_rootfs.tar -C / -cf /_rootfs.tar .
+      --exclude=./_rootfs.tar --exclude=./proc --exclude=./sys \
+      --exclude=./dev --exclude=./run -C / -cf /_rootfs.tar .
 
 # Same derivation from the older image: q13's aux cluster boots this at v1.34
 # and the candidate upgrades it with the staged v1.35 binaries. kubeadm itself
@@ -149,7 +154,8 @@ RUN apt-get update \
        > /opt/packages/upgrade-images.txt \
     && grep -q "kube-apiserver:${KUBE_UPGRADE_VERSION}" /opt/packages/upgrade-images.txt
 RUN tar --numeric-owner --xattrs --one-file-system \
-      --exclude=./_rootfs.tar -C / -cf /_rootfs.tar .
+      --exclude=./_rootfs.tar --exclude=./proc --exclude=./sys \
+      --exclude=./dev --exclude=./run -C / -cf /_rootfs.tar .
 
 FROM sim AS preload
 ARG PRELOAD=full
