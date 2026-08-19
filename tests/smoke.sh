@@ -379,13 +379,41 @@ for q in data.get("questions", []):
   [ "$drawn" -gt 0 ] || fail "solve: the attempt drew no questions at all"
 }
 
-missing=$(docker compose exec -T k8s-env yq -r '.spec.questions[].id' \
-  /banks/ckad-mock-01/exam.yaml | tr -d '\r' \
-  | while read -r qid; do
-      [ -n "$qid" ] || continue
-      [ -f "tests/solutions/ckad-mock-01/${qid}.sh" ] || printf '%s ' "$qid"
-    done)
-[ -z "$missing" ] || fail "ckad-mock-01 pool questions with no solution script: ${missing}"
+# A pooled bank asks a different subset every attempt, so "the questions this
+# attempt drew all have a solution" proves nothing about the next one: the
+# whole pool needs a script or some future draw fails with no warning. Which
+# banks are pooled is derived, not named — a bank is pooled when it declares
+# spec.examLength and that length is smaller than its pool (the same rule
+# tests/bank-weights.sh applies), and mcq banks are skipped because their
+# answers live in exam.yaml rather than in tests/solutions/.
+pooled_banks() {
+  local f bank len size
+  for f in banks/*/exam.yaml; do
+    [ -f "$f" ] || continue
+    bank=$(basename "$(dirname "$f")")
+    grep -qE '^[[:space:]]*examType:[[:space:]]*mcq[[:space:]]*$' "$f" && continue
+    len=$(grep -m1 -E '^[[:space:]]*examLength:' "$f" | sed -E 's/.*:[[:space:]]*//' | tr -d '\r')
+    case ${len:-} in ''|*[!0-9]*) continue ;; esac
+    size=$(grep -cE '^[[:space:]]*- id: q' "$f")
+    [ "$len" -gt 0 ] && [ "$len" -lt "$size" ] || continue
+    printf '%s\n' "$bank"
+  done
+}
+
+pooled_seen=0
+while read -r pbank; do
+  [ -n "$pbank" ] || continue
+  pooled_seen=$((pooled_seen + 1))
+  missing=$(docker compose exec -T k8s-env yq -r '.spec.questions[].id' \
+    "/banks/${pbank}/exam.yaml" | tr -d '\r' \
+    | while read -r qid; do
+        [ -n "$qid" ] || continue
+        [ -f "tests/solutions/${pbank}/${qid}.sh" ] || printf '%s ' "$qid"
+      done)
+  [ -z "$missing" ] || fail "${pbank} pool questions with no solution script: ${missing}"
+done < <(pooled_banks)
+[ "$pooled_seen" -gt 0 ] \
+  || fail "pooled_banks() detected no pooled bank at all — the detection is broken, and every pool-completeness assertion above it silently checked nothing"
 
 [ "$(req GET /api/exam)" = "200" ] || fail "GET /api/exam did not answer 200 during the attempt"
 drawn_ids=$(RESP="$RESP" python3 -c '
@@ -494,10 +522,24 @@ status=$(req GET /api/control/banks)
 active=$(json_field active)
 [ "$active" = "ckad-mock-01" ] || fail "active bank should be ckad-mock-01, got $active"
 
+# A coming-soon bank and an id nothing has ever heard of are both refused with
+# 400, so the status code alone cannot tell the two cases apart: this fixture
+# named cka-mock, cka-mock left banks/catalog.yaml, and the assertion went on
+# passing as a second unknown-id test with the coming-soon path unexercised.
+# The reason string is what distinguishes them, so both are asserted.
 curl -s -o "$RESP" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
-  -d '{"bank":"cka-mock"}' http://localhost:8080/api/control/switch > /tmp/smoke-cs.txt
+  -d '{"bank":"cks-mock"}' http://localhost:8080/api/control/switch > /tmp/smoke-cs.txt
 [ "$(cat /tmp/smoke-cs.txt)" = "400" ] \
   || fail "switch to a coming-soon bank should be 400, got $(cat /tmp/smoke-cs.txt)"
+grep -q 'cannot be activated' "$RESP" \
+  || fail "switch to cks-mock should be refused as a coming-soon bank ('cannot be activated'); if it is refused as unknown, cks-mock has left banks/catalog.yaml and this fixture is no longer testing the coming-soon path: $(cat "$RESP")"
+
+curl -s -o "$RESP" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+  -d '{"bank":"no-such-bank"}' http://localhost:8080/api/control/switch > /tmp/smoke-unk.txt
+[ "$(cat /tmp/smoke-unk.txt)" = "400" ] \
+  || fail "switch to an unknown bank id should be 400, got $(cat /tmp/smoke-unk.txt)"
+grep -q 'unknown bank' "$RESP" \
+  || fail "switch to an unknown bank id should say so: $(cat "$RESP")"
 
 curl -s -o "$RESP" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
   -d '{"bank":"../../etc"}' http://localhost:8080/api/control/switch > /tmp/smoke-tr.txt
@@ -549,6 +591,61 @@ api_name=$(json_field name)
 ./sim grade | tee /tmp/grade-back.txt
 read -r _ be0 _ _ < <(grep '^RESULT ' /tmp/grade-back.txt)
 [ "$be0" = "0" ] || fail "ckad after switch-back should score 0, got ${be0}"
+
+# The CKAD lifecycle above proves fresh-scores-0 -> solve the drawn questions
+# -> full marks for one hands-on pool, wound through the session, results and
+# resume assertions it also carries. Every other hands-on pool needs the same
+# proof, and needs it without a second copy of those assertions: switching
+# banks rebuilds the cluster, so this runs once per bank, on top of the bank
+# the switch section has already left active.
+solve_cycle() {
+  local bank=$1 declared pool drawn_n status e t
+  echo "== ${bank}: switch, fresh scores 0, the drawn attempt solves to full marks =="
+  curl -fsS -X POST -H 'Content-Type: application/json' -d "{\"bank\":\"${bank}\"}" \
+    http://localhost:8080/api/control/switch >/dev/null \
+    || { fail "switch to ${bank} not accepted"; return; }
+  wait_control
+
+  [ "$(req GET /api/exam)" = "200" ] || { fail "${bank}: /api/exam did not answer 200"; return; }
+  [ "$(json_field name)" = "$bank" ] \
+    || { fail "${bank}: the active exam is '$(json_field name)'"; return; }
+
+  declared=$(grep -m1 -E '^[[:space:]]*examLength:' "banks/${bank}/exam.yaml" | sed -E 's/.*:[[:space:]]*//')
+  pool=$(grep -cE '^[[:space:]]*- id: q' "banks/${bank}/exam.yaml")
+  [ "$(json_field questionCount)" = "$declared" ] \
+    || fail "${bank}: /api/exam questionCount should be the declared ${declared}, got '$(json_field questionCount)'"
+
+  status=$(start_session)
+  [ "$status" = "200" ] || { fail "${bank}: session start expected 200, got $status"; return; }
+
+  ./sim grade | tee "/tmp/grade-${bank}-fresh.txt"
+  read -r _ e t _ < <(grep '^RESULT ' "/tmp/grade-${bank}-fresh.txt")
+  [ "$e" = "0" ] || fail "${bank}: a fresh environment should score 0, got ${e}"
+  # A bank whose graders all fall over scores 0 out of 0 and would sail through
+  # the line above.
+  [ "${t:-0}" -gt 0 ] 2>/dev/null \
+    || fail "${bank}: the drawn attempt is worth ${t:-no} points — nothing was drawn, or no check declares any"
+
+  [ "$(req GET /api/exam)" = "200" ] || fail "${bank}: /api/exam did not answer 200 during the attempt"
+  drawn_n=$(RESP="$RESP" python3 -c '
+import json, os
+with open(os.environ["RESP"]) as f:
+    print(len(json.load(f).get("questions", [])))
+')
+  [ "$drawn_n" = "$declared" ] \
+    || fail "${bank}: a running attempt should ask the declared ${declared} of ${pool}, got ${drawn_n}"
+
+  solve_bank "$bank"
+
+  ./sim grade | tee "/tmp/grade-${bank}-solved.txt"
+  read -r _ e t _ < <(grep '^RESULT ' "/tmp/grade-${bank}-solved.txt")
+  [ "$e" = "$t" ] || fail "${bank}: a solved environment should score ${t}/${t}, got ${e}/${t}"
+
+  status=$(req DELETE /api/session)
+  [ "$status" = "204" ] || fail "${bank}: cleanup DELETE expected 204, got $status"
+}
+
+solve_cycle cka-mock-01
 
 echo "== mcq: kcna-mock — switch, blank/partial/full grades, answer gates =="
 curl -fsS -X POST -H 'Content-Type: application/json' -d '{"bank":"kcna-mock"}' \

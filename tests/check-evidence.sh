@@ -34,9 +34,13 @@ trap 'rm -rf "$tmp"' EXIT
 # where it lives inside the instance container. Run a copy that sources the tree
 # under test instead.
 run_check() {
-  local script=$1 fixture=$2
+  local script=$1 fixture=$2 bank
+  # BANK is what a check joins to reach its own expected/ files, so it comes
+  # from the script's own path. Hard-coding one bank made every other bank's
+  # checks read a directory belonging to ckad-mock-01.
+  bank=$(printf '%s' "$script" | awk -F/ '$1 == "banks" {print $2}')
   sed "s#^\. /banks/_lib/checks\.sh#. $root/banks/_lib/checks.sh#" "$script" > "$tmp/chk.sh"
-  PATH="$fixture:$PATH" BANK=ckad-mock-01 bash "$tmp/chk.sh" 2>&1
+  PATH="$fixture:$PATH" BANK="${bank:-ckad-mock-01}" bash "$tmp/chk.sh" 2>&1
 }
 
 # A kubectl that answers from files named after the flag it was asked for, so a
@@ -67,7 +71,25 @@ done
 exit 0
 STUB
   chmod +x "$dir/kubectl"
-  # jq is real; only kubectl is stubbed.
+
+  # A grader reads the API and nothing else, with exactly one documented
+  # exception: the CKA bank's etcd question runs
+  # `ssh -o ConnectTimeout=5 cka-aux-etcd 'etcdctl snapshot status …'`.
+  # Unstubbed, that line would try to reach a node from whatever machine runs
+  # this gate — a DNS lookup and a connect timeout per check at best, someone's
+  # real ssh agent and known_hosts at worst. So ssh is shadowed here for every
+  # fixture, answers only from the fixture, and never touches a network.
+  # Give it a canned answer by writing "$FIXTURE/ssh"; with no fixture file it
+  # answers with nothing, which is the shape a check has to survive anyway.
+  cat > "$dir/ssh" <<'STUB'
+#!/usr/bin/env bash
+if [ -n "${FIXTURE:-}" ] && [ -f "$FIXTURE/ssh" ]; then
+  cat "$FIXTURE/ssh"
+fi
+exit 0
+STUB
+  chmod +x "$dir/ssh"
+  # jq is real; only kubectl and ssh are stubbed.
 }
 
 # ---------------------------------------------------------------- q07 identity
@@ -246,6 +268,59 @@ for cmd in helm podman curl yq; do
   chmod +x "$all/bin/$cmd"
 done
 
+# ---------------------------------------------------- the stubs shadow, offline
+#
+# Both of these are the difference between "the check was exercised" and "the
+# check reached the reviewer's own machine". They are asserted rather than
+# assumed because a stub that is not on PATH fails silently: the real binary
+# answers, the case still goes green, and nothing says which one ran.
+
+probe=$tmp/probe
+fixture "$probe"
+printf 'stub-ssh-answer\n' > "$probe/ssh"
+out=$(PATH="$all/bin:$PATH" FIXTURE="$probe" ssh -o ConnectTimeout=5 cka-aux-etcd \
+  'etcdctl snapshot status /opt/backup/etcd.db' 2>&1)
+case $out in
+  stub-ssh-answer*) note ;;
+  *) bad "ssh is not shadowed on a check's PATH — the CKA etcd check's node read would leave this machine (got: ${out})" ;;
+esac
+
+# The aux-cluster questions read a second cluster with
+# `kubectl --kubeconfig ~candidate/.kube/aux-<name> --request-timeout=5s …`.
+# The stub keys off -o alone, so those flags have to pass straight through
+# rather than being mistaken for a subcommand.
+echo '{}' > "$probe/json"
+out=$(PATH="$all/bin:$PATH" FIXTURE="$probe" kubectl \
+  --kubeconfig /home/candidate/.kube/aux-etcd --request-timeout=5s \
+  -n kube-system get pods -o json 2>&1)
+[ "$out" = "{}" ] && note \
+  || bad "the kubectl stub does not answer an aux --kubeconfig read (got: ${out})"
+
+# What a broken program looks like when the TOOL says so, in the shapes the
+# tools actually print:
+#
+#   jq: parse error: Invalid numeric literal at line 1, column 2
+#   jq: error: syntax error, unexpected end of file … / jq: 1 compile error
+#   Error: bad file '-': yaml: while parsing a flow node …        (yq)
+#   /tmp/chk.sh: line 12: syntax error near unexpected token `fi'
+#   /tmp/chk.sh: line 4: kubectl: command not found
+#   /tmp/chk.sh: line 4: NS: unbound variable
+#
+# The patterns are anchored to those shapes rather than to the bare English in
+# them, because the same words are ordinary prose in a check's own evidence: a
+# CoreDNS question explaining that a stray brace "is a syntax error in the
+# block" was failing this gate while handing jq nothing at all. Prose is not
+# the bug, and rewording every question that has to name a parse failure would
+# be. One pattern serves both the verdict and the excerpt, so the two cannot
+# drift apart the way the duplicated list they replace could.
+# jq's RUNTIME complaints are deliberately not in here. "jq: error (at
+# <stdin>:0): Cannot iterate over null" is what the {} stub provokes from every
+# check that walks a list, and it says nothing about the program — which is why
+# the malformed-program shape to match is "jq: N compile error", the line jq
+# always prints alongside "jq: error: syntax error, …", and never a bare
+# "jq: error".
+TOOL_NOISE='jq: parse error|jq: [0-9]+ compile error|yq: [Ee]rror|^parse error:|^Error: .*(yaml|json|parse error)|line [0-9]+: syntax error|syntax error near|: command not found|: unbound variable'
+
 noisy=0
 for script in banks/*/q*/validate.d/*.sh; do
   out=$(FIXTURE=$all/fx run_check "$script" "$all/bin" </dev/null || true)
@@ -253,14 +328,11 @@ for script in banks/*/q*/validate.d/*.sh; do
   # runtime ("Cannot iterate over null") for every check that walks a list, and
   # that says nothing about the script — a real cluster returns a real object,
   # or nothing at all.
-  case $out in
-    *"syntax error"*|*"compile error"*|*"command not found"*|*"unbound variable"*|*"parse error"*)
-      echo "FAIL: $script hands its tooling something malformed:"
-      printf '%s\n' "$out" \
-        | grep -E "syntax error|compile error|command not found|unbound variable|parse error" \
-        | head -3 | sed 's/^/        /'
-      noisy=$((noisy+1)) ;;
-  esac
+  if printf '%s\n' "$out" | grep -qE "$TOOL_NOISE"; then
+    echo "FAIL: $script hands its tooling something malformed:"
+    printf '%s\n' "$out" | grep -E "$TOOL_NOISE" | head -3 | sed 's/^/        /'
+    noisy=$((noisy+1))
+  fi
 done
 if [ "$noisy" -eq 0 ]; then note; else FAIL=$((FAIL+noisy)); fi
 
