@@ -18,6 +18,11 @@ ssh cka-aux-sched         # the aux clusters, one per disruptive task:
 ssh cka-aux-cni           #   cka-aux-cni, cka-aux-upgrade, cka-aux-etcd
 ```
 
+`kubectl get nodes` shows the nodes' real names — `sim-worker`,
+`sim-worker2` and so on — and those are ssh-able too; the `cka-worker*`
+aliases map onto them in order (`cka-worker1` is `sim-worker`). Use the
+real name wherever kubectl wants one: drain, taint, label.
+
 Three habits that stop the model costing you points:
 
 - **Aliases do not persist across hosts.** The `k` alias and completion

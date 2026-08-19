@@ -17,6 +17,13 @@ nodes:
             - "localhost"
             - "127.0.0.1"
     extraPortMappings:
+      # Node ssh (CKA contract port table): 2200 is the control plane; workers
+      # get 2201+ appended by bootstrap.sh as it adds worker entries. Present
+      # for every bank — the node image runs sshd either way, and an unused
+      # mapping costs nothing.
+      - containerPort: 22
+        hostPort: 2200
+        protocol: TCP
       - containerPort: 80
         hostPort: 80
         protocol: TCP

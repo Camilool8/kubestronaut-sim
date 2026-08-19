@@ -27,8 +27,11 @@ mkdir -p /shared/ssh
 if [ ! -f /shared/ssh/id_ed25519 ]; then
   keytmp=$(mktemp -d /shared/ssh/.keygen.XXXXXX)
   ssh-keygen -t ed25519 -N '' -f "${keytmp}/id_ed25519" -q
-  mv "${keytmp}/id_ed25519.pub" /shared/ssh/id_ed25519.pub
+  # Private key first: every consumer gates on the .pub, so once it appears
+  # the key it belongs to must already be in place — the instance entrypoint
+  # copies the private key for the candidate the moment it sees the .pub.
   mv "${keytmp}/id_ed25519" /shared/ssh/id_ed25519
+  mv "${keytmp}/id_ed25519.pub" /shared/ssh/id_ed25519.pub
   rmdir "${keytmp}"
 fi
 
@@ -136,11 +139,32 @@ nodes=$(yq -r '.spec.environment.nodes // 2' "${BANK_DIR}/exam.yaml")
 case "$nodes" in
   ''|*[!0-9]*|0) echo "spec.environment.nodes must be a positive integer, got '${nodes}'"; exit 1 ;;
 esac
+
+# Optional addons, read like `nodes` above. Only gateway-api exists; anything
+# else is a typo that would otherwise silently install nothing, so it fails
+# the boot here, before a cluster is built.
+addons=$(yq -r '.spec.environment.addons // [] | .[]' "${BANK_DIR}/exam.yaml")
+for addon in $addons; do
+  case "$addon" in
+    gateway-api) ;;
+    *) echo "spec.environment.addons: unknown addon '${addon}' (only gateway-api is recognized)"; exit 1 ;;
+  esac
+done
+
 kind_config=/tmp/kind-config.yaml
 cp /opt/sim/kind-config.yaml "${kind_config}"
 worker=1
 while [ "$worker" -lt "$nodes" ]; do
-  printf '  - role: worker\n' >> "${kind_config}"
+  # Worker N's sshd rides host port 2200+N (contract: 2201-2204). Mapped for
+  # every bank and every worker count: the node image runs sshd regardless,
+  # and a mapping nothing connects to is inert.
+  {
+    printf '  - role: worker\n'
+    printf '    extraPortMappings:\n'
+    printf '      - containerPort: 22\n'
+    printf '        hostPort: %s\n' "$((2200 + worker))"
+    printf '        protocol: TCP\n'
+  } >> "${kind_config}"
   worker=$((worker + 1))
 done
 
@@ -156,6 +180,16 @@ if ! kind get clusters 2>/dev/null | grep -qx sim; then
 fi
 kind get kubeconfig --name sim | sed 's#https://0\.0\.0\.0:6443#https://k8s-env:6443#' | write_shared /shared/kubeconfig
 kind export kubeconfig --name sim
+
+# Root ssh onto every node: the node image runs sshd; only the key needs
+# injecting. Runs on create AND resume (a fresh /shared may hold a fresh
+# keypair), and overwriting makes it idempotent. Twin loop in
+# banks/_lib/aux.sh for the aux clusters.
+for node in $(kind get nodes --name sim); do
+  docker exec -i "$node" sh -c \
+    'mkdir -p /root/.ssh && cat > /root/.ssh/authorized_keys && chmod 700 /root/.ssh && chmod 600 /root/.ssh/authorized_keys' \
+    < /shared/ssh/id_ed25519.pub
+done
 
 phase api-server "Waiting for the API server" 4
 echo "waiting for API server..."
@@ -180,6 +214,37 @@ finish_ingress_prep
 kubectl apply -f /opt/sim/ingress-nginx.yaml
 kubectl -n ingress-nginx wait --for=condition=Available \
   deployment/ingress-nginx-controller --timeout=300s
+
+# The gateway-api addon, inside the ingress phase rather than a phase of its
+# own: banks without the addon must boot exactly as they always have, and a
+# ninth phase would show every one of them a step that no longer matches the
+# log. The GatewayClass guard keeps a resume from re-running the NGF
+# cert-generator Job, which would mint new agent-TLS secrets under a running
+# controller. The CRD applies are server-side because two of the CRDs are far
+# past the 262KB client-side-apply annotation limit.
+if printf '%s\n' "$addons" | grep -qx 'gateway-api'; then
+  if kubectl get gatewayclass sim >/dev/null 2>&1; then
+    echo "gateway-api addon already installed; skipping"
+  else
+    echo "installing the Gateway API controller (nginx-gateway-fabric)..."
+    detail "installing the Gateway API controller"
+    while read -r img; do
+      if [ -n "$img" ]; then load_image "${img%%@*}"; fi
+    done < /opt/sim/gateway-images.txt
+    kubectl apply --server-side --force-conflicts -f /opt/sim/gateway-api-crds.yaml
+    kubectl apply --server-side --force-conflicts -f /opt/sim/ngf-crds.yaml
+    kubectl wait --for=condition=Established --timeout=60s \
+      crd/gatewayclasses.gateway.networking.k8s.io \
+      crd/gateways.gateway.networking.k8s.io \
+      crd/httproutes.gateway.networking.k8s.io \
+      crd/nginxproxies.gateway.nginx.org \
+      crd/nginxgateways.gateway.nginx.org
+    kubectl apply -f /opt/sim/ngf.yaml
+    kubectl -n nginx-gateway wait --for=condition=Available \
+      deployment/nginx-gateway --timeout=300s
+    kubectl wait --for=condition=Accepted gatewayclass/sim --timeout=120s
+  fi
+fi
 
 exam_type=$(yq -r '.spec.examType // "hands-on"' "${BANK_DIR}/exam.yaml")
 
