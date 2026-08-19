@@ -159,7 +159,7 @@ func TestResetRunsFullSequenceInOrder(t *testing.T) {
 		"find:kubestronaut-sim/registry",
 		"exec:registry:" + registryShell,
 		"find:kubestronaut-sim/k8s-env",
-		"exec:k8s-env:bash -c kind delete cluster --name sim || true; /opt/sim/bootstrap.sh",
+		"exec:k8s-env:bash -c . /banks/_lib/aux.sh && aux_delete_all || true; kind delete cluster --name sim || true; /opt/sim/bootstrap.sh",
 		"find:kubestronaut-sim/instance-1",
 		"restart:instance-1",
 		"find:kubestronaut-sim/instance-2",
@@ -197,6 +197,27 @@ func TestResetFailsJobWhenExecExitsNonZero(t *testing.T) {
 		if strings.HasPrefix(call, "restart:") {
 			t.Error("restart must not run after the cluster phase failed")
 		}
+	}
+}
+
+// The recreate-cluster phase is the purge path: a candidate has root on every
+// kind node and may have wrecked the main cluster or any aux-* cluster, so the
+// one command both reset and bank-switch run must delete all of them before
+// bootstrapping. The aux deletion is best-effort (|| true) — a bank with no aux
+// clusters, or an image predating the helper, must not fail the phase.
+func TestBootstrapCmdPurgesAuxClustersFirst(t *testing.T) {
+	shell := bootstrapCmd[len(bootstrapCmd)-1]
+	aux := strings.Index(shell, ". /banks/_lib/aux.sh && aux_delete_all || true")
+	sim := strings.Index(shell, "kind delete cluster --name sim")
+	boot := strings.Index(shell, "/opt/sim/bootstrap.sh")
+	if aux < 0 {
+		t.Fatalf("bootstrapCmd does not delete the aux-* clusters: %q", shell)
+	}
+	if sim < 0 || boot < 0 {
+		t.Fatalf("bootstrapCmd lost the main-cluster purge or the bootstrap: %q", shell)
+	}
+	if !(aux < sim && sim < boot) {
+		t.Errorf("bootstrapCmd order is aux=%d sim=%d bootstrap=%d, want aux < sim < bootstrap: %q", aux, sim, boot, shell)
 	}
 }
 

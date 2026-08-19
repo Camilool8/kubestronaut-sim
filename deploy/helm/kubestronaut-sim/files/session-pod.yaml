@@ -184,7 +184,9 @@ spec:
     - {name: banks, emptyDir: {sizeLimit: 512Mi}}
     - {name: shared, emptyDir: {sizeLimit: 256Mi}}
     - {name: control, emptyDir: {sizeLimit: 1Mi}}
-    - {name: dind, emptyDir: {sizeLimit: 20Gi}}
+    # sizeLimit is an eviction cap, not a reservation; sized for the largest bank
+    # (cka-mock-01: 5 main nodes + up to 4 aux clusters + the prebaked v1.34 node image)
+    - {name: dind, emptyDir: {sizeLimit: 28Gi}}
     - {name: course-1, emptyDir: {sizeLimit: 1Gi}}
     - {name: course-2, emptyDir: {sizeLimit: 1Gi}}
     - {name: containers-1, emptyDir: {sizeLimit: 4Gi}}

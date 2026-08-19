@@ -189,7 +189,8 @@ jobs:
           tag = re.search(r'^appVersion:\s*"?([^"\s]+)"?',
                           open('deploy/helm/kubestronaut-sim/Chart.yaml').read(),
                           re.M).group(1)
-          want = {'session-pod.json': (1, 8, 1), 'session-pod-mcq.json': (1, 2, 0)}
+          want = {'session-pod.json': (1, 8, 1), 'session-pod-mcq.json': (1, 2, 0),
+                  'session-bank-cka-mock-01.json': (1, 8, 1)}
           if set(docs) != set(want):
               sys.exit(f'rendered {sorted(docs)}, want {sorted(want)}')
           for name, (inits, containers, privileged) in want.items():
@@ -224,7 +225,7 @@ jobs:
         working-directory: hub
         env:
           GOFLAGS: -buildvcs=false
-          SESSION_POD_JSON: /tmp/rendered/session-pod.json:/tmp/rendered/session-pod-mcq.json
+          SESSION_POD_JSON: /tmp/rendered/session-pod.json:/tmp/rendered/session-pod-mcq.json:/tmp/rendered/session-bank-cka-mock-01.json
         run: go test ./internal/session/ -run TestTheChart -v
 
   images:

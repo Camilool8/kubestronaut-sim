@@ -105,6 +105,19 @@ The instances hold `SYS_ADMIN`, `SYS_CHROOT`, `MKNOD`, `SETFCAP` and
 `SYS_RESOURCE`. Read that set as *meaningfully less than root on the
 host, but not a strong boundary*.
 
+**Root ssh to the kind nodes is not a new privilege.** The candidate
+gets a root shell on every node of the cluster — the main control plane
+included — because CKA-style tasks are node surgery: static-pod
+manifests, kubelet units, etcd. Inside the session that grants nothing
+they did not already have: the candidate holds cluster-admin on a
+cluster whose nodes are containers inside the already-`privileged`
+k8s-env, and cluster-admin manufactures a root shell on any node in one
+`kubectl debug node/`. The boundary was never the node — it is the
+conductor and its `internal: true` network, and that is unchanged.
+Breaking the cluster from inside it is allowed by design; recovery is
+the reset's purge, which deletes the `sim` cluster and every `aux-*`
+cluster and rebuilds.
+
 ## ingress-nginx is retired upstream
 
 The cluster's ingress controller is pinned to `controller-v1.15.1`

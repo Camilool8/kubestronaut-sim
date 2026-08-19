@@ -59,7 +59,7 @@ var (
 			"podman rmi -af >/dev/null 2>&1 || true"}
 	registryWipeCmd = []string{"sh", "-c",
 		"rm -rf /var/lib/registry/docker/registry/v2/repositories/* 2>/dev/null || true"}
-	bootstrapCmd = []string{"bash", "-c", "kind delete cluster --name sim || true; /opt/sim/bootstrap.sh"}
+	bootstrapCmd = []string{"bash", "-c", ". /banks/_lib/aux.sh && aux_delete_all || true; kind delete cluster --name sim || true; /opt/sim/bootstrap.sh"}
 )
 
 func (c *Controller) wipeCandidateState(ctx context.Context, jobID string) error {

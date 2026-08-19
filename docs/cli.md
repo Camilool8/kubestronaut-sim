@@ -83,6 +83,13 @@ facilitator, in five phases:
 4. `restart-instances`
 5. `verify`
 
+`recreate-cluster` is a purge, not a repair: it force-deletes the main
+`sim` kind cluster **and every `aux-*` cluster** a question's setup may
+have built, then re-runs bootstrap from scratch. That is the recovery
+half of the freedom model — a candidate with root on every node is
+never fenced off from breaking the cluster, because a clean board is
+always this one command away. Switching banks purges the same way.
+
 Cached images are kept, so a reset needs no network. To switch banks,
 use the exam selector rather than `reset`.
 
