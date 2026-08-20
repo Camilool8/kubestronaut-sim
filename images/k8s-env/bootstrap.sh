@@ -206,7 +206,17 @@ start_ingress_prep
 kubectl apply -f /opt/sim/calico.yaml
 kubectl -n kube-system rollout status daemonset/calico-node --timeout=300s
 
-kubectl wait --for=condition=Ready nodes --all --timeout=180s
+# Not fatal, and deliberately so on the resume path. A question is allowed to
+# leave a node NotReady on purpose — the CKA bank disables a worker's kubelet
+# and the whole point is that `./sim down && ./sim up` must not heal it — so
+# under `set -e` this wait would spend 180s and then kill a boot that is working
+# exactly as designed. It races today: the node controller needs about 45s to
+# turn a stale Ready into Unknown, and a fast boot gets here first. Say what is
+# NotReady and carry on; nothing after this point needs every node.
+if ! kubectl wait --for=condition=Ready nodes --all --timeout=180s; then
+  echo "warning: not every node reported Ready — a drawn question may have disabled one on purpose"
+  kubectl get nodes
+fi
 
 phase ingress "Installing the ingress controller" 6
 echo "installing ingress-nginx..."

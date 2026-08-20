@@ -73,8 +73,11 @@ STUB
   chmod +x "$dir/kubectl"
 
   # A grader reads the API and nothing else, with exactly one documented
-  # exception: the CKA bank's etcd question runs
-  # `ssh -o ConnectTimeout=5 cka-aux-etcd 'etcdctl snapshot status …'`.
+  # exception: the CKA bank's etcd question asks the aux-etcd node whether a
+  # file is a valid etcd snapshot. It dials the node directly —
+  # `ssh -i /shared/ssh/id_ed25519 -p 2214 root@k8s-env 'etcdutl …'` — and not
+  # by the `cka-aux-etcd` alias a candidate would type, because a check runs as
+  # ROOT on the instance and that alias lives in ~candidate/.ssh/config.
   # Unstubbed, that line would try to reach a node from whatever machine runs
   # this gate — a DNS lookup and a connect timeout per check at best, someone's
   # real ssh agent and known_hosts at worst. So ssh is shadowed here for every

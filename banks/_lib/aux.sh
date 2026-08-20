@@ -90,7 +90,16 @@ _aux_node_has_image() {
   [ -n "$node" ] || return 1
   out=$(docker exec "$node" ctr -n k8s.io images ls -q 2>/dev/null || true)
   printf '%s\n' "$out" | grep -qx -- "$img" && return 0
-  printf '%s\n' "$out" | grep -qx -- "docker.io/${img}"
+  printf '%s\n' "$out" | grep -qx -- "docker.io/${img}" && return 0
+  # A Docker Hub image with no user in its name is stored under the implied
+  # `library` user: `busybox:1.37` lands as `docker.io/library/busybox:1.37`.
+  # Without this form the guard answers "not present" for every such image and
+  # the caller reloads it on every warm re-seed — cheap, but it made the guard
+  # look like it worked while never once returning true.
+  case "$img" in
+    */*) return 1 ;;
+    *) printf '%s\n' "$out" | grep -qx -- "docker.io/library/${img}" ;;
+  esac
 }
 
 # Load one image into a named aux cluster, preferring the archives baked into
@@ -159,6 +168,10 @@ aux_up() {
     _aux_ensure_node_image "$image"
     local cfg="/tmp/aux-config-${name}.yaml"
     if [ -n "$config" ]; then
+      if [ ! -f "$config" ]; then
+        echo "aux_up: --config ${config} does not exist (it is read inside k8s-env, not on the host)" >&2
+        return 1
+      fi
       cp "$config" "$cfg"
     else
       printf 'kind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\n' > "$cfg"
@@ -180,8 +193,18 @@ aux_up() {
     # aux cluster: the seed job runs every drawn question's setup.sh in this
     # shell environment sequentially, and a hijacked ambient context would make
     # a later question seed into the wrong cluster.
-    kind create cluster --name "$cluster" --config "$cfg" --image "$image" \
-      --kubeconfig "/tmp/aux-${name}.kubeconfig"
+    # The exit status matters more here than anywhere else in this file. Without
+    # it a failed create falls through to the readiness loops below and spends
+    # 180s waiting for an API server that was never built, then 120s on an sshd
+    # that does not exist — 300s, past the 240s a question's setup.sh is given —
+    # and the message it finally prints blames readiness for a failure that
+    # happened three minutes earlier.
+    if ! kind create cluster --name "$cluster" --config "$cfg" --image "$image" \
+        --kubeconfig "/tmp/aux-${name}.kubeconfig"; then
+      echo "aux_up: kind could not create the ${cluster} cluster" >&2
+      rm -f "$cfg"
+      return 1
+    fi
     rm -f "$cfg"
   else
     # Warm path. kind lists clusters by container, running or not; after an
