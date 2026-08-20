@@ -280,9 +280,11 @@ root), but every check reads an API from an instance (main kubeconfig or the que
 `~/.kube/aux-*` with `--request-timeout`), which keeps the 30-second grader budget and the
 allowedInstances contract intact. **One documented exception:** q26's snapshot-file crit — the
 snapshot lives on the aux-etcd node's filesystem, which no API exposes. That check still
-*executes* on `instance-1/2` (allowedInstances intact) but shells to the node over the candidate
-ssh plumbing (`ssh -o ConnectTimeout=5 cka-aux-etcd 'etcdctl snapshot status …'`), with the ssh
-hop's own timeout nested inside the 30-second budget. This is the only check in the bank allowed
+*executes* on `instance-1/2` (allowedInstances intact) but shells to the node over the same ssh
+plumbing, with the hop's own timeout nested inside the 30-second budget. Not by the candidate's
+alias: `cka-aux-etcd` lives in `~candidate/.ssh/config` and a check runs as root, so the check
+spells the hop out — `ssh -i /shared/ssh/id_ed25519 -p 2214 -o BatchMode=yes -o ConnectTimeout=5
+root@k8s-env 'etcdutl snapshot status …'`, wrapped in `timeout 20`. This is the only check in the bank allowed
 to read node state directly; any future question wanting the same must either justify it here or
 require the artifact in an API/instance-visible location instead. Reserved workers and aux clusters exist for **setup-time
 independence** (each disruptive task owns its starting state), never to fence the candidate in;

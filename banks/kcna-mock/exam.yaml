@@ -465,7 +465,7 @@ spec:
       correct: [2]
       docs:
         - label: Horizontal Pod Autoscaling
-          url: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
+          url: https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/
     - id: q40
       domain: Container Orchestration
       multi: false
@@ -1065,4 +1065,4 @@ spec:
       correct: [0, 1, 3]
       docs:
         - label: Horizontal Pod Autoscaling
-          url: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
+          url: https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/

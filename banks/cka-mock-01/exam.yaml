@@ -196,7 +196,7 @@ spec:
         - label: Gateway API
           url: https://kubernetes.io/docs/concepts/services-networking/gateway/
         - label: HTTPRoute
-          url: https://gateway-api.sigs.k8s.io/api-types/httproute/
+          url: https://gateway-api.sigs.k8s.io/reference/api-types/httproute/
     - id: q15
       title: Ingress → Gateway migration
       instance: instance-1
@@ -206,9 +206,9 @@ spec:
       difficulty: deep
       docs:
         - label: Migrating from Ingress
-          url: https://gateway-api.sigs.k8s.io/guides/migrating-from-ingress/
+          url: https://gateway-api.sigs.k8s.io/guides/getting-started/migrating-from-ingress/
         - label: TLS configuration
-          url: https://gateway-api.sigs.k8s.io/guides/tls/
+          url: https://gateway-api.sigs.k8s.io/guides/user-guides/tls/
     - id: q16
       title: Least-privilege NetworkPolicy
       instance: instance-2
@@ -258,7 +258,7 @@ spec:
       difficulty: quick
       docs:
         - label: Horizontal Pod Autoscaling
-          url: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
+          url: https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/
         - label: HorizontalPodAutoscaler walkthrough
           url: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/
     - id: q21

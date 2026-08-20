@@ -292,7 +292,7 @@ container with a root shell in it.
 | The documentation allowlist stops being a network boundary | A Pod is one network namespace and a NetworkPolicy selects Pods, not containers. The desktop and the candidate's shells share one egress, and the shells need theirs. The allowlist still governs the browser. |
 | One candidate cannot reach another | Each session is its own Pod, addressed from the verified cookie. History is stored per user, scoped to the owner's directory. |
 | The one credential is `COOKIE_KEY` | It signs login cookies and, under a *derived* key, the per-Pod ticket a session uses to record an attempt. A ticket read out of a Pod spec can never be spent as that candidate's login. |
-| The answer key is inside the Pod, next to the candidate's root shell | `images/banks/Dockerfile` ships the whole bank tree — 145 `solution.md` and 44 `hints.md` — and the `banks` initContainer copies it into an `emptyDir` that both instances mount. So `cat /banks/ckad-mock-01/q03/solution.md` succeeds mid-attempt, while `GET /api/questions/q03/solution` correctly returns `403`. Assume a hosted candidate can read every answer. |
+| The answer key is inside the Pod, next to the candidate's root shell | `images/banks/Dockerfile` ships the whole bank tree — 171 `solution.md` and 70 `hints.md` — and the `banks` initContainer copies it into an `emptyDir` that both instances mount. So `cat /banks/ckad-mock-01/q03/solution.md` succeeds mid-attempt, while `GET /api/questions/q03/solution` correctly returns `403`. Assume a hosted candidate can read every answer. |
 
 The instances mount `/banks` because that is where the work happens:
 grading runs `validate.d/` from it over SSH, and a question's `setup.sh`

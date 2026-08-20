@@ -526,6 +526,16 @@ always renders as plain text.
 - Exit 0 = criterion met, non-zero = failed, stdout = short message, optionally
   followed by an [artifact trailer](#showing-your-work-the-artifact-protocol).
 - Never mutates the cluster or the filesystem.
+- Reads the cluster API, never a node's disk. `tests/check-lint.sh` fails a
+  check containing a bare `ssh` or `scp` for that reason: a login spends most
+  of the budget the check is meant to be grading in, and a machine's disk is
+  not what the cluster believes. One carve-out exists — whether an etcd
+  snapshot **file** is a real snapshot is a question no API answers
+  ([q26](../banks/cka-mock-01/q26/validate.d/10_snapshot.sh)). It is marked
+  per line with `# lint: allow-node-read`, and every marked line is listed at
+  the end of a lint run so the set stays small enough to read. A question that
+  wants node state for anything else should put the artifact somewhere the API
+  or the instance can see instead.
 - Finishes within 30 seconds. The facilitator kills a check that passes its 30s
   deadline and scores it failed with "check timed out".
 
