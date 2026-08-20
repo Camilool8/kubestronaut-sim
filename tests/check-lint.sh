@@ -38,7 +38,12 @@ HARD = [
      "grader spends the 30s budget on a login and grades a machine rather than "
      "the answer. If this really is something no API can see (the etcd snapshot "
      "file is the one such case), put '# lint: allow-node-read' on this line — "
-     "the run then lists it as a documented exception"),
+     "the run then lists it as a documented exception. If instead the word is "
+     "prose inside an evidence note or a failure message, reword it ('login "
+     "alias', 'from the node's own shell'): the match is on the bare token by "
+     "design, because a rule that tried to tell a command from a sentence would "
+     "have to miss wrapped calls like 'timeout 5 ssh …'. Do NOT silence prose "
+     "with the marker — it would document a node read that does not exist"),
 ]
 
 SOFT = [
