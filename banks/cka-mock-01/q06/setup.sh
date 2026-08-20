@@ -46,11 +46,16 @@ fi
 # Conditional, because the patch itself rolls the Deployment: on the untouched
 # seed — the common warm re-run — nothing is written and the apply below reports
 # "unchanged".
+#
+# `|| drift=no` is load-bearing: on the cold path the Deployment does not exist,
+# kubectl exits 1, and under `set -e` with `pipefail` an assignment from a
+# failing pipeline ends the script — killing the seed on a fresh cluster at the
+# line written to handle a re-seed.
 drift=$(kubectl -n "$NS" get deploy "$DEP" -o json 2>/dev/null \
   | jq -r --arg node "$NODE" '.spec.template.spec
       | if .affinity != null or (.nodeName // "") != ""
            or (.nodeSelector // {}) != {"kubernetes.io/hostname": $node}
-        then "yes" else "no" end' 2>/dev/null)
+        then "yes" else "no" end' 2>/dev/null) || drift=no
 if [ "${drift:-no}" = yes ]; then
   kubectl -n "$NS" patch deploy "$DEP" --type=merge -p \
     '{"spec":{"template":{"spec":{"nodeSelector":null,"affinity":null,"nodeName":null}}}}' \

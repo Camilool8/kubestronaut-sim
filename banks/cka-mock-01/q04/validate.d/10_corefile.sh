@@ -20,11 +20,14 @@ evidence() {
 }
 
 # The stub block, and everything that is not the stub block. Braces nest, so the
-# split counts them rather than stopping at the first closing brace.
+# split counts them rather than stopping at the first closing brace. The braces
+# in the regexes are escaped on purpose: a bare /{/ is a repetition count to
+# some awks — busybox's, which is the one the seed for this question runs
+# under — and the same expression that works here dies there.
 zone_block=$(printf '%s\n' "$corefile" | awk '
   skip == 0 && $1 ~ /^sim\.internal(:[0-9]+)?$/ { skip = 1; depth = 0 }
   skip == 1 {
-    n = gsub(/{/, "{"); m = gsub(/}/, "}")
+    n = gsub(/\{/, "{"); m = gsub(/\}/, "}")
     depth += n - m
     print
     if (depth <= 0 && (n + m) > 0) skip = 2
@@ -33,7 +36,7 @@ zone_block=$(printf '%s\n' "$corefile" | awk '
 rest=$(printf '%s\n' "$corefile" | awk '
   skip == 0 && $1 ~ /^sim\.internal(:[0-9]+)?$/ { skip = 1; depth = 0 }
   skip == 1 {
-    n = gsub(/{/, "{"); m = gsub(/}/, "}")
+    n = gsub(/\{/, "{"); m = gsub(/\}/, "}")
     depth += n - m
     if (depth <= 0 && (n + m) > 0) skip = 0
     next

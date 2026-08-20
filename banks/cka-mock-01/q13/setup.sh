@@ -38,7 +38,10 @@ esac
 # fails the seed loudly instead of shipping a question whose target has no
 # binaries and no images behind it.
 TARGET=v1.35.6
-staged=$(awk -F: '/kube-apiserver/ {print $NF}' /opt/sim/upgrade-images.txt 2>/dev/null | head -1)
+# `|| true` so the message below is the one that prints. Under `set -e` a
+# failing substitution ends the script where it stands, and a missing list would
+# then look like a crash rather than the explained mismatch it is.
+staged=$(awk -F: '/kube-apiserver/ {print $NF}' /opt/sim/upgrade-images.txt 2>/dev/null | head -1) || true
 if [ "$staged" != "$TARGET" ]; then
   echo "q13 setup: the staged upgrade images are for '${staged:-nothing}', but this question," >&2
   echo "           its checks and its question text are written for ${TARGET}." >&2

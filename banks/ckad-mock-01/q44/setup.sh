@@ -38,7 +38,7 @@ EOF
 # state a few seconds into the attempt instead.
 for _ in $(seq 1 20); do
   state=$(kubectl -n eridanus get job ledger-reconcile \
-    -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' 2>/dev/null)
+    -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' 2>/dev/null) || state=''
   if [ "${state:-}" = "True" ]; then break; fi
   sleep 3
 done

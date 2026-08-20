@@ -40,11 +40,15 @@ kubectl create ns "$NS" --dry-run=client -o yaml | kubectl apply -f -
 # warm re-run — there is nothing to undo, so nothing is written and the apply
 # that follows reports "unchanged".
 for dep in batch-runner web-frontend; do
+  # `|| drift=no` is not tidiness. On the cold path this Deployment does not
+  # exist yet, kubectl exits 1, and under `set -e` with `pipefail` an assignment
+  # from a failing pipeline ends the script — so the seed would die on a fresh
+  # cluster at the exact line that exists to handle a re-seed.
   drift=$(kubectl -n "$NS" get deploy "$dep" -o json 2>/dev/null \
     | jq -r --arg pin "$PIN" '.spec.template.spec
         | if (.tolerations // []) != [] or .affinity != null
              or (.nodeSelector // {}) != {"kubernetes.io/hostname": $pin}
-          then "yes" else "no" end' 2>/dev/null)
+          then "yes" else "no" end' 2>/dev/null) || drift=no
   [ "${drift:-no}" = yes ] || continue
   kubectl -n "$NS" patch deploy "$dep" --type=merge -p \
     '{"spec":{"template":{"spec":{"nodeSelector":null,"tolerations":null,"affinity":null}}}}' \

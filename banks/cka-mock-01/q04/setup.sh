@@ -9,8 +9,12 @@ kubectl create ns "$NS" --dry-run=client -o yaml | kubectl apply -f -
 
 # The zone server runs the CoreDNS image the cluster itself already runs: it is
 # in every node's image store, so nothing is pulled at seed time.
+# `|| true` on each of the three reads below is what makes the message under it
+# reachable. Under `set -e` a failing command substitution ends the script where
+# it stands, so the friendly guard would never run and the seed would die
+# without saying which read failed.
 dns_image=$(kubectl -n kube-system get deploy coredns \
-  -o jsonpath='{.spec.template.spec.containers[0].image}')
+  -o jsonpath='{.spec.template.spec.containers[0].image}') || true
 [ -n "$dns_image" ] || { echo "q04: cannot read the cluster's CoreDNS image"; exit 1; }
 
 # ---------------------------------------------------------------- the workload
@@ -69,7 +73,7 @@ spec:
           command: ["sh", "-c", "while true; do sleep 3600; done"]
 EOF
 
-ledger_ip=$(kubectl -n "$NS" get svc ledger -o jsonpath='{.spec.clusterIP}')
+ledger_ip=$(kubectl -n "$NS" get svc ledger -o jsonpath='{.spec.clusterIP}') || true
 [ -n "$ledger_ip" ] || { echo "q04: Service ledger has no ClusterIP"; exit 1; }
 # The seeded zone record must be an address ledger does NOT have, or the second
 # fault would not exist.
@@ -152,9 +156,14 @@ spec:
       protocol: TCP
 EOF
 
-kubectl -n "$NS" rollout status deploy/ledger --timeout=180s
-kubectl -n "$NS" rollout status deploy/dns-probe --timeout=180s
-kubectl -n "$NS" rollout status deploy/sim-dns --timeout=180s
+# 120s each, not 180: three of these plus the CoreDNS roll below have to sum to
+# less than the per-question seed budget, or a rollout that genuinely never
+# converges is killed from outside and reported as "context deadline exceeded"
+# instead of naming the Deployment that did not come up. The images are
+# preloaded on every node, so the real cost is seconds.
+kubectl -n "$NS" rollout status deploy/ledger --timeout=120s
+kubectl -n "$NS" rollout status deploy/dns-probe --timeout=120s
+kubectl -n "$NS" rollout status deploy/sim-dns --timeout=120s
 
 # ------------------------------------------------------------- the broken stub
 # ONLY the sim.internal server block is ours. The default `.:53` block — the one
@@ -162,11 +171,15 @@ kubectl -n "$NS" rollout status deploy/sim-dns --timeout=180s
 # re-run replaces our block rather than appending a second one. No cache plugin
 # in the stub: a repaired zone must answer correctly immediately, not after a
 # TTL somewhere has expired.
+# The braces in the regexes below are escaped because this runs under busybox
+# awk inside k8s-env, where a bare /{/ is read as the start of a repetition
+# count and the whole seed dies with "bad regex". mawk on the instances accepts
+# either spelling, so an unescaped brace fails only here, at seed time.
 strip_zone() {
   awk '
     skip == 0 && $1 ~ /^sim\.internal(:[0-9]+)?$/ { skip = 1; depth = 0 }
     skip == 1 {
-      n = gsub(/{/, "{"); m = gsub(/}/, "}")
+      n = gsub(/\{/, "{"); m = gsub(/\}/, "}")
       depth += n - m
       if (depth <= 0 && (n + m) > 0) skip = 0
       next
@@ -185,10 +198,13 @@ broken="sim.internal:53 {
     forward . ${DEAD_IP}
 }"
 
-current=$(kubectl -n kube-system get cm coredns -o jsonpath='{.data.Corefile}')
+current=$(kubectl -n kube-system get cm coredns -o jsonpath='{.data.Corefile}') || true
 [ -n "$current" ] || { echo "q04: kube-system/coredns has no Corefile"; exit 1; }
 
-want=$(printf '%s\n' "$current" | strip_zone)
+# NOT `|| true`: an empty result here would be written back as the whole
+# Corefile, taking cluster DNS down for every other question. Fail, and say so.
+want=$(printf '%s\n' "$current" | strip_zone) || {
+  echo "q04: could not strip the sim.internal zone out of the Corefile" >&2; exit 1; }
 want=$(printf '%s\n\n%s' "$want" "$broken")
 
 if [ "$current" != "$want" ]; then

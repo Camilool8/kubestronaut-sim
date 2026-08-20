@@ -120,7 +120,8 @@ wait_scheduler_down() {
   # Measured at about 8s on this image for the kubelet to notice the edit and
   # put the container into CrashLoopBackOff. The bound is generous rather than
   # patient: this runs at most twice, and both runs plus a cold recreate have to
-  # fit the 240s per-question seed budget.
+  # fit the per-question seed budget (600s preparing an attempt, 240s for a
+  # Training re-seed, which is always the warm path).
   deadline=$(( $(date +%s) + 60 ))
   while [ "$(sched_ready)" != 0 ]; do
     if [ "$(date +%s)" -ge "$deadline" ]; then

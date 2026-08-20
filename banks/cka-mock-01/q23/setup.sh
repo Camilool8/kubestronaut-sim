@@ -33,7 +33,7 @@ kubectl create ns "$NS" --dry-run=client -o yaml | kubectl apply -f -
 # Every deletion is bounded and none of them is fatal. On the ordinary path —
 # nothing there, or the candidate's own four objects — the whole block costs a
 # few seconds; the timeouts exist so that a claim held by some other Pod the
-# candidate made cannot spend this question's entire 240 s seed budget waiting
+# candidate made cannot spend this question's entire seed budget waiting
 # on a finalizer that is not going to clear.
 kubectl -n "$NS" delete pod "$POD" --ignore-not-found --timeout=45s >/dev/null 2>&1 || true
 kubectl -n "$NS" delete pvc "$PVC" --ignore-not-found --timeout=30s >/dev/null 2>&1 || true
@@ -109,7 +109,8 @@ EOF
 # Two attempts, because the whole question rests on this directory existing and
 # a single scheduling hiccup should not decide it. busybox:1.37 is preloaded on
 # the nodes, so the usual cost is a handful of seconds and both waits together
-# sit well inside the 240 s per-question seed budget. Warm re-runs pay it again
+# sit well inside the per-question seed budget — 600 s preparing an attempt,
+# 240 s for a Training re-seed. Warm re-runs pay it again
 # on purpose: the write is idempotent and it restores a report a previous
 # candidate may have edited.
 if ! stage 60s; then

@@ -94,7 +94,8 @@ EOF
 # Two attempts, because the whole question rests on this file existing and one
 # scheduling hiccup should not decide it. busybox:1.37 is preloaded on the
 # nodes, so the usual cost is a few seconds; both waits together stay well
-# inside the 240 s per-question seed budget. Warm re-runs pay it again on
+# inside the per-question seed budget — 600 s preparing an attempt, 240 s for
+# a Training re-seed. Warm re-runs pay it again on
 # purpose — the write is idempotent and it restores a trail a previous candidate
 # may have edited through the mount.
 if ! stage 90s; then
@@ -144,10 +145,14 @@ EOF
 # a candidate who changes the volume's SOURCE leaves a live object carrying both
 # a persistentVolumeClaim and (from this manifest) an emptyDir, which the API
 # rejects as two volume types in one volume. Delete and recreate is exact.
+# `|| shape=absent` is what the default in the test below is written for: on the
+# cold path there is no Deployment, kubectl exits 1, and under `set -e` with
+# `pipefail` an assignment from a failing pipeline ends the script before the
+# default is ever consulted.
 shape=$(kubectl -n "$NS" get deploy "$DEP" -o json 2>/dev/null | jq -r '
   .spec.template.spec.volumes // []
   | if length == 1 and all(.[]; .name == "audit" and has("emptyDir"))
-    then "seeded" else "drifted" end' 2>/dev/null)
+    then "seeded" else "drifted" end' 2>/dev/null) || shape=absent
 if [ "${shape:-absent}" = drifted ]; then
   kubectl -n "$NS" delete deploy "$DEP" --ignore-not-found --timeout=90s >/dev/null 2>&1 || true
   kubectl -n "$NS" wait --for=delete pod -l app="$DEP" --timeout=90s >/dev/null 2>&1 || true
@@ -159,7 +164,7 @@ fi
 holders=$(kubectl -n "$NS" get pvc -o json 2>/dev/null \
   | jq -r --arg pv "$PV" --arg c "$CLAIM" \
       '[.items[]? | select(.spec.volumeName == $pv or .metadata.name == $c) | .metadata.name]
-       | unique | join(" ")' 2>/dev/null)
+       | unique | join(" ")' 2>/dev/null) || holders=''
 for pvc in ${holders:-}; do
   kubectl -n "$NS" delete pvc "$pvc" --ignore-not-found --timeout=90s >/dev/null 2>&1 || true
 done
@@ -230,7 +235,7 @@ live_uid=$(pv_field .metadata.uid)
 # identical every time AND the volume object itself is never replaced.
 rec=$(kubectl -n "$NS" get cm "$REC" -o json 2>/dev/null || true)
 claim_uid=$(printf '%s' "${rec:-null}" | jq -r --arg u "$live_uid" \
-  'if (.data.volumeUid // "") == $u then (.data.claimUid // "") else "" end' 2>/dev/null)
+  'if (.data.volumeUid // "") == $u then (.data.claimUid // "") else "" end' 2>/dev/null) || claim_uid=''
 
 mint_claim_uid() {
   kubectl patch pv "$PV" --type=merge -p '{"spec":{"claimRef":null}}' >/dev/null 2>&1 || true
