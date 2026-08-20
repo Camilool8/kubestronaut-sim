@@ -246,24 +246,34 @@ aux_up() {
   # shape), so dial the 0.0.0.0 form kind emits, which connects locally.
   # NotReady *nodes* are fine — q12's whole premise is a node with no CNI —
   # but /readyz answers CNI or not.
+  #
+  # The two deadlines here and below sum to 180s, and the ceiling is chosen
+  # against the budget a setup.sh runs under rather than against how long a
+  # cluster might take. The tighter of the two is a Training-mode re-seed at
+  # 240s (conductor/internal/control/reseed.go); the old pair, 180 + 120, could
+  # outlive it, and then the outer timeout kills the seed with "context
+  # deadline exceeded" instead of letting these two lines say which half of
+  # readiness never arrived. Losing nothing by it: measured cold on this image
+  # aux_up returns in about eleven seconds, so 120s is an order of magnitude of
+  # headroom and a cluster that misses it is broken rather than slow.
   local deadline
-  deadline=$(( $(date +%s) + 180 ))
+  deadline=$(( $(date +%s) + 120 ))
   kind get kubeconfig --name "$cluster" > "/tmp/aux-${name}.kubeconfig"
   until kubectl --kubeconfig "/tmp/aux-${name}.kubeconfig" get --raw /readyz >/dev/null 2>&1; do
     if [ "$(date +%s)" -ge "$deadline" ]; then
-      echo "aux_up: ${cluster} API server not ready within 180s" >&2
+      echo "aux_up: ${cluster} API server not ready within 120s" >&2
       return 1
     fi
     sleep 2
   done
 
   # Then the contract's reachability promise: root ssh on the reserved port.
-  deadline=$(( $(date +%s) + 120 ))
+  deadline=$(( $(date +%s) + 60 ))
   until ssh -i /shared/ssh/id_ed25519 -p "$ssh_port" \
       -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
       -o ConnectTimeout=3 -o LogLevel=ERROR root@127.0.0.1 true 2>/dev/null; do
     if [ "$(date +%s)" -ge "$deadline" ]; then
-      echo "aux_up: ${cluster} sshd not reachable on port ${ssh_port} within 120s" >&2
+      echo "aux_up: ${cluster} sshd not reachable on port ${ssh_port} within 60s" >&2
       return 1
     fi
     sleep 2
