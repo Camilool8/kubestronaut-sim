@@ -7,7 +7,7 @@ fi
 
 echo "waiting for cluster kubeconfig..."
 wait_deadline=$((SECONDS + ${INSTANCE_WAIT_BUDGET:-2400}))
-until [ -s /shared/kubeconfig ] && [ -s /shared/ssh/id_ed25519.pub ]; do
+until [ -s /shared/kubeconfig ] && [ -s /shared/ssh/id_ed25519.pub ] && [ -s /shared/ssh/id_ed25519 ]; do
   if [ "$SECONDS" -ge "$wait_deadline" ]; then
     echo "gave up waiting for /shared/kubeconfig — k8s-env never finished bootstrapping" >&2
     echo "check it with: docker compose logs k8s-env" >&2
@@ -22,6 +22,46 @@ mkdir -p /home/candidate/.kube /home/candidate/.ssh /root/.ssh
 cp /shared/kubeconfig /home/candidate/.kube/config
 cp /shared/ssh/id_ed25519.pub /root/.ssh/authorized_keys
 cp /shared/ssh/id_ed25519.pub /home/candidate/.ssh/authorized_keys
+
+# Node ssh (the CKA freedom model; inert elsewhere): the candidate holds the
+# same key every node trusts, and the Host table is written statically at
+# boot because the ports are fixed by the bank contract — the aux rows may
+# pre-date their clusters, and `ssh cka-aux-etcd` starts working the moment
+# that cluster's setup.sh runs. Each row also carries the node's real name
+# (sim-worker2, aux-etcd-control-plane, ...) so the name `kubectl get nodes`
+# shows is ssh-able too.
+cp /shared/ssh/id_ed25519 /home/candidate/.ssh/id_ed25519
+chmod 600 /home/candidate/.ssh/id_ed25519
+{
+  while read -r host port extra; do
+    [ -n "$host" ] || continue
+    printf 'Host %s\n' "$host${extra:+ $extra}"
+    printf '  HostName k8s-env\n'
+    printf '  Port %s\n' "$port"
+    printf '  User root\n'
+    printf '  IdentityFile ~/.ssh/id_ed25519\n'
+    printf '  StrictHostKeyChecking accept-new\n\n'
+  done <<'EOF'
+sim-control-plane 2200
+cka-worker1 2201 sim-worker
+cka-worker2 2202 sim-worker2
+cka-worker3 2203 sim-worker3
+cka-worker4 2204 sim-worker4
+cka-aux-sched 2211 aux-sched-control-plane
+cka-aux-cni 2212 aux-cni-control-plane
+cka-aux-upgrade 2213 aux-upgrade-control-plane
+cka-aux-etcd 2214 aux-etcd-control-plane
+EOF
+} > /home/candidate/.ssh/config
+chmod 600 /home/candidate/.ssh/config
+
+# Aux kubeconfigs, symlinked rather than copied: they do not exist until the
+# owning question's setup.sh runs, and a dangling link that comes alive at
+# seed time beats a boot-order dependency.
+for aux in sched cni upgrade etcd; do
+  ln -sfn "/shared/kubeconfig-aux-${aux}" "/home/candidate/.kube/aux-${aux}"
+done
+
 chown -R candidate:candidate /home/candidate/.kube /home/candidate/.ssh
 chmod 600 /root/.ssh/authorized_keys /home/candidate/.ssh/authorized_keys
 exam_type="hands-on"

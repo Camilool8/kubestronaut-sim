@@ -42,7 +42,7 @@ EOF
 for _ in $(seq 1 15); do
   restarts=$(kubectl -n horologium get pod -l app=session-store \
     -o jsonpath='{.items[*].status.containerStatuses[*].restartCount}' 2>/dev/null \
-    | tr ' ' '\n' | sort -n | tail -1)
+    | tr ' ' '\n' | sort -n | tail -1) || restarts=0
   if [ "${restarts:-0}" -ge 1 ] 2>/dev/null; then break; fi
   sleep 3
 done

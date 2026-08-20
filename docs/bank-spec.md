@@ -108,17 +108,18 @@ Where the optional keys go:
 | `spec.passingScore` | Percent. Enforced by the facilitator's `Results.Passed` |
 | `spec.kubernetesVersion` | Informational; shown on the catalog card |
 | `spec.domainWeights` | The certification's published weights, and a runtime value in three places: `exam.Load` builds `Exam.Domains` from it, `exam.Draw` stratifies a pooled or filtered draw by it, and both graders weight the final score by it. [bank-weights.sh](../tests/bank-weights.sh) still gates it too. Getting it wrong now moves real scores, not just a build check |
-| `spec.difficultyMix` | Optional, hands-on. Opts a **pooled** bank into a second stratification: the percentage of a drawn attempt that should be `quick`, `core` and `deep`. Must sum to 100, must name only those three tiers, and every question in the bank must then declare a `difficulty` and a `targetSeconds`. Absent — every bank in this repo but `ckad-mock-01` — the draw is stratified by domain alone and nothing changes. See [Mixing a draw by level](#mixing-a-draw-by-level-specdifficultymix) |
-| `spec.examLength` | Optional, **both engines**. Pools the bank: author more questions than one attempt should ask, set this to the smaller per-attempt count, and `exam.Draw` takes a fresh domain-stratified subset every start. Must be positive and no larger than the pool — `exam.Load` rejects both, because an `examLength` typo that silently turns pooling *off* is worse than one that fails the boot. A pooled bank must declare `spec.domainWeights`; the draw stratifies against them and errors without. Absent or `>=` the pool means no pooling, which is every bank in this repo. **A pooled hands-on bank also changes when its cluster is seeded** — see below |
+| `spec.difficultyMix` | Optional, hands-on. Opts a **pooled** bank into a second stratification: the percentage of a drawn attempt that should be `quick`, `core` and `deep`. Must sum to 100, must name only those three tiers, and every question in the bank must then declare a `difficulty` and a `targetSeconds`. Absent — every bank in this repo but `ckad-mock-01` and `cka-mock-01` — the draw is stratified by domain alone and nothing changes. See [Mixing a draw by level](#mixing-a-draw-by-level-specdifficultymix) |
+| `spec.examLength` | Optional, **both engines**. Pools the bank: author more questions than one attempt should ask, set this to the smaller per-attempt count, and `exam.Draw` takes a fresh domain-stratified subset every start. Must be positive and no larger than the pool — `exam.Load` rejects both, because an `examLength` typo that silently turns pooling *off* is worse than one that fails the boot. A pooled bank must declare `spec.domainWeights`; the draw stratifies against them and errors without. Absent or `>=` the pool means no pooling; every listable bank in this repo pools — `ckad-mock-01` draws 17 of 44, `cka-mock-01` 16 of 26, `kcna-mock` 65 of 97. **A pooled hands-on bank also changes when its cluster is seeded** — see below |
 | `spec.environment.nodes` | **The size of this exam's cluster.** [bootstrap.sh](../images/k8s-env/bootstrap.sh) copies `kind-config.yaml` — which holds the control-plane node and nothing else — and appends one `- role: worker` per extra node before `kind create cluster`. Absent means 2; anything that is not a positive integer fails the boot rather than falling back, because a cluster silently the wrong size is discovered by a drain question grading zero. Also served on `GET /api/exam` so the screens that describe the environment while it builds describe the one being built |
 | `spec.environment.provider` | Informational; `kind` is the only one that exists. Served on `GET /api/exam` beside `nodes` |
+| `spec.environment.addons` | Optional list; only `gateway-api` is recognized. Installs the prebaked Gateway API CRDs and nginx-gateway-fabric controller and seeds GatewayClass `sim`. Absent means no addons ([bootstrap.sh](../images/k8s-env/bootstrap.sh)) |
 | `spec.environment.allowedDomains` | Domain suffixes the desktop browser may reach through the docs proxy, subdomains included ([proxy/entrypoint.sh](../proxy/entrypoint.sh)). Omit it to inherit `allow.DefaultDomains` ([allow.go](../proxy/internal/allow/allow.go)), the smallest set that leaves the documentation sites usable |
 | `spec.instances` | 1 or 2 entries. Convention: names outside `instance-1`/`instance-2` only mark the bank unavailable in the exam selector ([catalog.go](../conductor/internal/catalog/catalog.go)), and the facilitator's exam loader never parses the block at all |
 | `spec.questions[].id`, `.instance` | Question directory name, and the ssh host the grader runs its checks on |
 | `spec.questions[].title` | Optional short label shown in the question navigator, the jump grid and the score review. Absent, the UI falls back to the id (hands-on) or the attempt position (mcq) |
 | `spec.questions[].domain` | Must match a `domainWeights` key |
 | `spec.questions[].weight` | Must equal the sum of this question's `# points:` headers |
-| `spec.questions[].targetSeconds` | Optional pacing budget, in seconds, shown on the task chip. Absent, the facilitator derives one from the question's weight's share of the exam clock ([exam.go](../facilitator/internal/exam/exam.go), `TargetSeconds`) and flags it `targetDerived` on `GET /api/exam`, so a derived figure is never presented as the author's judgement. `ckad-mock-01` sets it on every question because its `spec.difficultyMix` requires one; `kcna-mock` sets none. It is a budget, never a limit: nothing enforces it and running over costs no points. Write it below `weight:` (hands-on) or `correct:` (mcq); both gate regexes end there, and a `targetSeconds:` line above them hides the question from the gate |
+| `spec.questions[].targetSeconds` | Optional pacing budget, in seconds, shown on the task chip. Absent, the facilitator derives one from the question's weight's share of the exam clock ([exam.go](../facilitator/internal/exam/exam.go), `TargetSeconds`) and flags it `targetDerived` on `GET /api/exam`, so a derived figure is never presented as the author's judgement. `ckad-mock-01` and `cka-mock-01` set it on every question because their `spec.difficultyMix` requires one; `kcna-mock` sets none. It is a budget, never a limit: nothing enforces it and running over costs no points. Write it below `weight:` (hands-on) or `correct:` (mcq); both gate regexes end there, and a `targetSeconds:` line above them hides the question from the gate |
 | `spec.questions[].difficulty` | `quick`, `core` or `deep`. Required on every question of a bank declaring `spec.difficultyMix`, and rejected on a bank that does not — a label nothing draws on is cruft. **The tier is its `targetSeconds` band, not a judgement**: `quick` is at most 240s, `core` 241-540, `deep` 541-840, and [exam.go](../facilitator/internal/exam/exam.go) refuses a bank whose label and budget disagree. Never sent to the client during an attempt: a question labelled `deep` on screen is a spoiler and an anxiety source |
 | `spec.questions[].docs` | Optional upstream reading: a list of `{label, url}`. Shown in the post-attempt deep dive, and during a Training attempt — see [Documentation links](#documentation-links-specquestionsdocs). Write it below `weight:`/`correct:` for the same reason `targetSeconds` goes there |
 
@@ -309,6 +310,16 @@ Derive them against the **pool**, exactly as an unpooled bank does:
 question. `ckad-mock-01`'s 44 questions total 360 points that way — flat per
 domain, 9 or 7 — and every domain's share of them lands within one
 percentage point of its curriculum weight.
+
+The flat split is a convention about the **domain budget**, not a rule
+about per-question uniformity, and a pooled bank may vary its questions'
+weights by tier within a domain so long as the domain totals land.
+`cka-mock-01` does this deliberately — deep questions outweigh core,
+core outweigh quick, the way the real CKA's task weights are non-uniform
+— because a flat split is arithmetically impossible for its five domains
+at its question counts, and the pooled-bank gates check domain totals
+and pool depth, not per-question uniformity
+([the bank's design rationale](cka-track-plan.md#question-pool--26-questions)).
 
 What that does *not* give you is a drawn attempt whose raw points divide
 in the curriculum's ratios, and it cannot: a domain that contributes 4 of
@@ -515,6 +526,16 @@ always renders as plain text.
 - Exit 0 = criterion met, non-zero = failed, stdout = short message, optionally
   followed by an [artifact trailer](#showing-your-work-the-artifact-protocol).
 - Never mutates the cluster or the filesystem.
+- Reads the cluster API, never a node's disk. `tests/check-lint.sh` fails a
+  check containing a bare `ssh` or `scp` for that reason: a login spends most
+  of the budget the check is meant to be grading in, and a machine's disk is
+  not what the cluster believes. One carve-out exists — whether an etcd
+  snapshot **file** is a real snapshot is a question no API answers
+  ([q26](../banks/cka-mock-01/q26/validate.d/10_snapshot.sh)). It is marked
+  per line with `# lint: allow-node-read`, and every marked line is listed at
+  the end of a lint run so the set stays small enough to read. A question that
+  wants node state for anything else should put the artifact somewhere the API
+  or the instance can see instead.
 - Finishes within 30 seconds. The facilitator kills a check that passes its 30s
   deadline and scores it failed with "check timed out".
 
@@ -816,8 +837,10 @@ question: how to sit **this** exam quickly. Typical contents:
 
 It is bank data, not UI copy, on the same reasoning that governs
 `spec.environment.nodes`: what makes a CKAD attempt fast is not what
-makes a KCNA one fast, and a panel of strings in the client would have to
-claim one of them was the other. CKA and CKS will each ship their own.
+makes a CKA one fast — the CKA bank's page is mostly about its
+ssh-per-task host model, which no other bank has — and a panel of
+strings in the client would have to claim one of them was the other.
+CKAD, CKA and KCNA each ship one today; CKS will ship its own.
 
 - **Served ungated** by `GET /api/exam/tips` as `{"markdown": "…"}` —
   unlike solutions and hints, which check the attempt's mode first.

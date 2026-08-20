@@ -23,9 +23,33 @@ until docker info >/dev/null 2>&1; do
 done
 echo "inner dockerd up"
 
-if [ -f /opt/sim/images/_node.tar ] && ! docker image inspect "${NODE_IMAGE%%@*}" >/dev/null 2>&1; then
+# The node tars are rootfs exports of the ssh-enabled derived images (see the
+# node-ssh stages in the Dockerfile), not docker archives — a derived build
+# stage cannot be `docker save`d from inside its own build. `docker import`
+# rebuilds the image from the tar, and the .changes file baked next to it
+# restores the original image config (ENTRYPOINT, ENV, STOPSIGNAL) that a
+# rootfs tar cannot carry. Twin of _aux_import_node_tar in banks/_lib/aux-cluster.sh,
+# which lazily imports the v1.34 aux tar the same way.
+import_node_tar() {
+  local tar=$1 ref=$2 line
+  local args=()
+  while IFS= read -r line; do
+    if [ -n "$line" ]; then args+=(--change "$line"); fi
+  done < "${tar}.changes"
+  docker import "${args[@]}" "$tar" "$ref" >/dev/null
+}
+
+# The guard checks the sim.node-ssh label, not bare tag existence: the inner
+# dockerd's volume outlives image upgrades, so a pre-ssh install has the same
+# tag pointing at the pristine upstream image, and a tag-only guard would keep
+# it forever. Importing over the tag untags the stale one; the running cluster
+# still needs one reset/switch to rebuild its nodes from the new image.
+node_image_current() {
+  [ "$(docker image inspect -f '{{index .Config.Labels "sim.node-ssh"}}' "$1" 2>/dev/null)" = "1" ]
+}
+if [ -f /opt/sim/images/_node.tar ] && ! node_image_current "${NODE_IMAGE%%@*}"; then
   detail "loading the Kubernetes node image"
-  docker load -q -i /opt/sim/images/_node.tar >/dev/null
+  import_node_tar /opt/sim/images/_node.tar "${NODE_IMAGE%%@*}"
 fi
 
 HELM_REPO_URL="http://k8s-env:${HELM_REPO_PORT}"

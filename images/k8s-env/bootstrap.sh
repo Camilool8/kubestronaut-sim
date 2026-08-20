@@ -27,8 +27,11 @@ mkdir -p /shared/ssh
 if [ ! -f /shared/ssh/id_ed25519 ]; then
   keytmp=$(mktemp -d /shared/ssh/.keygen.XXXXXX)
   ssh-keygen -t ed25519 -N '' -f "${keytmp}/id_ed25519" -q
-  mv "${keytmp}/id_ed25519.pub" /shared/ssh/id_ed25519.pub
+  # Private key first: every consumer gates on the .pub, so once it appears
+  # the key it belongs to must already be in place — the instance entrypoint
+  # copies the private key for the candidate the moment it sees the .pub.
   mv "${keytmp}/id_ed25519" /shared/ssh/id_ed25519
+  mv "${keytmp}/id_ed25519.pub" /shared/ssh/id_ed25519.pub
   rmdir "${keytmp}"
 fi
 
@@ -85,6 +88,30 @@ preload_bank_images() {
   done < /opt/sim/preload.txt
 }
 
+# Cluster infrastructure belongs on the control plane, which is the one node no
+# question may break. The CKA bank hands out whole workers — one is drained, one
+# has its kubelet disabled, one is tainted for a batch workload — and a
+# Deployment the scheduler happened to place on any of them goes down with it.
+# That is the correct fate for a candidate's workload and a bug for the storage
+# provisioner, whose absence surfaces minutes later as an unrelated question's
+# PVC stuck Pending with nothing on screen connecting the two. Observed: the
+# Gateway controller booted onto sim-worker3, which is the node q07 disables.
+#
+# A patch rather than an edit, because both manifests are fetched verbatim at
+# build time. Idempotent — patching the same values back reports no change and
+# starts no rollout, which is what the resume path needs.
+pin_to_control_plane() {
+  local ns=$1 deploy=$2
+  kubectl -n "$ns" patch deployment "$deploy" -p '{
+    "spec": {"template": {"spec": {
+      "nodeSelector": {"kubernetes.io/hostname": "sim-control-plane"},
+      "tolerations": [{"key": "node-role.kubernetes.io/control-plane",
+                       "operator": "Exists", "effect": "NoSchedule"}]
+    }}}
+  }'
+  kubectl -n "$ns" rollout status "deployment/${deploy}" --timeout=180s
+}
+
 ingress_prep_pid=""
 ingress_prep_log=""
 
@@ -136,11 +163,32 @@ nodes=$(yq -r '.spec.environment.nodes // 2' "${BANK_DIR}/exam.yaml")
 case "$nodes" in
   ''|*[!0-9]*|0) echo "spec.environment.nodes must be a positive integer, got '${nodes}'"; exit 1 ;;
 esac
+
+# Optional addons, read like `nodes` above. Only gateway-api exists; anything
+# else is a typo that would otherwise silently install nothing, so it fails
+# the boot here, before a cluster is built.
+addons=$(yq -r '.spec.environment.addons // [] | .[]' "${BANK_DIR}/exam.yaml")
+for addon in $addons; do
+  case "$addon" in
+    gateway-api) ;;
+    *) echo "spec.environment.addons: unknown addon '${addon}' (only gateway-api is recognized)"; exit 1 ;;
+  esac
+done
+
 kind_config=/tmp/kind-config.yaml
 cp /opt/sim/kind-config.yaml "${kind_config}"
 worker=1
 while [ "$worker" -lt "$nodes" ]; do
-  printf '  - role: worker\n' >> "${kind_config}"
+  # Worker N's sshd rides host port 2200+N (contract: 2201-2204). Mapped for
+  # every bank and every worker count: the node image runs sshd regardless,
+  # and a mapping nothing connects to is inert.
+  {
+    printf '  - role: worker\n'
+    printf '    extraPortMappings:\n'
+    printf '      - containerPort: 22\n'
+    printf '        hostPort: %s\n' "$((2200 + worker))"
+    printf '        protocol: TCP\n'
+  } >> "${kind_config}"
   worker=$((worker + 1))
 done
 
@@ -157,6 +205,16 @@ fi
 kind get kubeconfig --name sim | sed 's#https://0\.0\.0\.0:6443#https://k8s-env:6443#' | write_shared /shared/kubeconfig
 kind export kubeconfig --name sim
 
+# Root ssh onto every node: the node image runs sshd; only the key needs
+# injecting. Runs on create AND resume (a fresh /shared may hold a fresh
+# keypair), and overwriting makes it idempotent. Twin loop in
+# banks/_lib/aux-cluster.sh for the aux clusters.
+for node in $(kind get nodes --name sim); do
+  docker exec -i "$node" sh -c \
+    'mkdir -p /root/.ssh && cat > /root/.ssh/authorized_keys && chmod 700 /root/.ssh && chmod 600 /root/.ssh/authorized_keys' \
+    < /shared/ssh/id_ed25519.pub
+done
+
 phase api-server "Waiting for the API server" 4
 echo "waiting for API server..."
 for i in $(seq 1 60); do
@@ -170,9 +228,119 @@ echo "installing Calico (NetworkPolicy enforcement)..."
 preload_images /opt/sim/calico.yaml
 start_ingress_prep
 kubectl apply -f /opt/sim/calico.yaml
-kubectl -n kube-system rollout status daemonset/calico-node --timeout=300s
 
-kubectl wait --for=condition=Ready nodes --all --timeout=180s
+# NOT `kubectl rollout status`, which waits for a ready Pod on EVERY node the
+# DaemonSet is scheduled to. A node a question has deliberately taken down is
+# never going to have one — the CKA bank disables a worker's kubelet, and the
+# whole point is that `./sim down && ./sim up` must not heal it — so on the
+# resume path of an attempt that drew it, rollout status spends its entire
+# timeout and then, under `set -e` with an ERR trap, fails the boot of an
+# environment behaving exactly as designed. Measured: 4 of 5 ready, boot
+# failed, cluster fine.
+#
+# The condition asked for instead is the one that matters, and it distinguishes
+# the two cases without racing either. A node still coming up reports Ready
+# `False` ("container runtime network not ready") — every node does, before
+# Calico lands. A node whose kubelet has stopped posting reports `Unknown`, and
+# only after the node controller's ~45s grace period. So "ready Pods plus nodes
+# nobody is hearing from covers every node the DaemonSet wants" is false all the
+# way through a normal boot and becomes true, once, at the end of either.
+cni_state() { # -> "<desired> <ready> <unknown>"
+  local ds unknown
+  ds=$(kubectl -n kube-system get daemonset calico-node \
+    -o jsonpath='{.status.desiredNumberScheduled} {.status.numberReady}' 2>/dev/null) || ds=""
+  unknown=$(kubectl get nodes \
+    -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' 2>/dev/null \
+    | grep -c '^Unknown$') || unknown=0
+  printf '%s %s' "${ds:-0 0}" "${unknown:-0}"
+}
+
+# The heal, run once if the wait is not making progress. `./sim down && ./sim
+# up` restarts the node containers and the inner docker daemon can hand one a
+# different address than it had — with four aux clusters' nodes sharing the
+# network, it usually does. A live node posts its new address and Calico
+# follows it; a node whose kubelet is disabled cannot, so its stale
+# projectcalico.org/IPv4Address annotation goes on claiming an address some live
+# node has just been given, and calico/node on THAT node refuses to start at
+# all: "conflicting node detected: IPv4 address conflict". Measured on a resume
+# of an attempt that had drawn q07 — sim-worker3 was down holding 172.18.0.6,
+# the control plane came back on 172.18.0.6, and the cluster booted with no CNI
+# on its control plane.
+#
+# Clearing the down node's annotation releases the address, and costs nothing:
+# Calico writes it again from the node's own interface the moment that node's
+# Pod runs, which is the moment the candidate repairs the kubelet.
+heal_calico_address_conflicts() {
+  kubectl get nodes \
+    -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' \
+    | awk '$2 == "Unknown" { print $1 }' \
+    | while read -r down_node; do
+        [ -n "$down_node" ] || continue
+        echo "clearing the Calico address annotation of ${down_node}, which nothing is hearing from"
+        kubectl annotate node "$down_node" projectcalico.org/IPv4Address- >/dev/null 2>&1 || true
+      done
+  # And restart whatever could not start because of it: such a Pod is in
+  # CrashLoopBackOff, where the next attempt can be minutes away.
+  kubectl -n kube-system get pods -l k8s-app=calico-node \
+    -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.containerStatuses[*].ready}{"\n"}{end}' \
+    | awk '$2 != "true" { print $1 }' \
+    | while read -r stuck_pod; do
+        [ -n "$stuck_pod" ] || continue
+        kubectl -n kube-system delete pod "$stuck_pod" >/dev/null 2>&1 || true
+      done
+}
+
+echo "waiting for the pod network on every node that is up..."
+cni_ok=''
+healed=''
+cni_desired=0
+cni_ready=0
+cni_unknown=0
+cni_started=$(date +%s)
+while :; do
+  read -r cni_desired cni_ready cni_unknown <<<"$(cni_state)"
+  if [ "${cni_desired:-0}" -gt 0 ] && [ "${cni_ready:-0}" -gt 0 ] \
+     && [ $(( cni_ready + cni_unknown )) -ge "${cni_desired:-0}" ]; then
+    cni_ok=1
+    break
+  fi
+  # 90s in: the node controller has had its grace period, so a shortfall that
+  # is still here is a Pod that cannot start rather than one still starting.
+  if [ -z "$healed" ] && [ "$(( $(date +%s) - cni_started ))" -ge 90 ]; then
+    healed=1
+    heal_calico_address_conflicts
+  fi
+  [ "$(( $(date +%s) - cni_started ))" -ge 300 ] && break
+  sleep 5
+done
+if [ -n "$cni_ok" ]; then
+  if [ "${cni_unknown:-0}" -gt 0 ]; then
+    echo "calico-node is ready on all ${cni_ready} node(s) that are up; ${cni_unknown} node(s) are down"
+    echo "  — expected when a drawn question has disabled one on purpose"
+  fi
+else
+  echo "calico-node is ready on ${cni_ready} of ${cni_desired} node(s), ${cni_unknown} of which are down"
+  kubectl -n kube-system get pods -l k8s-app=calico-node -o wide
+  boot_failed "the pod network did not come up on every node that is up"
+  exit 1
+fi
+
+# Not fatal, and deliberately so on the resume path. A question is allowed to
+# leave a node NotReady on purpose — the CKA bank disables a worker's kubelet
+# and the whole point is that `./sim down && ./sim up` must not heal it — so
+# under `set -e` this wait would spend 180s and then kill a boot that is working
+# exactly as designed. It races today: the node controller needs about 45s to
+# turn a stale Ready into Unknown, and a fast boot gets here first. Say what is
+# NotReady and carry on; nothing after this point needs every node.
+if ! kubectl wait --for=condition=Ready nodes --all --timeout=180s; then
+  echo "warning: not every node reported Ready — a drawn question may have disabled one on purpose"
+  kubectl get nodes
+fi
+
+# kind's own storage provisioner, which it installs with the cluster: it
+# tolerates the control-plane taint already but is pinned to no node, so which
+# one it lands on is luck. Every PVC in every bank is bound by this one Pod.
+pin_to_control_plane local-path-storage local-path-provisioner
 
 phase ingress "Installing the ingress controller" 6
 echo "installing ingress-nginx..."
@@ -180,6 +348,47 @@ finish_ingress_prep
 kubectl apply -f /opt/sim/ingress-nginx.yaml
 kubectl -n ingress-nginx wait --for=condition=Available \
   deployment/ingress-nginx-controller --timeout=300s
+
+# The gateway-api addon, inside the ingress phase rather than a phase of its
+# own: banks without the addon must boot exactly as they always have, and a
+# ninth phase would show every one of them a step that no longer matches the
+# log. The GatewayClass guard keeps a resume from re-running the NGF
+# cert-generator Job, which would mint new agent-TLS secrets under a running
+# controller. The CRD applies are server-side because two of the CRDs are far
+# past the 262KB client-side-apply annotation limit.
+if printf '%s\n' "$addons" | grep -qx 'gateway-api'; then
+  if kubectl get gatewayclass sim >/dev/null 2>&1; then
+    echo "gateway-api addon already installed; skipping"
+  else
+    echo "installing the Gateway API controller (nginx-gateway-fabric)..."
+    detail "installing the Gateway API controller"
+    while read -r img; do
+      if [ -n "$img" ]; then load_image "${img%%@*}"; fi
+    done < /opt/sim/gateway-images.txt
+    kubectl apply --server-side --force-conflicts -f /opt/sim/gateway-api-crds.yaml
+    kubectl apply --server-side --force-conflicts -f /opt/sim/ngf-crds.yaml
+    kubectl wait --for=condition=Established --timeout=60s \
+      crd/gatewayclasses.gateway.networking.k8s.io \
+      crd/gateways.gateway.networking.k8s.io \
+      crd/httproutes.gateway.networking.k8s.io \
+      crd/nginxproxies.gateway.nginx.org \
+      crd/nginxgateways.gateway.nginx.org
+    kubectl apply -f /opt/sim/ngf.yaml
+  fi
+  # Outside the guard, on purpose. The skip above is about not reinstalling;
+  # placement is decided every boot, or a controller that came up on a worker
+  # before this existed would sit there for the life of the volume. It also
+  # replaces the old `wait --for=condition=Available`, which proved nothing: a
+  # Deployment whose previous Pod is still running satisfies Available while
+  # the pinned replacement is still being scheduled.
+  #
+  # Before the GatewayClass wait, not after, and that ordering is worth a
+  # boot's difference. Accepted requires the controller to be up, so pinning
+  # after it would always mean a second rollout on a fresh cluster; pinning
+  # first means the only Pod NGF ever starts here is the pinned one.
+  pin_to_control_plane nginx-gateway nginx-gateway
+  kubectl wait --for=condition=Accepted gatewayclass/sim --timeout=120s
+fi
 
 exam_type=$(yq -r '.spec.examType // "hands-on"' "${BANK_DIR}/exam.yaml")
 

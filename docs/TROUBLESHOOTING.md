@@ -21,7 +21,7 @@ doctor before a first boot on a new machine.
 | `docker : NOT REACHABLE` | Daemon not running, or your user cannot reach its socket | Start Docker Desktop, or add yourself to the `docker` group |
 | `compose : MISSING` | Compose v2 absent. The v1 `docker-compose` binary is not a substitute | Install the Compose v2 plugin |
 | `python3 : MISSING` | `./sim` reads JSON with `python3`. Bash launcher only — `.\sim.ps1 doctor` has no such check, since it parses JSON natively | Install `python3`. Without it, `up` prints no phases and spins until the boot budget expires |
-| `RAM to docker : NGB << LOW` | Under 8GB reaches Docker. The desktop plus a two-node cluster wants ~9GB | Raise the memory limit in Docker Desktop → Resources |
+| `RAM to docker : NGB << LOW` | Under 8GB reaches Docker. The desktop plus a two-node cluster wants ~9GB; the CKA bank's five-node cluster plus aux clusters wants ~12GB, worst case ~15-16GB | Raise the memory limit in Docker Desktop → Resources |
 | `disk for images : NGB << LOW` | Under 25GB free. The images alone are ~10GB | Free space, or `./sim purge` to drop an old install's volumes |
 | `warm volumes : none` | Not a fault — this is a cold first boot | Expect several minutes. Later boots resume |
 | `line endings : N script(s) have CRLF` | A clone made before `.gitattributes` existed checked out `sim`, the `.sh` scripts and `images/k8s-env/preload.txt` as CRLF | Nothing to do — `./sim up` or `.\sim.ps1 up` repairs them in place before building |
@@ -29,7 +29,7 @@ doctor before a first boot on a new machine.
 | `env: 'bash\r': No such file or directory` when running `./sim` itself | `sim`'s own shebang line has a trailing `\r`, so the OS never gets far enough to run the repair inside it. Reachable only on a WSL or Git-Bash checkout made with an old Git for Windows, before it defaulted to LF | Re-clone, or force a re-checkout: `git ls-files -z \| xargs -0 rm -f && git checkout -- .` |
 | `.\sim.ps1 cannot be loaded because running scripts is disabled` | Windows blocks unsigned scripts by default | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, or `powershell -ExecutionPolicy Bypass -File .\sim.ps1 up` |
 | `container OS : windows` | Docker Desktop is in Windows-containers mode | Right-click the tray icon → *Switch to Linux containers* |
-| `RAM to docker : NGB << LOW` on Windows | WSL2 allocates itself a fraction of host RAM | Create `%UserProfile%\.wslconfig` with `memory=10GB`, then `wsl --shutdown` |
+| `RAM to docker : NGB << LOW` on Windows | WSL2 allocates itself a fraction of host RAM | Create `%UserProfile%\.wslconfig` with `memory=10GB` — `memory=13GB` or more for the CKA bank — then `wsl --shutdown` |
 
 ## During a boot
 

@@ -26,6 +26,24 @@ HARD = [
      "(this cost 10 points on a real run). kubectl exec into a workload the question already runs."),
     ("grep-qx", re.compile(r"grep\s+-[a-z]*x")," "
      "use file_text from _lib/checks.sh — grep -qx fails on a trailing space or a CRLF, which are not wrong answers"),
+    # A check reads the API. Reaching a node instead grades whatever that
+    # machine's disk happens to say, spends most of the 30s budget on a login
+    # (a timed-out check is scored FAILED), and breaks the moment a question
+    # moves to another node or cluster. There is exactly one thing no API can
+    # answer — whether an etcd snapshot FILE on a node is a valid snapshot —
+    # so the exception is a marker on the offending line, not a blanket
+    # allowance, and every use of it is listed at the end of a run.
+    ("node-read", re.compile(r"(?<![\w.-])(?:ssh|scp)(?![\w-])"),
+     "a check reads the cluster API, not a node's filesystem: ssh/scp from a "
+     "grader spends the 30s budget on a login and grades a machine rather than "
+     "the answer. If this really is something no API can see (the etcd snapshot "
+     "file is the one such case), put '# lint: allow-node-read' on this line — "
+     "the run then lists it as a documented exception. If instead the word is "
+     "prose inside an evidence note or a failure message, reword it ('login "
+     "alias', 'from the node's own shell'): the match is on the bare token by "
+     "design, because a rule that tried to tell a command from a sentence would "
+     "have to miss wrapped calls like 'timeout 5 ssh …'. Do NOT silence prose "
+     "with the marker — it would document a node read that does not exist"),
 ]
 
 SOFT = [
@@ -59,7 +77,7 @@ LIB = pathlib.Path("banks/_lib/checks.sh")
 HELPERS = sorted(set(re.findall(r"^([a-z_][a-z0-9_]*)\(\)", LIB.read_text(), re.MULTILINE))) if LIB.is_file() else []
 CALLS = re.compile(r"(?:^|[|&;(]|\$\(|\s)(" + "|".join(HELPERS) + r")(?=\s|$|[)|;&])") if HELPERS else None
 
-errors, warnings = [], []
+errors, warnings, node_reads = [], [], []
 
 for path in scripts:
     text = path.read_text()
@@ -137,7 +155,15 @@ for path in scripts:
         if stripped.startswith("#"):
             continue
         for rule, pat, msg in HARD:
-            if not pat.search(line) or f"lint: allow-{rule}" in line:
+            if not pat.search(line):
+                continue
+            if f"lint: allow-{rule}" in line:
+                # An allowed node read is the bank's one documented departure
+                # from API-only grading. Counting it here is what keeps it
+                # documented: the marker cannot spread quietly, because every
+                # run prints where it is.
+                if rule == "node-read":
+                    node_reads.append((path, i))
                 continue
             if rule in EXEMPT and EXEMPT[rule].search(line):
                 continue
@@ -156,6 +182,14 @@ for path, line, rule, msg in warnings:
 
 for path, line, rule, msg in errors:
     print(f"FAIL  {path}:{line} [{rule}] {msg}")
+
+if node_reads:
+    print()
+    print(f"check-lint: {len(node_reads)} check(s) read a node instead of the API, "
+          f"each with an explicit '# lint: allow-node-read'. That is meant to be a "
+          f"handful of lines across all banks — review any new one:")
+    for path, line in node_reads:
+        print(f"      {path}:{line}")
 
 print()
 print(f"check-lint: {len(scripts)} checks, {len(errors)} errors, {len(warnings)} warnings")

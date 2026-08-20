@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"kubestronaut-sim/conductor/internal/job"
 )
@@ -112,4 +113,19 @@ func (c *Controller) seedOne(ctx context.Context, containerID, bank, qid string,
 	return nil
 }
 
-const seedQuestionBudget = reseedBudget
+// Its own number rather than the re-seed budget it used to borrow, because the
+// two are watched by different people. A re-seed is interactive — one question,
+// a cluster that already exists, a candidate looking at a spinner — and 240s is
+// the right point to give up. Preparing an attempt happens once, behind a
+// progress screen, and one CKA question builds a whole kind cluster before it
+// seeds anything into it.
+//
+// The reason for the headroom is not that seeding is slow: measured on this
+// image, the aux-cluster questions cost about 16s each and a seven-question
+// domain sweep averages 35s a question. It is that this deadline competes with
+// the timeouts inside the setups themselves — `kubectl rollout status
+// --timeout=120s`, and the readiness loops in banks/_lib/aux-cluster.sh. Whichever
+// fires first writes the message, and the inner one names what did not converge
+// while this one can only say "context deadline exceeded". So the outer budget
+// is deliberately larger than any single setup's internal waits can sum to.
+const seedQuestionBudget = 600 * time.Second

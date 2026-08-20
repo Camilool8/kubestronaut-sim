@@ -2637,8 +2637,14 @@ button.nav-menu-item:hover {
   color: var(--danger);
 }
 
+/* A check's message is its stdout, and a check with several criteria prints
+   one line per criterion. Collapsing those newlines ran two verdicts together
+   into a sentence that said neither: "...want kubelet v1.35.6 or newer and
+   Ready=True nothing is cordoned, but the upgrade has not landed either".
+   pre-line keeps the line breaks the grader wrote and still wraps long ones. */
 .check-message {
   color: var(--text-muted);
+  white-space: pre-line;
 }
 
 .solution-details summary {

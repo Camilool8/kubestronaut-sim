@@ -132,7 +132,7 @@ first is still booting and hand both a half-built cluster.
 |---|---|---|
 | `sessions.practical.seats` | 3 | Concurrent hands-on environments, across every hands-on exam |
 | `sessions.practical.bank` | `ckad-mock-01` | The exam a hands-on session sits when the request names none |
-| `sessions.practical.banks.<id>.resources` | `{}` | Per-exam container resources, merged over `sessions.practical.resources` |
+| `sessions.practical.banks.<id>.resources` | a `cka-mock-01` entry | Per-exam container resources, merged over `sessions.practical.resources` |
 | `sessions.mcq.seats` | 30 | Concurrent multiple-choice sessions |
 | `sessions.mcq.bank` | `kcna-mock` | As above, for the MCQ pool |
 | `sessions.maxAge` | `10h` | Hard cap. A seat is taken back at it |
@@ -166,16 +166,26 @@ Per practical session, across its eight containers:
   needs more — put that in
   `sessions.practical.banks.<id>.resources`. Seats are unaffected: one
   pool, one queue, a differently sized Pod in it.
+- The chart ships one such entry: `cka-mock-01` raises the k8s-env
+  memory limit to **12Gi**, because that exam builds a five-node main
+  cluster and its questions can add up to four single-node `aux-*`
+  clusters inside the same container. Only the limit is raised — the
+  request stays at the manifest's 2Gi, the same overcommitment bet the
+  base sizing makes. If your CKA seats share nodes with anything you
+  care about, reserve the peak instead:
+  `sessions.practical.banks.cka-mock-01.resources.k8s-env.requests.memory: 6Gi`.
 
 **Overcommitment is deliberate.** Three sessions request 11.8Gi and
-could demand 35Gi. If several peak at once a node can OOM mid-exam.
-Serialised boots are most of the mitigation — the peak *is* the boot —
-and `emptyDir.sizeLimit` is the rest.
+could demand 35Gi — 53.4Gi if all three sit `cka-mock-01`. If several
+peak at once a node can OOM mid-exam. Serialised boots are most of the
+mitigation — the peak *is* the boot — and `emptyDir.sizeLimit` is the
+rest.
 
 **Node disk is the figure most likely to surprise.** The emptyDir
-volumes declare **32.9GiB** of `sizeLimit` between them, 20GiB of it the
-inner Docker daemon's. It is a ceiling, not a reservation, but three
-seats on one node can legitimately ask for 99GiB.
+volumes declare **40.9GiB** of `sizeLimit` between them, 28GiB of it the
+inner Docker daemon's — sized for the largest bank's five-node main
+cluster plus its aux clusters. It is a ceiling, not a reservation, but
+three seats on one node can legitimately ask for 123GiB.
 
 Steady state is cheap. The expensive part is the first three to six
 minutes: `kind create cluster`, a CNI, an ingress controller, and every

@@ -20,7 +20,9 @@ locally on your own machine.
 ## Quickstart
 
 **Requirements:** Docker Desktop (or docker + compose v2) and ~9GB of
-free RAM. Full per-OS steps are in [docs/install.md](docs/install.md).
+free RAM — the CKA bank's larger cluster wants ~12GB (see
+[The exams](#the-exams)). Full per-OS steps are in
+[docs/install.md](docs/install.md).
 
 ```bash
 ./sim doctor    # preflight: RAM, disk, cgroups, tools
@@ -51,17 +53,24 @@ what creates its cluster, and the page shows each phase as it completes.
 
 | Bank | Engine | Questions | Per attempt | Time | Pass |
 |---|---|---|---|---|---|
+| CKA Mock Exam | Hands-on | 26 | 16 drawn | 120 min | 66% |
 | CKAD Mock Exam | Hands-on | 44 | 17 drawn | 120 min | 66% |
 | KCNA Mock Exam | Multiple choice | 97 | 65 drawn | 90 min | 75% |
 
 - Every draw is stratified to the published curriculum weights.
-- CKAD also mixes the draw across three levels — quick, core and deep, set
-  by how long a task should take — so an attempt is not a wall of long
-  multi-step tasks.
+- CKA and CKAD also mix the draw across three levels — quick, core and
+  deep, set by how long a task should take — so an attempt is not a wall
+  of long multi-step tasks.
+- CKA runs a five-node kind cluster with **root ssh to every node** —
+  the control plane included — plus per-question auxiliary clusters for
+  the disruptive tasks (scheduler repair, CNI install, kubeadm upgrade,
+  etcd restore), and a real Gateway API controller. It wants more RAM
+  than the other banks: ~12GB free, plus about 1GB per aux-cluster
+  question drawn — worst case ~15-16GB.
 - CKAD runs against a two-node kind cluster, at the Kubernetes version
   its bank pins.
 - KCNA ships a full explanation for every question.
-- CKA, KCSA and CKS appear in the catalog as coming soon.
+- KCSA and CKS appear in the catalog as coming soon.
 
 Hands-on questions are graded on **behaviour**, not on the shape of your
 YAML — a policy that actually denies, an Ingress the controller really
@@ -139,6 +148,9 @@ A kind cluster sized by the exam you picked
   retired controller is not an exam change — see
   [SECURITY.md](SECURITY.md#ingress-nginx-is-retired-upstream) for why
   that is acceptable here and what would force a migration.
+- Gateway API CRDs and a real Gateway controller, when the bank asks
+  for them (`spec.environment.addons` — the CKA bank does), so Gateway
+  and HTTPRoute questions are graded on routes that actually serve.
 - A local Helm repository.
 - A plain-HTTP registry for the image-building questions.
 
@@ -171,7 +183,7 @@ Calibration choices, not gaps.
 | Divergence | Reason |
 |---|---|
 | Harder than the real exam | Pass here, be comfortable there. |
-| Two-node cluster | Headroom for scheduling, affinity and DaemonSet questions, and it fits in 9GB. No question needs the second node today — CKAD has no node-management competency. |
+| Cluster sized per bank | CKAD's two nodes give headroom for scheduling, affinity and DaemonSet questions and fit in 9GB — no CKAD question needs the second node, since CKAD has no node-management competency. CKA's five nodes exist because its questions do manage nodes: drain, kubelet repair, taints. |
 | Ingress and NodePorts published to your host | Convenience for debugging. No grading check depends on it. |
 | Documentation allowlist has no deny-override | Allowing `kubernetes.io` also allows `discuss.kubernetes.io`. |
 | Solutions readable in Training | That is the point of the mode. Exam and Mastery keep the gate. |

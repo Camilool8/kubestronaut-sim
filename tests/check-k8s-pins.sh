@@ -34,8 +34,17 @@ esac
 # Where the non-bank pins live. path:ARG name:kind. The kind decides how the
 # version is dug out of the raw value, because NODE_IMAGE carries a digest and
 # KUBECTL_VERSION does not.
+#
+# aux-node is the CKA aux-cluster image (q13 upgrades FROM it), pinned one
+# minor BEHIND everything else on purpose. It is validated — digest-pinned,
+# exactly one minor below NODE_IMAGE — but never joins the same-minor
+# agreement below, and never appears in the --list table the curriculum
+# watcher parses. Until the ARG lands in the Dockerfile the check skips with
+# a note rather than failing: absence means the CKA aux image has not shipped
+# yet, not that a pin was lost.
 IMAGE_PINS='images/k8s-env/Dockerfile:KUBECTL_VERSION:kubectl
 images/k8s-env/Dockerfile:NODE_IMAGE:node
+images/k8s-env/Dockerfile:AUX_NODE_IMAGE:aux-node
 images/instance/Dockerfile:KUBECTL_VERSION:kubectl'
 
 VERSION_RE='^([0-9]+)\.([0-9]+)([.][0-9]+)?$'
@@ -110,6 +119,8 @@ for f in banks/*/exam.yaml; do
 done
 
 # ----------------------------------------------------------------- the images
+aux_raw=''
+aux_series=''
 while IFS=: read -r file name kind; do
   [ -n "$file" ] || continue
   if [ ! -f "$file" ]; then
@@ -117,6 +128,10 @@ while IFS=: read -r file name kind; do
     continue
   fi
   if ! raw=$(docker_arg "$file" "$name"); then
+    if [ "$kind" = aux-node ]; then
+      echo "check-k8s-pins: note: $file declares no ARG $name yet — aux-image check skipped" >&2
+      continue
+    fi
     problem "$file: no 'ARG $name=' line — the pin moved or was renamed"
     continue
   fi
@@ -137,6 +152,24 @@ while IFS=: read -r file name kind; do
       ver=${tag##*:}
       ver=${ver#v}
       ;;
+    aux-node)
+      # Validated here, compared after the loop, appended to rows never:
+      # a deliberately-older pin in the agreement set would mark itself as
+      # the straggler on every run.
+      if ! [[ $raw =~ $DIGEST_RE ]]; then
+        problem "$file: $name is not pinned by digest: $raw"
+        continue
+      fi
+      tag=${raw%%@*}
+      ver=${tag##*:}
+      ver=${ver#v}
+      if ! aux_series=$(series "$ver"); then
+        problem "$file: $name='$raw' does not carry a Kubernetes version"
+        continue
+      fi
+      aux_raw=$raw
+      continue
+      ;;
     *)
       problem "unknown pin kind '$kind' for $file:$name"
       continue
@@ -151,6 +184,31 @@ while IFS=: read -r file name kind; do
 done <<EOF
 $IMAGE_PINS
 EOF
+
+# ------------------------------------------------------------ the aux relation
+#
+# The aux image exists to be upgraded FROM: q13's kubeadm-upgrade question
+# starts a cluster on it and upgrades to the main series. The same series
+# would make the question a no-op; two behind is a skip kubeadm refuses. So
+# the pin must sit exactly one minor below NODE_IMAGE — a relation read from
+# the two ARGs on every run, never hardcoded, so a cutover that moves
+# NODE_IMAGE moves this expectation with it.
+if [ -n "$aux_series" ]; then
+  main_series=''
+  for row in "${rows[@]}"; do
+    if [ "$(printf '%s' "$row" | cut -f2)" = NODE_IMAGE ]; then
+      main_series=$(printf '%s' "$row" | cut -f4)
+    fi
+  done
+  if [ -z "$main_series" ]; then
+    problem "AUX_NODE_IMAGE is pinned but NODE_IMAGE could not be read — there is nothing to be one minor behind"
+  else
+    want_aux="${main_series%%.*}.$((${main_series##*.} - 1))"
+    if [ "$aux_series" != "$want_aux" ]; then
+      problem "images/k8s-env/Dockerfile: AUX_NODE_IMAGE is on ${aux_series}, want ${want_aux} — exactly one minor below NODE_IMAGE (${main_series}), the premise of the kubeadm-upgrade question"
+    fi
+  fi
+fi
 
 # ---------------------------------------------------------------- the verdict
 #
@@ -225,5 +283,9 @@ if [ ${#abstained[@]} -gt 0 ]; then
   for f in "${abstained[@]}"; do
     printf '  %-32s %s\n' "$f" "(declares no kubernetesVersion — not compared)"
   done
+fi
+if [ -n "$aux_raw" ]; then
+  printf '  %-32s %-18s %s (one minor behind by design — not compared)\n' \
+    "images/k8s-env/Dockerfile" "AUX_NODE_IMAGE" "$aux_raw"
 fi
 echo "check-k8s-pins: ${#rows[@]} pins, all on Kubernetes ${wanted}"

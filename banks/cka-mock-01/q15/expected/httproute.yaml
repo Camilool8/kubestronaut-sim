@@ -1,0 +1,33 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: lacerta-routes
+  namespace: lacerta
+spec:
+  hostnames:
+    - q15-lacerta.sim.local
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: lacerta-gateway
+  rules:
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: storefront
+          port: 80
+          weight: 1
+      matches:
+        - path:
+            type: PathPrefix
+            value: /store
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: checkout
+          port: 8080
+          weight: 1
+      matches:
+        - path:
+            type: PathPrefix
+            value: /checkout
