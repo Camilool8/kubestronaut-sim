@@ -32,7 +32,7 @@
 #   DRILL_BASE              facilitator URL           (default http://localhost:8080)
 #   DRILL_PREPARE_BUDGET    seconds to wait for per-question seeding (default 900)
 #   DRILL_ATTEMPT_LIMIT     attempts per domain before giving up      (default 12)
-#   DRILL_RESET             1 => ./sim reset before each attempt      (default 0)
+#   DRILL_RESET             0 => skip the ./sim reset before each attempt (default 1)
 #
 # Exit status: 0 when every pool question was drawn, solved and graded to full
 # marks; 1 otherwise, with the reason per question. It never exits 0 with
@@ -45,7 +45,16 @@ BANK=${1:-${DRILL_BANK:-cka-mock-01}}
 BASE=${DRILL_BASE:-http://localhost:8080}
 PREPARE_BUDGET=${DRILL_PREPARE_BUDGET:-900}
 ATTEMPT_LIMIT=${DRILL_ATTEMPT_LIMIT:-12}
-RESET_EACH=${DRILL_RESET:-0}
+# On by default, because without it the sweep can only ever finish its first
+# domain. The facilitator remembers which ids the environment was seeded for
+# and refuses a start whose draw differs (errClusterHoldsAnotherDraw,
+# facilitator/internal/api/prepare.go) — correctly, since the cluster still
+# holds the previous draw's objects. Ending the session does not clear that;
+# only a rebuild does. So every attempt after the first answers 409 until
+# something resets, and the reset is also what makes each attempt's grade a
+# real fresh-environment measurement rather than a reading taken on top of the
+# last domain's solved state.
+RESET_EACH=${DRILL_RESET:-1}
 
 RESP=/tmp/drill-http.json
 STATE=/tmp/drill-state-${BANK}.tsv   # qid <TAB> verdict <TAB> detail

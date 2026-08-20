@@ -77,7 +77,7 @@ gate green precisely because nothing ran it.
 | `check-preload.sh` | The two image tags two questions depend on *not* resolving are still absent from `images/k8s-env/preload.txt`. It reads that tag list out of the prose under [Rules that are not negotiable](#rules-that-are-not-negotiable) rather than keeping a second copy, and confirms each tag against the question the prose attributes it to — so a wrong question number fails the gate rather than surviving in the document, which is how issue #88 stood until someone corrected it by hand |
 | `check-k8s-pins.sh` | The Kubernetes **minor** agrees across every `banks/*/exam.yaml`, `images/k8s-env/Dockerfile` and `images/instance/Dockerfile`. The patch levels differ on purpose and are not compared. A cutover that raises three pins and forgets the fourth builds a cluster whose kubectl, whose node image and whose catalog card disagree, and nothing else in CI notices |
 | `check-sim-parity.sh` | `sim` and `sim.ps1` offer the same subcommands, the same usage string, and behave the same. `sim.ps1`'s `switch` arms must match its `$COMMANDS` declaration — a command declared but not dispatched prints nothing and exits 0 — and both launchers must return the same exit code for every row of a shared bad-argv table, including `DOCTOR`/`Purge` and `purge --ALL`, whose case-sensitivity is the contract that keeps `--ALL` from deleting every graded attempt. Both run with a stub `docker`/`curl`/`python3`/`git` first on `PATH` that records any call and exits 97, so a row that reaches docker is reported rather than executed, and the gate is safe to run with an exam live. Without a PowerShell the behaviour half says loudly that it skipped; CI sets `PWSH_REQUIRED=1`, which makes a missing one a failure instead |
-| `check-shell.sh` | Every shell script git knows about — not a curated glob, so nothing falls outside it — parses under `bash -n` and passes ShellCheck at **severity `warning`**. `info` and `style` add 63 and 71 findings that are not defects, so the floor sits above them. Without ShellCheck installed the lint pass says loudly that it skipped; CI sets `SHELLCHECK_REQUIRED=1`, which makes a missing binary a failure instead |
+| `check-shell.sh` | Every shell script git knows about — not a curated glob, so nothing falls outside it — parses under `bash -n` and passes ShellCheck at **severity `warning`**. `info` and `style` add 63 and 71 findings that are not defects, so the floor sits above them. Without ShellCheck installed the lint pass says loudly that it skipped; CI sets `SHELLCHECK_REQUIRED=1`, which makes a missing binary a failure instead. It also carries one rule ShellCheck has no equivalent for: a `setup.sh` running under `set -e` may not assign from a command substitution without a fallback, because `x=$(kubectl get deploy foo -o json \| jq …)` ends the script when `foo` does not exist — which on the cold path, where the seed has not created it yet, is the normal case. Three questions shipped with it and died on a fresh cluster |
 
 ### What CI cannot run
 
@@ -97,6 +97,20 @@ machine:
 Docker and ~9GB of RAM, and takes about 35 minutes. Run it by hand for
 any change to `sim`, `images/`, `docker-compose.yaml` or a validator,
 and before a release.
+
+Two more live scripts sit beside it, both needing a running stack:
+
+- `tests/drill.sh [bank]` — every question in a pooled bank drawn,
+  seeded on a freshly rebuilt cluster, solved by its reference script
+  and graded to full marks. Smoke proves one attempt, which is the 16 or
+  17 a draw happened to pick; the other ten ship unexecuted. Run it for
+  any change to a bank, and after adding one. It rebuilds the cluster
+  before every attempt, so it takes about 40 minutes and its grades are
+  real fresh-environment measurements.
+- `tests/check-docs-links.sh [bank...]` — every `docs:` link a question
+  shows, fetched through the candidate's own proxy, which checks both
+  that the page is there and that its host is on the bank's allowlist.
+  Upstream sites reorganise; a bank has no way to notice.
 
 ## Things that will bite you
 
