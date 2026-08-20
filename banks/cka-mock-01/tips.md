@@ -54,7 +54,7 @@ k expose deploy web --port=80 --target-port=8080 $do > svc.yaml
 k create role ci --verb=get,list,watch --resource=pods $do > role.yaml
 k create rolebinding ci --role=ci --serviceaccount=ns:ci-bot $do > rb.yaml
 k create priorityclass high --value=100000 $do > pc.yaml
-k autoscale deploy api --min=2 --max=6 --cpu-percent=50 $do > hpa.yaml
+k autoscale deploy api --min=2 --max=6 --cpu=50% $do > hpa.yaml
 k create ingress web --rule='site.local/*=web:80' $do > ing.yaml
 k taint nodes <node> <key>=<value>:NoSchedule
 k drain <node> --ignore-daemonsets --delete-emptydir-data
