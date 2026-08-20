@@ -37,10 +37,11 @@ at_least_target() {
 
 both_upgraded() { at_least_target "$scheduler" && at_least_target "$controller"; }
 
+# State only — the target version is in the criterion message, not in here.
 evidence() {
-  show_actual text "$(printf 'control-plane Pods on aux-upgrade:\n%s\n\nimages: %s\nkube-scheduler: %s\nkube-controller-manager: %s\nwanted: %s or newer for both\n' \
+  show_actual text "$(printf 'control-plane Pods on aux-upgrade:\n%s\n\nimages: %s\nkube-scheduler: %s\nkube-controller-manager: %s\n' \
     "$(aux -n kube-system get pods -l tier=control-plane 2>&1 | head -c 700)" \
-    "${running:-none}" "${scheduler:-not found}" "${controller:-not found}" "$TARGET")"
+    "${running:-none}" "${scheduler:-not found}" "${controller:-not found}")"
   show_why "$1"
 }
 

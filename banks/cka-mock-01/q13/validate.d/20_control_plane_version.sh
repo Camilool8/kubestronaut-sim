@@ -24,10 +24,11 @@ at_least_target() {
 
 control_plane_upgraded() { at_least_target "$served"; }
 
+# State only — the target version is in the criterion message, not in here.
 evidence() {
-  show_actual text "$(printf 'what the aux-upgrade API server reports:\n%s\n\nserverVersion.gitVersion: %s\nwanted: %s or newer\n' \
+  show_actual text "$(printf 'what the aux-upgrade API server reports:\n%s\n\nserverVersion.gitVersion: %s\n' \
     "$(aux version 2>&1 | head -c 500)" \
-    "${served:-none — nothing answered}" "$TARGET")"
+    "${served:-none — nothing answered}")"
   show_why "$1"
 }
 

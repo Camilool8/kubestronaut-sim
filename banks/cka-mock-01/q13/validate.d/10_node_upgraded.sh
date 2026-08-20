@@ -64,10 +64,14 @@ else
   schedulable_msg="nothing is cordoned, but the kubelet upgrade above has not landed either: ${summary:-the cluster answered nothing at all}"
 fi
 
+# The pane is what the cluster says and nothing else. What was wanted belongs
+# in the criterion messages below, where the candidate reads it beside the
+# verdict it explains; printing it inside "your cluster state" made the two
+# impossible to tell apart.
 evidence() {
-  show_actual text "$(printf 'aux-upgrade nodes:\n%s\n\nas the API reports them: %s\nwanted: kubelet %s or newer, Ready, not cordoned\n' \
+  show_actual text "$(printf 'aux-upgrade nodes:\n%s\n\nas the API reports them: %s\n' \
     "$(aux get nodes -o wide 2>&1 | head -c 700)" \
-    "${summary:-nothing — the cluster answered nothing at all}" "$TARGET")"
+    "${summary:-nothing — the cluster answered nothing at all}")"
   show_why "$1"
 }
 
