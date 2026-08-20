@@ -25,9 +25,9 @@ When you are done, all three of these must answer `yes`:
 
 ```bash
 sa=--as=system:serviceaccount:pavo:ci-bot
-k auth can-i list   pods              -n pavo $sa
-k auth can-i create deployments       -n pavo $sa
-k auth can-i update deployments/scale -n pavo $sa
+k auth can-i list   pods        -n pavo $sa
+k auth can-i create deployments -n pavo $sa
+k auth can-i update deployments -n pavo --subresource=scale $sa
 ```
 
 and all three of these must answer `no`:

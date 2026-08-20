@@ -23,7 +23,6 @@ gw=$(kubectl -n lacerta get gateway lacerta-gateway -o json 2>/dev/null)
 
 evidence() {
   show_actual yaml "$(kubectl -n lacerta get gateway lacerta-gateway -o yaml 2>/dev/null | k8s_clean)"
-  # TODO(lead): generate expected/gateway.yaml per docs/bank-spec.md:588-622
   show_expected yaml "/banks/${BANK:-cka-mock-01}/q15/expected/gateway.yaml"
   show_why "$1"
 }

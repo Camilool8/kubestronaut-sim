@@ -18,11 +18,20 @@ evidence() {
 
 # yq prints a --- separator between the results of a multi-document file, so the
 # separator has to come back out before the kinds are compared as a set.
+#
+# The same filter is on the three reads below, and there it is load-bearing
+# rather than tidy. `select` drops a document it does not match, but yq still
+# emits the separator that stood in front of it: a file whose Service comes
+# first answers a Deployment query with a blank line, then `---`, then the
+# value. `head -1` would take the blank, and the criterion would report a
+# correct render as having asked for '' replicas of ''. Which object a chart
+# renders first is the chart's business, so the read must not depend on it.
+first_value() { grep -v -e '^$' -e '^---$' | head -1; }
 kinds=$(yq -r '.kind // ""' "$F" 2>/dev/null | grep -v -e '^$' -e '^---$' | sort -u)
 names=$(yq -r '.metadata.name // ""' "$F" 2>/dev/null | grep -v -e '^$' -e '^---$' | sort -u)
-reps=$(yq -r 'select(.kind == "Deployment") | .spec.replicas // ""' "$F" 2>/dev/null | head -1)
-img=$(yq -r 'select(.kind == "Deployment") | .spec.template.spec.containers[].image // ""' "$F" 2>/dev/null | head -1)
-port=$(yq -r 'select(.kind == "Service") | .spec.ports[].port // ""' "$F" 2>/dev/null | head -1)
+reps=$(yq -r 'select(.kind == "Deployment") | .spec.replicas // ""' "$F" 2>/dev/null | first_value)
+img=$(yq -r 'select(.kind == "Deployment") | .spec.template.spec.containers[].image // ""' "$F" 2>/dev/null | first_value)
+port=$(yq -r 'select(.kind == "Service") | .spec.ports[].port // ""' "$F" 2>/dev/null | first_value)
 
 renders_the_release() {
   same_set "$kinds" "$(printf 'Deployment\nService')" && [ "$names" = "storefront" ]

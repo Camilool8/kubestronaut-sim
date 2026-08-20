@@ -6,7 +6,6 @@ set -uo pipefail
 
 evidence() {
   show_actual yaml "$(kubectl -n phoenix get ingress phoenix-routes -o yaml 2>/dev/null | k8s_clean)"
-  # TODO(lead): generate expected/ingress.yaml per docs/bank-spec.md:588-622
   show_expected yaml "/banks/${BANK:-cka-mock-01}/q18/expected/ingress.yaml"
   show_why "$1"
 }

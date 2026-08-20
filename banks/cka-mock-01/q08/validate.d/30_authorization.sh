@@ -9,13 +9,23 @@ SUBJECT=system:serviceaccount:pavo:ci-bot
 
 # One SubjectAccessReview per question, asked up front so the messages can quote
 # the answers back. The first word is all of it: some versions add a reason.
-answer() {
-  kubectl auth can-i "$1" "$2" -n "$3" --as="$SUBJECT" 2>/dev/null \
+#
+# The fourth argument is the SUBRESOURCE, and it has to be a flag. In
+# `kubectl auth can-i`, the positional form is VERB TYPE [NAME] — so
+# `can-i update deployments/scale` asks about a resource named "scale", not
+# about the scale subresource, and answers "no" against a Role that grants
+# exactly what the question asked for. There is no error and no warning; the
+# only tell is that `can-i --list` shows `deployments.apps/scale [update]`
+# while the query says no. --subresource=scale is the spelling that asks.
+answer() { # verb resource namespace [extra kubectl flags...]
+  local verb=$1 res=$2 ns=$3
+  shift 3
+  kubectl auth can-i "$verb" "$res" -n "$ns" "$@" --as="$SUBJECT" 2>/dev/null \
     | head -1 | awk '{print $1}'
 }
 a_list=$(answer list pods "$NS")
 a_create=$(answer create deployments "$NS")
-a_scale=$(answer update deployments/scale "$NS")
+a_scale=$(answer update deployments "$NS" --subresource=scale)
 a_delete=$(answer delete pods "$NS")
 a_update=$(answer update deployments "$NS")
 a_other=$(answer list pods kube-system)

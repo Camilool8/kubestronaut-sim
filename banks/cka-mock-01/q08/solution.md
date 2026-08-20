@@ -90,12 +90,12 @@ Then verify both halves, the denials included:
 
 ```bash
 sa=--as=system:serviceaccount:pavo:ci-bot
-k auth can-i list   pods              -n pavo        $sa   # yes
-k auth can-i create deployments       -n pavo        $sa   # yes
-k auth can-i update deployments/scale -n pavo        $sa   # yes
-k auth can-i delete pods              -n pavo        $sa   # no
-k auth can-i update deployments       -n pavo        $sa   # no
-k auth can-i list   pods              -n kube-system $sa   # no
+k auth can-i list   pods        -n pavo        $sa   # yes
+k auth can-i create deployments -n pavo        $sa   # yes
+k auth can-i update deployments -n pavo --subresource=scale $sa   # yes
+k auth can-i delete pods        -n pavo        $sa   # no
+k auth can-i update deployments -n pavo        $sa   # no
+k auth can-i list   pods        -n kube-system $sa   # no
 ```
 
 ## The scale subresource
@@ -118,6 +118,25 @@ Two subresources worth knowing beside it: `pods/log`, which is why a
 reader that can `get pods` still cannot read logs, and `pods/exec`,
 which is the grant that decides whether somebody can open a shell in a
 container.
+
+### `--subresource`, and the trap in the obvious spelling
+
+The subresource is a **flag**. `can-i`'s positional form is
+`VERB TYPE [NAME]`, so
+
+```bash
+k auth can-i update deployments/scale -n pavo $sa   # no
+```
+
+does not ask what it looks like it asks: the slash makes `scale` a
+resource *name*, and the question becomes "may this account update the
+Deployment called scale", which nothing grants. There is no error and no
+warning — a correct Role answers `no` and it is not obvious why. The tell
+is that `can-i --list` shows the grant while the query denies it:
+
+```
+deployments.apps/scale   []   []   [update]
+```
 
 ## can-i, and asking it about somebody else
 

@@ -39,11 +39,23 @@ api_ready() {
 # through the mirror Pod the kubelet publishes. Bounded retries because the
 # mirror can be a few seconds behind an API server that has only just started,
 # and an empty answer here is read as drift.
+#
+# Asked for BY NAME, and on this question that is what makes the answer true.
+# The cluster this runs against may be one a candidate has just restored a
+# snapshot into, which moves etcd's revision backwards; the API server's watch
+# cache then believes it is ahead and keeps serving what it held before the
+# restore, for the life of that process. A LIST is answered from that cache, a
+# GET of a named object is not. A label selector here would therefore report
+# the SEEDED directory on a cluster that is already running from a restored
+# one — the drift would be invisible, the cluster would be kept, and the
+# question would open with its second criterion already satisfied.
 etcd_datadir() {
-  local dir='' _
+  local dir='' node _
+  node=$(kind get nodes --name "$CLUSTER" 2>/dev/null | head -1) || return 0
+  [ -n "$node" ] || return 0
   for _ in 1 2 3 4 5; do
-    dir=$(k -n kube-system get pod -l component=etcd \
-      -o jsonpath='{.items[*].spec.volumes[?(@.name=="etcd-data")].hostPath.path}' 2>/dev/null || true)
+    dir=$(k -n kube-system get pod "etcd-${node}" \
+      -o jsonpath='{.spec.volumes[?(@.name=="etcd-data")].hostPath.path}' 2>/dev/null || true)
     [ -n "$dir" ] && break
     sleep 3
   done
@@ -93,7 +105,7 @@ fi
 aux_up etcd
 kind get kubeconfig --name "$CLUSTER" > "$KCFG"
 
-node=$(kind get nodes --name "$CLUSTER" | head -1)
+node=$(kind get nodes --name "$CLUSTER" 2>/dev/null | head -1) || true
 [ -n "$node" ] || { echo "q26 setup: ${CLUSTER} has no node" >&2; exit 1; }
 
 # 1. The marker, back in place. apply rather than create: the previous attempt

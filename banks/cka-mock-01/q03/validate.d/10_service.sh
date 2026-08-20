@@ -8,7 +8,6 @@ defaults='del(.spec.clusterIP, .spec.clusterIPs, .spec.internalTrafficPolicy,
               .spec.ipFamilies, .spec.ipFamilyPolicy, .spec.sessionAffinity)'
 evidence() {
   show_actual yaml "$(kubectl -n draco get svc nova-api -o yaml 2>/dev/null | k8s_clean | yq "$defaults")"
-  # TODO(lead): generate expected/service.yaml per docs/bank-spec.md:588-622
   show_expected yaml "/banks/${BANK:-cka-mock-01}/q03/expected/service.yaml"
   show_why "$1"
 }
