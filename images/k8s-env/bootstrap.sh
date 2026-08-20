@@ -208,7 +208,7 @@ kind export kubeconfig --name sim
 # Root ssh onto every node: the node image runs sshd; only the key needs
 # injecting. Runs on create AND resume (a fresh /shared may hold a fresh
 # keypair), and overwriting makes it idempotent. Twin loop in
-# banks/_lib/aux.sh for the aux clusters.
+# banks/_lib/aux-cluster.sh for the aux clusters.
 for node in $(kind get nodes --name sim); do
   docker exec -i "$node" sh -c \
     'mkdir -p /root/.ssh && cat > /root/.ssh/authorized_keys && chmod 700 /root/.ssh && chmod 600 /root/.ssh/authorized_keys' \

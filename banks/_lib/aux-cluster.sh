@@ -2,7 +2,7 @@
 # ShellCheck the dialect it would otherwise have read from one.
 # shellcheck shell=bash
 #
-# Aux-cluster helper, sourced at /banks/_lib/aux.sh inside k8s-env — by the
+# Aux-cluster helper, sourced at /banks/_lib/aux-cluster.sh inside k8s-env — by the
 # setup.sh of any question that starts from a broken control plane (q05 sched,
 # q12 cni, q13 upgrade, q26 etcd), and by the conductor's reset flow. Each aux
 # cluster is a one-node kind cluster in the same inner dockerd as the main

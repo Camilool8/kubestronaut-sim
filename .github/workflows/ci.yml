@@ -339,6 +339,8 @@ jobs:
         run: bash tests/check-shell.sh
       - name: No script carries CRLF
         run: sh tests/check-line-endings.sh
+      - name: Every path checks out on Windows
+        run: sh tests/check-windows-paths.sh
       - name: CRLF repair
         env:
           # The static half of this gate runs anywhere; the functional half

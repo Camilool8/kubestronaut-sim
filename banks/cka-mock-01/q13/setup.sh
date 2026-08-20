@@ -6,8 +6,8 @@ set -euo pipefail
 # one-node kind cluster of its own, created here one minor version behind the
 # rest of the environment.
 #
-# shellcheck source=../../_lib/aux.sh
-. /banks/_lib/aux.sh
+# shellcheck source=../../_lib/aux-cluster.sh
+. /banks/_lib/aux-cluster.sh
 
 CLUSTER=aux-upgrade
 NODE=aux-upgrade-control-plane
@@ -16,7 +16,7 @@ NODE=aux-upgrade-control-plane
 KCFG=/tmp/q13-aux-upgrade.kubeconfig
 
 # Where the cluster must start. Read from the image the helper will boot rather
-# than written down twice: aux.sh exports the tag, the k8s-env Dockerfile pins
+# than written down twice: aux-cluster.sh exports the tag, the k8s-env Dockerfile pins
 # the digest, and this question's whole premise is that the two differ by a
 # minor version.
 START=${AUX_NODE_IMAGE##*:}

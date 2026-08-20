@@ -9,7 +9,7 @@ set -euo pipefail
 # containers.
 #
 # shellcheck source=/dev/null
-. /banks/_lib/aux.sh
+. /banks/_lib/aux-cluster.sh
 
 AUX=sched
 CLUSTER=aux-sched

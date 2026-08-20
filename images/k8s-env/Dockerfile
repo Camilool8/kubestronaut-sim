@@ -109,7 +109,7 @@ RUN ARCH=$(uname -m); case "$ARCH" in x86_64) ARCH=amd64 ;; aarch64) ARCH=arm64 
 # sshd (the candidate has root ssh to every node — see the CKA plan's freedom
 # model) and the assets the aux questions need staged on the node. The stage
 # ends by tarring its own rootfs; the preload stage ships that tar and start.sh
-# / banks/_lib/aux.sh `docker import` it under the pristine tag inside the
+# / banks/_lib/aux-cluster.sh `docker import` it under the pristine tag inside the
 # inner dockerd, reapplying the image config recorded in the .changes file.
 # The virtual filesystems are excluded by name, not just by --one-file-system:
 # tar still archives a foreign mount point's own directory entry, and sysfs's
@@ -135,7 +135,7 @@ RUN tar --numeric-owner --xattrs --one-file-system \
 # Same derivation from the older image: q13's aux cluster boots this at v1.34
 # and the candidate upgrades it with the staged v1.35 binaries. kubeadm itself
 # names the control-plane images the upgrade will need; that list is baked as
-# archives below and banks/_lib/aux.sh loads them into the aux-upgrade cluster
+# archives below and banks/_lib/aux-cluster.sh loads them into the aux-upgrade cluster
 # so the upgrade never needs the network.
 FROM ${AUX_NODE_IMAGE} AS aux-node-ssh
 ARG KUBE_UPGRADE_VERSION=v1.35.6

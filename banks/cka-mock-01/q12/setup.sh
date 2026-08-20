@@ -3,7 +3,7 @@ set -euo pipefail
 
 # q12 runs on its own auxiliary kind cluster, aux-cni, created WITHOUT a pod
 # network: that is the whole premise, so nothing here may leave one behind.
-. /banks/_lib/aux.sh
+. /banks/_lib/aux-cluster.sh
 
 CLUSTER=aux-cni
 NS=q12-probe

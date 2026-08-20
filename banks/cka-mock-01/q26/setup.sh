@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-. /banks/_lib/aux.sh
+. /banks/_lib/aux-cluster.sh
 
 # q26 seeds the aux-etcd cluster with the shape a restore exercise needs and
 # nothing more: a marker object, a snapshot of the cluster TAKEN WHILE THAT

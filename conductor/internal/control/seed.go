@@ -124,7 +124,7 @@ func (c *Controller) seedOne(ctx context.Context, containerID, bank, qid string,
 // image, the aux-cluster questions cost about 16s each and a seven-question
 // domain sweep averages 35s a question. It is that this deadline competes with
 // the timeouts inside the setups themselves — `kubectl rollout status
-// --timeout=120s`, and the readiness loops in banks/_lib/aux.sh. Whichever
+// --timeout=120s`, and the readiness loops in banks/_lib/aux-cluster.sh. Whichever
 // fires first writes the message, and the inner one names what did not converge
 // while this one can only say "context deadline exceeded". So the outer budget
 // is deliberately larger than any single setup's internal waits can sum to.
