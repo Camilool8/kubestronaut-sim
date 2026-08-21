@@ -8,8 +8,8 @@ PASS=0; FAIL=0
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 
 mk() { # qid script body...
-  mkdir -p "$tmp/banks/fix-01/$1/validate.d"
-  printf '%s\n' "${@:3}" > "$tmp/banks/fix-01/$1/validate.d/$2"
+  mkdir -p "$tmp/banks/cka-mock-01/$1/validate.d"
+  printf '%s\n' "${@:3}" > "$tmp/banks/cka-mock-01/$1/validate.d/$2"
 }
 
 expect_fail() { # description, grep pattern
@@ -41,12 +41,12 @@ mk q01 10_a.sh '#!/usr/bin/env bash' '# expected: svc.yaml yaml' 'snapshot() { t
 expect_fail "rule 4: declared document missing" "does not exist"
 
 mk q01 10_a.sh '#!/usr/bin/env bash' '# expected: none — a reading, not a document' 'true'
-mkdir -p "$tmp/banks/fix-01/q01/expected"; printf 'x\n' > "$tmp/banks/fix-01/q01/expected/orphan.yaml"
+mkdir -p "$tmp/banks/cka-mock-01/q01/expected"; printf 'x\n' > "$tmp/banks/cka-mock-01/q01/expected/orphan.yaml"
 expect_fail "rule 5: orphan document" "no check declares it"
 
 # And the shape that must PASS.
 mk q01 10_a.sh '#!/usr/bin/env bash' '# expected: svc.yaml yaml' 'snapshot() { true; }' 'show_pair yaml svc.yaml'
-mkdir -p "$tmp/banks/fix-01/q01/expected"; printf 'kind: Service\n' > "$tmp/banks/fix-01/q01/expected/svc.yaml"
+mkdir -p "$tmp/banks/cka-mock-01/q01/expected"; printf 'kind: Service\n' > "$tmp/banks/cka-mock-01/q01/expected/svc.yaml"
 if bash tests/check-expected.sh "$tmp" >/dev/null 2>&1; then PASS=$((PASS+1));
 else echo "FAIL: a correctly paired check did not pass the gate"; FAIL=$((FAIL+1)); fi
 

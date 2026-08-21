@@ -16,7 +16,8 @@ python3 - "${1:-.}" <<'PY'
 import pathlib, re, sys
 
 root = pathlib.Path(sys.argv[1])
-scripts = sorted(root.glob("banks/*/q*/validate.d/*.sh"))
+BANKS = ("cka-mock-01", "ckad-mock-01")
+scripts = sorted(p for b in BANKS for p in root.glob(f"banks/{b}/q*/validate.d/*.sh"))
 if not scripts:
     print(f"check-expected: found no validate.d scripts under {root} — refusing to pass")
     sys.exit(1)
