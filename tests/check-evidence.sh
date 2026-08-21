@@ -39,8 +39,8 @@ run_check() {
   # from the script's own path. Hard-coding one bank made every other bank's
   # checks read a directory belonging to ckad-mock-01.
   bank=$(printf '%s' "$script" | awk -F/ '$1 == "banks" {print $2}')
-  sed "s#^\. /banks/_lib/checks\.sh#. $root/banks/_lib/checks.sh#" "$script" > "$tmp/chk.sh"
-  PATH="$fixture:$PATH" BANK="${bank:-ckad-mock-01}" bash "$tmp/chk.sh" 2>&1
+  sed "s#^\. /banks/_lib/checks\.sh#. $root/banks/_lib/checks.sh#; s#\"/banks/#\"$root/banks/#g" "$script" > "$tmp/chk.sh"
+  PATH="$fixture:$PATH" BANK="${bank:-ckad-mock-01}" SIM_CHECK_PATH="$script" bash "$tmp/chk.sh" 2>&1
 }
 
 # A kubectl that answers from files named after the flag it was asked for, so a
@@ -156,6 +156,19 @@ case $out in
 esac
 [ "$(printf '%s' "$out" | grep -c 'sim:criterion fail')" = 0 ] && note \
   || bad "q07 correct answer reported a failed criterion"
+
+# ------------------------------------------------- expected_dir under rewrite
+#
+# run_check executes a REWRITTEN copy of the script from a temp directory, so
+# $0 inside it is that copy and the qid is gone. Without SIM_CHECK_PATH every
+# show_pair in the bank would look for its document under $tmp/expected/ and
+# find nothing — and show_expected returns quietly on a missing file, so the
+# whole gate would keep passing while proving nothing about the pairs.
+out=$(FIXTURE=$q07/misnamed run_check banks/ckad-mock-01/q07/validate.d/20_hardening.sh "$q07/bin")
+case $out in
+  *"sim:artifact expected"*) note ;;
+  *) bad "check-evidence: a paired check produced no expected pane — SIM_CHECK_PATH is not reaching it" ;;
+esac
 
 # Case 3: nothing there at all. The pane must say so rather than vanish.
 fixture "$q07/absent"
