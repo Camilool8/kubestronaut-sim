@@ -1,0 +1,20 @@
+{
+  "ingressClassName": "nginx",
+  "rules": [
+    {
+      "host": "sculptor.sim.local",
+      "path": "/",
+      "pathType": "Prefix",
+      "port": 80,
+      "service": "portal"
+    }
+  ],
+  "tls": [
+    {
+      "hosts": [
+        "sculptor.sim.local"
+      ],
+      "secretName": "portal-tls"
+    }
+  ]
+}

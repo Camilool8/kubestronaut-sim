@@ -1,18 +1,8 @@
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: reports
-  namespace: lynx
-spec:
-  ingressClassName: nginx
-  rules:
-    - host: reports.sim.local
-      http:
-        paths:
-          - backend:
-              service:
-                name: reports
-                port:
-                  number: 80
-            path: /
-            pathType: Prefix
+ingressClassName: nginx
+rule:
+  backend:
+    port: 80
+    service: reports
+  host: reports.sim.local
+  path: /
+  pathType: Prefix

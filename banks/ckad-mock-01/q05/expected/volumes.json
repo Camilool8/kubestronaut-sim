@@ -1,0 +1,5 @@
+{
+  "feedLogsVolume": "emptyDir",
+  "writerMountPath": "/var/log/feed",
+  "shipperMountPath": "/var/log/feed"
+}

@@ -1,0 +1,9 @@
+{
+  "accessModes": [
+    "ReadWriteOnce"
+  ],
+  "requests": {
+    "storage": "1Gi"
+  },
+  "storageClassName": "manual"
+}

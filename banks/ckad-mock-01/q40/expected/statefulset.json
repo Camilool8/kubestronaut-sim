@@ -1,0 +1,9 @@
+{
+  "statefulset ledger": {
+    "replicas": 2,
+    "serviceName": "ledger"
+  },
+  "service ledger": {
+    "clusterIP": "None"
+  }
+}

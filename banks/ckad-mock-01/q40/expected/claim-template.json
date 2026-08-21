@@ -1,0 +1,10 @@
+{
+  "volumeClaimTemplate": {
+    "name": "data",
+    "accessModes": [
+      "ReadWriteOnce"
+    ],
+    "storage": "128Mi"
+  },
+  "mountPath": "/data"
+}

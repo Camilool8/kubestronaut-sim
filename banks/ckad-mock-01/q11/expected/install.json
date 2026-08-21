@@ -1,0 +1,6 @@
+{
+  "chart": "sim-cache-1.0.0",
+  "values": {
+    "replicaCount": "2"
+  }
+}

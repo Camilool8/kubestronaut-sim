@@ -1,0 +1,9 @@
+{
+  "app-limits": {
+    "limits.conf": "max_connections = 512\nread_timeout = 30s\nwrite_timeout = 30s"
+  },
+  "app-tuning": {
+    "LOG_LEVEL": "debug",
+    "MAX_WORKERS": "8"
+  }
+}

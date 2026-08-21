@@ -1,0 +1,6 @@
+{
+  "defaultMode": "256",
+  "mountPath": "/etc/api",
+  "readOnly": "true",
+  "secretName": "api-keys"
+}

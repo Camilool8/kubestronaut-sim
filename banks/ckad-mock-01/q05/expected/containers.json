@@ -1,17 +1,23 @@
 {
-  "initContainers": [
-    {
-      "name": "wait-for-source",
-      "restartPolicy": null
-    },
-    {
-      "name": "shipper",
-      "restartPolicy": "Always"
-    }
-  ],
   "containers": [
     {
       "name": "writer"
+    }
+  ],
+  "initContainers": [
+    {
+      "image": "busybox:1.37",
+      "name": "wait-for-source",
+      "restartPolicy": null,
+      "volumeMounts": []
+    },
+    {
+      "image": "busybox:1.37",
+      "name": "shipper",
+      "restartPolicy": "Always",
+      "volumeMounts": [
+        "feed-logs"
+      ]
     }
   ]
 }

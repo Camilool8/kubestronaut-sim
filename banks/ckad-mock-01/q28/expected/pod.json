@@ -1,0 +1,11 @@
+{
+  "containers": [
+    {
+      "image": "nginx:1.29-alpine",
+      "name": "web"
+    }
+  ],
+  "imagePullSecrets": [
+    "registry-cred"
+  ]
+}

@@ -1,0 +1,4 @@
+{
+  "image": "busybox:1.37",
+  "restartPolicy": "OnFailure"
+}

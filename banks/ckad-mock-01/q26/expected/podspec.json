@@ -1,0 +1,13 @@
+{
+  "containers": [
+    {
+      "imagePullPolicy": "Never",
+      "name": "cache"
+    },
+    {
+      "imagePullPolicy": "Never",
+      "name": "refresher"
+    }
+  ],
+  "terminationGracePeriodSeconds": 45
+}

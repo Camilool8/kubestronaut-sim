@@ -1,0 +1,10 @@
+{
+  "app": "report-runner",
+  "containers": [
+    {
+      "image": "busybox:1.37",
+      "name": "report"
+    }
+  ],
+  "replicas": 3
+}

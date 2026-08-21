@@ -1,0 +1,7 @@
+{
+  "image": "nginx:1.29-alpine",
+  "labels": {
+    "app": "search",
+    "track": "canary"
+  }
+}

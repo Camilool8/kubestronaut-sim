@@ -1,0 +1,12 @@
+{
+  "containers": [
+    {
+      "image": "busybox:1.37",
+      "name": "adapter"
+    },
+    {
+      "image": "busybox:1.37",
+      "name": "app"
+    }
+  ]
+}

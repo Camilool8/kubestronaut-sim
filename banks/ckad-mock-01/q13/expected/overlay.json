@@ -1,0 +1,7 @@
+{
+  "image": "nginx:1.29-alpine",
+  "label": "staging",
+  "name": "staging-cargo-api",
+  "replicas": "3",
+  "service": "staging-cargo-api"
+}

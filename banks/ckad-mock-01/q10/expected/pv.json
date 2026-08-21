@@ -1,0 +1,13 @@
+{
+  "accessModes": [
+    "ReadWriteOnce"
+  ],
+  "capacity": {
+    "storage": "2Gi"
+  },
+  "hostPath": {
+    "path": "/mnt/archive"
+  },
+  "persistentVolumeReclaimPolicy": "Retain",
+  "storageClassName": "manual"
+}

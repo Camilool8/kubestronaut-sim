@@ -1,0 +1,11 @@
+{
+  "mount": {
+    "mountPath": "/etc/app",
+    "readOnly": true
+  },
+  "volume": {
+    "configMap": {
+      "name": "app-limits"
+    }
+  }
+}

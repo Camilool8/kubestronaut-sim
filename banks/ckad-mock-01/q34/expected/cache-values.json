@@ -1,0 +1,6 @@
+{
+  "image": {
+    "tag": "1.27-alpine"
+  },
+  "replicaCount": 3
+}

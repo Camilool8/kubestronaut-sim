@@ -1,0 +1,5 @@
+{
+  "backoffLimit": 2,
+  "completions": 3,
+  "parallelism": 2
+}

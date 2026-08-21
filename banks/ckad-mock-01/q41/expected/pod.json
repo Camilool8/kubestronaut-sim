@@ -1,0 +1,6 @@
+{
+  "image": "busybox:1.37",
+  "requests": {
+    "memory": "64Mi"
+  }
+}
