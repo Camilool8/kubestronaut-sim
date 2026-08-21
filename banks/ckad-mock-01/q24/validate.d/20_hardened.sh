@@ -22,8 +22,18 @@ snapshot() {
             | (.spec.template.spec.securityContext // {}) as $psc
             | {
                 runAsUser: ($csc.runAsUser // $psc.runAsUser // null),
-                runAsNonRoot: ($csc.runAsNonRoot // $psc.runAsNonRoot // null),
-                allowPrivilegeEscalation: ($csc.allowPrivilegeEscalation // null),
+                # has() guarded rather than the // operator: jq treats a false
+                # value the same as null there, so a wrongly hardened
+                # runAsNonRoot false, or a correctly hardened
+                # allowPrivilegeEscalation false, would both render as null.
+                # get()/container_only() below never make that mistake because
+                # they read jsonpath string output, where false is non-empty.
+                # has() reads presence the same way regardless of value, which
+                # keeps this pane honest about what is actually set.
+                runAsNonRoot: (if ($csc | has("runAsNonRoot")) then $csc.runAsNonRoot
+                               elif ($psc | has("runAsNonRoot")) then $psc.runAsNonRoot
+                               else null end),
+                allowPrivilegeEscalation: $csc.allowPrivilegeEscalation,
                 capabilities: {drop: (($csc.capabilities.drop // []) | sort)},
                 seccompProfile: {type: ($csc.seccompProfile.type // $psc.seccompProfile.type // null)}
               }
