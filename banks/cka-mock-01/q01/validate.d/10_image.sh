@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the api container runs nginx:1.29-alpine and the image really pulls
+# expected: image.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -18,9 +19,14 @@ pods=$(kubectl -n "$ns" get pod -l app=telemetry-api -o json 2>/dev/null \
 # One pane, two halves: what the Pod template asks for, and what the kubelet
 # made of it. Pod names are left out on purpose — they are controller-generated
 # and change under every rollout, so they teach nothing here.
+snapshot() {
+  printf '%s' "${containers:-null}" \
+    | jq -S '(first(.[]? | select(.name=="api")) // {}) | {image: (.image // null)}' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "$(printf '{"pod template containers": %s, "pods": %s}' \
-    "${containers:-null}" "${pods:-null}")"
+  show_pair json image.json
+  show_actual json "$(printf '{"pods": %s}' "${pods:-null}")"
   show_why "$1"
 }
 

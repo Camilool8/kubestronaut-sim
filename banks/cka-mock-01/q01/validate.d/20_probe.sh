@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the readinessProbe is an HTTP GET on / and targets port 8080
+# expected: probe.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -10,9 +11,13 @@ dep=telemetry-api
 spec=$(kubectl -n "$ns" get deploy "$dep" -o json 2>/dev/null \
   | jq 'first(.spec.template.spec.containers[]? | select(.name == "api")) // empty')
 
+snapshot() {
+  printf '%s' "${spec:-null}" \
+    | jq -S '{ports: (.ports // null), readinessProbe: (.readinessProbe // null)}' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "$(printf '%s' "${spec:-null}" \
-    | jq '{ports: (.ports // null), readinessProbe: (.readinessProbe // null)}' 2>/dev/null)"
+  show_pair json probe.json
   show_why "$1"
 }
 
