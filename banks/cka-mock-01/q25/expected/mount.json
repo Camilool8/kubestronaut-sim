@@ -1,0 +1,21 @@
+{
+  "mounts": [
+    {
+      "container": "web",
+      "volumeMounts": [
+        {
+          "mountPath": "/data",
+          "name": "data"
+        }
+      ]
+    }
+  ],
+  "volumes": [
+    {
+      "name": "data",
+      "persistentVolumeClaim": {
+        "claimName": "archive-data"
+      }
+    }
+  ]
+}

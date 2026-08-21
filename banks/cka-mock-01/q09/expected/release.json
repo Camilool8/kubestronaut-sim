@@ -1,0 +1,9 @@
+{
+  "chart": "sim-web-1.1.0",
+  "values": {
+    "replicaCount": "3",
+    "service": {
+      "port": "8080"
+    }
+  }
+}

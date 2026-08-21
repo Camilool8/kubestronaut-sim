@@ -27,6 +27,7 @@ killer-sh-*.txt
 *-dump.txt
 dump*.txt
 banks/**/*.txt
+!banks/**/expected/*.txt
 
 .claude/
 .superpowers/

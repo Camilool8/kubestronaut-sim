@@ -1,0 +1,50 @@
+{
+  "behavior": {
+    "scaleDown": {
+      "policies": [
+        {
+          "periodSeconds": 15,
+          "type": "Percent",
+          "value": 100
+        }
+      ],
+      "selectPolicy": "Max",
+      "stabilizationWindowSeconds": 60
+    },
+    "scaleUp": {
+      "policies": [
+        {
+          "periodSeconds": 15,
+          "type": "Pods",
+          "value": 4
+        },
+        {
+          "periodSeconds": 15,
+          "type": "Percent",
+          "value": 100
+        }
+      ],
+      "selectPolicy": "Max",
+      "stabilizationWindowSeconds": 0
+    }
+  },
+  "maxReplicas": 6,
+  "metrics": [
+    {
+      "resource": {
+        "name": "cpu",
+        "target": {
+          "averageUtilization": 50,
+          "type": "Utilization"
+        }
+      },
+      "type": "Resource"
+    }
+  ],
+  "minReplicas": 2,
+  "scaleTargetRef": {
+    "apiVersion": "apps/v1",
+    "kind": "Deployment",
+    "name": "payments-api"
+  }
+}

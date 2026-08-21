@@ -1,0 +1,10 @@
+{
+  "ports": [
+    {
+      "nodePort": 30081,
+      "port": 80,
+      "targetPort": "http-web"
+    }
+  ],
+  "type": "NodePort"
+}

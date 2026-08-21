@@ -1,0 +1,19 @@
+{
+  "gatewayClassName": "sim",
+  "listeners": [
+    {
+      "hostname": "q15-lacerta.sim.local",
+      "port": 443,
+      "protocol": "HTTPS",
+      "tls": {
+        "certificateRefs": [
+          {
+            "kind": "Secret",
+            "name": "lacerta-tls"
+          }
+        ],
+        "mode": "Terminate"
+      }
+    }
+  ]
+}

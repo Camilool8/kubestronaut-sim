@@ -1,0 +1,19 @@
+{
+  "claims": [
+    {
+      "claim": "audit-data",
+      "name": "audit"
+    }
+  ],
+  "mounts": [
+    {
+      "container": "viewer",
+      "volumeMounts": [
+        {
+          "mountPath": "/srv/audit",
+          "name": "audit"
+        }
+      ]
+    }
+  ]
+}

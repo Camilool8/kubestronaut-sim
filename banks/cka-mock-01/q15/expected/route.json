@@ -1,0 +1,26 @@
+{
+  "hostnames": [
+    "q15-lacerta.sim.local"
+  ],
+  "parentRefs": [
+    {
+      "kind": "Gateway",
+      "name": "lacerta-gateway",
+      "namespace": "lacerta"
+    }
+  ],
+  "rules": [
+    {
+      "name": "checkout",
+      "pathType": "PathPrefix",
+      "pathValue": "/checkout",
+      "port": 8080
+    },
+    {
+      "name": "storefront",
+      "pathType": "PathPrefix",
+      "pathValue": "/store",
+      "port": 80
+    }
+  ]
+}

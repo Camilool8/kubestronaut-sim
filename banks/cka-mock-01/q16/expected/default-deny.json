@@ -1,0 +1,9 @@
+{
+  "egress": [],
+  "ingress": [],
+  "podSelector": {},
+  "policyTypes": [
+    "Egress",
+    "Ingress"
+  ]
+}

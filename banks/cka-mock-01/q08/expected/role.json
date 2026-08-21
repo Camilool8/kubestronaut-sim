@@ -1,0 +1,37 @@
+[
+  {
+    "apiGroups": [
+      ""
+    ],
+    "resources": [
+      "pods"
+    ],
+    "verbs": [
+      "get",
+      "list",
+      "watch"
+    ]
+  },
+  {
+    "apiGroups": [
+      "apps"
+    ],
+    "resources": [
+      "deployments"
+    ],
+    "verbs": [
+      "create"
+    ]
+  },
+  {
+    "apiGroups": [
+      "apps"
+    ],
+    "resources": [
+      "deployments/scale"
+    ],
+    "verbs": [
+      "update"
+    ]
+  }
+]

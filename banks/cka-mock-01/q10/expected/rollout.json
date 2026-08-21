@@ -1,0 +1,4 @@
+{
+  "image": "nginx:1.29-alpine",
+  "replicas": "3"
+}

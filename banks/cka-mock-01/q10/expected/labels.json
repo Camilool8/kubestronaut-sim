@@ -1,0 +1,5 @@
+{
+  "deployment": "prod",
+  "podTemplate": "prod",
+  "service": "prod"
+}

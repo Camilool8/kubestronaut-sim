@@ -1,0 +1,13 @@
+{
+  "envFrom_configMapRefs": [],
+  "env_DB_ENDPOINT": {
+    "name": "DB_ENDPOINT",
+    "valueFrom": {
+      "configMapKeyRef": {
+        "key": "DB_ENDPOINT",
+        "name": "payments-config",
+        "optional": true
+      }
+    }
+  }
+}

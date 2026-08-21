@@ -1,0 +1,86 @@
+{
+  "allow-api-ingress": {
+    "ingress": [
+      {
+        "from": [
+          {
+            "podSelector": {
+              "matchLabels": {
+                "tier": "frontend"
+              }
+            }
+          }
+        ],
+        "ports": [
+          {
+            "port": 8080,
+            "protocol": "TCP"
+          }
+        ]
+      }
+    ],
+    "podSelector": {
+      "matchLabels": {
+        "tier": "api"
+      }
+    },
+    "policyTypes": [
+      "Ingress"
+    ]
+  },
+  "allow-frontend-egress": {
+    "egress": [
+      {
+        "ports": [
+          {
+            "port": 53,
+            "protocol": "TCP"
+          },
+          {
+            "port": 53,
+            "protocol": "UDP"
+          }
+        ],
+        "to": [
+          {
+            "namespaceSelector": {
+              "matchLabels": {
+                "kubernetes.io/metadata.name": "kube-system"
+              }
+            },
+            "podSelector": {
+              "matchLabels": {
+                "k8s-app": "kube-dns"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "ports": [
+          {
+            "port": 8080,
+            "protocol": "TCP"
+          }
+        ],
+        "to": [
+          {
+            "podSelector": {
+              "matchLabels": {
+                "tier": "api"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "podSelector": {
+      "matchLabels": {
+        "tier": "frontend"
+      }
+    },
+    "policyTypes": [
+      "Egress"
+    ]
+  }
+}

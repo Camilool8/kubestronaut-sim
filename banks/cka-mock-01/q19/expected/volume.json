@@ -1,0 +1,28 @@
+{
+  "mounts": [
+    {
+      "name": "api",
+      "volumeMounts": [
+        {
+          "mountPath": "/var/log/orders",
+          "name": "orders-logs"
+        }
+      ]
+    },
+    {
+      "name": "shipper",
+      "volumeMounts": [
+        {
+          "mountPath": "/var/log/orders",
+          "name": "orders-logs"
+        }
+      ]
+    }
+  ],
+  "volumes": [
+    {
+      "emptyDir": {},
+      "name": "orders-logs"
+    }
+  ]
+}
