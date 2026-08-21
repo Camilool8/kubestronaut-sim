@@ -31,4 +31,5 @@ banks/**/*.txt
 
 .claude/
 .superpowers/
+docs/superpowers/
 **/.impeccable/
