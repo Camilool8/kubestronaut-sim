@@ -208,8 +208,10 @@ describe("the catalog", () => {
     );
     await screen.findByRole("heading", { name: "CKAD" });
 
-    expect(onBanksLoaded).toHaveBeenCalledWith(
-      expect.objectContaining({ active: "ckad-mock-01" }),
+    await waitFor(() =>
+      expect(onBanksLoaded).toHaveBeenCalledWith(
+        expect.objectContaining({ active: "ckad-mock-01" }),
+      ),
     );
     const reported = onBanksLoaded.mock.calls[0][0] as { banks: { id: string }[] };
     expect(reported.banks.map((b) => b.id)).toEqual(["ckad-mock-01", "kcna-mock", "cks-mock"]);
