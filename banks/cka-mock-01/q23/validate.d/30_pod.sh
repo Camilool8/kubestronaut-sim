@@ -58,7 +58,16 @@ fi
 # one in the UI, which shows one actual/expected pair per check, not per
 # criterion.
 snapshot() {
-  printf '%s' "${pod:-null}" | jq -S '{claims: (.claims // []), mounts: (.mounts // [])}' 2>/dev/null
+  printf '%s' "${pod:-null}" | jq -S '
+    (.claims // []) as $claims
+    | ($claims | map(.volume)) as $claimVolNames
+    | {
+        claims: $claims,
+        mounts: [ (.mounts // [])[] | {
+            container: .container,
+            mountedAt: [ (.mountedAt // [])[] | select(.volume as $v | $claimVolNames | index($v)) ]
+          } | select(.mountedAt | length > 0) ]
+      }' 2>/dev/null
 }
 
 evidence() {

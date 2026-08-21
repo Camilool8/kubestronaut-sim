@@ -105,11 +105,16 @@ out=''
 # one in the UI, which shows one actual/expected pair per check, not per
 # criterion.
 snapshot() {
-  printf '%s' "${podjson:-null}" | jq -S '{
-    claims: [ .spec.volumes[]? | select((.persistentVolumeClaim|type)=="object")
-              | {name, claim: .persistentVolumeClaim.claimName} ],
-    mounts: [ .spec.containers[]? | {container: .name, volumeMounts: (.volumeMounts // [])} ]
-  }' 2>/dev/null
+  printf '%s' "${podjson:-null}" | jq -S '
+    ([.spec.volumes[]? | select((.persistentVolumeClaim|type)=="object") | .name]) as $claimVolNames
+    | {
+        claims: [ .spec.volumes[]? | select((.persistentVolumeClaim|type)=="object")
+                  | {name, claim: .persistentVolumeClaim.claimName} ],
+        mounts: [ .spec.containers[]? | {
+            container: .name,
+            volumeMounts: [(.volumeMounts // [])[] | select(.name as $n | $claimVolNames | index($n))]
+          } | select(.volumeMounts | length > 0) ]
+      }' 2>/dev/null
 }
 
 evidence() {
