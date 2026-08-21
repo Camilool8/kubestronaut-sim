@@ -10,7 +10,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 root=$PWD
-. banks/_lib/checks.sh   # for ARTIFACT_EMPTY
+. banks/_lib/checks.sh
 
 # The stub keys its canned jsonpath answers by the flattened path. Derive the
 # key here the same way rather than hand-spelling it, so a fixture cannot go
@@ -129,7 +129,7 @@ case $out in
   *) bad "q07 misnamed container: no actual pane — this is the regression" ;;
 esac
 case $out in
-  *'"containers that exist"'*) note ;;
+  *"containers that exist: vault-agent"*) note ;;
   *) bad "q07 misnamed container: actual pane does not list the real containers" ;;
 esac
 # The old message blamed the field. It must not be what the candidate reads now.
@@ -164,7 +164,20 @@ esac
 # show_pair in the bank would look for its document under $tmp/expected/ and
 # find nothing — and show_expected returns quietly on a missing file, so the
 # whole gate would keep passing while proving nothing about the pairs.
-out=$(FIXTURE=$q07/misnamed run_check banks/ckad-mock-01/q07/validate.d/20_hardening.sh "$q07/bin")
+#
+# $q07/misnamed cannot exercise this: 20_hardening.sh's name gate now bails
+# out before evidence()/show_pair ever runs, so it never reaches a paired
+# pane at all. This fixture keeps the container correctly named "agent" —
+# clearing that gate — but answers allowPrivilegeEscalation backwards, so
+# crit_all_passed fails on exactly that one field and evidence() actually
+# runs, which is what proves SIM_CHECK_PATH reached expected_dir().
+fixture "$q07/escalates"
+canned "$q07/escalates" '{.spec.containers[*].name}' 'agent'
+canned "$q07/escalates" '{.spec.containers[?(@.name=="agent")].securityContext.allowPrivilegeEscalation}' 'true'
+canned "$q07/escalates" '{.spec.containers[?(@.name=="agent")].securityContext.readOnlyRootFilesystem}'    'true'
+canned "$q07/escalates" '{.spec.containers[?(@.name=="agent")].securityContext.capabilities.drop[*]}'      'ALL'
+
+out=$(FIXTURE=$q07/escalates run_check banks/ckad-mock-01/q07/validate.d/20_hardening.sh "$q07/bin")
 case $out in
   *"sim:artifact expected"*) note ;;
   *) bad "check-evidence: a paired check produced no expected pane — SIM_CHECK_PATH is not reaching it" ;;
@@ -178,8 +191,12 @@ case $out in
   *'sim:artifact actual'*) note ;;
   *) bad "q07 absent pod: no actual pane at all" ;;
 esac
+# This used to reach evidence()'s JSON snapshot, where an empty body
+# degrades to ARTIFACT_EMPTY — but an absent pod has no containers either,
+# so it now takes the very same has_name gate as the misnamed case above,
+# and says so the same way: plain text, naming what it found (nothing).
 case $out in
-  *"$ARTIFACT_EMPTY"*) note ;;
+  *"containers that exist: none"*) note ;;
   *) bad "q07 absent pod: actual pane does not state that nothing was found" ;;
 esac
 
