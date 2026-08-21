@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: the kube-system Corefile forwards sim.internal to the sim-dns resolver, default block untouched
-# expected: corefile.txt text
+# expected: none — crit 3 grades the stub's forward target against the
+#           sim-dns Service's ClusterIP, read live from the API at grading
+#           time and assigned fresh on every cluster build rather than
+#           authored by either side, so no fixed document could ever stay
+#           correct. The actual pane shows the whole Corefile instead.
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -54,12 +58,8 @@ printf '%s\n' "$rest" | grep -q 'kubernetes[[:space:]][[:space:]]*cluster\.local
   exit 1
 }
 
-snapshot() {
-  printf '%s' "${zone_block:-}"
-}
-
 evidence() {
-  show_pair text corefile.txt
+  show_actual text "$corefile"
   show_why "$1"
 }
 

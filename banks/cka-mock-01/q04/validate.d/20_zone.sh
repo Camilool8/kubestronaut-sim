@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the sim-dns resolver serves ledger.sim.internal as the ledger Service ClusterIP
-# expected: zone-record.txt text
+# expected: none — crit 1 grades the zone's declared record against the
+#           ledger Service's ClusterIP, read live from the API at grading
+#           time and assigned fresh on every cluster build rather than
+#           authored by either side, so no fixed document could ever stay
+#           correct. The actual pane shows the zone data considered.
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -24,16 +28,8 @@ record=$(printf '%s\n' "$zone" | awk '
     for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) print $i
   }')
 
-# Only the authored half — the address the zone file itself declares for
-# ledger.sim.internal. Whether the running resolver has picked that edit up
-# is a live reading (crit 2 below) and rides on its own message instead of a
-# second pane; the UI shows exactly one actual/expected pair per check.
-snapshot() {
-  printf 'ledger.sim.internal %s' "$(printf '%s' "${record:-}" | tr '\n' ' ' | sed -e 's/[[:space:]]*$//')"
-}
-
 evidence() {
-  show_pair text zone-record.txt
+  show_actual text "$zone"
   show_why "$1"
 }
 
