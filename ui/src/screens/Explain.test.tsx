@@ -189,7 +189,12 @@ describe("Explain document panes", () => {
       />,
     );
     expect(screen.getByText(strings.explain.diffIdentical)).toBeInTheDocument();
-    expect(screen.queryByText(strings.explain.diffLegend)).toBeNull();
+    expect(screen.getByText(strings.explain.diffLegend)).toBeInTheDocument();
+  });
+
+  test("says the panes show only what the check grades, not the whole object", () => {
+    render(<Explain results={attempt([withEvidence])} questionId="q19" />);
+    expect(screen.getByText(strings.explain.diffLegend)).toHaveTextContent("only the fields this check grades");
   });
 
   test("a capture with no counterpart renders alone, and says what to compare it against", () => {
