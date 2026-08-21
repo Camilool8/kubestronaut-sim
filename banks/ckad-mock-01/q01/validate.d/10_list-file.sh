@@ -7,7 +7,7 @@ set -uo pipefail
 f=/opt/course/1/aurora-namespaces
 
 snapshot() {
-  cat "$f" 2>/dev/null
+  printf '%s\n' "${actual_order:-}"
 }
 
 evidence() {

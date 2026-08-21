@@ -23,7 +23,7 @@ count=$(printf '%s\n' "$lines" | tail -n +2 | grep -c .)
 want='search-indexer audit-writer image-resizer billing-api'
 
 snapshot() {
-  cat /opt/course/42/report 2>/dev/null
+  printf '%s\n' "${lines:-}"
 }
 
 evidence() {

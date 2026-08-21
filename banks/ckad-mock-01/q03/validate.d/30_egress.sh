@@ -7,7 +7,11 @@ set -uo pipefail
 
 snapshot() {
   kubectl -n orbit get netpol api-guard -o json 2>/dev/null \
-    | jq -S '.spec | .policyTypes |= sort | .egress[]?.ports |= sort_by(.port, (.protocol // "TCP"))'
+    | jq -S '.spec
+      | .policyTypes |= sort
+      | .ingress[]?.from |= sort
+      | .ingress[]?.ports |= sort_by(.port, (.protocol // "TCP"))
+      | .egress[]?.ports |= sort_by(.port, (.protocol // "TCP"))'
 }
 
 evidence() {

@@ -14,7 +14,7 @@ NODE=sim-worker2
 nodes=$(kubectl get nodes -o json 2>/dev/null \
   | jq -S '[.items[]? | {name: .metadata.name,
                       "labels.workload": (.metadata.labels.workload // null),
-                      taints: [.spec.taints[]? | {key, value, effect}]}]' 2>/dev/null)
+                      taints: [.spec.taints[]? | select(.key == "workload") | {key, value, effect}]}]' 2>/dev/null)
 
 snapshot() {
   printf '%s' "${nodes:-null}"

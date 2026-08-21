@@ -25,7 +25,7 @@ head_line=$(printf '%s\n' "$lines" | head -1 | tr '[:lower:]' '[:upper:]')
 body=$(printf '%s\n' "$lines" | tail -n +2)
 
 snapshot() {
-  cat /opt/course/42/report 2>/dev/null
+  printf '%s\n' "${lines:-}"
 }
 
 evidence() {
