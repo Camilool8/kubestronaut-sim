@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: ledger-api reads the key that exists and is ready; ledger-creds untouched
+# expected: secretkey.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 user=$(kubectl -n tucana get secret ledger-creds -o jsonpath='{.data.username}' 2>/dev/null | base64 -d 2>/dev/null)
@@ -26,8 +27,18 @@ key=$(kubectl -n tucana get deploy ledger-api -o json 2>/dev/null \
   | jq -r '[.spec.template.spec.containers[].env[]? | select(.valueFrom.secretKeyRef.name == "ledger-creds") | .valueFrom.secretKeyRef.key] | first // ""')
 ready=$(kubectl -n tucana get deploy ledger-api -o jsonpath='{.status.readyReplicas}' 2>/dev/null)
 
+# Only the secretKeyRef's key is a shape the candidate edited — the env var's
+# own name and the Secret it names were already right before this question
+# started. readyReplicas is a live rollout reading and rides on its own crit
+# message via pod_pane instead of a second pane.
+snapshot() {
+  jq -nS --arg key "${key:-}" '
+    { valueFrom: { secretKeyRef: { name: "ledger-creds", key: (if $key == "" then null else $key end) } } }
+  ' 2>/dev/null
+}
+
 env_pane() {
-  show_actual json "$(kubectl -n tucana get deploy ledger-api -o json 2>/dev/null | jq '[.spec.template.spec.containers[] | {name, env}]')"
+  show_pair json secretkey.json
   show_why "$1"
 }
 pod_pane() {

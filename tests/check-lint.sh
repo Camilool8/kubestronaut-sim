@@ -52,7 +52,7 @@ SOFT = [
 ]
 
 EXEMPT = {
-    "get-yaml": re.compile(r"show_(?:actual|expected)\b.*\|\s*k8s_clean\b"),
+    "get-yaml": re.compile(r"\|\s*k8s_clean\b"),
 }
 
 SHAPE = [

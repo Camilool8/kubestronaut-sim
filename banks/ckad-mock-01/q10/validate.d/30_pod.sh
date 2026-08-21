@@ -1,17 +1,9 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: Pod archiver mounts the claim at /var/archive and an emptyDir at /var/scratch
+# expected: pod-volumes.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
-evidence() {
-  show_actual json "$(kubectl -n orion get pod archiver -o json 2>/dev/null | jq --arg c web '
-    {volumes: .spec.volumes,
-     mounts: (if any(.spec.containers[]; .name == $c)
-              then first(.spec.containers[] | select(.name == $c)) | .volumeMounts
-              else {"no such container": $c, "containers that exist": [.spec.containers[].name]}
-              end)}')"
-  show_why "$1"
-}
 
 # The mount comparison at the end addresses the container by the name the
 # question gave it, so a Pod built with a differently named container would
@@ -19,7 +11,8 @@ evidence() {
 names=$(kubectl -n orion get pod archiver -o jsonpath='{.spec.containers[*].name}' 2>/dev/null)
 [ -z "$names" ] || has_name "$names" web || {
   echo "pod archiver has no container named 'web' (found: $(name_list "$names"))"
-  evidence "The question names the container 'web'. Mounts are per container and are read off that name, so under another one the volumes below are mounted in a container this check cannot see."
+  show_actual text "containers that exist: $(name_list "$names")"
+  show_why "The question names the container 'web'. Mounts are per container and are read off that name, so under another one the volumes below are mounted in a container this check cannot see."
   exit 1
 }
 
@@ -34,6 +27,21 @@ mounts=$(kubectl -n orion get pod archiver -o json 2>/dev/null \
       | sort | join(" ")')
 expect=$(printf '%s@/var/archive scratch@/var/scratch' "$claim" | tr ' ' '\n' | sort | tr '\n' ' ')
 expect=${expect% }
+
+snapshot() {
+  jq -n -S \
+    --arg claim "${claim:-}" --arg scratch "${scratch:-}" --arg mounts "${mounts:-}" \
+    '{
+      claimVolume: (if $claim == "" then null else {name: $claim, persistentVolumeClaim: {claimName: "archive-pvc"}} end),
+      scratchVolume: (if $scratch == "" then null else {name: "scratch", emptyDir: {}} end),
+      mounts: ($mounts | if . == "" then [] else split(" ") end)
+    }' 2>/dev/null
+}
+
+evidence() {
+  show_pair json pod-volumes.json
+  show_why "$1"
+}
 
 crit 1 "a volume backed by claim archive-pvc" \
   "no volume backed by claim archive-pvc" \

@@ -1,11 +1,21 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: default-deny selects every Pod in hydra, governs both directions and allows nothing
+# expected: default-deny.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
+snapshot() {
+  printf '%s' "${pol:-null}" | jq -S '{
+    podSelector: (.spec.podSelector // {}),
+    policyTypes: ((.spec.policyTypes // []) | sort),
+    ingress: (.spec.ingress // []),
+    egress: (.spec.egress // [])
+  }' 2>/dev/null
+}
+
 evidence() {
-  show_actual yaml "$(kubectl -n hydra get netpol default-deny -o yaml 2>/dev/null | k8s_clean)"
+  show_pair json default-deny.json
   show_why "$1"
 }
 

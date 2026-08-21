@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: Pod checkout runs app (busybox) and ambassador (nginx), and is Running
+# expected: containers.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
+
+# The Pod phase criterion below is a behavioural reading (has every container
+# started), not a shape either container was authored with, so it is left out
+# of the pane and rides on its own crit message instead.
+snapshot() {
+  kubectl -n dorado get pod checkout -o json 2>/dev/null \
+    | jq -S '{containers: ([.spec.containers[]? | {name, image}] | sort_by(.name))}' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "$(kubectl -n dorado get pod checkout -o json 2>/dev/null | jq '{containers: [.spec.containers[] | {name, image}], phase: .status.phase}')"
+  show_pair json containers.json
   show_why "$1"
 }
 

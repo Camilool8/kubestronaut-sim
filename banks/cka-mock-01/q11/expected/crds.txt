@@ -1,0 +1,3 @@
+carriers.logistics.sim.dev
+depots.logistics.sim.dev
+shipments.logistics.sim.dev

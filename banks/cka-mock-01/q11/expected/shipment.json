@@ -1,0 +1,9 @@
+{
+  "carrier": {
+    "contract": "LOG-2291",
+    "name": "blue-line"
+  },
+  "destination": "rotterdam-north",
+  "priority": "express",
+  "weightKg": 1200
+}

@@ -1,10 +1,21 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the container's port 8080 is named http-web in Deployment pollux-web
+# expected: ports.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
 deploy=$(kubectl -n gemini get deploy pollux-web -o json 2>/dev/null)
+
+snapshot() {
+  printf '%s' "${deploy:-null}" \
+    | jq -S '[.spec.template.spec.containers[]? | {name, ports}]' 2>/dev/null
+}
+
+evidence() {
+  show_pair json ports.json
+  show_why "$1"
+}
 
 [ -n "$deploy" ] || {
   echo "no Deployment named pollux-web in namespace gemini"
@@ -25,8 +36,5 @@ crit 1 "the container port 8080 is named http-web" \
   "A named targetPort on the Service side is resolved per Pod against the names in that Pod's containers[].ports, so the name has to exist there first — and on the entry carrying 8080, since the name is only a label for that number. Adding it rewrites the Pod template, which rolls the Deployment: the running Pods are replaced, and only the new ones carry the name." \
   -- has_name "$named" http-web
 
-crit_all_passed || {
-  show_actual json "$(printf '%s' "$deploy" | jq '[.spec.template.spec.containers[]? | {name, ports}]')"
-  show_why "$(crit_why)"
-}
+crit_all_passed || evidence "$(crit_why)"
 report "container port named"

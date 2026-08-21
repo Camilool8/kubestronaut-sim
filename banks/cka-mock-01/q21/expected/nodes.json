@@ -1,0 +1,33 @@
+[
+  {
+    "labels.workload": null,
+    "name": "sim-control-plane",
+    "taints": []
+  },
+  {
+    "labels.workload": null,
+    "name": "sim-worker",
+    "taints": []
+  },
+  {
+    "labels.workload": "batch",
+    "name": "sim-worker2",
+    "taints": [
+      {
+        "effect": "NoSchedule",
+        "key": "workload",
+        "value": "batch"
+      }
+    ]
+  },
+  {
+    "labels.workload": null,
+    "name": "sim-worker3",
+    "taints": []
+  },
+  {
+    "labels.workload": null,
+    "name": "sim-worker4",
+    "taints": []
+  }
+]

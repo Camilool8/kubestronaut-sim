@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: batch-runner's Pod template tolerates the batch taint and requires the workload=batch label with no node pinned
+# expected: scheduling.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -12,11 +13,15 @@ name=$(kubectl -n "$NS" get deploy "$DEP" -o jsonpath='{.metadata.name}' 2>/dev/
 # Only the four fields that decide placement. The whole Pod template would bury
 # them, and the question is about nothing else here.
 tpl=$(kubectl -n "$NS" get deploy "$DEP" -o json 2>/dev/null \
-  | jq '.spec.template.spec
+  | jq -S '.spec.template.spec
         | {nodeName, nodeSelector, tolerations, nodeAffinity: .affinity.nodeAffinity}' 2>/dev/null)
 
+snapshot() {
+  printf '%s' "${tpl:-null}"
+}
+
 evidence() {
-  show_actual json "${tpl:-null}"
+  show_pair json scheduling.json
   show_why "$1"
 }
 

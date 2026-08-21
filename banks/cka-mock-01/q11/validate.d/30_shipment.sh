@@ -1,12 +1,24 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: Shipment atlas-7 in pyxis carries the consignment's destination, weight and service level, and the carrier it was booked with
+# expected: shipment.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
 NS=pyxis
 
 cr=$(kubectl -n "$NS" get shipment atlas-7 -o json 2>/dev/null)
+
+# The schema has exactly these fields under spec — nothing to project away.
+snapshot() {
+  printf '%s' "${cr:-null}" | jq -S '.spec // null' 2>/dev/null
+}
+
+evidence() {
+  show_pair json shipment.json
+  show_why "$1"
+}
+
 [ -n "$cr" ] || {
   echo "no Shipment named atlas-7 in $NS"
   show_actual text "$(kubectl -n "$NS" get shipments 2>&1)"
@@ -19,11 +31,6 @@ weight=$(printf '%s' "$cr" | jq -r '.spec.weightKg // ""')
 priority=$(printf '%s' "$cr" | jq -r '.spec.priority // ""')
 carrier=$(printf '%s' "$cr" | jq -r '.spec.carrier.name // ""')
 contract=$(printf '%s' "$cr" | jq -r '.spec.carrier.contract // ""')
-
-evidence() {
-  show_actual json "$(printf '%s' "$cr" | jq '.spec' 2>/dev/null)"
-  show_why "$1"
-}
 
 # jq compares 1200 against the number, not the string: weightKg is declared an
 # integer, so a quoted value never reaches the object at all - the API server

@@ -1,0 +1,12 @@
+[
+  {
+    "name": "web",
+    "ports": [
+      {
+        "containerPort": 8080,
+        "name": "http-web",
+        "protocol": "TCP"
+      }
+    ]
+  }
+]

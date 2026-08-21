@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: an emptyDir named telemetry is mounted at /var/run/telemetry in both containers
+# expected: shared-volume.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
+
+snapshot() {
+  kubectl -n pictor get pod telemetry -o json 2>/dev/null \
+    | jq -S '{telemetryVolume: ((.spec.volumes[]? | select(.name == "telemetry") | (.emptyDir // {})) // null),
+              mounts: ([.spec.containers[]? | {name, mountPath: ((.volumeMounts[]? | select(.name == "telemetry") | .mountPath) // null)}] | sort_by(.name))}' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "$(kubectl -n pictor get pod telemetry -o json 2>/dev/null | jq '{volumes: .spec.volumes, mounts: [.spec.containers[] | {name, volumeMounts}]}')"
+  show_pair json shared-volume.json
   show_why "$1"
 }
 

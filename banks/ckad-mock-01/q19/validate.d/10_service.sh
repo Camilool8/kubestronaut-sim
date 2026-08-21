@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the Service selects the Pods and targets the port they listen on
+# expected: service.yaml yaml
 set -uo pipefail
 . /banks/_lib/checks.sh
 
-defaults='del(.spec.clusterIP, .spec.clusterIPs, .spec.internalTrafficPolicy,
-              .spec.ipFamilies, .spec.ipFamilyPolicy, .spec.sessionAffinity)'
+snapshot() {
+  kubectl -n serpens get svc inventory -o json 2>/dev/null | jq -S '
+    {selector: (.spec.selector // {}),
+     targetPort: ((.spec.ports[]? | select(.port == 80) | .targetPort) // null)}' \
+    | yq -p json -o yaml -P 2>/dev/null
+}
+
 evidence() {
-  show_actual yaml "$(kubectl -n serpens get svc inventory -o yaml 2>/dev/null | k8s_clean | yq "$defaults")"
-  show_expected yaml "/banks/${BANK:-ckad-mock-01}/q19/expected/service.yaml"
+  show_pair yaml service.yaml
   show_why "$1"
 }
 

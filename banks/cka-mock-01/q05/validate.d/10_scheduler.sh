@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: the aux-sched cluster runs a healthy kube-scheduler static Pod and it has taken the scheduling lease
+# expected: none — both criteria are live readings of the repaired control
+#           plane (the static Pod's phase/readiness, and the Lease's current
+#           holderIdentity) rather than a document the candidate authored; the
+#           manifest fix itself lives on the aux node's filesystem, out of
+#           this check's reach. The messages already name what was seen.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

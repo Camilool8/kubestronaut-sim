@@ -1,0 +1,44 @@
+{
+  "egress": [
+    {
+      "ports": [
+        {
+          "port": 53,
+          "protocol": "TCP"
+        },
+        {
+          "port": 53,
+          "protocol": "UDP"
+        }
+      ]
+    }
+  ],
+  "ingress": [
+    {
+      "from": [
+        {
+          "podSelector": {
+            "matchLabels": {
+              "role": "frontend"
+            }
+          }
+        }
+      ],
+      "ports": [
+        {
+          "port": 80,
+          "protocol": "TCP"
+        }
+      ]
+    }
+  ],
+  "podSelector": {
+    "matchLabels": {
+      "role": "api"
+    }
+  },
+  "policyTypes": [
+    "Egress",
+    "Ingress"
+  ]
+}

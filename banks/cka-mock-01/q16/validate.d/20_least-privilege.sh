@@ -1,13 +1,60 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the two allow policies open exactly frontend->api:8080 and DNS, and nothing in hydra allows all
+# expected: least-privilege.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
 pols=$(kubectl -n hydra get netpol -o json 2>/dev/null)
 
+# Only the two named policies' authored shape gets a generated document:
+# podSelector, policyTypes and the rules themselves (peers and ports), the
+# fields this check compares field-by-field against a wanted shape. Which
+# live Pods a selector resolves to is read only to accept a semantically
+# equivalent matchExpressions in place of matchLabels — the same way
+# q01/20_probe.sh resolves a named port through the container's own ports —
+# and is deliberately not baked into the pane; nor is the namespace-wide
+# open-rule scan the second criterion also runs, whose outcome already rides
+# on that criterion's own message and why text below.
+#
+# The grading below is provably order-independent — in_peers/in_ports/eg_ports
+# all flatten across every rule and compare via same_set — so the pane has to
+# be too. Each rule's own ports and peers are sorted (ports normalised to an
+# explicit protocol first, since an omitted protocol and a written 'TCP' are
+# the same rule and must not render as one), and the outer ingress/egress
+# rule arrays are sorted too: a candidate who writes the DNS rule before the
+# api rule, or TCP before UDP within it, is exactly as correct as the
+# reference solution's own order and must produce a byte-identical pane.
+snapshot() {
+  printf '%s' "${pols:-null}" | jq -S '
+    def norm_ports: (. // []) | map({port: .port, protocol: (.protocol // "TCP")}) | sort_by(.protocol, .port);
+    {
+      "allow-api-ingress": (
+        (first(.items[]? | select(.metadata.name == "allow-api-ingress")) // null) as $p
+        | if $p == null then null else {
+            podSelector: ($p.spec.podSelector // {}),
+            policyTypes: (($p.spec.policyTypes // []) | sort),
+            ingress: (($p.spec.ingress // [])
+              | map({from: ((.from // []) | sort), ports: (.ports | norm_ports)})
+              | sort)
+          } end
+      ),
+      "allow-frontend-egress": (
+        (first(.items[]? | select(.metadata.name == "allow-frontend-egress")) // null) as $p
+        | if $p == null then null else {
+            podSelector: ($p.spec.podSelector // {}),
+            policyTypes: (($p.spec.policyTypes // []) | sort),
+            egress: (($p.spec.egress // [])
+              | map({to: ((.to // []) | sort), ports: (.ports | norm_ports)})
+              | sort)
+          } end
+      )
+    }
+  ' 2>/dev/null
+}
+
 evidence() {
-  show_actual yaml "$(kubectl -n hydra get netpol -o yaml 2>/dev/null | k8s_clean)"
+  show_pair json least-privilege.json
   show_why "$1"
 }
 

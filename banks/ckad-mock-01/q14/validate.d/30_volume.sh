@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: api-keys mounted read-only at /etc/api with defaultMode 0400
+# expected: volume.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
-evidence() {
-  show_actual json "$(kubectl -n tucana get deploy ledger-api -o json 2>/dev/null | jq '.spec.template.spec | {volumes, mounts: [.containers[] | {name, volumeMounts}]}')"
-  show_why "$1"
-}
 
 # Everything below is addressed by the names the question fixed — the volume
 # 'api-keys' and the container 'api'. A name nothing matches reads back exactly
@@ -15,7 +12,8 @@ vols=$(kubectl -n tucana get deploy ledger-api \
   -o jsonpath='{.spec.template.spec.volumes[*].name}' 2>/dev/null)
 has_name "$vols" api-keys || {
   echo "deployment ledger-api has no volume named 'api-keys' (found: $(name_list "$vols"))"
-  evidence "The question fixes the volume's name at 'api-keys', separately from the Secret it carries. Mounting the right Secret under a volume named something else is a working Pod, but this check looks the volume up by the name it was told to expect and finds nothing there — so secretName, defaultMode and the mount below all read back empty."
+  show_actual json "$(kubectl -n tucana get deploy ledger-api -o json 2>/dev/null | jq '.spec.template.spec | {volumes, mounts: [.containers[] | {name, volumeMounts}]}')"
+  show_why "The question fixes the volume's name at 'api-keys', separately from the Secret it carries. Mounting the right Secret under a volume named something else is a working Pod, but this check looks the volume up by the name it was told to expect and finds nothing there — so secretName, defaultMode and the mount below all read back empty."
   exit 1
 }
 
@@ -27,6 +25,20 @@ path=$(kubectl -n tucana get deploy ledger-api \
   -o jsonpath='{.spec.template.spec.containers[?(@.name=="api")].volumeMounts[?(@.name=="api-keys")].mountPath}' 2>/dev/null)
 ro=$(kubectl -n tucana get deploy ledger-api \
   -o jsonpath='{.spec.template.spec.containers[?(@.name=="api")].volumeMounts[?(@.name=="api-keys")].readOnly}' 2>/dev/null)
+
+snapshot() {
+  jq -nS --arg src "${src:-}" --arg mode "${mode:-}" --arg path "${path:-}" --arg ro "${ro:-}" '
+    { secretName: (if $src == "" then null else $src end),
+      defaultMode: (if $mode == "" then null else $mode end),
+      mountPath: (if $path == "" then null else $path end),
+      readOnly: (if $ro == "" then null else $ro end) }
+  ' 2>/dev/null
+}
+
+evidence() {
+  show_pair json volume.json
+  show_why "$1"
+}
 
 crit 1 "backed by Secret api-keys" \
   "volume 'api-keys' is not backed by Secret api-keys (got '$src')" \

@@ -1,12 +1,29 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: shipper is a native sidecar (initContainers entry with restartPolicy Always)
+# expected: containers.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
+
+snapshot() {
+  kubectl -n lyra get deploy feed-writer -o json 2>/dev/null | jq -S '
+    .spec.template.spec | {
+      initContainers: [(.initContainers // [])[] | {name, image, restartPolicy: (.restartPolicy // null), volumeMounts: [(.volumeMounts // [])[] | .name]}],
+      containers: [(.containers // [])[] | {name}]
+    }'
+}
+
 evidence() {
-  show_actual json "$(kubectl -n lyra get deploy feed-writer -o json 2>/dev/null | jq '.spec.template.spec | {initContainers: [.initContainers[]? | {name, restartPolicy}], containers: [.containers[] | {name}]}')"
-  show_expected json "/banks/${BANK:-ckad-mock-01}/q05/expected/containers.json"
+  show_pair json containers.json
   show_why "$1"
+}
+
+exists=$(kubectl -n lyra get deploy feed-writer -o jsonpath='{.metadata.name}' 2>/dev/null)
+[ -n "$exists" ] || {
+  echo "Deployment feed-writer not found in Namespace lyra"
+  show_actual text "$(kubectl -n lyra get deploy 2>/dev/null)"
+  show_why "Every part of this question is graded on Deployment feed-writer in Namespace lyra, and the pane above lists what that Namespace actually holds. A Deployment created under another name is invisible to every check here."
+  exit 1
 }
 
 policy=$(kubectl -n lyra get deploy feed-writer \

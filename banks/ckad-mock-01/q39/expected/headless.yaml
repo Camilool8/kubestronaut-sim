@@ -1,0 +1,4 @@
+clusterIP: None
+selector:
+  app: shard
+targetPort: 80

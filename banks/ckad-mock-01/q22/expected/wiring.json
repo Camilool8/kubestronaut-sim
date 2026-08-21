@@ -1,0 +1,4 @@
+{
+  "ambassadorMountPath": "/etc/nginx/conf.d",
+  "conf": "ambassador-conf"
+}

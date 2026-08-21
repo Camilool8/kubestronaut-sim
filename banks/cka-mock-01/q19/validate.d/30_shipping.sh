@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the shipper sidecar runs and its own container log carries the app's lines
+# expected: none — the check grades whether the shipper container is actually
+#           running and whether its own container log holds lines proving it
+#           tailed the application's file. Both are live readings off Pod
+#           status and container logs at request time, not a document the
+#           candidate authored.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

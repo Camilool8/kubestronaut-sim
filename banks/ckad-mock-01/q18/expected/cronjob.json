@@ -1,0 +1,4 @@
+{
+  "schedule": "0 2 * * *",
+  "image": "busybox:1.37"
+}

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: every node in the aux-cni cluster reports Ready
+# expected: none — this grades the node's live Ready condition, written by
+#           the node lifecycle controller once the kubelet's own network
+#           check clears, rather than anything the candidate authored; there
+#           is no manifest for a Ready condition to be compared against.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

@@ -1,0 +1,13 @@
+{
+  "containers": [
+    {
+      "name": "api"
+    }
+  ],
+  "initContainers": [
+    {
+      "name": "shipper",
+      "restartPolicy": "Always"
+    }
+  ]
+}

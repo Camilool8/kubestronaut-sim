@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: the policy is actually enforced — frontend reaches api, metrics does not
+# expected: none — this grades whether traffic is actually allowed or denied
+#           between two live Pods, a relationship observed by sending real
+#           requests rather than a shape the candidate wrote down. The message
+#           and why text already name which side failed and why.
 set -uo pipefail
 . /banks/_lib/checks.sh
 evidence() {

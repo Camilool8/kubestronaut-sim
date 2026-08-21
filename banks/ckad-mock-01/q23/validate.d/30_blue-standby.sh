@@ -1,8 +1,21 @@
 #!/usr/bin/env bash
 # points: 1
 # desc: the cutover left blue standing at full strength as the rollback
+# expected: service.yaml yaml
 set -uo pipefail
 . /banks/_lib/checks.sh
+
+# Same Service, same projection as 10_selector.sh's snapshot() — this check
+# grades the selector too (that it excludes blue rather than that it exactly
+# matches green), so it shares that document instead of declaring its own.
+# Must stay byte-identical to that snapshot(): tests/drill.sh --capture writes
+# this file once per declaring check, and the last one to run wins.
+snapshot() {
+  kubectl -n lacerta get svc checkout -o json 2>/dev/null | jq -S '
+    {selector: (.spec.selector // {}),
+     port: ((.spec.ports[]? | select(.port == 80) | .port) // null)}' \
+    | yq -p json -o yaml -P 2>/dev/null
+}
 
 want=$(kubectl -n lacerta get deploy checkout-blue -o jsonpath='{.spec.replicas}' 2>/dev/null)
 [ -n "$want" ] || {
@@ -44,7 +57,7 @@ deploy_pane() {
   show_why "$1"
 }
 sel_pane() {
-  show_actual text "$(printf 'selector: %s\nmatches:\n%s\n\nblue release Pods:\n%s\n' "$sel" "$matched" "$blue")"
+  show_pair yaml service.yaml
   show_why "$1"
 }
 

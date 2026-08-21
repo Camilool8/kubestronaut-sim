@@ -1,16 +1,9 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: PV archive-pv: 2Gi, RWO, hostPath /mnt/archive, class manual, Retain
+# expected: pv.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
-
-noise='del(.spec.claimRef, .metadata.finalizers,
-           .metadata.annotations."pv.kubernetes.io/bound-by-controller")'
-
-evidence() {
-  show_actual yaml "$(kubectl get pv archive-pv -o yaml 2>/dev/null | k8s_clean | yq "$noise")"
-  show_why "$1"
-}
 
 field() { kubectl get pv archive-pv -o jsonpath="{$1}" 2>/dev/null; }
 size=$(field .spec.capacity.storage)
@@ -19,9 +12,27 @@ path=$(field .spec.hostPath.path)
 class=$(field .spec.storageClassName)
 reclaim=$(field .spec.persistentVolumeReclaimPolicy)
 
-# Five fields, each doing something different, so each is scored on its own. An
-# empty pane means no PV of this name exists at all; a PV is cluster-scoped, so
-# it is not created into a Namespace.
+snapshot() {
+  jq -n -S \
+    --arg size "${size:-}" --arg modes "${modes:-}" --arg path "${path:-}" \
+    --arg class "${class:-}" --arg reclaim "${reclaim:-}" \
+    '{
+      capacity: {storage: (if $size == "" then null else $size end)},
+      accessModes: ($modes | if . == "" then [] else (split(" ") | map(select(length > 0)) | sort) end),
+      hostPath: {path: (if $path == "" then null else $path end)},
+      storageClassName: (if $class == "" then null else $class end),
+      persistentVolumeReclaimPolicy: (if $reclaim == "" then null else $reclaim end)
+    }' 2>/dev/null
+}
+
+evidence() {
+  show_pair json pv.json
+  show_why "$1"
+}
+
+# Five fields, each doing something different, so each is scored on its own.
+# All five reading back null in the pane means no PV of this name exists at
+# all; a PV is cluster-scoped, so it is not created into a Namespace.
 crit 1 "offers 2Gi" \
   "capacity is '$size', want 2Gi" \
   "capacity.storage is what the volume offers, and a claim binds to it only if the volume is at least as big as the claim asks for." \

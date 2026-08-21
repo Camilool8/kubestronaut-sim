@@ -27,7 +27,9 @@
 # pointed at a bank without paying for a cluster rebuild first.
 #
 # Usage:
-#   bash tests/drill.sh [bank-id]        # default cka-mock-01
+#   bash tests/drill.sh [bank-id]              # solve and grade to full marks
+#   bash tests/drill.sh --capture [bank-id]    # regenerate expected/ documents
+#   bash tests/drill.sh --check   [bank-id]    # prove they are current and non-vacuous
 #
 #   DRILL_BASE              facilitator URL           (default http://localhost:8080)
 #   DRILL_PREPARE_BUDGET    seconds to wait for per-question seeding (default 900)
@@ -40,6 +42,20 @@
 # draw an id fails at the attempt limit rather than spinning.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
+
+# grade   — the default sweep: solve every question and require full marks.
+# capture — additionally regenerate every declared expected/ document from the
+#           check's own snapshot, but ONLY for a question the grader just
+#           scored full marks. A solution script can exit 0 while leaving the
+#           cluster subtly wrong; the grader's own verdict cannot.
+# check   — regenerate and diff instead of writing, and prove each pane pair
+#           actually diverges on the unsolved cluster before anything is done
+#           to it.
+MODE=grade
+case ${1:-} in
+  --capture) MODE=capture; shift ;;
+  --check)   MODE=check;   shift ;;
+esac
 
 BANK=${1:-${DRILL_BANK:-cka-mock-01}}
 BASE=${DRILL_BASE:-http://localhost:8080}
@@ -262,6 +278,71 @@ solve() { # qid instance -> 0 when the solution script ran clean
     -c "bash /tests/solutions/${BANK}/${qid}.sh" >"$log" 2>&1 </dev/null
 }
 
+# qid -> "<script>\t<name>\t<lang>" per check that declares a document.
+# Opt-outs produce no row, so they are skipped by declaration rather than by
+# a failure the operator has to read past.
+declared_docs() {
+  local f base
+  for f in "banks/${BANK}/$1"/validate.d/*.sh; do
+    [ -f "$f" ] || continue
+    base=$(basename "$f")
+    awk -v s="$base" '
+      /^#[[:space:]]*expected:/ {
+        sub(/^#[[:space:]]*expected:[[:space:]]*/, "")
+        if ($1 != "none") print s "\t" $1 "\t" $2
+        exit
+      }' "$f"
+  done
+}
+
+# Run one check with capture on and return only what the trap emitted. The
+# env is the grader's own (facilitator/internal/evaluate/evaluate.go:95) so the
+# check reads the same cluster through the same kubeconfig it is graded with.
+capture_one() { # qid instance script
+  docker compose exec -T "$2" env SIM_CAPTURE_EXPECTED=1 \
+    KUBECONFIG=/home/candidate/.kube/config "BANK=${BANK}" \
+    bash "/banks/${BANK}/$1/validate.d/$3" 2>/dev/null </dev/null \
+    | awk 'f {print} /^---8<--- sim:capture$/ {f=1}'
+}
+
+capture_question() { # qid instance
+  local qid=$1 inst=$2 script name body path
+  while IFS=$'\t' read -r script name _; do
+    [ -n "$script" ] || continue
+    body=$(capture_one "$qid" "$inst" "$script")
+    case "$(printf '%s' "$body" | tr -d '[:space:]')" in
+      ''|null)
+        fail "${qid}/${script}: captured nothing for ${name} — the check exited before its snapshot, or the cluster is not actually solved"
+        continue ;;
+    esac
+    path="banks/${BANK}/${qid}/expected/${name}"
+    if [ "$MODE" = capture ]; then
+      mkdir -p "$(dirname "$path")"
+      printf '%s\n' "$body" > "$path"
+      echo "    wrote ${path}"
+    elif [ ! -f "$path" ]; then
+      fail "${qid}/${script}: declares ${name} but ${path} does not exist — run --capture"
+    elif [ "$(cat "$path")" != "$body" ]; then
+      fail "${qid}/${script}: ${name} is stale — the check's snapshot no longer matches the committed document"
+    fi
+  done <<< "$(declared_docs "$qid")"
+}
+
+# A pane pair that already matches before the candidate has done anything is
+# proving nothing: the projection does not cover what the check grades, and the
+# candidate would be shown two identical documents beside a failed check.
+divergence_question() { # qid instance
+  local qid=$1 inst=$2 script name path
+  while IFS=$'\t' read -r script name _; do
+    [ -n "$script" ] || continue
+    path="banks/${BANK}/${qid}/expected/${name}"
+    [ -f "$path" ] || continue
+    if [ "$(cat "$path")" = "$(capture_one "$qid" "$inst" "$script")" ]; then
+      fail "${qid}/${script}: ${name} already matches on the unsolved cluster — the projection does not cover what the check grades"
+    fi
+  done <<< "$(declared_docs "$qid")"
+}
+
 run_attempt() { # domain -> solves and grades one filtered attempt
   local dom=$1 sd code rows qid inst earned total why
   sd=$(seed)
@@ -283,6 +364,13 @@ run_attempt() { # domain -> solves and grades one filtered attempt
     fail "${dom}: the attempt drew no questions at all"
     req DELETE /api/session >/dev/null
     return 1
+  fi
+
+  if [ "$MODE" = check ]; then
+    while IFS=$'\t' read -r qid inst; do
+      [ -n "$qid" ] || continue
+      divergence_question "$qid" "$inst"
+    done <<< "$rows"
   fi
 
   while IFS=$'\t' read -r qid inst; do
@@ -321,6 +409,14 @@ run_attempt() { # domain -> solves and grades one filtered attempt
       mark "$qid" SHORT "${earned}/${total} — ${why}"
     fi
   done <<< "$graded"
+
+  if [ "$MODE" != grade ]; then
+    while IFS=$'\t' read -r qid inst; do
+      [ -n "$qid" ] || continue
+      [ "$(verdict "$qid")" = OK ] || continue
+      capture_question "$qid" "$inst"
+    done <<< "$rows"
+  fi
 
   [ "$(req DELETE /api/session)" = "204" ] \
     || fail "${dom}: could not clear the attempt after grading"

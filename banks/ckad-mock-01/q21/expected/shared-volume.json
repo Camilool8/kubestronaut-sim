@@ -1,0 +1,13 @@
+{
+  "mounts": [
+    {
+      "mountPath": "/var/run/telemetry",
+      "name": "adapter"
+    },
+    {
+      "mountPath": "/var/run/telemetry",
+      "name": "app"
+    }
+  ],
+  "telemetryVolume": {}
+}

@@ -1,20 +1,32 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the ambassador holds the config, and the app knows nothing about the backend
+# expected: wiring.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
+
+snapshot() {
+  kubectl -n dorado get pod checkout -o json 2>/dev/null \
+    | jq -S '{conf: ((.spec.volumes[]? | select(.name == "conf") | .configMap.name) // null),
+              ambassadorMountPath: ((.spec.containers[]? | select(.name == "ambassador")
+                | (.volumeMounts[]? | select(.name == "conf") | .mountPath)) // null)}' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "$(kubectl -n dorado get pod checkout -o json 2>/dev/null | jq '{volumes: .spec.volumes, containers: [.spec.containers[] | {name, env, volumeMounts}]}')"
+  show_pair json wiring.json
   show_why "$1"
 }
 
 # The question rules this one out: the application must not know where the
-# backend lives, so telling it is not a partial answer to anything.
+# backend lives, so telling it is not a partial answer to anything. This gate
+# is about the app's own env, not the conf/mount shape the pane above pairs,
+# so its failure gets its own inline pane rather than the shared one.
 appspec=$(kubectl -n dorado get pod checkout -o json 2>/dev/null \
   | jq -r '.spec.containers[] | select(.name == "app")')
 printf '%s' "$appspec" | grep -q 'payments-backend' && {
   echo "the app container references payments-backend; only the ambassador may know about it"
-  evidence "The pattern's whole promise is that the application knows nothing about where the backend lives: its outbound configuration is permanently localhost, and everything that can change — the Service's name, its namespace, TLS, retries, a circuit breaker — moves into the ambassador. Passing the Service name to the app as an environment variable still makes the request succeed while handing the application exactly the knowledge the pattern exists to take away from it."
+  show_actual json "$(printf '%s' "$appspec" | jq -S '{env: (.env // [])}' 2>/dev/null)"
+  show_why "The pattern's whole promise is that the application knows nothing about where the backend lives: its outbound configuration is permanently localhost, and everything that can change — the Service's name, its namespace, TLS, retries, a circuit breaker — moves into the ambassador. Passing the Service name to the app as an environment variable still makes the request succeed while handing the application exactly the knowledge the pattern exists to take away from it."
   exit 1
 }
 

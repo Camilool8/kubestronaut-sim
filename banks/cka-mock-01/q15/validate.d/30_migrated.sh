@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: both paths answer over HTTPS through the Gateway's own address, and the legacy Ingress is gone
+# expected: none — this sends real HTTPS requests through the Gateway and
+#           checks that the legacy Ingress no longer exists, an event
+#           measured at request time and an absence rather than a document;
+#           the Gateway and HTTPRoute shapes it depends on are already
+#           paired by the checks that grade them.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

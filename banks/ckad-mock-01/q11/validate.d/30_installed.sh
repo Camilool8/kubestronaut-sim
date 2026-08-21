@@ -1,23 +1,36 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: report-cache installed from sim-cache with 2 replicas set via values
+# expected: install.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 export HELM_NAMESPACE=carina
-evidence() {
-  show_actual text "$(helm ls -a 2>/dev/null; echo; helm -n carina get values report-cache 2>/dev/null)"
-  show_why "$1"
-}
 
 chart=$(helm ls -o json 2>/dev/null | jq -r '.[] | select(.name == "report-cache") | .chart')
 [ -n "$chart" ] || {
   echo "report-cache is not installed"
-  evidence "There is no release called report-cache. The release name is chosen at install time and is separate from the chart it renders — one chart can back many releases, each with its own values and history."
+  show_actual text "$(helm ls -a 2>/dev/null)"
+  show_why "There is no release called report-cache. The release name is chosen at install time and is separate from the chart it renders — one chart can back many releases, each with its own values and history."
   exit 1
 }
 replicas=$(kubectl -n carina get deploy report-cache -o jsonpath='{.spec.replicas}' 2>/dev/null)
 value=$(helm -n carina get values report-cache -o json 2>/dev/null | jq -r '.replicaCount // empty')
 from_sim_cache() { printf '%s' "$chart" | grep -q '^sim-cache-'; }
+
+# chart and the release's own replicaCount value are what the candidate chose
+# at install time. The Deployment's live replica count is a rollout reading —
+# it can lag the value for a moment — and rides on its own crit message below.
+snapshot() {
+  jq -nS --arg chart "${chart:-}" --arg value "${value:-}" '
+    { chart: (if $chart == "" then null else $chart end),
+      values: { replicaCount: (if $value == "" then null else $value end) } }
+  ' 2>/dev/null
+}
+
+evidence() {
+  show_pair json install.json
+  show_why "$1"
+}
 
 crit 1 "installed from the sim-cache chart" \
   "report-cache uses chart '$chart', want sim-cache" \

@@ -1,0 +1,14 @@
+{
+  "roleRef": {
+    "apiGroup": "rbac.authorization.k8s.io",
+    "kind": "Role",
+    "name": "configmap-reader"
+  },
+  "subjects": [
+    {
+      "kind": "ServiceAccount",
+      "name": "report-reader",
+      "namespace": "crater"
+    }
+  ]
+}

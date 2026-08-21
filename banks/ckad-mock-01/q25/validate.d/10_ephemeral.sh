@@ -1,14 +1,29 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: an ephemeral container runs busybox:1.37 targeting api, in the original Pod
+# expected: ephemeral.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
+# Mirrors the same best-candidate selection the crits below judge against —
+# see the comment on $eph further down for why. The name is deliberately not
+# part of the projection: it is not graded, for the same reason (an ephemeral
+# container can never be removed, so a first attempt under the wrong name
+# would be permanent and unfixable to hold against the candidate).
+snapshot() {
+  kubectl -n perseus get pod ledger-api -o json 2>/dev/null | jq -S '
+    (.spec.ephemeralContainers // []) as $e
+    | ( first($e[] | select(.image == "busybox:1.37" and .targetContainerName == "api"))
+      // first($e[] | select(.targetContainerName == "api"))
+      // first($e[] | select(.image == "busybox:1.37"))
+      // $e[0] # lint: allow-index (last resort: judge whatever was attached, mirrors $eph below)
+      // null ) as $c
+    | if $c == null then null else {image: ($c.image // null), targetContainerName: ($c.targetContainerName // null)} end
+  ' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "$(kubectl -n perseus get pod ledger-api -o json 2>/dev/null \
-    | jq '{containers: [.spec.containers[].name],
-           ephemeralContainers: [.spec.ephemeralContainers // [] | .[]
-             | {name, image, targetContainerName}]}')"
+  show_pair json ephemeral.json
   show_why "$1"
 }
 
@@ -21,7 +36,8 @@ containers=$(kubectl -n perseus get pod ledger-api \
 }
 same_set "$containers" "api" || {
   echo "the Pod's containers are '$(printf '%s' "$containers" | tr '\n' ' ')', want exactly one named api"
-  evidence "spec.containers is immutable on a running Pod, so a changed container list means the Pod was deleted and replaced. An ephemeral container is not added there — it lives in spec.ephemeralContainers, which is why it can be added to a Pod that is already running."
+  show_actual text "containers that exist: $(name_list "$containers")"
+  show_why "spec.containers is immutable on a running Pod, so a changed container list means the Pod was deleted and replaced. An ephemeral container is not added there — it lives in spec.ephemeralContainers, which is why it can be added to a Pod that is already running."
   exit 1
 }
 

@@ -1,0 +1,23 @@
+{
+  "local": {
+    "path": "/mnt/q23-data"
+  },
+  "nodeAffinity": {
+    "required": {
+      "nodeSelectorTerms": [
+        {
+          "matchExpressions": [
+            {
+              "key": "kubernetes.io/hostname",
+              "operator": "In",
+              "values": [
+                "sim-worker"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "storageClassName": "q23-local"
+}

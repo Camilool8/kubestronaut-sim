@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the rollout finished and all 3 replicas are ready again
+# expected: none — this grades whether the restart's rollout finished
+#           (status.updatedReplicas caught up to spec.replicas on the
+#           restarted template) and whether the replicas are ready again —
+#           both readings taken at a moment rather than a document the
+#           candidate authored. The message already names the counts and the
+#           restart stamp they are read against.
 set -uo pipefail
 . /banks/_lib/checks.sh
 KEY=kubectl.kubernetes.io/restartedAt

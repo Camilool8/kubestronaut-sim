@@ -1,24 +1,47 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: the report container runs as uid 1000, non-root, no privilege escalation, no capabilities, RuntimeDefault seccomp
+# expected: securitycontext.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
 tmpl='.spec.template.spec'
+# Single-quoted on purpose. This whole expression already sits inside
+# "$( ... )", so a \" here would be unescaped by that outer layer into a real
+# quote, end the jq program early, and leave jq's {…} to bash — which brace-
+# expands it into two broken programs. The path is spelled out rather than
+# interpolated from $tmpl for the same reason.
+snapshot() {
+  kubectl -n auriga get deploy report-runner -o json 2>/dev/null \
+    | jq -S --arg c report '
+        (first(.spec.template.spec.containers[]? | select(.name == $c)) // null) as $ctr
+        | if $ctr == null
+          then {"no such container": $c, "containers that exist": [.spec.template.spec.containers[].name]}
+          else
+            ($ctr.securityContext // {}) as $csc
+            | (.spec.template.spec.securityContext // {}) as $psc
+            | {
+                runAsUser: ($csc.runAsUser // $psc.runAsUser // null),
+                # has() guarded rather than the // operator: jq treats a false
+                # value the same as null there, so a wrongly hardened
+                # runAsNonRoot false, or a correctly hardened
+                # allowPrivilegeEscalation false, would both render as null.
+                # get()/container_only() below never make that mistake because
+                # they read jsonpath string output, where false is non-empty.
+                # has() reads presence the same way regardless of value, which
+                # keeps this pane honest about what is actually set.
+                runAsNonRoot: (if ($csc | has("runAsNonRoot")) then $csc.runAsNonRoot
+                               elif ($psc | has("runAsNonRoot")) then $psc.runAsNonRoot
+                               else null end),
+                allowPrivilegeEscalation: $csc.allowPrivilegeEscalation,
+                capabilities: {drop: (($csc.capabilities.drop // []) | sort)},
+                seccompProfile: {type: ($csc.seccompProfile.type // $psc.seccompProfile.type // null)}
+              }
+          end' 2>/dev/null
+}
+
 evidence() {
-  # Single-quoted on purpose. This whole expression already sits inside
-  # "$( ... )", so a \" here would be unescaped by that outer layer into a real
-  # quote, end the jq program early, and leave jq's {…} to bash — which brace-
-  # expands it into two broken programs. The path is spelled out rather than
-  # interpolated from $tmpl for the same reason.
-  show_actual json "$(kubectl -n auriga get deploy report-runner -o json 2>/dev/null \
-    | jq --arg c report '
-        if any(.spec.template.spec.containers[]; .name == $c)
-        then {pod: .spec.template.spec.securityContext,
-              container: (first(.spec.template.spec.containers[] | select(.name == $c)) | .securityContext)}
-        else {"no such container": $c, "containers that exist": [.spec.template.spec.containers[].name]}
-        end')"
-  show_expected json "/banks/${BANK:-ckad-mock-01}/q24/expected/securitycontext.json"
+  show_pair json securitycontext.json
   show_why "$1"
 }
 

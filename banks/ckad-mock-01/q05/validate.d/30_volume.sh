@@ -1,18 +1,36 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: emptyDir feed-logs mounted at /var/log/feed in both writer and shipper
+# expected: volumes.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
+
+snapshot() {
+  jq -n --arg ed "$kind" --arg w "${writer:-}" --arg s "${shipper:-}" \
+    '{feedLogsVolume: (if $ed == "" then null else "emptyDir" end),
+      writerMountPath: (if $w == "" then null else $w end),
+      shipperMountPath: (if $s == "" then null else $s end)}'
+}
+
 evidence() {
-  show_actual json "$(kubectl -n lyra get deploy feed-writer -o json 2>/dev/null | jq '.spec.template.spec | {volumes, mounts: [(.containers[]?, .initContainers[]?) | {name, volumeMounts}]}')"
+  show_pair json volumes.json
   show_why "$1"
+}
+
+exists=$(kubectl -n lyra get deploy feed-writer -o jsonpath='{.metadata.name}' 2>/dev/null)
+[ -n "$exists" ] || {
+  echo "Deployment feed-writer not found in Namespace lyra"
+  show_actual text "$(kubectl -n lyra get deploy 2>/dev/null)"
+  show_why "Every part of this question is graded on Deployment feed-writer in Namespace lyra, and the pane above lists what that Namespace actually holds. A Deployment created under another name is invisible to every check here."
+  exit 1
 }
 
 kind=$(kubectl -n lyra get deploy feed-writer \
   -o jsonpath='{.spec.template.spec.volumes[?(@.name=="feed-logs")].emptyDir}' 2>/dev/null)
 [ -n "$kind" ] || {
   echo "no emptyDir volume named feed-logs"
-  evidence "A volume is declared once at Pod level and mounted separately by every container that wants it. emptyDir is created empty when the Pod is scheduled and disappears with it, which is what makes it the right scratch space for one container to write and another to read."
+  show_actual json "$(kubectl -n lyra get deploy feed-writer -o json 2>/dev/null | jq -S '.spec.template.spec.volumes // []')"
+  show_why "A volume is declared once at Pod level and mounted separately by every container that wants it. emptyDir is created empty when the Pod is scheduled and disappears with it, which is what makes it the right scratch space for one container to write and another to read. The pane above lists every volume the Pod template actually declares."
   exit 1
 }
 

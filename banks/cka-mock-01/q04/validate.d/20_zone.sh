@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the sim-dns resolver serves ledger.sim.internal as the ledger Service ClusterIP
+# expected: none — crit 1 grades the zone's declared record against the
+#           ledger Service's ClusterIP, read live from the API at grading
+#           time and assigned fresh on every cluster build rather than
+#           authored by either side, so no fixed document could ever stay
+#           correct. The actual pane shows the zone data considered.
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -8,15 +13,11 @@ zone=$(kubectl -n cygnus get cm sim-dns -o jsonpath='{.data.Corefile}' 2>/dev/nu
 ledger_ip=$(kubectl -n cygnus get svc ledger -o jsonpath='{.spec.clusterIP}' 2>/dev/null)
 resolver_ip=$(kubectl -n cygnus get svc sim-dns -o jsonpath='{.spec.clusterIP}' 2>/dev/null)
 
-evidence() {
-  show_actual text "$(printf 'ConfigMap cygnus/sim-dns, key Corefile:\n%s\n\nasking the resolver directly:\n%s\n' \
-                        "${zone:-$ARTIFACT_EMPTY}" "${answer:-(not asked)}")"
-  show_why "$1"
-}
-
 [ -n "$zone" ] || {
   echo "ConfigMap cygnus/sim-dns holds no Corefile"
-  evidence "sim-dns is a CoreDNS of its own, and the zone it is authoritative for is the Corefile in this ConfigMap — the Deployment mounts it as a file. With the key gone the resolver has no zone to serve at all, so forwarding to it correctly still resolves nothing."
+  show_actual text "$(printf 'ConfigMap cygnus/sim-dns, key Corefile:\n%s\n\nasking the resolver directly:\n%s\n' \
+                        "${zone:-$ARTIFACT_EMPTY}" "(not asked)")"
+  show_why "sim-dns is a CoreDNS of its own, and the zone it is authoritative for is the Corefile in this ConfigMap — the Deployment mounts it as a file. With the key gone the resolver has no zone to serve at all, so forwarding to it correctly still resolves nothing."
   exit 1
 }
 
@@ -26,6 +27,11 @@ record=$(printf '%s\n' "$zone" | awk '
   /(^|[[:space:]])ledger\.sim\.internal(\.)?([[:space:]]|$)/ {
     for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) print $i
   }')
+
+evidence() {
+  show_actual text "$zone"
+  show_why "$1"
+}
 
 answer=''
 if [ -n "$resolver_ip" ]; then

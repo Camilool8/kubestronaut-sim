@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # points: 1
 # desc: PersistentVolumeClaim norma/audit-data is Bound to the retained volume q24-audit-pv
+# expected: none — the one scored criterion grades whether this claim's
+#           binding reached the specific volume the task pinned, a live
+#           outcome of the binder controller compared against one object
+#           rather than a document the candidate authored. The message
+#           already names the phase and the volume the claim actually took.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

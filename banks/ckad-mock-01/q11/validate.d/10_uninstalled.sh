@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: report-api-v1 and the failed release are gone, report-web untouched
+# expected: none — the check grades whether specific named Helm releases
+#           still exist in the release list, a presence reading taken at a
+#           moment rather than a document the candidate authored. The
+#           listing above already names what actually exists.
 set -uo pipefail
 . /banks/_lib/checks.sh
 export HELM_NAMESPACE=carina

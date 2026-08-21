@@ -6,16 +6,19 @@ The conductor scans every `banks/*/exam.yaml` into the catalog
 the exam selector renders; [banks/catalog.yaml](../banks/catalog.yaml) adds
 coming-soon entries whose exam engine does not exist yet.
 
-Six gates decide whether a bank ships —
+Seven gates decide whether a bank ships —
 [bank-weights.sh](../tests/bank-weights.sh),
 [check-lint.sh](../tests/check-lint.sh),
 [check-lib.sh](../tests/check-lib.sh),
-[check-evidence.sh](../tests/check-evidence.sh) and
+[check-evidence.sh](../tests/check-evidence.sh),
+[check-expected.sh](../tests/check-expected.sh) and
 [bank-hints.sh](../tests/bank-hints.sh) for hands-on banks, and
 [bank-mcq.sh](../tests/bank-mcq.sh) for multiple-choice ones. All are
-offline and CI runs all six. Every one but `check-evidence.sh` also runs
-at the top of [tests/smoke.sh](../tests/smoke.sh), so a bank mistake
-fails in seconds rather than forty minutes into a cold boot.
+offline; six run in CI today, and `check-expected.sh` joins them once
+every check in both banks carries a declaration. Every one but
+`check-evidence.sh` and `check-expected.sh` also runs at the top of
+[tests/smoke.sh](../tests/smoke.sh), so a bank mistake fails in seconds
+rather than forty minutes into a cold boot.
 
 There are two exam engines. Everything down to
 [Multiple-choice banks](#multiple-choice-banks-examtype-mcq) describes
@@ -561,27 +564,53 @@ matches no Pod, the Service has no endpoints at all.
 
 Everything before the first sentinel line is the message, unchanged. Each
 sentinel opens a body running to the next sentinel or to EOF. Emit them with
-the [\_lib/checks.sh](../banks/_lib/checks.sh) helpers rather than by hand:
+the [\_lib/checks.sh](../banks/_lib/checks.sh) helpers rather than by hand.
+
+A check that pairs a generated document (see
+[Expected documents](#expected-documents) below) calls `show_pair`, which
+emits both the actual and expected panes from one `snapshot()`:
 
 ```bash
-[ "$sel" = "app=inventory" ] || {
-  echo "selector is '$sel', want app=inventory"
-  show_actual yaml "$(kubectl -n serpens get svc inventory -o yaml | k8s_clean)"
-  show_expected yaml "/banks/${BANK:-ckad-mock-01}/q19/expected/service.yaml"
-  show_why "A Service finds its Pods by label, never by name."
+snapshot() {
+  printf '%s' "${spec:-null}" \
+    | jq -S '{ports: (.ports // null), readinessProbe: (.readinessProbe // null)}' 2>/dev/null
+}
+
+evidence() {
+  show_pair json probe.json
+  show_why "$1"
+}
+
+[ "$kind" = httpGet ] && [ "$path" = "/" ] || {
+  echo "the readinessProbe is a '$kind' probe on path '$path', want an httpGet on /"
+  evidence "The question asks for this probe to be repaired rather than replaced, and only its port was ever wrong. A tcpSocket probe passes as soon as the port accepts a connection, which says nothing about whether the application can serve a request, and an exec probe grades something else entirely — so swapping the probe's type is not a repair, and this check scores nothing for it."
   exit 1
+}
+```
+
+A check with nothing to pair calls `show_actual` directly instead, exactly
+as it always has:
+
+```bash
+evidence() {
+  show_actual text "$(printf '%s\n\n%s\n' \
+    "$(kubectl -n "$ns" get pod -l app=telemetry-api 2>/dev/null)" \
+    "Available=${avail:-<none>} ${reason:-}")"
+  show_why "$1"
 }
 ```
 
 Call them **after** the failure message and **before** `exit 1`.
 
-Every check in `ckad-mock-01` now emits at least a `show_why`, so the
-bank itself is the reference. Two are worth reading first:
-[q19/10\_service.sh](../banks/ckad-mock-01/q19/validate.d/10_service.sh)
-shows the full three-artifact shape with an `evidence()` helper reused
-across several failure paths, and
-[q16/10\_probes.sh](../banks/ckad-mock-01/q16/validate.d/10_probes.sh)
-shows a JSON fragment captured with `jq` instead of a whole object.
+Every check in `ckad-mock-01` and `cka-mock-01` emits at least a
+`show_why`, so the banks themselves are the reference.
+[`cka-mock-01/q01`](../banks/cka-mock-01/q01/validate.d) is worth reading
+first — it is the worked example the rest of this section is built from:
+[20\_probe.sh](../banks/cka-mock-01/q01/validate.d/20_probe.sh) shows the
+full `evidence()` shape above, with a `jq` fragment captured instead of a
+whole object, and
+[30\_ready.sh](../banks/cka-mock-01/q01/validate.d/30_ready.sh) shows the
+same shape for a check that opts out of a document entirely.
 
 Prefer a `jq` projection to a whole object where the check is about a few
 fields. It sidesteps the server-side noise entirely, and the pane then
@@ -609,45 +638,123 @@ one-space indent is the answer.
 
 #### Expected documents
 
-`show_expected` reads a file and nothing else, on purpose.
+Every check declares, beside its `# points:`/`# desc:` headers, whether it
+pairs a generated document. Paired:
 
-- Expected documents live at
-  `banks/<bank-id>/<qid>/expected/<name>`.
-- They are **generated from the reference solution, never
-  hand-written.** A hand-written "expected" drifts from what
-  `tests/solutions/<bank>/<qid>.sh` actually produces, and then teaches
-  the candidate something false.
-
-To regenerate one, solve the question and re-run the check's own
-`show_actual` pipeline against the result:
-
-```bash
-docker compose exec -T instance-1 su - candidate \
-  -c 'bash /tests/solutions/ckad-mock-01/q19.sh'
-docker compose exec -T instance-1 bash -c '. /banks/_lib/checks.sh
-  kubectl -n serpens get svc inventory -o yaml | k8s_clean | yq "<the check's filter>"' \
-  > banks/ckad-mock-01/q19/expected/service.yaml
+```
+# expected: probe.json json
 ```
 
-**Filter both panes identically**, and filter out whatever the API
-server assigns rather than the candidate. A `clusterIP` in the EXPECTED
-pane is an address they never had, and showing it teaches them it was
-part of the answer.
+Opted out, with the reason inline — the reason can wrap across
+continuation comment lines:
 
-- `k8s_clean` removes the noise every object carries: `managedFields`,
-  `status`, `resourceVersion`, `uid`, `generation`, `creationTimestamp`,
-  and the `last-applied-configuration` annotation.
-- Anything else the question is not about is the check's own `yq`/`jq`
-  filter to remove.
+```
+# expected: none — the check grades whether the Deployment reached its replica
+#           count, which is a reading taken at a moment rather than a document
+#           the candidate authored. The message already names the count.
+```
 
-A question with no `expected/` document is fine: `show_expected` emits
-nothing and the candidate gets the message they always had. **Prefer
-that to inventing one.**
+[check-expected.sh](../tests/check-expected.sh) requires exactly one
+`# expected:` line per check and enforces everything below.
 
-`q19/20_reachable.sh` deliberately has none. An EndpointSlice is written
-by a controller, with a random name suffix and Pod IPs for addresses, so
-an authored "expected" one would only teach a candidate to look for
-numbers that were never going to be theirs.
+**Pairing.** A paired check declares an unconditional, top-level
+`snapshot()` — the exact projection the check already builds for its
+evidence pane, lifted out and given a name — and calls `show_pair <lang>
+<name>` from `evidence()` in place of the old `show_actual` call:
+
+```bash
+snapshot() {
+  printf '%s' "${spec:-null}" \
+    | jq -S '{ports: (.ports // null), readinessProbe: (.readinessProbe // null)}' 2>/dev/null
+}
+
+evidence() {
+  show_pair json probe.json
+  show_why "$1"
+}
+```
+
+`show_pair` ([\_lib/checks.sh](../banks/_lib/checks.sh)) emits both panes
+from one pipeline: the actual side from `snapshot()`'s own output, and the
+expected side from the generated document at `<qid>/expected/<name>`,
+located through `expected_dir()` — derived from the check's own path,
+never a hardcoded bank id or qid. One function feeding both panes is also
+what makes "filter both panes identically" stop being something an author
+has to remember and turns it into the only way to write it.
+
+An opted-out check declares no `snapshot()` and calls no `show_pair`.
+`evidence()` keeps calling `show_actual` directly, exactly as it always
+has:
+
+```bash
+evidence() {
+  show_actual text "$(printf '%s\n\n%s\n' \
+    "$(kubectl -n "$ns" get pod -l app=telemetry-api 2>/dev/null)" \
+    "Available=${avail:-<none>} ${reason:-}")"
+  show_why "$1"
+}
+```
+
+**When to pair**, the whole rule in one line:
+
+> Pair when the check grades a shape the candidate authored. Opt out when
+> it grades an event, a measurement, or a relationship between two live
+> values.
+
+Sampled across the 212 checks in both banks, by the pane the check
+already shows:
+
+| Pane the check shows | Checks | Pairs? |
+|---|---|---|
+| a `jq`/`yq` projection (`show_actual json` or `yaml`) | 126 | yes |
+| the content of a file the candidate wrote (`cat`, `file_text`) | 21 | yes, as text |
+| a `kubectl get` table, a name list, a count, or a "ready / reachable / complete" reading | 65 | mostly no |
+
+A check can carry two criteria of different taxonomy without splitting its
+pane:
+[q01/10\_image.sh](../banks/cka-mock-01/q01/validate.d/10_image.sh) grades
+both the authored image field and a behavioural "did a Pod start"
+reading, and pairs only the image half. The UI shows exactly one
+actual/expected pair per check, not per criterion, so the behavioural
+criterion's outcome rides on its own `crit` message and `show_why` text
+instead of getting a second pane.
+
+**Two projection rules**, whether or not the check pairs:
+
+1. Only what this check grades. Not the whole object. A whole-object pane
+   marks a legitimately different but ungraded field as if it were
+   wrong.
+2. Sort what has no meaningful order. `jq -S` for key order, and sort any
+   scalar array whose order carries no meaning — an RBAC Role's `verbs:
+   ["get","list"]` and `verbs: ["list","get"]` are the same Role and must
+   never render as a difference. `k8s_clean` already covers the
+   server-assigned fields a YAML pane needs stripped: `managedFields`,
+   `status`, `resourceVersion`, `uid`, `generation`, `creationTimestamp`,
+   and the `last-applied-configuration` annotation. Anything else the
+   question is not about is the check's own `yq`/`jq` filter to remove.
+
+**Documents are never hand-written.** The only way one is created:
+
+```bash
+bash tests/drill.sh --capture <bank>
+```
+
+It runs the check's own `snapshot()` against a cluster the grader just
+scored at full marks — never against an unsolved or hand-edited one. A
+hand-written "expected" drifts from what the reference solution actually
+produces the moment either side changes, and then teaches the candidate
+something false.
+
+A check with no document must say why, in the file — not just silently
+have nothing. **Prefer declaring to inventing.**
+[q19/20\_reachable.sh](../banks/ckad-mock-01/q19/validate.d/20_reachable.sh)
+is the model for how to reason a `none` out: it grades whether a Service
+has ready endpoints and really answers a request, and an EndpointSlice is
+written by a controller, with a random name suffix and Pod IPs for
+addresses, so an authored "expected" one would only teach a candidate to
+look for numbers that were never going to be theirs. (That file does not
+carry its own `# expected: none` header yet — a later pass converts every
+remaining check — but its reasoning is the pattern to follow.)
 
 ### Grade behaviour, not spelling
 

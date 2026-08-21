@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the restart changed nothing about what the Deployment runs
+# expected: none — the two gates below compare the Deployment's live image,
+#           replica count and ConfigMap reference against the fixed values it
+#           was seeded with, to catch an edit that was ruled out — a
+#           relationship between a live value and its own seeded baseline,
+#           not a document the candidate authored. The scored criterion is
+#           the same restartedAt presence check as 10_restarted.sh, whose
+#           value is a fresh timestamp every run rather than a fixed shape.
+#           Each failure already names the field and the value it holds.
 set -uo pipefail
 . /banks/_lib/checks.sh
 KEY=kubectl.kubernetes.io/restartedAt

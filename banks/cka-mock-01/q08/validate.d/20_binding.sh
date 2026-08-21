@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: ServiceAccount ci-bot exists and ci-bot-deployer binds Role ci-deployer to it
+# expected: binding.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -9,12 +10,24 @@ NS=pavo
 sas=$(kubectl -n "$NS" get serviceaccount -o jsonpath='{.items[*].metadata.name}' 2>/dev/null)
 rb=$(kubectl -n "$NS" get rolebinding ci-bot-deployer -o json 2>/dev/null)
 
+# Only the RoleBinding half is a shape the candidate authored. Whether the
+# ServiceAccount exists at all is a name-list reading — has_name against
+# `kubectl get serviceaccount` — and rides on its own crit message instead;
+# pairing it would mean generating a document that says nothing but "ci-bot
+# is here", which teaches nothing a diff can show.
+snapshot() {
+  printf '%s' "${rb:-null}" | jq -S '
+    {roleRef: (.roleRef // null),
+     subjects: ((.subjects // []) | sort_by(.kind, .name, (.namespace // "")))}
+  ' 2>/dev/null
+}
+
 sa_pane() {
   show_actual text "$(kubectl -n "$NS" get serviceaccount 2>/dev/null)"
   show_why "$1"
 }
 rb_pane() {
-  show_actual json "$(printf '%s' "$rb" | jq '{roleRef, subjects}' 2>/dev/null)"
+  show_pair json binding.json
   show_why "$1"
 }
 pane=''

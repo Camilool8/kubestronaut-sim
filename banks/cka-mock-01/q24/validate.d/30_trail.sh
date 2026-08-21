@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the audit-viewer Pod mounts claim audit-data at /srv/audit and the retained trail reads back inside it
+# expected: mount.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -70,7 +71,6 @@ claim_state=$(kubectl -n "$NS" get pvc "$CLAIM" \
 podjson=''
 [ -n "$pod" ] && podjson=$(kubectl -n "$NS" get pod "$pod" -o json 2>/dev/null)
 
-node=$(printf '%s' "${podjson:-null}" | jq -r '.spec.nodeName // "<unscheduled>"' 2>/dev/null)
 vols=$(printf '%s' "${podjson:-null}" \
   | jq -r '[.spec.volumes[]? | .name + " -> " + (del(.name) | keys | join(","))] | join("; ")' 2>/dev/null)
 mounts=$(printf '%s' "${podjson:-null}" \
@@ -98,19 +98,32 @@ out=''
 [ -n "$pod" ] && out=$(timeout 12 kubectl -n "$NS" --request-timeout=10s exec "$pod" -- \
   cat "$MOUNT/$FILE" 2>&1 | tr -d '\r')
 
+# Only the mount shape — the running Pod's own volumes and volumeMounts —
+# gets a generated document. Whether the retained trail actually reads back
+# through it is a live outcome, and its verdict is already carried by that
+# criterion's own message below; a second pane here would collide with this
+# one in the UI, which shows one actual/expected pair per check, not per
+# criterion.
+snapshot() {
+  printf '%s' "${podjson:-null}" | jq -S '
+    ([.spec.volumes[]? | select((.persistentVolumeClaim|type)=="object") | .name]) as $claimVolNames
+    | {
+        claims: [ .spec.volumes[]? | select((.persistentVolumeClaim|type)=="object")
+                  | {name, claim: .persistentVolumeClaim.claimName} ],
+        mounts: [ .spec.containers[]? | {
+            container: .name,
+            volumeMounts: [(.volumeMounts // [])[] | select(.name as $n | $claimVolNames | index($n))]
+          } | select(.volumeMounts | length > 0) ]
+      }' 2>/dev/null
+}
+
 evidence() {
-  show_actual text "$(printf '%s\n' \
-    "Pod of $DEP on node $node" \
-    "  volumes:  ${vols:-<none>}" \
-    "  mounts:   ${mounts:-<none>}" \
-    "PersistentVolumeClaim $NS/$CLAIM: ${claim_state:-<no such claim>}" \
-    "cat $MOUNT/$FILE inside the Pod:" \
-    "  -> ${out:-<nothing read>}")"
+  show_pair json mount.json
   show_why "$1"
 }
 
 crit 1 "the running Pod mounts claim $CLAIM at $MOUNT" \
-  "no volume backed by claim $CLAIM is mounted at $MOUNT (volumes: ${vols:-none})" \
+  "no volume backed by claim $CLAIM is mounted at $MOUNT (volumes: ${vols:-none}; mounts: ${mounts:-none})" \
   "Two things have to line up inside the Pod and the pane above shows both. spec.volumes needs an entry whose persistentVolumeClaim.claimName is $CLAIM, and a container needs a volumeMount whose mountPath is $MOUNT and whose name matches THAT volume's name — the volume name is a label local to the Pod and is not the claim's name, so a mount naming the claim instead of the volume is the usual slip. This is read from the running Pod rather than from the Deployment's template, because a template that was edited after the last rollout describes a Pod that does not exist yet. The mount path was already there and already backed by scratch space: what changes is the volume entry behind it, not the volumeMount." \
   -- [ "$mounted" = yes ]
 

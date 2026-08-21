@@ -1,22 +1,39 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: Role ci-deployer grants Pod reads, Deployment create and scale update, and nothing else
+# expected: role.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
 NS=pavo
 
 role=$(kubectl -n "$NS" get role ci-deployer -o json 2>/dev/null)
+
+# RBAC's cross product has no meaningful order at any level: a rule granting
+# the same apiGroups/resources/verbs is the same rule howsoever the candidate
+# split or ordered them, so every level here is sorted before comparison —
+# ["get","list"] and ["list","get"] must render as the same Role, and so must
+# a Role whose three rules were written in a different sequence.
+snapshot() {
+  printf '%s' "${role:-null}" | jq -S '
+    [ .rules[]?
+      | {apiGroups: ((.apiGroups // []) | sort),
+         resources: ((.resources // []) | sort),
+         verbs: ((.verbs // []) | sort)} ]
+    | sort_by(.apiGroups, .resources, .verbs)
+  ' 2>/dev/null
+}
+
+evidence() {
+  show_pair json role.json
+  show_why "$1"
+}
+
 [ -n "$role" ] || {
   echo "Role ci-deployer not found in $NS"
   show_actual text "$(kubectl -n "$NS" get role 2>/dev/null)"
   show_why "A Role is namespaced, and its rules only ever apply inside its own Namespace — one of this name in another Namespace grants nothing here. A ClusterRole called ci-deployer is a different object again and this lookup would not find it."
   exit 1
-}
-
-evidence() {
-  show_actual json "$(printf '%s' "$role" | jq '.rules' 2>/dev/null)"
-  show_why "$1"
 }
 
 # RBAC expands each rule into the cross product of its apiGroups, resources and

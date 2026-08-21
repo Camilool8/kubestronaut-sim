@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: PersistentVolume q24-audit-pv is still the recorded object, still Retain, and Bound to the live claim norma/audit-data
+# expected: none — the two scored criteria read live outcomes rather than a
+#           document the candidate authored: whether the volume's phase
+#           reached Bound again, and whether its claimRef names the live
+#           claim by uid, a relationship between two API-assigned identifiers
+#           never chosen by the candidate. The Retain-policy gate above them
+#           guards the seeded field rather than scoring a criterion, and it
+#           already prints the volume's own reclaimPolicy in its message.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

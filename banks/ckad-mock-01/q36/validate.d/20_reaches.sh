@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # points: 5
 # desc: a Pod in octans really reaches the mensa catalog through the local name
+# expected: none — this execs into a Pod and curls http://catalog/, grading
+#           whether the alias actually resolves and forwards a real request
+#           into mensa, a live reachability probe rather than a document
+#           either side authored. The message already names what came back.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

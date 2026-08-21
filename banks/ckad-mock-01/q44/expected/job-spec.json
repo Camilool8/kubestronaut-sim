@@ -1,0 +1,10 @@
+{
+  "activeDeadlineSeconds": 120,
+  "backoffLimit": 4,
+  "completions": 4,
+  "container": {
+    "image": "busybox:1.37"
+  },
+  "parallelism": 2,
+  "restartPolicy": "OnFailure"
+}

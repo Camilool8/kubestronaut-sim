@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: Service shard is headless, selects app=shard and publishes port 80
+# expected: headless.yaml yaml
 set -uo pipefail
 . /banks/_lib/checks.sh
+
+snapshot() {
+  kubectl -n telescopium get svc shard -o json 2>/dev/null | jq -S '
+    {clusterIP: (.spec.clusterIP // null),
+     selector: (.spec.selector // {}),
+     targetPort: ((.spec.ports[]? | select(.port == 80) | .targetPort) // null)}' \
+    | yq -p json -o yaml -P 2>/dev/null
+}
+
 evidence() {
-  show_actual yaml "$(kubectl -n telescopium get svc shard -o yaml 2>/dev/null | k8s_clean)"
+  show_pair yaml headless.yaml
   show_why "$1"
 }
 

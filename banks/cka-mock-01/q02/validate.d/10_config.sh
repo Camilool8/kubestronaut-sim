@@ -1,14 +1,9 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: payments-api takes DB_ENDPOINT from a key that exists in ConfigMap payments-config
+# expected: db-endpoint.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
-
-evidence() {
-  show_actual json "$(kubectl -n lyra get deploy payments-api -o json 2>/dev/null \
-    | jq '[.spec.template.spec.containers[]? | {name, envFrom, env}]' 2>/dev/null)"
-  show_why "$1"
-}
 
 deploys=$(kubectl -n lyra get deploy -o jsonpath='{.items[*].metadata.name}' 2>/dev/null)
 has_name "$deploys" payments-api || {
@@ -19,6 +14,19 @@ has_name "$deploys" payments-api || {
 }
 
 d=$(kubectl -n lyra get deploy payments-api -o json 2>/dev/null)
+
+snapshot() {
+  printf '%s' "${d:-null}" | jq -S '{
+    env_DB_ENDPOINT: (first(.spec.template.spec.containers[]?.env[]?
+      | select(.name == "DB_ENDPOINT")) // null),
+    envFrom_configMapRefs: ([ .spec.template.spec.containers[]?.envFrom[]?.configMapRef.name // empty ] | sort)
+  }' 2>/dev/null
+}
+
+evidence() {
+  show_pair json db-endpoint.json
+  show_why "$1"
+}
 
 # The variable may be wired either way round: named explicitly with a
 # configMapKeyRef, or imported wholesale with envFrom. Both take the value from

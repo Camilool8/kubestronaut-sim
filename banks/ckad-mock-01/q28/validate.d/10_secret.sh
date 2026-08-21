@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 5
 # desc: Secret registry-cred is a dockerconfigjson credential for registry:5000
+# expected: secret.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -31,8 +32,31 @@ if [ -z "$user" ] || [ -z "$pass" ]; then
   esac
 fi
 
+# The kubelet reads the same host with or without a scheme, and the check
+# below matches that way — $servers is already stripped of scheme and
+# trailing slash — so the snapshot documents the canonical host rather than
+# however it happens to be spelled in .auths. Likewise the username/password
+# shown here are the check's own derivation, which falls back to decoding
+# the 'auth' blob when there is no separate username/password: a candidate
+# who wrote the credential either way sees the same pane.
+snapshot() {
+  jq -n -S \
+    --arg type "${type:-}" \
+    --arg user "${user:-}" \
+    --arg pass "${pass:-}" \
+    --arg servers "${servers:-}" \
+    '{
+      type: (if $type == "" then null else $type end),
+      servers: ($servers | split(" ") | map(select(length > 0)) | sort),
+      auth: {
+        username: (if $user == "" then null else $user end),
+        password: (if $pass == "" then null else $pass end)
+      }
+    }' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "$(printf '%s' "$sec" | jq --arg cfg "$cfg" '{type, keys: (.data // {} | keys), dockerconfigjson: ($cfg | fromjson? // $cfg)}' 2>/dev/null)"
+  show_pair json secret.json
   show_why "$1"
 }
 

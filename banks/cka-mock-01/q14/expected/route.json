@@ -1,0 +1,11 @@
+{
+  "backendRefs": [
+    {
+      "name": "dorado-web",
+      "port": 80
+    }
+  ],
+  "hostnames": [
+    "web.sim.internal"
+  ]
+}

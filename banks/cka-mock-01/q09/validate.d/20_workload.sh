@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the live release runs 3 ready replicas of the 1.1.0 image behind a Service on 8080
+# expected: image.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
-evidence() {
-  show_actual text "$(kubectl -n tucana get deploy,svc,pod 2>/dev/null)"
-  show_why "$1"
-}
 
 img=$(kubectl -n tucana get deploy storefront \
   -o jsonpath='{.spec.template.spec.containers[*].image}' 2>/dev/null)
@@ -14,9 +11,22 @@ ready=$(kubectl -n tucana get deploy storefront -o jsonpath='{.status.readyRepli
 want=$(kubectl -n tucana get deploy storefront -o jsonpath='{.spec.replicas}' 2>/dev/null)
 svc_port=$(kubectl -n tucana get svc storefront -o jsonpath='{.spec.ports[*].port}' 2>/dev/null)
 
+# Only the image is a shape the candidate influenced (indirectly — see below).
+# readyReplicas and the Service reachability test are live readings and ride
+# on their own crit messages instead of a second pane.
+snapshot() {
+  jq -nS --arg img "${img:-}" '{image: (if $img == "" then null else $img end)}' 2>/dev/null
+}
+
+evidence() {
+  show_pair json image.json
+  show_why "$1"
+}
+
 [ -n "$img" ] || {
   echo "there is no Deployment named storefront in namespace tucana"
-  evidence "The chart names every object it renders after the release, so a release called storefront produces a Deployment and a Service of that name. Nothing of the sort is here: either the release was never installed, or it was installed under another name, or it was installed into another Namespace — a Helm release is namespaced and only ever creates its objects where it was told to."
+  show_actual text "$(kubectl -n tucana get deploy,svc,pod 2>/dev/null)"
+  show_why "The chart names every object it renders after the release, so a release called storefront produces a Deployment and a Service of that name. Nothing of the sort is here: either the release was never installed, or it was installed under another name, or it was installed into another Namespace — a Helm release is namespaced and only ever creates its objects where it was told to."
   exit 1
 }
 

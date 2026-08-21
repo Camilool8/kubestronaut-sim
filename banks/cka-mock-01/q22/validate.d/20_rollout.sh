@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: checkout-api's Pod template names q22-critical and the Pods it is running carry that class's resolved priority
+# expected: podpriority.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -81,9 +82,19 @@ away=$(printf '%s' "${pods:-null}" | jq --arg pc "$PC" --arg w "${want:-none}" '
 here=$(count_or_zero "$here")
 away=$(count_or_zero "$away")
 
+# Only the authored half — the Pod template's own priorityClassName — gets a
+# generated document. Whether the running Pods have actually picked up that
+# class's resolved priority is a live reading, not a document, and its verdict
+# is already carried by that criterion's own message below; a second pane here
+# would collide with this one in the UI, which shows one actual/expected pair
+# per check, not per criterion.
+snapshot() {
+  printf '%s' "${dep:-null}" \
+    | jq -S '{priorityClassName: (.spec.template.spec.priorityClassName // null)}' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "$(printf '{"pod template priorityClassName": "%s", "value of %s": "%s", "running Pods by class": %s, "replicas": %s}' \
-    "$named" "$PC" "${want:-<the class does not exist>}" "${by_class:-null}" "$replicas")"
+  show_pair json podpriority.json
   show_why "$1"
 }
 
@@ -101,7 +112,7 @@ crit 1 "the Pod template names $PC" \
   -- template_names_it
 
 crit 1 "the Pods it is running carry that class's priority" \
-  "Pods at $PC: $here of $replicas; Pods at another priority: $away" \
+  "Pods at $PC: $here of $replicas; Pods at another priority: $away (by class: ${by_class:-none})" \
   "Naming a class is a request; spec.priority on the Pod is the resolved answer. The Priority admission plugin looks the name up when the Pod is CREATED and writes the class's integer into spec.priority — which is why a Pod created before the class existed keeps whatever it resolved to then, and why a Pod whose template names a class that does not exist is rejected at creation rather than defaulted. Read the pane above for which of the two happened: Pods still sitting at the old class mean the new ReplicaSet never produced any, and 'kubectl -n $NS describe rs' names the reason — 'no PriorityClass with name $PC was found' is the one to expect if the Deployment was patched before the class was created. Once maxUnavailable is 0 the old Pods are deliberately kept until new ones are Ready, so a rollout that never starts looks like a perfectly healthy workload sitting at the wrong priority." \
   -- pods_carry_it
 

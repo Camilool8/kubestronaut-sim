@@ -1,0 +1,16 @@
+{
+  "claimVolume": {
+    "name": "archive",
+    "persistentVolumeClaim": {
+      "claimName": "archive-pvc"
+    }
+  },
+  "mounts": [
+    "archive@/var/archive",
+    "scratch@/var/scratch"
+  ],
+  "scratchVolume": {
+    "emptyDir": {},
+    "name": "scratch"
+  }
+}

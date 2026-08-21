@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: PersistentVolume q23-report-pv publishes /mnt/q23-data on sim-worker and claim report-data is bound to it
+# expected: volume.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -34,9 +35,23 @@ claim=$(kubectl -n "$NS" get pvc "$PVC" -o json 2>/dev/null | jq '{
 
 name=$(printf '%s' "${pv:-null}" | jq -r '.name // ""' 2>/dev/null)
 
+# Only the PersistentVolume's own authored fields get a generated document —
+# the path, the class and the node affinity are all things this task's
+# manifest has to spell out. Whether the claim actually reached this volume is
+# a live binding outcome rather than a document, and its verdict is already
+# carried by that criterion's own message below; a second pane here would
+# collide with this one in the UI, which shows one actual/expected pair per
+# check, not per criterion.
+snapshot() {
+  printf '%s' "${pv:-null}" | jq -S '{
+    local: (.local // null),
+    storageClassName: (.storageClassName // null),
+    nodeAffinity: (.nodeAffinity // null)
+  }' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "$(printf '{"PersistentVolume %s": %s, "PersistentVolumeClaim %s/%s": %s}' \
-    "$PV" "${pv:-null}" "$NS" "$PVC" "${claim:-null}")"
+  show_pair json volume.json
   show_why "$1"
 }
 

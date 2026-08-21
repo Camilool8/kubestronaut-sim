@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: nothing outside a DaemonSet is left on sim-worker4 and telemetry-collector's Pods survived the eviction
+# expected: none — both criteria are counts read from the live Pod list at a
+#           moment (how many non-DaemonSet Pods remain bound to the node, how
+#           many of the Deployment's Pods are alive and off it), not a
+#           document the candidate authored; the Deployment fields that matter
+#           here (replicas, nodeSelector pin) are graded as do-no-harm gates
+#           above, not scored criteria. The messages already name the counts
+#           and Pods seen.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

@@ -1,0 +1,19 @@
+{
+  "claims": [
+    {
+      "claim": "report-data",
+      "volume": "report"
+    }
+  ],
+  "mounts": [
+    {
+      "container": "reader",
+      "mountedAt": [
+        {
+          "mountPath": "/data",
+          "volume": "report"
+        }
+      ]
+    }
+  ]
+}

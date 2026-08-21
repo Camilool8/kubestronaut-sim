@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: node sim-worker4 is marked unschedulable
+# expected: cordon.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -15,11 +16,6 @@ nodes=$(kubectl get nodes -o json 2>/dev/null \
                        ready: ([ .status.conditions[]?
                                  | select(.type == "Ready") | .status ] | join(""))} ]' 2>/dev/null)
 
-evidence() {
-  show_actual json "${nodes:-null}"
-  show_why "$1"
-}
-
 node=$(printf '%s' "${nodes:-[]}" \
   | jq --arg n "$NODE" 'first(.[]? | select(.name == $n)) // empty' 2>/dev/null)
 
@@ -28,8 +24,18 @@ node=$(printf '%s' "${nodes:-[]}" \
 # this question would be met by an object that no longer exists.
 [ -n "$node" ] || {
   echo "no node named $NODE in this cluster"
-  evidence "This criterion is read from the node object called $NODE, and the pane above lists the nodes the API knows about. Two things put an empty answer there. Either the name was wrong — cka-worker4 is a login alias in a client config file and the API server has never heard of it, so use the names 'kubectl get nodes' prints — or the Node object was deleted. Deleting a Node takes nothing out of service: the machine keeps running its Pods, its kubelet re-registers it moments later, and in the meantime the API has no record of the maintenance you were asked to arrange. Taking a node out of service is a change to that object, not the removal of it."
+  show_actual json "${nodes:-null}"
+  show_why "This criterion is read from the node object called $NODE, and the pane above lists the nodes the API knows about. Two things put an empty answer there. Either the name was wrong — cka-worker4 is a login alias in a client config file and the API server has never heard of it, so use the names 'kubectl get nodes' prints — or the Node object was deleted. Deleting a Node takes nothing out of service: the machine keeps running its Pods, its kubelet re-registers it moments later, and in the meantime the API has no record of the maintenance you were asked to arrange. Taking a node out of service is a change to that object, not the removal of it."
   exit 1
+}
+
+snapshot() {
+  printf '%s' "${node:-null}" | jq -S '{unschedulable: (.unschedulable // false)}' 2>/dev/null
+}
+
+evidence() {
+  show_pair json cordon.json
+  show_why "$1"
 }
 
 unsched=$(printf '%s' "$node" | jq -r '.unschedulable' 2>/dev/null)

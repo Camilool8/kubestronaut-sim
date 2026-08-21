@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # points: 1
 # desc: both StatefulSet replicas are Ready
+# expected: none — the check grades whether the StatefulSet reached its
+#           replica count, which is a reading taken at a moment rather than a
+#           document the candidate authored. The message already names the
+#           count.
 set -uo pipefail
 . /banks/_lib/checks.sh
 ready=$(kubectl -n cepheus get statefulset ledger -o jsonpath='{.status.readyReplicas}' 2>/dev/null)

@@ -1,0 +1,9 @@
+{
+  "envFrom": [
+    {
+      "configMapRef": {
+        "name": "app-tuning"
+      }
+    }
+  ]
+}

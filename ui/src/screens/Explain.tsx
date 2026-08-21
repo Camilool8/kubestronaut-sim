@@ -280,14 +280,12 @@ function EvidenceSection({ evidence }: { evidence: Evidence[] }) {
     [evidence],
   );
 
-  const marksAnything = blocks.some(
-    (b) => b.diff !== null && b.diff.compared && b.diff.changedLines > 0,
-  );
+  const showsAPair = blocks.some((b) => b.actual && b.expected);
 
   return (
     <section className="explain-section explain-evidence">
       <h2 className="explain-section-title">{strings.explain.evidenceTitle(evidence.length)}</h2>
-      {marksAnything && <p className="explain-note">{strings.explain.diffLegend}</p>}
+      {showsAPair && <p className="explain-note">{strings.explain.diffLegend}</p>}
       <div className="explain-checks">
         {blocks.map((block) => (
           <EvidenceBlock key={block.check.name} block={block} />

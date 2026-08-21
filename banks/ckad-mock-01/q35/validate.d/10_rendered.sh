@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the overlay renders the env var and the shortened probe delay
+# expected: rendered.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
-evidence() {
-  show_actual yaml "$out"
-  show_why "$1"
-}
 
 out=$(kubectl kustomize /opt/course/35/overlays/prod 2>&1)
 [ $? -eq 0 ] || {
@@ -19,8 +16,25 @@ out=$(kubectl kustomize /opt/course/35/overlays/prod 2>&1)
 dep=$(printf '%s' "$out" | yq 'select(.kind == "Deployment")' - 2>/dev/null)
 [ -n "$dep" ] || {
   echo "the overlay renders no Deployment"
-  evidence "The build produced no Deployment, which means the base is not being included: an overlay lists the base under resources, and without it there is nothing to patch and the build renders only what the overlay itself declares."
+  show_actual text "kinds rendered: $(printf '%s' "$out" | yq -r '.kind' - 2>/dev/null | paste -sd, -)"
+  show_why "The build produced no Deployment, which means the base is not being included: an overlay lists the base under resources, and without it there is nothing to patch and the build renders only what the overlay itself declares."
   exit 1
+}
+
+# LEDGER_MODE and the readinessProbe are the two things this overlay's patch
+# touches; nothing else in the rendered Deployment is graded here.
+snapshot() {
+  printf '%s' "${dep:-}" \
+    | yq -o=json '.spec.template.spec.containers[]? | select(.name == "api")' - 2>/dev/null \
+    | jq -S '
+        (.env // [] | map(select(.name == "LEDGER_MODE")) | first) as $e
+        | {LEDGER_MODE: ($e.value // null), readinessProbe: (.readinessProbe // null)}
+      ' 2>/dev/null
+}
+
+evidence() {
+  show_pair json rendered.json
+  show_why "$1"
 }
 
 api='.spec.template.spec.containers[] | select(.name == "api")'

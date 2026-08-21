@@ -1,12 +1,30 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: egress allows only port 53 (UDP and TCP)
+# expected: networkpolicy.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
+
+snapshot() {
+  kubectl -n orbit get netpol api-guard -o json 2>/dev/null \
+    | jq -S '.spec
+      | .policyTypes |= sort
+      | .ingress[]?.from |= sort
+      | .ingress[]?.ports |= sort_by(.port, (.protocol // "TCP"))
+      | .egress[]?.ports |= sort_by(.port, (.protocol // "TCP"))'
+}
+
 evidence() {
-  show_actual yaml "$(kubectl -n orbit get netpol api-guard -o yaml 2>/dev/null | k8s_clean)"
-  show_expected yaml "/banks/${BANK:-ckad-mock-01}/q03/expected/networkpolicy.yaml"
+  show_pair json networkpolicy.json
   show_why "$1"
+}
+
+exists=$(kubectl -n orbit get netpol api-guard -o jsonpath='{.metadata.name}' 2>/dev/null)
+[ -n "$exists" ] || {
+  echo "NetworkPolicy api-guard not found in Namespace orbit"
+  show_actual text "$(kubectl -n orbit get netpol 2>/dev/null)"
+  show_why "Every part of this question is graded on a NetworkPolicy named api-guard in Namespace orbit, and the pane above lists what that Namespace actually holds. A policy created under another name, or in another Namespace, is invisible to every check here."
+  exit 1
 }
 
 eg=$(kubectl -n orbit get netpol api-guard -o jsonpath='{.spec.egress}' 2>/dev/null)

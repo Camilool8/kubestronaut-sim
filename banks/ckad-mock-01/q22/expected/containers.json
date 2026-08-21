@@ -1,0 +1,12 @@
+{
+  "containers": [
+    {
+      "image": "nginx:1.29-alpine",
+      "name": "ambassador"
+    },
+    {
+      "image": "busybox:1.37",
+      "name": "app"
+    }
+  ]
+}

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: a container named pulsar-agent is running from that image
+# expected: none — the check grades a live reading of podman process state (is
+#           a container running, and from which image) rather than a document
+#           the candidate authored. The podman ps listing above already names
+#           what is actually running.
 set -uo pipefail
 . /banks/_lib/checks.sh
 img=$(podman ps --filter name=^pulsar-agent$ --filter status=running \

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: HorizontalPodAutoscaler payments-api scales the Deployment between 2 and 6 on 50% CPU with a 60s scale-down window
+# expected: hpa.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -26,15 +27,19 @@ hpa=$(kubectl -n "$NS" get horizontalpodautoscalers.v2.autoscaling "$HPA" -o jso
 # the API server fills in everything under it that was not written, so seeing
 # the defaults beside the one value that was asked for is the fastest way to
 # tell an answer apart from a default.
-spec=$(printf '%s' "$hpa" | jq '{
+spec=$(printf '%s' "$hpa" | jq -S '{
     scaleTargetRef: .spec.scaleTargetRef,
     minReplicas: .spec.minReplicas,
     maxReplicas: .spec.maxReplicas,
     metrics: .spec.metrics,
     behavior: .spec.behavior}' 2>/dev/null)
 
+snapshot() {
+  printf '%s' "${spec:-null}"
+}
+
 evidence() {
-  show_actual json "${spec:-null}"
+  show_pair json hpa.json
   show_why "$1"
 }
 

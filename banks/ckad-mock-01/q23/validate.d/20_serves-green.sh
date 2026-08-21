@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: a request through the Service really comes back from the green release
+# expected: none — the check sends a live request through the Service and
+#           reads whichever release answers at that moment, an event rather
+#           than a document the candidate authored; the message and evidence
+#           pane already carry the actual response body/log.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

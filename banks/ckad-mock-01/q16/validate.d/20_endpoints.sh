@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: both replicas pass readiness and appear as ready Service endpoints
+# expected: none — the two criteria are readyReplicas and a ready-endpoint
+#           count, both readings taken at a moment rather than anything the
+#           candidate wrote; the endpoint count also names the EndpointSlice,
+#           which carries a controller-assigned name and Pod IPs no candidate
+#           could have authored.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

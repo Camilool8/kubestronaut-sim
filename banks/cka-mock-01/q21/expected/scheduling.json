@@ -1,0 +1,29 @@
+{
+  "nodeAffinity": {
+    "requiredDuringSchedulingIgnoredDuringExecution": {
+      "nodeSelectorTerms": [
+        {
+          "matchExpressions": [
+            {
+              "key": "workload",
+              "operator": "In",
+              "values": [
+                "batch"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "nodeName": null,
+  "nodeSelector": null,
+  "tolerations": [
+    {
+      "effect": "NoSchedule",
+      "key": "workload",
+      "operator": "Equal",
+      "value": "batch"
+    }
+  ]
+}

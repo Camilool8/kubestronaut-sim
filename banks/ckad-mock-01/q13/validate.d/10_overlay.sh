@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: the overlay itself renders the prefix, label, image and replica count
+# expected: overlay.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
-evidence() {
-  show_actual yaml "$out"
-  show_why "$1"
-}
 
 out=$(kubectl kustomize /opt/course/13/overlays/staging 2>&1)
 [ $? -eq 0 ] || {
@@ -20,7 +17,8 @@ dep=$(printf '%s' "$out" | yq 'select(.kind == "Deployment")' - 2>/dev/null)
 svc=$(printf '%s' "$out" | yq 'select(.kind == "Service")' - 2>/dev/null)
 [ -n "$dep" ] || {
   echo "the overlay renders no Deployment"
-  evidence "The build produced no Deployment, which means the base is not being included: an overlay lists the base under resources, and without it there is nothing to transform and the build renders only whatever the overlay itself declares."
+  show_actual yaml "$out"
+  show_why "The build produced no Deployment, which means the base is not being included: an overlay lists the base under resources, and without it there is nothing to transform and the build renders only whatever the overlay itself declares."
   exit 1
 }
 
@@ -29,6 +27,25 @@ svcname=$(printf '%s' "$svc" | yq -r '.metadata.name')
 img=$(printf '%s' "$dep" | yq -r '.spec.template.spec.containers[] | select(.name == "api") | .image')
 reps=$(printf '%s' "$dep" | yq -r '.spec.replicas')
 label=$(printf '%s' "$dep" | yq -r '.metadata.labels.tier // ""')
+
+# Every field graded here is the overlay's own build output — namePrefix, the
+# images and replicas transformers, and the labels transformer — so the whole
+# render pairs against one document.
+snapshot() {
+  jq -nS --arg name "${name:-}" --arg svcname "${svcname:-}" --arg img "${img:-}" \
+    --arg reps "${reps:-}" --arg label "${label:-}" '
+    { name: (if $name == "" then null else $name end),
+      service: (if $svcname == "" then null else $svcname end),
+      image: (if $img == "" then null else $img end),
+      replicas: (if $reps == "" then null else $reps end),
+      label: (if $label == "" then null else $label end) }
+  ' 2>/dev/null
+}
+
+evidence() {
+  show_pair json overlay.json
+  show_why "$1"
+}
 
 crit 1 "namePrefix reaches the Deployment" \
   "Deployment renders as '$name', want staging-cargo-api" \

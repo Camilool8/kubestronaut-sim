@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: image registry:5000/pulsar-agent:v1 was built, and carries the new value
+# expected: image-channel.txt text
 set -uo pipefail
 . /banks/_lib/checks.sh
 podman image exists registry:5000/pulsar-agent:v1 2>/dev/null || {
@@ -13,9 +14,18 @@ podman image exists registry:5000/pulsar-agent:v1 2>/dev/null || {
 value=$(podman image inspect registry:5000/pulsar-agent:v1 \
   --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
   | sed -n 's/^RELEASE_CHANNEL=//p' | tail -1)
+
+snapshot() {
+  printf '%s' "${value:-}"
+}
+
+evidence() {
+  show_pair text image-channel.txt
+  show_why "$1"
+}
+
 [ "$value" = "stable" ] && echo "image built with RELEASE_CHANNEL=stable" || {
   echo "image has RELEASE_CHANNEL='$value' — rebuild after editing the Dockerfile"
-  show_actual text "$(podman image inspect registry:5000/pulsar-agent:v1 --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null)"
-  show_why "ENV is evaluated while the image is being built, so editing the Dockerfile changes nothing anywhere until the build runs again. The value above is the one baked into this image. Passing the variable at run time with -e would override it for one container without ever fixing the image, which is a useful thing to know and not what was asked for."
+  evidence "ENV is evaluated while the image is being built, so editing the Dockerfile changes nothing anywhere until the build runs again. The value above is the one baked into this image. Passing the variable at run time with -e would override it for one container without ever fixing the image, which is a useful thing to know and not what was asked for."
   exit 1
 }

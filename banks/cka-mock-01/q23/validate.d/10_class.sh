@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: StorageClass q23-local provisions nothing and binds on the first consumer
+# expected: storageclass.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -16,8 +17,13 @@ sc=$(kubectl get storageclass "$SC" -o json 2>/dev/null | jq '{
 
 name=$(printf '%s' "${sc:-null}" | jq -r '.name // ""' 2>/dev/null)
 
+snapshot() {
+  printf '%s' "${sc:-null}" \
+    | jq -S '{provisioner: (.provisioner // null), volumeBindingMode: (.volumeBindingMode // null)}' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "${sc:-null}"
+  show_pair json storageclass.json
   show_why "$1"
 }
 

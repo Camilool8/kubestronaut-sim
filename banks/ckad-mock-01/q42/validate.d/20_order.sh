@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the report holds one row per Deployment, ordered by ascending replica count
+# expected: report.txt text
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -21,8 +22,12 @@ names=$(printf '%s\n' "$lines" | tail -n +2 | cut -d' ' -f1 | tr '\n' ' ' | sed 
 count=$(printf '%s\n' "$lines" | tail -n +2 | grep -c .)
 want='search-indexer audit-writer image-resizer billing-api'
 
+snapshot() {
+  printf '%s\n' "${lines:-}"
+}
+
 evidence() {
-  show_actual text "$(cat /opt/course/42/report 2>/dev/null)"
+  show_pair text report.txt
   show_why "$1"
 }
 

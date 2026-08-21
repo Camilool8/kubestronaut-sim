@@ -1,0 +1,14 @@
+{
+  "roleRef": {
+    "apiGroup": "rbac.authorization.k8s.io",
+    "kind": "Role",
+    "name": "ci-deployer"
+  },
+  "subjects": [
+    {
+      "kind": "ServiceAccount",
+      "name": "ci-bot",
+      "namespace": "pavo"
+    }
+  ]
+}

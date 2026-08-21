@@ -1,10 +1,31 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: Ingress portal-https routes sculptor.sim.local to portal:80 and ends TLS with portal-tls
+# expected: ingress.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
+
+# The grading below is order-independent — rules/tlshosts/tlssecret all sort
+# before comparing — so the pane has to be too: a candidate who writes the
+# tls block before the rule, or lists a second host ahead of the first, is
+# exactly as correct as the reference solution's own order.
+snapshot() {
+  kubectl -n sculptor get ingress portal-https -o json 2>/dev/null | jq -S '{
+    ingressClassName: (.spec.ingressClassName // null),
+    rules: ([(.spec.rules // [])[]? | .host as $h | (.http.paths // [])[]? | {
+        host: $h,
+        path: .path,
+        pathType: .pathType,
+        service: .backend.service.name,
+        port: (.backend.service.port.number // .backend.service.port.name)
+      }] | sort_by(.host, .path, .service, .port)),
+    tls: ([(.spec.tls // [])[]? | {secretName: .secretName, hosts: ((.hosts // []) | sort)}]
+      | sort_by(.secretName))
+  }' 2>/dev/null
+}
+
 evidence() {
-  show_actual yaml "$(kubectl -n sculptor get ingress portal-https -o yaml 2>/dev/null | k8s_clean)"
+  show_pair json ingress.json
   show_why "$1"
 }
 

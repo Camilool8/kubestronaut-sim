@@ -1,22 +1,13 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: storefront is a deployed sim-web 1.1.0 release, upgraded into, still carrying both overrides
+# expected: release.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 export HELM_NAMESPACE=tucana
-evidence() {
-  show_actual text "$(helm ls -a 2>/dev/null; echo; helm get values storefront 2>/dev/null; echo; helm history storefront 2>/dev/null)"
-  show_why "$1"
-}
 
 info=$(helm ls -a -o json 2>/dev/null \
   | jq -r '.[] | select(.name == "storefront") | "\(.chart)|\(.status)|\(.revision)"')
-[ -n "$info" ] || {
-  echo "there is no release named storefront in namespace tucana"
-  show_actual text "$(helm ls -a 2>/dev/null)"
-  show_why "The release name is chosen at install time and is what every later helm command addresses; one chart backs as many releases as you like, each with its own values and its own history. Creating the Deployment and Service with kubectl instead reaches similar objects that Helm does not know about, cannot upgrade and cannot roll back. helm ls hides a release that failed, so this listing asks for all of them."
-  exit 1
-}
 
 chart=${info%%|*}
 rest=${info#*|}
@@ -24,6 +15,30 @@ status=${rest%%|*}
 revision=${rest##*|}
 reps=$(helm get values storefront -o json 2>/dev/null | jq -r '.replicaCount // empty')
 port=$(helm get values storefront -o json 2>/dev/null | jq -r '.service.port // empty')
+
+# Only chart and the two overrides are shapes the candidate chose — the chart
+# version at upgrade time, replicaCount and service.port on the command line.
+# revision/status is a lifecycle reading (did an upgrade happen and land) and
+# rides on its own crit message below instead of a second pane.
+snapshot() {
+  jq -nS --arg chart "${chart:-}" --arg reps "${reps:-}" --arg port "${port:-}" '
+    { chart: (if $chart == "" then null else $chart end),
+      values: { replicaCount: (if $reps == "" then null else $reps end),
+                service: { port: (if $port == "" then null else $port end) } } }
+  ' 2>/dev/null
+}
+
+evidence() {
+  show_pair json release.json
+  show_why "$1"
+}
+
+[ -n "$info" ] || {
+  echo "there is no release named storefront in namespace tucana"
+  show_actual text "$(helm ls -a 2>/dev/null)"
+  show_why "The release name is chosen at install time and is what every later helm command addresses; one chart backs as many releases as you like, each with its own values and its own history. Creating the Deployment and Service with kubectl instead reaches similar objects that Helm does not know about, cannot upgrade and cannot roll back. helm ls hides a release that failed, so this listing asks for all of them."
+  exit 1
+}
 
 at_target_version() { [ "$chart" = "sim-web-1.1.0" ]; }
 

@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: Ingress helios-routes uses class nginx, host helios.sim.local, two Prefix paths
+# expected: ingress.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
-evidence() {
-  show_actual yaml "$(kubectl -n helios get ingress helios-routes -o yaml 2>/dev/null | k8s_clean)"
-  show_expected yaml "/banks/${BANK:-ckad-mock-01}/q08/expected/ingress.yaml"
-  show_why "$1"
-}
 
 class=$(kubectl -n helios get ingress helios-routes -o jsonpath='{.spec.ingressClassName}' 2>/dev/null)
 hosts=$(kubectl -n helios get ingress helios-routes -o json 2>/dev/null \
@@ -18,6 +14,21 @@ paths=$(kubectl -n helios get ingress helios-routes -o json 2>/dev/null \
            | sort | join(" ")')
 want='/|Prefix|storefront|80 /checkout|Prefix|checkout|80'
 want=$(printf '%s\n' $want | sort | tr '\n' ' '); want=${want% }
+
+snapshot() {
+  jq -n -S \
+    --arg class "${class:-}" --arg hosts "${hosts:-}" --arg paths "${paths:-}" \
+    '{
+      ingressClassName: (if $class == "" then null else $class end),
+      hosts: ($hosts | if . == "" then [] else split(",") end),
+      paths: ($paths | if . == "" then [] else split(" ") end)
+    }' 2>/dev/null
+}
+
+evidence() {
+  show_pair json ingress.json
+  show_why "$1"
+}
 
 crit 2 "handed to the nginx IngressClass" \
   "ingressClassName is '$class', want nginx" \

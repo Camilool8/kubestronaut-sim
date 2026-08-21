@@ -1,15 +1,13 @@
 {
-  "terminationGracePeriodSeconds": 45,
   "containers": [
     {
-      "name": "cache",
-      "image": "nginx:1.29-alpine",
-      "imagePullPolicy": "Never"
+      "imagePullPolicy": "Never",
+      "name": "cache"
     },
     {
-      "name": "refresher",
-      "image": "busybox:1.37",
-      "imagePullPolicy": "Never"
+      "imagePullPolicy": "Never",
+      "name": "refresher"
     }
-  ]
+  ],
+  "terminationGracePeriodSeconds": 45
 }

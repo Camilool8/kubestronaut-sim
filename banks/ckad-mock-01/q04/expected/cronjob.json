@@ -1,0 +1,6 @@
+{
+  "concurrencyPolicy": "Forbid",
+  "failedJobsHistoryLimit": 1,
+  "schedule": "*/5 * * * *",
+  "successfulJobsHistoryLimit": 2
+}

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the rewritten Job carries the completion, concurrency and give-up settings
+# expected: job-spec.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -12,11 +13,23 @@ spec=$(kubectl -n eridanus get job ledger-reconcile -o json 2>/dev/null | jq '.s
   exit 1
 }
 
+# Narrowed to the fields every criterion below actually compares: the five
+# Job-level settings, and the reconcile container's image (looked up by name,
+# same as the other criteria). command is never graded by any crit here, so it
+# stays out of the pane.
+snapshot() {
+  printf '%s' "${spec:-null}" \
+    | jq -S '{completions: (.completions // null),
+              parallelism: (.parallelism // null),
+              backoffLimit: (.backoffLimit // null),
+              activeDeadlineSeconds: (.activeDeadlineSeconds // null),
+              restartPolicy: (.template.spec.restartPolicy // null),
+              container: ((first(.template.spec.containers[]? | select(.name == "reconcile")) // {})
+                          | {image: (.image // null)})}'
+}
+
 evidence() {
-  show_actual json "$(printf '%s' "$spec" | jq '{completions, parallelism, backoffLimit,
-    activeDeadlineSeconds,
-    restartPolicy: .template.spec.restartPolicy,
-    containers: [.template.spec.containers[] | {name, image, command}]}')"
+  show_pair json job-spec.json
   show_why "$1"
 }
 

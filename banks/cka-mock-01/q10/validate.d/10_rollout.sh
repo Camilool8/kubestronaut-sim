@@ -1,14 +1,27 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: Deployment helios-web in scutum runs 3 ready replicas on nginx:1.29-alpine
+# expected: rollout.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
-view='{replicas: .spec.replicas, readyReplicas: (.status.readyReplicas // 0),
-       images: [.spec.template.spec.containers[].image]}'
+img=$(kubectl -n scutum get deploy helios-web \
+  -o jsonpath='{.spec.template.spec.containers[?(@.name=="web")].image}' 2>/dev/null)
+reps=$(kubectl -n scutum get deploy helios-web -o jsonpath='{.spec.replicas}' 2>/dev/null)
+ready=$(kubectl -n scutum get deploy helios-web -o jsonpath='{.status.readyReplicas}' 2>/dev/null)
+
+# replicas and the web container's image are what the kustomize transformers
+# set; readyReplicas is a live rollout reading and rides on its own crit
+# message below instead of a second pane.
+snapshot() {
+  jq -nS --arg reps "${reps:-}" --arg img "${img:-}" '
+    { replicas: (if $reps == "" then null else $reps end),
+      image: (if $img == "" then null else $img end) }
+  ' 2>/dev/null
+}
 
 evidence() {
-  show_actual json "$(kubectl -n scutum get deploy helios-web -o json 2>/dev/null | jq "$view" 2>/dev/null)"
+  show_pair json rollout.json
   show_why "$1"
 }
 
@@ -18,11 +31,6 @@ kubectl -n scutum get deploy helios-web >/dev/null 2>&1 || {
   show_why "Rendering an overlay and applying it are two separate acts: kubectl kustomize prints what the build produces and changes nothing, while apply -k sends it to the API. Nothing of this app has reached the Namespace at all. The overlay already pins namespace: scutum, so no -n is needed on the apply, and the name comes from the base — nothing in this task renames it."
   exit 1
 }
-
-img=$(kubectl -n scutum get deploy helios-web \
-  -o jsonpath='{.spec.template.spec.containers[?(@.name=="web")].image}' 2>/dev/null)
-reps=$(kubectl -n scutum get deploy helios-web -o jsonpath='{.spec.replicas}' 2>/dev/null)
-ready=$(kubectl -n scutum get deploy helios-web -o jsonpath='{.status.readyReplicas}' 2>/dev/null)
 
 crit 2 "the image transformer reached the cluster" \
   "deployed image is '$img', want nginx:1.29-alpine" \

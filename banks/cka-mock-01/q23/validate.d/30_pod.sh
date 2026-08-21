@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: Pod report-reader mounts claim report-data at /data and reads the report staged on the node
+# expected: mount.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -31,7 +32,6 @@ name=$(printf '%s' "${pod:-null}" | jq -r '.name // ""' 2>/dev/null)
 }
 
 phase=$(printf '%s' "${pod:-null}" | jq -r '.phase // ""' 2>/dev/null)
-node=$(printf '%s' "${pod:-null}" | jq -r '.node // ""' 2>/dev/null)
 
 vol=$(printf '%s' "${pod:-null}" | jq -r --arg c "$PVC" \
   'first(.claims[]? | select(.claim == $c) | .volume) // ""' 2>/dev/null)
@@ -51,13 +51,27 @@ if [ "$phase" = Running ]; then
     cat "$MOUNT/$FILE" 2>/dev/null | tr -d '\r')
 fi
 
+# Only the mount shape — the Pod's own volumes and volumeMounts — gets a
+# generated document. Whether the staged report actually reads back through
+# it is a live outcome, and its verdict is already carried by that
+# criterion's own message below; a second pane here would collide with this
+# one in the UI, which shows one actual/expected pair per check, not per
+# criterion.
+snapshot() {
+  printf '%s' "${pod:-null}" | jq -S '
+    (.claims // []) as $claims
+    | ($claims | map(.volume)) as $claimVolNames
+    | {
+        claims: $claims,
+        mounts: [ (.mounts // [])[] | {
+            container: .container,
+            mountedAt: [ (.mountedAt // [])[] | select(.volume as $v | $claimVolNames | index($v)) ]
+          } | select(.mountedAt | length > 0) ]
+      }' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "${pod:-null}"
-  show_actual text "$(printf '%s\n' \
-    "Pod $POD: phase=${phase:-<none>}, node=${node:-<not scheduled>}" \
-    "PersistentVolumeClaim $NS/$PVC: ${cphase:-<no such claim>}" \
-    "kubectl -n $NS exec $POD -- cat $MOUNT/$FILE" \
-    "  -> ${out:-<nothing read>}")"
+  show_pair json mount.json
   show_why "$1"
 }
 

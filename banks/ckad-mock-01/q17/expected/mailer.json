@@ -1,0 +1,4 @@
+{
+  "bad_image": "nginx:0.0.0-corvus-nonexistent",
+  "mailer_image": "nginx:1.29-alpine"
+}

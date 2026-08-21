@@ -890,7 +890,7 @@ export const strings = {
     whyTitle: "Why this scored what it did",
 
     diffLegend:
-      "Lines marked - are in your state and not in the expected document; lines marked + are in the expected document and not in yours.",
+      "Both panes show only the fields this check grades, not the whole object — the rest of your answer is not being compared here. Lines marked - are in your state and not in the expected document; lines marked + are in the expected document and not in yours.",
 
     lineChanged: "Differs:",
 
@@ -901,7 +901,7 @@ export const strings = {
       "These documents are too long to compare line by line, so neither pane is marked up. Both are shown in full.",
 
     actualOnlyNote:
-      "This is what the check read off the cluster. It has no authored counterpart to sit beside, so compare it against the reference solution below.",
+      "There is no expected document to set beside this pane. Either this check grades a reading rather than a document — whether something became ready, how many of a thing there are, or whether two live values still agree — or the object it would compare against was never found. The message above names what it measured.",
 
     expectedOnlyNote:
       "This is what the check was looking for. Nothing was captured from your cluster to sit beside it, which usually means the object does not exist yet.",
@@ -912,7 +912,7 @@ export const strings = {
 
     noEvidenceTitle: "No captured state for this task",
     noEvidenceBody:
-      "These checks report what they measured without keeping a copy of what they read, so there is nothing to set side by side. The messages above are the evidence — each one names the field it looked at and what it found there — and the reference solution below is the shape they were looking for.",
+      "These checks grade readings rather than documents, so there is nothing to set side by side. The messages above are the evidence — each one names the field it looked at and what it found there — and the reference solution below is the shape they were looking for.",
 
     solutionTitle: "Reference solution",
     solutionLoading: "Loading the reference solution…",

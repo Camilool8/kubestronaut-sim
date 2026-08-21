@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the change lives in the overlay as a patch, and base/ was left alone
+# expected: none — the scored criterion only counts whether the overlay's
+#           kustomization declares at least one patch, not any specific
+#           patch content, and the gate above it compares the candidate's
+#           current base/deployment.yaml against its own original seeded
+#           content to catch an edit that was ruled out — a relationship
+#           between two live/seeded values, not a document the candidate
+#           authored. Both panes already name what's wrong in their own
+#           message text.
 set -uo pipefail
 . /banks/_lib/checks.sh
 K=/opt/course/35/overlays/prod/kustomization.yaml
@@ -12,15 +20,13 @@ overlay_pane() {
 }
 base_pane() {
   show_actual text "$(cat "$BASE" 2>/dev/null)"
-  show_expected text "/banks/${BANK:-ckad-mock-01}/q35/files/base/deployment.yaml"
   show_why "$1"
 }
 
 [ -f "$BASE" ] || {
   echo "$BASE no longer exists"
   show_actual text "$(ls -R /opt/course/35 2>/dev/null)"
-  show_expected text "/banks/${BANK:-ckad-mock-01}/q35/files/base/deployment.yaml"
-  show_why "The overlay builds on this file, so deleting it is not a way of getting out of the rule against editing it. Restore it from the document beside this pane and put the change in the overlay's kustomization instead."
+  show_why "The overlay builds on this file, so deleting it is not a way of getting out of the rule against editing it. The base ships with no env vars on the api container and readinessProbe.initialDelaySeconds at 30 — restore it to that shape and put the change in the overlay's kustomization instead."
   exit 1
 }
 
@@ -40,7 +46,7 @@ base_untouched() { [ "$base_env" = "0" ] && [ "$base_delay" = "30" ]; }
 # candidate who has written nothing anywhere has left it alone too.
 base_untouched || {
   echo "base/deployment.yaml has been edited: container 'api' now has $base_env env var(s) and initialDelaySeconds '$base_delay', want 0 and 30"
-  base_pane "The question ruled this out: nothing under base/ was to be edited. The base is what every environment shares; the overlay is what one environment differs by. Putting LEDGER_MODE=prod in the base gives it to staging too, silently, the next time anyone builds that overlay — and the overlay that was supposed to document production's differences documents nothing at all. Restore the file from the document beside this pane and make the change in the overlay."
+  base_pane "The question ruled this out: nothing under base/ was to be edited. The base is what every environment shares; the overlay is what one environment differs by. Putting LEDGER_MODE=prod in the base gives it to staging too, silently, the next time anyone builds that overlay — and the overlay that was supposed to document production's differences documents nothing at all. Restore base/deployment.yaml to no env vars and initialDelaySeconds: 30, and make the change in the overlay instead."
   exit 1
 }
 

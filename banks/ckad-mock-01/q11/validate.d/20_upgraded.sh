@@ -1,18 +1,16 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: report-api-v2 was upgraded to a newer sim-web chart and is deployed
+# expected: upgrade.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 export HELM_NAMESPACE=carina
-evidence() {
-  show_actual text "$(helm ls -a 2>/dev/null; echo; helm search repo sim/sim-web --versions 2>/dev/null)"
-  show_why "$1"
-}
 
 info=$(helm ls -o json 2>/dev/null | jq -r '.[] | select(.name == "report-api-v2") | "\(.chart)|\(.status)|\(.revision)"')
 [ -n "$info" ] || {
   echo "report-api-v2 is not installed"
-  evidence "report-api-v2 is not in the release list at all. An upgrade is not a reinstall: it keeps the release's name and history and moves it to a new chart version, so uninstalling this one loses the very thing the task is about. The second table is every version of the chart the repo holds."
+  show_actual text "$(helm ls -a 2>/dev/null; echo; helm search repo sim/sim-web --versions 2>/dev/null)"
+  show_why "report-api-v2 is not in the release list at all. An upgrade is not a reinstall: it keeps the release's name and history and moves it to a new chart version, so uninstalling this one loses the very thing the task is about. The second table is every version of the chart the repo holds."
   exit 1
 }
 
@@ -21,6 +19,19 @@ rest=${info#*|}
 status=${rest%%|*}
 revision=${rest##*|}
 version=${chart#sim-web-}
+
+# Only the chart version is a shape the candidate chose, on the upgrade
+# command line. status/revision is a lifecycle reading (did an upgrade
+# happen and land) and rides on its own crit messages below instead of a
+# second pane.
+snapshot() {
+  jq -nS --arg chart "${chart:-}" '{chart: (if $chart == "" then null else $chart end)}' 2>/dev/null
+}
+
+evidence() {
+  show_pair json upgrade.json
+  show_why "$1"
+}
 
 newest=$(printf '1.0.0\n%s\n' "$version" | sort -V | tail -1)
 moved_on()  { [ "$version" != "1.0.0" ] && [ "$newest" = "$version" ]; }

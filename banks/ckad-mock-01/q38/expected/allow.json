@@ -1,0 +1,26 @@
+{
+  "ingress": [
+    {
+      "from": [
+        {
+          "podSelector": {
+            "matchLabels": {
+              "role": "teller"
+            }
+          }
+        }
+      ],
+      "ports": [
+        {
+          "port": 80,
+          "protocol": "TCP"
+        }
+      ]
+    }
+  ],
+  "podSelector": {
+    "matchLabels": {
+      "role": "ledger"
+    }
+  }
+}

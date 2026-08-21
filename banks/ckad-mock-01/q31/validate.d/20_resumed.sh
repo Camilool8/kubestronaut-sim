@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the rollout was resumed and the staged change really rolled out
+# expected: none — this grades whether spec.paused was lifted and the staged
+#           template actually rolled out to a second ReplicaSet, which is a
+#           relationship between live status fields (spec.paused,
+#           status.updatedReplicas, ReplicaSet count) read at a moment rather
+#           than a document the candidate authored. The image field itself is
+#           the authored half and already has its own document in
+#           10_image.sh. The message and why text already name which half is
+#           still missing.
 set -uo pipefail
 . /banks/_lib/checks.sh
 evidence() {

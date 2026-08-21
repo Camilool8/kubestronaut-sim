@@ -1,0 +1,10 @@
+{
+  "hosts": [
+    "helios.sim.local"
+  ],
+  "ingressClassName": "nginx",
+  "paths": [
+    "/checkout|Prefix|checkout|80",
+    "/|Prefix|storefront|80"
+  ]
+}

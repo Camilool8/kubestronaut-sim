@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # points: 5
 # desc: payments-api is Available and its container really reads the endpoint from the ConfigMap
+# expected: none — both criteria are readings taken at a moment (the Deployment's
+#           converged replica/Available status, and the live value printenv sees
+#           inside the running container) rather than a document the candidate
+#           authored. The messages already name the values seen.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

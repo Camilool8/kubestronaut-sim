@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: a Pod in cygnus resolves ledger.sim.internal through cluster DNS to the ledger ClusterIP
+# expected: none — both criteria come from an nslookup run live from inside the
+#           cluster (whether it answers at all, and whether the answer is the
+#           ledger ClusterIP), a behavioural reading of the whole DNS path
+#           rather than a document either side authored. The messages already
+#           name the addresses seen.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

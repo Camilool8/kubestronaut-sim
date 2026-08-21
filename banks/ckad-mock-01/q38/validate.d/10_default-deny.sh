@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: default-deny-ingress selects every Pod in reticulum, governs ingress and allows nothing
+# expected: default-deny.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
+
+snapshot() {
+  printf '%s' "${pol:-null}" | jq -S '{
+    podSelector: (.spec.podSelector // {}),
+    policyTypes: ((.spec.policyTypes // []) | sort),
+    ingress: (.spec.ingress // [])
+  }' 2>/dev/null
+}
+
 evidence() {
-  show_actual yaml "$(kubectl -n reticulum get netpol default-deny-ingress -o yaml 2>/dev/null | k8s_clean)"
+  show_pair json default-deny.json
   show_why "$1"
 }
 

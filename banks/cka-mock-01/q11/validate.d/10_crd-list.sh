@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: /opt/course/11/crds names every CustomResourceDefinition of group logistics.sim.dev and nothing else
+# expected: crds.txt text
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -22,6 +23,10 @@ GROUP=logistics.sim.dev
 # means.
 listed=$(file_lines_sorted "$F" | sed 's#^[^/]*/##')
 
+snapshot() {
+  printf '%s\n' "${listed:-}"
+}
+
 # Spelled out rather than read back from the cluster on purpose: derived from a
 # live listing, a candidate who deleted the CRDs would be compared against an
 # empty set, and an empty file would then agree with it.
@@ -42,7 +47,7 @@ done)
 extra=${extra% | }
 
 evidence() {
-  show_actual text "$(cat "$F" 2>/dev/null)"
+  show_pair text crds.txt
   show_why "$1"
 }
 

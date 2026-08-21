@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: the pair is really enforced — teller reaches ledger, auditor times out
+# expected: none — this sends real traffic between seeded Pods (teller,
+#           auditor, ledger) and grades what reaches ledger or times out, an
+#           event measured at probe time rather than a document; the
+#           NetworkPolicy shapes it depends on are already paired by
+#           10_default-deny.sh and 20_allow.sh.
 set -uo pipefail
 . /banks/_lib/checks.sh
 evidence() {

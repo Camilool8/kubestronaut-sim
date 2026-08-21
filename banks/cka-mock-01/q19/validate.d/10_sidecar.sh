@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: shipper is a native sidecar — an initContainers entry with restartPolicy Always
+# expected: sidecar.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -9,11 +10,15 @@ dep=orders-api
 
 # Both lists side by side, because the whole answer to this check is which list
 # the entry is in and what one field on it says.
-evidence() {
-  show_actual json "$(kubectl -n "$ns" get deploy "$dep" -o json 2>/dev/null \
-    | jq '.spec.template.spec
+snapshot() {
+  kubectl -n "$ns" get deploy "$dep" -o json 2>/dev/null \
+    | jq -S '.spec.template.spec
           | {initContainers: [.initContainers[]? | {name, restartPolicy}],
-             containers: [.containers[]? | {name}]}' 2>/dev/null)"
+             containers: [.containers[]? | {name}]}' 2>/dev/null
+}
+
+evidence() {
+  show_pair json sidecar.json
   show_why "$1"
 }
 

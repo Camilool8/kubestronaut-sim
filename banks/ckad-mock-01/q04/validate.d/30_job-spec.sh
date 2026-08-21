@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: Job backfill: 3 completions, parallelism 2, backoffLimit 2, container worker
+# expected: job-spec.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
+
+snapshot() {
+  kubectl -n vega get job backfill -o json 2>/dev/null \
+    | jq -S '{completions: (.spec.completions // null), parallelism: (.spec.parallelism // null), backoffLimit: (.spec.backoffLimit // null)}'
+}
+
 evidence() {
-  show_actual json "$(kubectl -n vega get job backfill -o json 2>/dev/null | jq '{completions: .spec.completions, parallelism: .spec.parallelism, backoffLimit: .spec.backoffLimit, containers: [.spec.template.spec.containers[] | {name, image}]}')"
+  show_pair json job-spec.json
   show_why "$1"
 }
 
@@ -12,7 +19,8 @@ names=$(kubectl -n vega get job backfill \
   -o jsonpath='{.spec.template.spec.containers[*].name}' 2>/dev/null)
 has_name "$names" worker || {
   echo "no container named 'worker' in the Job's Pod template (found: $(name_list "$names"))"
-  evidence "The container is found by name, and the question names it worker. A Pod template whose container is called something else describes a different workload as far as anything selecting by name is concerned."
+  show_actual text "containers that exist: $(name_list "$names")"
+  show_why "The container is found by name, and the question names it worker. A Pod template whose container is called something else describes a different workload as far as anything selecting by name is concerned."
   exit 1
 }
 

@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: ResourceQuota staging-quota limits pods=5 and requests.cpu=1
+# expected: quota.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
+snapshot() {
+  kubectl -n aurora-staging get quota staging-quota -o json 2>/dev/null \
+    | jq -S '.spec.hard // {} | {pods: (.pods // null), "requests.cpu": (."requests.cpu" // null)}'
+}
+
 evidence() {
-  show_actual yaml "$(kubectl -n aurora-staging get quota staging-quota -o yaml 2>/dev/null | k8s_clean)"
+  show_pair json quota.json
   show_why "$1"
 }
 
@@ -16,7 +22,8 @@ cpu=$(kubectl -n aurora-staging get quota staging-quota \
 
 [ -n "${pods}${cpu}" ] || {
   echo "ResourceQuota staging-quota not found in aurora-staging"
-  evidence "A ResourceQuota is a namespaced object, so it only limits the Namespace it was created in — one made in default caps nothing here. An empty pane means no object of that name exists in aurora-staging; a pane that shows one means it sets neither pods nor requests.cpu, and limits.cpu is a different key from requests.cpu."
+  show_actual text "$(kubectl -n aurora-staging get quota 2>/dev/null)"
+  show_why "A ResourceQuota is a namespaced object, so it only limits the Namespace it was created in — one made in default caps nothing here. The pane above lists what aurora-staging actually holds; an empty one means no object of that name exists there at all."
   exit 1
 }
 

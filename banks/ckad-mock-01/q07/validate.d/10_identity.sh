@@ -1,16 +1,9 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: runs as uid 10001 / gid 20001 and is refused if the image would run as root
+# expected: identity.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
-evidence() {
-  show_actual json "$(kubectl -n cygnus get pod vault-agent -o json 2>/dev/null | jq --arg c agent '
-    if any(.spec.containers[]; .name == $c)
-    then {pod: .spec.securityContext, container: (first(.spec.containers[] | select(.name == $c)) | .securityContext)}
-    else {"no such container": $c, "containers that exist": [.spec.containers[].name]}
-    end')"
-  show_why "$1"
-}
 
 # The fields below are read out of the container the question names. Nothing
 # matching that name reads exactly like nothing being set, so say which it is
@@ -18,7 +11,8 @@ evidence() {
 names=$(kubectl -n cygnus get pod vault-agent -o jsonpath='{.spec.containers[*].name}' 2>/dev/null)
 has_name "$names" agent || {
   echo "pod vault-agent has no container named 'agent' (found: $(name_list "$names"))"
-  evidence "Every securityContext field below is read off the container the question names. A container under a different name is a different container to the API, so the settings you put on it are not consulted and each field reads back empty — which is what the rest of this check would otherwise report."
+  show_actual text "containers that exist: $(name_list "$names")"
+  show_why "Every securityContext field below is read off the container the question names. A container under a different name is a different container to the API, so the settings you put on it are not consulted and each field reads back empty — which is what the rest of this check would otherwise report."
   exit 1
 }
 
@@ -31,6 +25,21 @@ get() {
   printf '%s' "$v"
 }
 uid=$(get runAsUser); gid=$(get runAsGroup); nonroot=$(get runAsNonRoot)
+
+snapshot() {
+  jq -n -S \
+    --arg uid "${uid:-}" --arg gid "${gid:-}" --arg nonroot "${nonroot:-}" \
+    '{
+      runAsUser: (if $uid == "" then null else ($uid | tonumber) end),
+      runAsGroup: (if $gid == "" then null else ($gid | tonumber) end),
+      runAsNonRoot: (if $nonroot == "" then null elif $nonroot == "true" then true elif $nonroot == "false" then false else $nonroot end)
+    }' 2>/dev/null
+}
+
+evidence() {
+  show_pair json identity.json
+  show_why "$1"
+}
 
 crit 1 "runs as uid 10001"          "runAsUser='$uid', want 10001"     -- [ "$uid" = "10001" ]
 crit 1 "runs as gid 20001"          "runAsGroup='$gid', want 20001"    -- [ "$gid" = "20001" ]

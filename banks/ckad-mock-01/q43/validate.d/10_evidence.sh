@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the kubelet's probe-failure message and the port it named were captured
+# expected: none — the file is expected to carry text copied from the Pods'
+#           own events/description, and both `kubectl describe pod` and
+#           `kubectl get events` bake the Pod's live IP and a
+#           continuously-advancing relative age into the very same lines as
+#           the probe-failure message — so even two captures of the
+#           identical, correctly-solved cluster never come out byte-for-byte
+#           alike. The two `holds` checks below only test for the two stable
+#           fragments named in the desc, an event fact rather than a
+#           document with a pinned shape.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

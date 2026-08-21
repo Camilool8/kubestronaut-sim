@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the Pod template records a rollout restart and every Pod came from it
+# expected: none — this grades whether a restartedAt annotation is present on
+#           the Pod template and on every live Pod, not any specific value:
+#           the timestamp kubectl writes is different every run, including
+#           between the reference capture and the candidate's own attempt, so
+#           there is no single correct document to hold it against. The
+#           message and why text already name which half — the template or
+#           the Pods — is missing it.
 set -uo pipefail
 . /banks/_lib/checks.sh
 KEY=kubectl.kubernetes.io/restartedAt

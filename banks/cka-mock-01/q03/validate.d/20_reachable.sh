@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: the Service has ready endpoints and really answers from inside the cluster
+# expected: none — an EndpointSlice is written by a controller, with a random
+#           name suffix and Pod IPs for addresses, so an authored "expected"
+#           one would only teach a candidate to look for numbers that were
+#           never going to be theirs; and whether curl from inside the cluster
+#           gets an answer is a live behavioural reading, not a document
+#           either. Both criteria's messages already name what they saw.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the starting revision and the rollout history were saved on the instance
+# expected: revision-before.txt text
 set -uo pipefail
 . /banks/_lib/checks.sh
 before=$(cat /opt/course/12/revision-before 2>/dev/null | tr -d '[:space:]')
@@ -9,6 +10,20 @@ hist=$(cat /opt/course/12/history 2>/dev/null)
 looks_like_history() {
   printf '%s' "$hist" | grep -q 'REVISION' \
     && printf '%s' "$hist" | grep -q 'upgrade to nginx 1.29'
+}
+
+# The starting revision has exactly one correct answer ("1") and is a value
+# the candidate copied to disk, so it pairs. The saved history is the live
+# output of `kubectl rollout history` at whatever moment it was captured, not
+# text the candidate composed, so its outcome rides on its own crit message
+# below instead of a second pane.
+snapshot() {
+  printf '%s' "${before:-}"
+}
+
+evidence() {
+  show_pair text revision-before.txt
+  show_why "$1"
 }
 
 crit 1 "the starting revision was recorded" \
@@ -21,8 +36,5 @@ crit 1 "the rollout history was saved" \
   "What was saved does not carry the REVISION header and the 1.29 change-cause that a full history has. Capturing it before the annotation was set, or from a different Deployment, produces a file that looks plausible and records nothing about the change the question was about — and an empty file means nothing was written to that path at all." \
   -- looks_like_history
 
-crit_all_passed || {
-  show_actual text "$(head -20 /opt/course/12/revision-before 2>/dev/null; echo; head -20 /opt/course/12/history 2>/dev/null)"
-  show_why "$(crit_why)"
-}
+crit_all_passed || evidence "$(crit_why)"
 report "files ok"

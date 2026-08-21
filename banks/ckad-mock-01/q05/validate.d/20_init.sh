@@ -1,11 +1,29 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: init container wait-for-source exists, is not a sidecar, and mounts nothing
+# expected: containers.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
+
+snapshot() {
+  kubectl -n lyra get deploy feed-writer -o json 2>/dev/null | jq -S '
+    .spec.template.spec | {
+      initContainers: [(.initContainers // [])[] | {name, image, restartPolicy: (.restartPolicy // null), volumeMounts: [(.volumeMounts // [])[] | .name]}],
+      containers: [(.containers // [])[] | {name}]
+    }'
+}
+
 evidence() {
-  show_actual json "$(kubectl -n lyra get deploy feed-writer -o json 2>/dev/null | jq '[.spec.template.spec.initContainers[]? | {name, image, restartPolicy, volumeMounts}]')"
+  show_pair json containers.json
   show_why "$1"
+}
+
+exists=$(kubectl -n lyra get deploy feed-writer -o jsonpath='{.metadata.name}' 2>/dev/null)
+[ -n "$exists" ] || {
+  echo "Deployment feed-writer not found in Namespace lyra"
+  show_actual text "$(kubectl -n lyra get deploy 2>/dev/null)"
+  show_why "Every part of this question is graded on Deployment feed-writer in Namespace lyra, and the pane above lists what that Namespace actually holds. A Deployment created under another name is invisible to every check here."
+  exit 1
 }
 
 sel='{.spec.template.spec.initContainers[?(@.name=="wait-for-source")]'
@@ -19,9 +37,9 @@ mounts=$(kubectl -n lyra get deploy feed-writer -o jsonpath="${sel}.volumeMounts
 # the thing it qualifies exists. Before feed-writer is written there is no
 # wait-for-source, so it has no restartPolicy and no volumeMounts either — which
 # scored a candidate who had done nothing two of these four weights.
-exists() { has_name "$names" wait-for-source; }
-plain_init_container() { exists && [ -z "$policy" ]; }
-mounts_nothing() { exists && [ -z "$mounts" ]; }
+exists_wfs() { has_name "$names" wait-for-source; }
+plain_init_container() { exists_wfs && [ -z "$policy" ]; }
+mounts_nothing() { exists_wfs && [ -z "$mounts" ]; }
 
 crit 2 "an init container wait-for-source runs busybox:1.37" \
   "wait-for-source image is '$img'" \

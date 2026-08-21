@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: Service pollux-web is a NodePort on 30081 whose targetPort names the container port
+# expected: service.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
 svc=$(kubectl -n gemini get svc pollux-web -o json 2>/dev/null)
+
+# Only the port-80 entry: nodePort and targetPort travel on it, and it is the
+# only entry any criterion here reads.
+snapshot() {
+  printf '%s' "${svc:-null}" \
+    | jq -S '{type: (.spec.type // null),
+              ports: [.spec.ports[]? | select(.port == 80)
+                      | {port, targetPort: (.targetPort // null), nodePort: (.nodePort // null)}]}' 2>/dev/null
+}
 
 [ -n "$svc" ] || {
   echo "no Service named pollux-web in namespace gemini"
@@ -20,7 +30,7 @@ target=$(printf '%s' "$svc" | jq -r \
   '[.spec.ports[]? | select(.port == 80) | (.targetPort // "") | tostring] | join(" ")')
 
 evidence() {
-  show_actual json "$(printf '%s' "$svc" | jq '{type: .spec.type, selector: .spec.selector, ports: .spec.ports}')"
+  show_pair json service.json
   show_why "$1"
 }
 

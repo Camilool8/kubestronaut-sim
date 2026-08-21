@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: a valid pipeline-runner token, good for at least an hour, was saved
+# expected: none — the check grades a ServiceAccount token requested live from
+#           the API server: its claims carry the moment it was issued
+#           (iat/exp), so a document captured once would never match a token
+#           requested at a different time. The decoded claims pane already
+#           shows what was actually issued.
 set -uo pipefail
 . /banks/_lib/checks.sh
 tok=$(cat /opt/course/15/pipeline-token 2>/dev/null | tr -d '[:space:]')
