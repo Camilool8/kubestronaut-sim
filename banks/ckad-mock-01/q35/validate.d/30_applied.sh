@@ -23,11 +23,30 @@ ready=$(printf '%s' "$spec" | jq -r '.status.readyReplicas // 0')
 # api container, now read from the live cluster instead of the kustomize
 # build. readyReplicas is a live rollout reading and rides on its own crit
 # message below instead of a second pane.
+#
+# The live object carries API-server defaults kustomize's local build never
+# has (readinessProbe.failureThreshold, successThreshold, timeoutSeconds,
+# httpGet.scheme), so readinessProbe is projected down to exactly the four
+# fields the base/overlay ever author instead of passed through whole —
+# otherwise this snapshot can never match 10_rendered.sh's, which is a pure
+# build with no defaulting step. Do not "simplify" this back to
+# ($c.readinessProbe // null).
 snapshot() {
   printf '%s' "${spec:-null}" | jq -S '
     (.spec.template.spec.containers[]? | select(.name == "api")) as $c
     | (($c.env // []) | map(select(.name == "LEDGER_MODE")) | first) as $e
-    | {LEDGER_MODE: ($e.value // null), readinessProbe: ($c.readinessProbe // null)}
+    | ($c.readinessProbe // {}) as $p
+    | {
+        LEDGER_MODE: ($e.value // null),
+        readinessProbe: {
+          httpGet: {
+            path: ($p.httpGet.path // null),
+            port: ($p.httpGet.port // null)
+          },
+          initialDelaySeconds: ($p.initialDelaySeconds // null),
+          periodSeconds: ($p.periodSeconds // null)
+        }
+      }
   ' 2>/dev/null
 }
 
