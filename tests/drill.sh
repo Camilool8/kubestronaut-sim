@@ -301,7 +301,7 @@ declared_docs() {
 capture_one() { # qid instance script
   docker compose exec -T "$2" env SIM_CAPTURE_EXPECTED=1 \
     KUBECONFIG=/home/candidate/.kube/config "BANK=${BANK}" \
-    bash "/banks/${BANK}/$1/validate.d/$3" 2>/dev/null \
+    bash "/banks/${BANK}/$1/validate.d/$3" 2>/dev/null </dev/null \
     | awk 'f {print} /^---8<--- sim:capture$/ {f=1}'
 }
 
