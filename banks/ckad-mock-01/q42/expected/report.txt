@@ -1,5 +1,5 @@
-NAME             REPLICAS   IMAGE
-search-indexer   1          busybox:1.37
-audit-writer     2          busybox:1.37
-image-resizer    3          nginx:1.27-alpine
-billing-api      4          nginx:1.29-alpine
+NAME REPLICAS IMAGE
+search-indexer 1 busybox:1.37
+audit-writer 2 busybox:1.37
+image-resizer 3 nginx:1.27-alpine
+billing-api 4 nginx:1.29-alpine
