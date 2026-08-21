@@ -1,0 +1,21 @@
+{
+  "ports": [
+    {
+      "containerPort": 8080,
+      "name": "http",
+      "protocol": "TCP"
+    }
+  ],
+  "readinessProbe": {
+    "failureThreshold": 3,
+    "httpGet": {
+      "path": "/",
+      "port": 8080,
+      "scheme": "HTTP"
+    },
+    "initialDelaySeconds": 3,
+    "periodSeconds": 5,
+    "successThreshold": 1,
+    "timeoutSeconds": 2
+  }
+}
