@@ -1,0 +1,4 @@
+sim.internal:53 {
+    errors
+    forward . 10.96.43.47
+}
