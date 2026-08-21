@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: Deployment is ready and the sidecar's output was saved to the instance
+# expected: none — one criterion is a live readyReplicas reading and the other
+#           is a grep test for any timestamped line in a captured log file.
+#           The captured content is real runtime log output, so its timestamps
+#           differ every time the sidecar runs, including on a correctly
+#           solved cluster — a captured "expected" excerpt would never match
+#           even a correct answer, so there is no fixed document to compare
+#           against.
 set -uo pipefail
 . /banks/_lib/checks.sh
 ready=$(kubectl -n lyra get deploy feed-writer -o jsonpath='{.status.readyReplicas}' 2>/dev/null)

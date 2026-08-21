@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: PriorityClass q22-critical outranks q22-bulk and q22-standard, stays under the ceiling and never preempts
+# expected: priorityclass.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -19,8 +20,13 @@ pcs=$(kubectl get priorityclass -o json 2>/dev/null | jq '
        preemptionPolicy: (.preemptionPolicy // "PreemptLowerPriority"),
        globalDefault: (.globalDefault // false)} ]' 2>/dev/null)
 
+snapshot() {
+  printf '%s' "${pcs:-[]}" \
+    | jq -S --arg n "$PC" '(first(.[]? | select(.name == $n)) // {}) | {preemptionPolicy: (.preemptionPolicy // null)}' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "${pcs:-null}"
+  show_pair json priorityclass.json
   show_why "$1"
 }
 
@@ -40,7 +46,8 @@ missing=$(printf '%s' "${pcs:-[]}" \
 
 [ -z "$missing" ] || {
   echo "the seeded PriorityClass(es) $missing are gone from the cluster"
-  evidence "This question is graded on a relationship — q22-critical has to be worth more than the two classes that were already here — so those two have to still be here to be worth more than. Deleting one, or lowering it, is not the promotion that was asked for; the new class is what carries the higher number. Note also that a PriorityClass value is immutable once created: the API refuses an update that changes it, so the only way one of these could have changed value is a delete and a recreate. A reset re-seeds both."
+  show_actual json "${pcs:-null}"
+  show_why "This question is graded on a relationship — q22-critical has to be worth more than the two classes that were already here — so those two have to still be here to be worth more than. Deleting one, or lowering it, is not the promotion that was asked for; the new class is what carries the higher number. Note also that a PriorityClass value is immutable once created: the API refuses an update that changes it, so the only way one of these could have changed value is a delete and a recreate. A reset re-seeds both."
   exit 1
 }
 
@@ -49,7 +56,8 @@ exists=$(printf '%s' "${pcs:-[]}" \
 
 [ "$exists" = true ] || {
   echo "no PriorityClass named $PC in this cluster"
-  evidence "Everything this check grades lives on a PriorityClass called $PC, and the pane above lists the ones that exist. PriorityClasses are cluster-scoped: there is no Namespace to create this one in and none to look for it in, so 'kubectl -n reticulum get priorityclass' and 'kubectl get priorityclass' list exactly the same objects. A class under another name is invisible here, and there is no way round creating one: a priority NUMBER written straight into a Pod template does not skip this step, because the admission plugin computes spec.priority from the class name and refuses a Pod whose spec.priority disagrees with what it computed."
+  show_actual json "${pcs:-null}"
+  show_why "Everything this check grades lives on a PriorityClass called $PC, and the pane above lists the ones that exist. PriorityClasses are cluster-scoped: there is no Namespace to create this one in and none to look for it in, so 'kubectl -n reticulum get priorityclass' and 'kubectl get priorityclass' list exactly the same objects. A class under another name is invisible here, and there is no way round creating one: a priority NUMBER written straight into a Pod template does not skip this step, because the admission plugin computes spec.priority from the class name and refuses a Pod whose spec.priority disagrees with what it computed."
   exit 1
 }
 
@@ -62,7 +70,8 @@ gd=$(printf '%s' "${pcs:-[]}" \
 # creates without asking for it, so it costs nothing to leave alone.
 [ "$gd" != true ] || {
   echo "$PC is marked globalDefault: true, which re-ranks Pods across the whole cluster"
-  evidence "globalDefault does not mean 'the default for my workload'. There is exactly one global default per cluster, and the admission plugin stamps it onto every Pod created anywhere that names no priorityClassName — other Namespaces, other teams' workloads, add-ons. The question rules it out for that reason. What actually moves checkout-api onto this class is naming the class in that Deployment's Pod template, not making it the default for everything. To take the flag back off, edit the class with kubectl edit and set globalDefault to false; unlike value, that field can be updated in place."
+  show_actual json "${pcs:-null}"
+  show_why "globalDefault does not mean 'the default for my workload'. There is exactly one global default per cluster, and the admission plugin stamps it onto every Pod created anywhere that names no priorityClassName — other Namespaces, other teams' workloads, add-ons. The question rules it out for that reason. What actually moves checkout-api onto this class is naming the class in that Deployment's Pod template, not making it the default for everything. To take the flag back off, edit the class with kubectl edit and set globalDefault to false; unlike value, that field can be updated in place."
   exit 1
 }
 

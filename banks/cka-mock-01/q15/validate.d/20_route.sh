@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: HTTPRoute lacerta-routes attaches to lacerta-gateway for the host, carries both prefix paths to storefront:80 and checkout:8080, and the Gateway accepted it
+# expected: route.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -14,9 +15,27 @@ rt=$(kubectl -n lacerta get httproute lacerta-routes -o json 2>/dev/null)
   exit 1
 }
 
+# Only the authored half — the parent attachment, the hostname and the path
+# rules — gets a generated document. Whether the Gateway actually accepted
+# the route is a live status reading, not a document, and its verdict
+# already rides on that criterion's own message and why text below; a
+# second pane here would collide with this one in the UI, which shows one
+# actual/expected pair per check, not per criterion.
+snapshot() {
+  printf '%s' "${rt:-null}" | jq -S '{
+    parentRefs: ([(.spec.parentRefs // [])[]? | {kind: (.kind // "Gateway"), namespace: (.namespace // "lacerta"), name: (.name // null)}] | sort_by(.kind, .namespace, .name)),
+    hostnames: ((.spec.hostnames // []) | sort),
+    rules: ([(.spec.rules // [])[]? as $r | ($r.matches // [])[]? as $m | ($r.backendRefs // [])[]? | {
+        pathType: ($m.path.type // "PathPrefix"),
+        pathValue: ($m.path.value // "/"),
+        name: (.name // null),
+        port: (.port // null)
+      }] | sort_by(.pathValue, .name, .port))
+  }' 2>/dev/null
+}
+
 evidence() {
-  show_actual yaml "$(kubectl -n lacerta get httproute lacerta-routes -o yaml 2>/dev/null | k8s_clean)"
-  show_expected yaml "/banks/${BANK:-cka-mock-01}/q15/expected/httproute.yaml"
+  show_pair json route.json
   show_why "$1"
 }
 

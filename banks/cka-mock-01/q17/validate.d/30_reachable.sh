@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the named port resolves and the node port really answers from inside the cluster
+# expected: none — the check grades whether the named port resolves in the
+#           EndpointSlice and whether a curl from inside the cluster actually
+#           gets an answer. An EndpointSlice is written by a controller, with a
+#           random name suffix and Pod IPs as addresses, and the HTTP answer is
+#           a live reading taken at request time — neither is a document the
+#           candidate authored.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

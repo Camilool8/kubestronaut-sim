@@ -1,14 +1,30 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: env=prod labels the live Deployment, the Service and the running Pods
+# expected: labels.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
-view='[.items[] | {kind, labels: .metadata.labels,
-                   podTemplateLabels: (.spec.template.metadata.labels // null)}]'
+dep=$(kubectl -n scutum get deploy helios-web -o jsonpath='{.metadata.labels.env}' 2>/dev/null)
+svc=$(kubectl -n scutum get svc helios-web -o jsonpath='{.metadata.labels.env}' 2>/dev/null)
+tmpl=$(kubectl -n scutum get deploy helios-web \
+  -o jsonpath='{.spec.template.metadata.labels.env}' 2>/dev/null)
+running=$(kubectl -n scutum get pod -l app=helios-web,env=prod -o json 2>/dev/null \
+  | jq '[.items[] | select(.status.phase == "Running")] | length' 2>/dev/null)
+
+# The label transformer's own output — what it wrote onto the Deployment, the
+# Service and the Pod template. The count of Pods actually Running from that
+# template is a live reading and rides on its own crit message instead.
+snapshot() {
+  jq -nS --arg dep "${dep:-}" --arg svc "${svc:-}" --arg tmpl "${tmpl:-}" '
+    { deployment: (if $dep == "" then null else $dep end),
+      service: (if $svc == "" then null else $svc end),
+      podTemplate: (if $tmpl == "" then null else $tmpl end) }
+  ' 2>/dev/null
+}
 
 evidence() {
-  show_actual json "$(kubectl -n scutum get deploy,svc,pod -o json 2>/dev/null | jq "$view" 2>/dev/null)"
+  show_pair json labels.json
   show_why "$1"
 }
 
@@ -18,13 +34,6 @@ kubectl -n scutum get deploy helios-web >/dev/null 2>&1 || {
   show_why "There is nothing in the Namespace for a label transformer to have labelled. Building the overlay renders the objects; applying it is what creates them."
   exit 1
 }
-
-dep=$(kubectl -n scutum get deploy helios-web -o jsonpath='{.metadata.labels.env}' 2>/dev/null)
-svc=$(kubectl -n scutum get svc helios-web -o jsonpath='{.metadata.labels.env}' 2>/dev/null)
-tmpl=$(kubectl -n scutum get deploy helios-web \
-  -o jsonpath='{.spec.template.metadata.labels.env}' 2>/dev/null)
-running=$(kubectl -n scutum get pod -l app=helios-web,env=prod -o json 2>/dev/null \
-  | jq '[.items[] | select(.status.phase == "Running")] | length' 2>/dev/null)
 
 # The Pods are not resources in the build — the Deployment makes them from its
 # template — so both halves have to hold: the template carries the pair, and

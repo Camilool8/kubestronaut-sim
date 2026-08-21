@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: checkout-api rolls out with maxSurge 2 and maxUnavailable 0, written as absolute Pod counts
+# expected: strategy.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -28,8 +29,12 @@ surge=$(printf '%s' "$dep" \
 unavail=$(printf '%s' "$dep" \
   | jq -r '.spec.strategy.rollingUpdate.maxUnavailable | if . == null then "<none>" else tojson end' 2>/dev/null)
 
+snapshot() {
+  printf '%s' "${strategy:-null}" | jq -S '.' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "${strategy:-null}"
+  show_pair json strategy.json
   show_why "$1"
 }
 

@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # points: 1
 # desc: the hardened Pod actually runs
+# expected: none — the check grades the Pod's status.phase, a live reading taken
+#           at a moment rather than a document the candidate authored. The
+#           message and container-state pane already name what is happening.
 set -uo pipefail
 . /banks/_lib/checks.sh
 phase=$(kubectl -n cygnus get pod vault-agent -o jsonpath='{.status.phase}' 2>/dev/null)

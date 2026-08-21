@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: an emptyDir is declared once and mounted at /var/log/orders in both api and shipper
+# expected: volume.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -11,11 +12,15 @@ path=/var/log/orders
 spec=$(kubectl -n "$ns" get deploy "$dep" -o json 2>/dev/null \
   | jq '.spec.template.spec // empty' 2>/dev/null)
 
-evidence() {
-  show_actual json "$(printf '%s' "${spec:-}" \
-    | jq '{volumes: [.volumes[]? | {name, emptyDir}],
+snapshot() {
+  printf '%s' "${spec:-null}" \
+    | jq -S '{volumes: [.volumes[]? | {name, emptyDir}],
            mounts: [(.containers[]?, .initContainers[]?)
-                    | {name, volumeMounts: (.volumeMounts // [])}]}' 2>/dev/null)"
+                    | {name, volumeMounts: (.volumeMounts // [])}]}' 2>/dev/null
+}
+
+evidence() {
+  show_pair json volume.json
   show_why "$1"
 }
 
@@ -29,7 +34,8 @@ evidence() {
 mains=$(printf '%s' "$spec" | jq -r '[.containers[]?.name] | join(" ")' 2>/dev/null)
 has_name "$mains" api || {
   echo "no container named 'api' in the Pod template of deploy/$dep (found: $(name_list "$mains"))"
-  evidence "The application container was seeded as 'api' and the question asks for it to be left alone — a sidecar is ADDED beside it. A template with no container by that name means it was renamed or replaced, and the log this question ships would then be coming from something other than the application it is supposed to be watching."
+  show_actual text "containers that exist: $(name_list "$mains")"
+  show_why "The application container was seeded as 'api' and the question asks for it to be left alone — a sidecar is ADDED beside it. A template with no container by that name means it was renamed or replaced, and the log this question ships would then be coming from something other than the application it is supposed to be watching."
   exit 1
 }
 

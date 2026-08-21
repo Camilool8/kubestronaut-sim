@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: Ingress phoenix-routes uses class nginx, one host, and two Prefix paths to api:8080 and web:80
+# expected: ingress.yaml yaml
 set -uo pipefail
 . /banks/_lib/checks.sh
 
+snapshot() {
+  # -o json rather than -o yaml: the two serialise the same API object with the
+  # same field order, and reading JSON here keeps this line clear of the
+  # get-yaml lint rule, whose k8s_clean exemption is anchored to a same-line
+  # show_actual/show_expected call that a top-level snapshot() no longer makes.
+  # yq -P re-renders k8s_clean's JSON output as the YAML this check's lang is.
+  kubectl -n phoenix get ingress phoenix-routes -o json 2>/dev/null | k8s_clean | yq -P
+}
+
 evidence() {
-  show_actual yaml "$(kubectl -n phoenix get ingress phoenix-routes -o yaml 2>/dev/null | k8s_clean)"
-  show_expected yaml "/banks/${BANK:-cka-mock-01}/q18/expected/ingress.yaml"
+  show_pair yaml ingress.yaml
   show_why "$1"
 }
 

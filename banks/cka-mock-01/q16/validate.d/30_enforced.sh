@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: the policies are really enforced — db and 9090 time out, frontend still reaches api:8080 and DNS
+# expected: none — this sends real traffic and a DNS lookup between seeded
+#           Pods and grades what gets through or times out, an event
+#           measured at probe time rather than a document; the NetworkPolicy
+#           shapes it depends on are already paired by the checks that grade
+#           them.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

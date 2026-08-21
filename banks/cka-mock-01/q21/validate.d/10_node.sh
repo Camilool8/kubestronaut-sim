@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: sim-worker2 carries the workload=batch:NoSchedule taint and the workload=batch label, and no other node does
+# expected: nodes.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -11,12 +12,16 @@ NODE=sim-worker2
 # this half goes wrong are the reservation landing on the wrong node and it
 # landing on several.
 nodes=$(kubectl get nodes -o json 2>/dev/null \
-  | jq '[.items[]? | {name: .metadata.name,
+  | jq -S '[.items[]? | {name: .metadata.name,
                       "labels.workload": (.metadata.labels.workload // null),
                       taints: [.spec.taints[]? | {key, value, effect}]}]' 2>/dev/null)
 
+snapshot() {
+  printf '%s' "${nodes:-null}"
+}
+
 evidence() {
-  show_actual json "${nodes:-null}"
+  show_pair json nodes.json
   show_why "$1"
 }
 
@@ -25,7 +30,8 @@ node=$(printf '%s' "${nodes:-[]}" \
 
 [ -n "$node" ] || {
   echo "no node named $NODE in this cluster"
-  evidence "Every criterion here is read from the node object called $NODE, and the pane above lists the nodes that exist. The reservation has to be made on that node under that name: the login alias cka-worker2 reaches the same machine, but it is a name in a client config file and the API server has never heard of it, so 'kubectl taint nodes cka-worker2 ...' fails outright. 'kubectl get nodes' prints the names the API answers to, and they are the ones to use."
+  show_actual text "nodes that exist: $(name_list "$(kubectl get nodes -o jsonpath='{.items[*].metadata.name}' 2>/dev/null)")"
+  show_why "Every criterion here is read from the node object called $NODE, and the pane above lists the nodes that exist. The reservation has to be made on that node under that name: the login alias cka-worker2 reaches the same machine, but it is a name in a client config file and the API server has never heard of it, so 'kubectl taint nodes cka-worker2 ...' fails outright. 'kubectl get nodes' prints the names the API answers to, and they are the ones to use."
   exit 1
 }
 

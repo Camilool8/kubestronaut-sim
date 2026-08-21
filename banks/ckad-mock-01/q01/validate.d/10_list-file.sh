@@ -1,9 +1,20 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: /opt/course/1/aurora-namespaces lists team=aurora namespaces, sorted, names only
+# expected: aurora-namespaces.txt text
 set -uo pipefail
 . /banks/_lib/checks.sh
 f=/opt/course/1/aurora-namespaces
+
+snapshot() {
+  cat "$f" 2>/dev/null
+}
+
+evidence() {
+  show_pair text aurora-namespaces.txt
+  show_why "$1"
+}
+
 [ -f "$f" ] || {
   echo "$f not found"
   show_why "The answer to this part is a file on the instance, not a command you ran once: the query has to be redirected to that path. Nothing exists there at all."
@@ -25,8 +36,5 @@ crit 1 "sorted" \
   "Ordering is a property of the file you saved rather than of the cluster: the API returns Namespaces in its own order, so the sort has to happen on the way to the file." \
   -- [ "$actual_order" = "$expected" ]
 
-crit_all_passed || {
-  show_actual text "$(cat "$f" 2>/dev/null)"
-  show_why "$(crit_why)"
-}
+crit_all_passed || evidence "$(crit_why)"
 report "list matches"

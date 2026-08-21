@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: Gateway dorado-gateway asks for GatewayClass sim, serves HTTP on 80, and is Programmed
+# expected: gateway.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -21,12 +22,21 @@ programmed=$(printf '%s' "$gw" | jq -r \
 prog_msg=$(printf '%s' "$gw" | jq -r \
   '[.status.conditions[]? | select(.type == "Programmed") | .message] | first // "no Programmed condition has been written at all"')
 
+# Only the authored half — the class and the listener's protocol/port — gets
+# a generated document. Whether the controller reports Programmed is a live
+# status reading, not a document, and its verdict is already carried by that
+# criterion's own message and why text below; a second pane here would
+# collide with this one in the UI, which shows one actual/expected pair per
+# check, not per criterion.
+snapshot() {
+  printf '%s' "${gw:-null}" | jq -S '{
+    gatewayClassName: (.spec.gatewayClassName // null),
+    listeners: ([(.spec.listeners // [])[]? | {protocol: (.protocol // null), port: (.port // null)}] | sort_by(.protocol, .port))
+  }' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "$(printf '%s' "$gw" | jq \
-    '{gatewayClassName: .spec.gatewayClassName,
-      listeners: [.spec.listeners[]? | {name, protocol, port, allowedRoutes}],
-      conditions: [.status.conditions[]? | {type, status, reason, message}],
-      addresses: .status.addresses}')"
+  show_pair json gateway.json
   show_why "$1"
 }
 

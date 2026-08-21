@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 1
 # desc: the archive Deployment mounts the archive-data claim at /data in its web container
+# expected: mount.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -58,11 +59,15 @@ sources=$(printf '%s' "$dep" | jq -r '
     | .name + " -> " + (.persistentVolumeClaim.claimName // (keys_unsorted | map(select(. != "name")) | join(","))) ]
   | join("; ") | if . == "" then "no volumes" else . end' 2>/dev/null)
 
-evidence() {
-  show_actual json "$(printf '%s' "$dep" | jq --arg c "$CTR" '{
+snapshot() {
+  printf '%s' "$dep" | jq -S --arg c "$CTR" '{
       volumes: (.spec.template.spec.volumes // []),
       mounts: [ .spec.template.spec.containers[]? | select(.name == $c)
-                | {container: .name, volumeMounts: (.volumeMounts // [])} ]}' 2>/dev/null)"
+                | {container: .name, volumeMounts: (.volumeMounts // [])} ]}' 2>/dev/null
+}
+
+evidence() {
+  show_pair json mount.json
   show_why "$1"
 }
 

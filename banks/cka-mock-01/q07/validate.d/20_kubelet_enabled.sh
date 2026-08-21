@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # points: 6
 # desc: the node-probe Pod runs on sim-worker3 and the kubelet unit is enabled to start at boot
+# expected: none — both criteria are live readings taken through the probe
+#           Pod rather than a document the candidate authored: whether an
+#           exec into a container on sim-worker3 actually succeeds (proof
+#           the node's kubelet is serving, not just that a Pod object once
+#           said Running), and a directory listing of which systemd unit
+#           files are linked into multi-user.target.wants on that node.
+#           Neither is a shape written into an API object.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

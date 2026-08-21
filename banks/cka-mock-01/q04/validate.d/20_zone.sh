@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the sim-dns resolver serves ledger.sim.internal as the ledger Service ClusterIP
+# expected: zone-record.txt text
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -8,15 +9,11 @@ zone=$(kubectl -n cygnus get cm sim-dns -o jsonpath='{.data.Corefile}' 2>/dev/nu
 ledger_ip=$(kubectl -n cygnus get svc ledger -o jsonpath='{.spec.clusterIP}' 2>/dev/null)
 resolver_ip=$(kubectl -n cygnus get svc sim-dns -o jsonpath='{.spec.clusterIP}' 2>/dev/null)
 
-evidence() {
-  show_actual text "$(printf 'ConfigMap cygnus/sim-dns, key Corefile:\n%s\n\nasking the resolver directly:\n%s\n' \
-                        "${zone:-$ARTIFACT_EMPTY}" "${answer:-(not asked)}")"
-  show_why "$1"
-}
-
 [ -n "$zone" ] || {
   echo "ConfigMap cygnus/sim-dns holds no Corefile"
-  evidence "sim-dns is a CoreDNS of its own, and the zone it is authoritative for is the Corefile in this ConfigMap — the Deployment mounts it as a file. With the key gone the resolver has no zone to serve at all, so forwarding to it correctly still resolves nothing."
+  show_actual text "$(printf 'ConfigMap cygnus/sim-dns, key Corefile:\n%s\n\nasking the resolver directly:\n%s\n' \
+                        "${zone:-$ARTIFACT_EMPTY}" "(not asked)")"
+  show_why "sim-dns is a CoreDNS of its own, and the zone it is authoritative for is the Corefile in this ConfigMap — the Deployment mounts it as a file. With the key gone the resolver has no zone to serve at all, so forwarding to it correctly still resolves nothing."
   exit 1
 }
 
@@ -26,6 +23,19 @@ record=$(printf '%s\n' "$zone" | awk '
   /(^|[[:space:]])ledger\.sim\.internal(\.)?([[:space:]]|$)/ {
     for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) print $i
   }')
+
+# Only the authored half — the address the zone file itself declares for
+# ledger.sim.internal. Whether the running resolver has picked that edit up
+# is a live reading (crit 2 below) and rides on its own message instead of a
+# second pane; the UI shows exactly one actual/expected pair per check.
+snapshot() {
+  printf 'ledger.sim.internal %s' "$(printf '%s' "${record:-}" | tr '\n' ' ' | sed -e 's/[[:space:]]*$//')"
+}
+
+evidence() {
+  show_pair text zone-record.txt
+  show_why "$1"
+}
 
 answer=''
 if [ -n "$resolver_ip" ]; then

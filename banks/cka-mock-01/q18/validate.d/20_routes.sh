@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: the controller really routes /api to api-ok and /web to web-ok for host q18-phoenix.sim.local
+# expected: none — the check grades whether the ingress-nginx controller
+#           actually routes two live HTTP requests to the right backend
+#           Service. That is a reading taken at request time against a
+#           running controller, not a document the candidate authored.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

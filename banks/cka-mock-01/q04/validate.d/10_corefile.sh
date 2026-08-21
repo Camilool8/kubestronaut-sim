@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: the kube-system Corefile forwards sim.internal to the sim-dns resolver, default block untouched
+# expected: corefile.txt text
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -8,14 +9,10 @@ DEAD_IP=10.255.255.254
 
 corefile=$(kubectl -n kube-system get cm coredns -o jsonpath='{.data.Corefile}' 2>/dev/null)
 
-evidence() {
-  show_actual text "$corefile"
-  show_why "$1"
-}
-
 [ -n "$corefile" ] || {
   echo "kube-system/coredns holds no Corefile"
-  evidence "Cluster DNS is configured by the Corefile stored in the ConfigMap coredns in kube-system: CoreDNS mounts it from there, so that ConfigMap is the file. An empty pane means the ConfigMap, or its Corefile key, is gone entirely — and with it the default server block every Pod in the cluster resolves Service names through."
+  show_actual text "$corefile"
+  show_why "Cluster DNS is configured by the Corefile stored in the ConfigMap coredns in kube-system: CoreDNS mounts it from there, so that ConfigMap is the file. An empty pane means the ConfigMap, or its Corefile key, is gone entirely — and with it the default server block every Pod in the cluster resolves Service names through."
   exit 1
 }
 
@@ -45,14 +42,25 @@ rest=$(printf '%s\n' "$corefile" | awk '
 
 printf '%s\n' "$rest" | grep -q 'kubernetes[[:space:]][[:space:]]*cluster\.local' || {
   echo "no server block outside the sim.internal stub serves cluster.local any more"
-  evidence "Only the sim.internal block belongs to this task. The default block — the one whose kubernetes plugin answers every name under svc.cluster.local — belongs to the whole cluster, so rewriting the file around the stub instead of editing the stub inside it takes Service discovery away from every Pod in every Namespace. That is why this scores nothing even when the internal zone works."
+  show_actual text "$corefile"
+  show_why "Only the sim.internal block belongs to this task. The default block — the one whose kubernetes plugin answers every name under svc.cluster.local — belongs to the whole cluster, so rewriting the file around the stub instead of editing the stub inside it takes Service discovery away from every Pod in every Namespace. That is why this scores nothing even when the internal zone works."
   exit 1
 }
 
 [ -n "$zone_block" ] || {
   echo "the Corefile has no server block for sim.internal"
-  evidence "A stub domain is its own server block, headed by the zone name, and only that block decides where queries for names under it go. Deleting the block does not make the zone resolve: it makes CoreDNS treat sim.internal as an ordinary external name and hand it to the upstream nameserver in the default block, which has never heard of the zone."
+  show_actual text "$corefile"
+  show_why "A stub domain is its own server block, headed by the zone name, and only that block decides where queries for names under it go. Deleting the block does not make the zone resolve: it makes CoreDNS treat sim.internal as an ordinary external name and hand it to the upstream nameserver in the default block, which has never heard of the zone."
   exit 1
+}
+
+snapshot() {
+  printf '%s' "${zone_block:-}"
+}
+
+evidence() {
+  show_pair text corefile.txt
+  show_why "$1"
 }
 
 # Tokens of the stub block with any :port suffix removed, so 10.0.0.1 and

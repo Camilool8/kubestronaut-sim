@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: Gateway lacerta-gateway is on class sim with one HTTPS:443 listener for the host, terminating TLS with lacerta-tls, and the controller programmed it
+# expected: gateway.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -21,9 +22,29 @@ gw=$(kubectl -n lacerta get gateway lacerta-gateway -o json 2>/dev/null)
   exit 1
 }
 
+# Only the authored half — the class, the listener and its TLS termination —
+# gets a generated document. Whether the controller reports the Gateway and
+# its listener resolved is a live status reading, not a document, and its
+# verdict already rides on that criterion's own message and why text below;
+# a second pane here would collide with this one in the UI, which shows one
+# actual/expected pair per check, not per criterion.
+snapshot() {
+  printf '%s' "${gw:-null}" | jq -S '{
+    gatewayClassName: (.spec.gatewayClassName // null),
+    listeners: ([(.spec.listeners // [])[]? | {
+        protocol: (.protocol // null),
+        port: (.port // null),
+        hostname: (.hostname // null),
+        tls: {
+          mode: (.tls.mode // null),
+          certificateRefs: ([(.tls.certificateRefs // [])[]? | {kind: (.kind // "Secret"), name: (.name // null)}] | sort_by(.kind, .name))
+        }
+      }] | sort_by(.protocol, .port, .hostname))
+  }' 2>/dev/null
+}
+
 evidence() {
-  show_actual yaml "$(kubectl -n lacerta get gateway lacerta-gateway -o yaml 2>/dev/null | k8s_clean)"
-  show_expected yaml "/banks/${BANK:-cka-mock-01}/q15/expected/gateway.yaml"
+  show_pair json gateway.json
   show_why "$1"
 }
 

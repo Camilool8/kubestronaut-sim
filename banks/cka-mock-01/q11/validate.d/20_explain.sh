@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: /opt/course/11/shipment-spec holds the explain output for the Shipment's spec, not for the whole resource
+# expected: none — kubectl explain's layout is kubectl's own, generated from
+#           the CRD's published schema and reshuffled between releases, so
+#           this check (by its own comment) grades what the output is
+#           ABOUT rather than what it looks like: whether each field name
+#           is mentioned at all. A captured copy of that text would teach
+#           a candidate to match a rendering that is not theirs to
+#           reproduce and is not even stable across kubectl versions.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

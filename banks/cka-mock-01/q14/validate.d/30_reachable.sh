@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: a request through the Gateway carrying Host web.sim.internal really reaches dorado-web
+# expected: none — this sends a real HTTP request through the Gateway's
+#           listener and grades what comes back (a status code, and whether
+#           the body says dorado-ok), an event measured at request time
+#           rather than a document; the Gateway and HTTPRoute shapes it
+#           depends on are already paired by the checks that grade them.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

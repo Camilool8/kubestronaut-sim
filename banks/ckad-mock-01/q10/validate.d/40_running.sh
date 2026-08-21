@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # points: 1
 # desc: the archiver Pod is running with its volumes attached
+# expected: none — the check grades the Pod's status.phase, a live reading
+#           taken at a moment rather than a document the candidate authored.
+#           The Pod/PVC table already names what is actually there.
 set -uo pipefail
 . /banks/_lib/checks.sh
 phase=$(kubectl -n orion get pod archiver -o jsonpath='{.status.phase}' 2>/dev/null)

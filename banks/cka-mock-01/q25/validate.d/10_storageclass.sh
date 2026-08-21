@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: StorageClass q25-local-retain provisions through the cluster's local-path provisioner on first consumer, and retains its volumes
+# expected: storageclass.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -20,20 +21,19 @@ prov=$(printf '%s' "$sc" | jq -r '.provisioner // "<none>"' 2>/dev/null)
 vbm=$(printf '%s' "$sc" | jq -r '.volumeBindingMode // "<none>"' 2>/dev/null)
 rec=$(printf '%s' "$sc" | jq -r '.reclaimPolicy // "<none>"' 2>/dev/null)
 
-# A projection rather than the object: a StorageClass carries little else, and
-# the four fields below are the whole of what was asked for. isDefault is shown
-# because it is the one property of this class that is invisible in the spec —
-# it lives in an annotation — and a candidate who copied 'standard' wholesale
-# brings it along.
-spec=$(printf '%s' "$sc" | jq '{
+# Only the three fields the crits below actually read. parameters and
+# whether this class is the cluster's default are neither graded, and a
+# candidate free to leave either at any value would see a false diff against
+# a pane that included them.
+snapshot() {
+  printf '%s' "$sc" | jq -S '{
     provisioner,
     reclaimPolicy,
-    volumeBindingMode,
-    parameters,
-    isDefaultClass: (.metadata.annotations["storageclass.kubernetes.io/is-default-class"] // "false")}' 2>/dev/null)
+    volumeBindingMode}' 2>/dev/null
+}
 
 evidence() {
-  show_actual json "${spec:-null}"
+  show_pair json storageclass.json
   show_why "$1"
 }
 

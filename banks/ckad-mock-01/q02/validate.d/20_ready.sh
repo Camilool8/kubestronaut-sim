@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # points: 1
 # desc: 3/3 replicas ready
+# expected: none — the check grades whether the Deployment reached its replica
+#           count, which is a reading taken at a moment rather than a document
+#           the candidate authored. The message already names the count.
 set -uo pipefail
 . /banks/_lib/checks.sh
 ready=$(kubectl -n nova get deploy nova-api -o jsonpath='{.status.readyReplicas}' 2>/dev/null)

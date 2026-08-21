@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: PersistentVolumeClaim archive-data is Bound to a volume dynamically provisioned by q25-local-retain, and that volume retains its data
+# expected: none — both criteria read live outcomes rather than a document
+#           the candidate authored: whether this claim's binding reached a
+#           volume from the named class, and whether that dynamically
+#           provisioned volume inherited Retain — a stamp taken from the
+#           class at the moment of provisioning, which depends on the order
+#           the candidate did the work in rather than on any field they set
+#           directly. The messages already name the phase, class and policy
+#           found.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

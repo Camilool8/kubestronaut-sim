@@ -1,8 +1,19 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: Job backfill completed, and its succeeded count is recorded on the instance
+# expected: backfill-succeeded.txt text
 set -uo pipefail
 . /banks/_lib/checks.sh
+
+snapshot() {
+  cat /opt/course/4/backfill-succeeded 2>/dev/null | tr -d '[:space:]'
+}
+
+evidence() {
+  show_pair text backfill-succeeded.txt
+  show_why "$1"
+}
+
 succeeded=$(kubectl -n vega get job backfill -o jsonpath='{.status.succeeded}' 2>/dev/null)
 recorded=$(cat /opt/course/4/backfill-succeeded 2>/dev/null | tr -d '[:space:]')
 
@@ -16,8 +27,5 @@ crit 1 "the count was recorded on the instance" \
   "The number comes from the Job's own status, so it can only be recorded after the Job has completed. Digits only: a header row, a whole kubectl table or a line of prose is not the count, even when the count is somewhere inside it." \
   -- [ "$recorded" = "3" ]
 
-crit_all_passed || {
-  show_actual text "$(kubectl -n vega get job backfill 2>/dev/null; echo; kubectl -n vega get pod 2>/dev/null; echo; cat /opt/course/4/backfill-succeeded 2>/dev/null)"
-  show_why "$(crit_why)"
-}
+crit_all_passed || evidence "$(crit_why)"
 report "job complete and recorded"

@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the scheduler and the controller-manager on aux-upgrade run v1.35.6 or newer too
+# expected: none — this grades the image tags kube-scheduler and
+#           kube-controller-manager are actually running under right now,
+#           read from their live static Pods rather than from a manifest the
+#           candidate wrote directly; kubeadm rewrites those manifests
+#           itself, so the running image is the only proof the upgrade
+#           truly landed rather than being interrupted partway through.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

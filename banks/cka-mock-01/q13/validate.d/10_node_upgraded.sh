@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: the aux-upgrade node runs kubelet v1.35.6 or newer, is Ready, and was left schedulable
+# expected: none — this grades the node's live kubeletVersion, Ready
+#           condition and cordon state, all readings the kubelet and the node
+#           lifecycle controller write themselves once a real upgrade has
+#           landed; there is no candidate-authored manifest a kubelet version
+#           string could be compared against.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

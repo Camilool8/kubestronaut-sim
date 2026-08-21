@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the network plugin's DaemonSet is rolled out on every node and the seeded q12-probe workload is Running
+# expected: none — this grades whether an installed DaemonSet has actually
+#           finished rolling out (numberReady against desiredNumberScheduled)
+#           and whether the seeded probe Deployments are Running, both live
+#           controller-written readings rather than anything the candidate
+#           authored; the plugin's own name and shape are deliberately not
+#           graded at all, only that some DaemonSet converged everywhere.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

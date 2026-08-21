@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: /opt/course/9/manifest.yaml renders the storefront release from sim-web 1.1.0 with both overrides
+# expected: manifest.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 F=/opt/course/9/manifest.yaml
-evidence() {
-  show_actual yaml "$(cat "$F" 2>/dev/null)"
-  show_why "$1"
-}
 
 [ -f "$F" ] || {
   echo "$F does not exist"
@@ -38,6 +35,28 @@ renders_the_release() {
 }
 carries_the_overrides() {
   [ "$reps" = "3" ] && [ "$img" = "nginx:1.29-alpine" ] && [ "$port" = "8080" ]
+}
+
+# Every graded field of this file is a direct byproduct of the release name
+# and chart/values the render was pointed at, so both criteria pair here.
+# Projected to just those fields — not the whole rendered YAML, which also
+# carries labels, selectors and other content this check never grades.
+snapshot() {
+  jq -nS \
+    --arg kinds "$kinds" --arg names "$names" \
+    --arg reps "${reps:-}" --arg img "${img:-}" --arg port "${port:-}" '
+    def lines: if . == "" then [] else split("\n") end;
+    { kinds: ($kinds | lines),
+      names: ($names | lines),
+      replicas: (if $reps == "" then null else $reps end),
+      image: (if $img == "" then null else $img end),
+      port: (if $port == "" then null else $port end) }
+  ' 2>/dev/null
+}
+
+evidence() {
+  show_pair json manifest.json
+  show_why "$1"
 }
 
 crit 1 "holds the release's Deployment and Service, named after the release" \

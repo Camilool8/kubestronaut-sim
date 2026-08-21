@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: node sim-worker3 reports Ready again
+# expected: none — the check grades the Node's Ready condition, a status
+#           field the node's own kubelet writes roughly every ten seconds
+#           and the node controller overwrites to Unknown when it stops
+#           hearing from it. It is a reading taken at a moment, not a
+#           document the candidate authored, and the message already
+#           names the value.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

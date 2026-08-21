@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the aux-upgrade API server itself serves v1.35.6 or newer
+# expected: none — this grades what the aux-upgrade API server reports about
+#           itself from /version, a live reading of the running binary
+#           rather than a document; a static Pod manifest edited on disk
+#           would only prove an edit was made, not that the new apiserver
+#           ever came up and started answering.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

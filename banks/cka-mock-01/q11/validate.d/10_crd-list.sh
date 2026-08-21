@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: /opt/course/11/crds names every CustomResourceDefinition of group logistics.sim.dev and nothing else
+# expected: none — the file is graded against a hardcoded list of the three
+#           CRD names this group ships (spelled out on purpose, so a
+#           candidate who deleted them is compared against something real
+#           rather than an empty document that would agree with an empty
+#           file), plus a survey of everything else this cluster's API
+#           serves. Both are live cluster surveys, not a shape the
+#           candidate authored.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

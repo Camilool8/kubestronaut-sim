@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the api container declares a CPU request and the Pods the Deployment runs carry it
+# expected: requests.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -34,14 +35,19 @@ live=$(kubectl -n "$NS" get pod -l app=payments-api -o json 2>/dev/null | jq '
       | select(.name == "api")
       | (.resources.requests // {}) ]' 2>/dev/null)
 
-tmpl=$(printf '%s' "$dep" | jq '
-    [ .spec.template.spec.containers[]?
-      | select(.name == "api")
-      | {name, requests: (.resources.requests // {}), limits: (.resources.limits // {})} ]' 2>/dev/null)
+# Only the authored half — the template's own CPU request. Whether the running
+# Pods carry it is a live reading, not a document, and its verdict is already
+# carried by that criterion's own message below; a second pane here would
+# collide with this one in the UI, which shows one actual/expected pair per
+# check, not per criterion.
+snapshot() {
+  printf '%s' "${dep:-null}" \
+    | jq -S '(first(.spec.template.spec.containers[]? | select(.name=="api")) // {})
+             | {requests: {cpu: (.resources.requests.cpu // null)}}' 2>/dev/null
+}
 
 evidence() {
-  show_actual json "$(printf '{"pod template": %s, "requests on the running Pods": %s}' \
-    "${tmpl:-null}" "${live:-null}")"
+  show_pair json requests.json
   show_why "$1"
 }
 

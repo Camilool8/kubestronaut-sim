@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: every batch-runner Pod runs on sim-worker2, and web-frontend is still there with none of its Pods on it
+# expected: none — the check grades where the scheduler actually placed each
+#           Pod, counted per node from live Pod status. Pod names are
+#           deliberately not read, since they are controller-generated and
+#           churn on every rollout and restart — this is a moment-in-time
+#           measurement, not a document the candidate authored.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

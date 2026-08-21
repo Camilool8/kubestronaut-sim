@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # points: 5
 # desc: orbit-planner's three Pods were placed on the aux-sched node by the cluster and are running
+# expected: none — both criteria are scheduling outcomes measured at a moment
+#           (how many Pods now carry a nodeName, how many are Running and
+#           Ready), not a document the candidate authored; the Deployment
+#           fields that matter here (replicas, nodeName) are graded as
+#           do-no-harm gates above, not scored criteria. The messages already
+#           name the counts seen.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

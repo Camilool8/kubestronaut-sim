@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # points: 5
 # desc: the controller really routes / to storefront and /checkout to checkout
+# expected: none — the check grades whether HTTP requests curled through the
+#           live ingress controller actually reach the right backend Service,
+#           a runtime networking reading rather than a document the candidate
+#           authored. The Ingress/Service/EndpointSlice pane already names the
+#           live objects to look at.
 set -uo pipefail
 . /banks/_lib/checks.sh
 out=$(kubectl -n helios exec deploy/storefront -- \

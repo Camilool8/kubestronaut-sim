@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: fleet-registry is back in Namespace q26-fleet on aux-etcd, restored from the snapshot under a new data directory
+# expected: configmap.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -74,9 +75,19 @@ etcd=$(kaux -n kube-system get pod "$ETCD_POD" -o json 2>/dev/null | jq -c '
          dataDir: ([ .spec.volumes[]? | select(.name == "etcd-data")
                      | .hostPath.path ] | join(",")) } ]' 2>/dev/null)
 
+# Only the ConfigMap's own name and data get a generated document — the
+# restore either brought back this exact object or it did not, and that is
+# a shape a solved cluster reproduces byte for byte. Whether the etcd Pod
+# has been repointed to the restored data directory is a live reading of a
+# different object, and its verdict is already carried by that criterion's
+# own message below; a second pane here would collide with this one in the
+# UI, which shows one actual/expected pair per check, not per criterion.
+snapshot() {
+  printf '%s' "${cm:-null}" | jq -S '{name: (.name // null), data: (.data // {})}' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "$(printf '{"%s in %s": %s, "ConfigMaps %s lists in %s (from the API server cache, which a restore leaves behind)": %s, "etcd static Pod": %s}' \
-    "$CM" "$NS" "${cm:-null}" "kubectl" "$NS" "${cms:-null}" "${etcd:-null}")"
+  show_pair json configmap.json
   show_why "$1"
 }
 
@@ -89,7 +100,7 @@ datadir=$(printf '%s' "${etcd:-[]}" | jq -r 'first(.[]? | .dataDir) // ""' 2>/de
 # the object back or it did not: an object of the right name carrying different
 # data was typed out by hand, which is the one route this question rules out.
 if [ -z "$name" ]; then
-  cm_msg="no ConfigMap named ${CM} in Namespace ${NS}"
+  cm_msg="no ConfigMap named ${CM} in Namespace ${NS} (a LIST of that Namespace's ConfigMaps, which a restore can leave stale, returns: ${cms:-[]})"
 else
   cm_msg="${CM} exists but holds region='${region}', serial='${serial}'"
 fi

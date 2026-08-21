@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the pod network really carries traffic — client reaches web by address and by Service name, and the seeded NetworkPolicy is enforced against outsider
+# expected: none — this sends real traffic over exec (Pod-to-Pod, the
+#           Service's cluster DNS name, and a NetworkPolicy's enforcement
+#           against a third Pod) and grades what the dataplane does with each
+#           request at the moment it is sent, an event rather than a
+#           document; the policy this exercises is seeded, not authored here.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: HTTPRoute dorado-web-route sends web.sim.internal to dorado-web:80 and is attached to the Gateway
+# expected: route.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -37,12 +38,21 @@ route_attached() {
     >/dev/null 2>&1
 }
 
+# Only the authored half — the hostnames and the backendRefs they resolve
+# to — gets a generated document. Whether the Gateway reports the route
+# attached and its backend resolved is a live status reading, not a
+# document, and its verdict already rides on that criterion's own message
+# and why text below; a second pane here would collide with this one in the
+# UI, which shows one actual/expected pair per check, not per criterion.
+snapshot() {
+  printf '%s' "${route:-null}" | jq -S '{
+    hostnames: ((.spec.hostnames // []) | sort),
+    backendRefs: ([(.spec.rules // [])[]?.backendRefs[]? | {name: (.name // null), port: (.port // null)}] | sort_by(.name, .port))
+  }' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "$(printf '%s' "$route" | jq \
-    '{parentRefs: .spec.parentRefs, hostnames: .spec.hostnames,
-      rules: .spec.rules,
-      status_parents: [.status.parents[]? | {parentRef: .parentRef,
-        conditions: [.conditions[]? | {type, status, reason, message}]}]}')"
+  show_pair json route.json
   show_why "$1"
 }
 

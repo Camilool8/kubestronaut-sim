@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: a snapshot of the live cluster was saved to /opt/backup/etcd-before-restore.db on the aux-etcd node
+# expected: none — the one criterion grades a measurement, the key count
+#           etcdutl reads back out of the file, not a shape the candidate
+#           authored. A real snapshot's own revision and key count are
+#           moments taken off a live etcd and never repeat between runs, so
+#           a captured reference would never match a correct answer's own
+#           file. The message already names the count found.
 set -uo pipefail
 . /banks/_lib/checks.sh
 
