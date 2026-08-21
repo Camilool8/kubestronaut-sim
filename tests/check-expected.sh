@@ -16,8 +16,19 @@ python3 - "${1:-.}" <<'PY'
 import pathlib, re, sys
 
 root = pathlib.Path(sys.argv[1])
-BANKS = ("cka-mock-01", "ckad-mock-01")
-scripts = sorted(p for b in BANKS for p in root.glob(f"banks/{b}/q*/validate.d/*.sh"))
+# Every bank except the smoke banks: smoke-01 predates this feature and
+# carries one validate.d check with no `# expected:` declaration at all
+# (it's a minimal end-to-end sanity check, not part of this feature's
+# scope); smoke-mcq and kcna-mock are MCQ-only banks with no validate.d
+# checks. An allow-list here would let a future bank's checks go
+# ungraded by this gate with zero signal — silent omission looking
+# exactly like a deliberate decision, which is what this feature exists
+# to prevent — so this is a glob with an explicit skip instead.
+SKIP_BANKS = ("smoke-01", "smoke-mcq", "kcna-mock")
+scripts = sorted(
+    p for p in root.glob("banks/*/q*/validate.d/*.sh")
+    if p.relative_to(root).parts[1] not in SKIP_BANKS
+)
 if not scripts:
     print(f"check-expected: found no validate.d scripts under {root} — refusing to pass")
     sys.exit(1)
