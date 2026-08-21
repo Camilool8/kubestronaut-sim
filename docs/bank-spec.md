@@ -14,8 +14,9 @@ Seven gates decide whether a bank ships —
 [check-expected.sh](../tests/check-expected.sh) and
 [bank-hints.sh](../tests/bank-hints.sh) for hands-on banks, and
 [bank-mcq.sh](../tests/bank-mcq.sh) for multiple-choice ones. All are
-offline and CI runs all seven. Every one but `check-evidence.sh` and
-`check-expected.sh` also runs at the top of
+offline; six run in CI today, and `check-expected.sh` joins them once
+every check in both banks carries a declaration. Every one but
+`check-evidence.sh` and `check-expected.sh` also runs at the top of
 [tests/smoke.sh](../tests/smoke.sh), so a bank mistake fails in seconds
 rather than forty minutes into a cold boot.
 
@@ -582,7 +583,7 @@ evidence() {
 
 [ "$kind" = httpGet ] && [ "$path" = "/" ] || {
   echo "the readinessProbe is a '$kind' probe on path '$path', want an httpGet on /"
-  evidence "The question asks for this probe to be repaired rather than replaced, so swapping the probe's type is not a repair and this check scores nothing for it."
+  evidence "The question asks for this probe to be repaired rather than replaced, and only its port was ever wrong. A tcpSocket probe passes as soon as the port accepts a connection, which says nothing about whether the application can serve a request, and an exec probe grades something else entirely — so swapping the probe's type is not a repair, and this check scores nothing for it."
   exit 1
 }
 ```
@@ -687,7 +688,9 @@ has:
 
 ```bash
 evidence() {
-  show_actual text "$(kubectl -n "$ns" get pod -l app=telemetry-api 2>/dev/null)"
+  show_actual text "$(printf '%s\n\n%s\n' \
+    "$(kubectl -n "$ns" get pod -l app=telemetry-api 2>/dev/null)" \
+    "Available=${avail:-<none>} ${reason:-}")"
   show_why "$1"
 }
 ```
