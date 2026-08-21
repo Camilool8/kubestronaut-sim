@@ -16,9 +16,11 @@ pods=$(kubectl -n "$ns" get pod -l app=telemetry-api -o json 2>/dev/null \
             containers: [.status.containerStatuses[]?
                          | {ready, state: (.state | keys), waiting: (.state.waiting.reason // null)}]}]')
 
-# One pane, two halves: what the Pod template asks for, and what the kubelet
-# made of it. Pod names are left out on purpose — they are controller-generated
-# and change under every rollout, so they teach nothing here.
+# Only the authored half — the image — gets a generated document. Whether a
+# Pod's container actually started is a live reading, not a document, and its
+# verdict is already carried by that criterion's own message and why text
+# below; a second JSON pane here would collide with the image pane in the UI,
+# which shows one actual/expected pair per check, not per criterion.
 snapshot() {
   printf '%s' "${containers:-null}" \
     | jq -S '(first(.[]? | select(.name=="api")) // {}) | {image: (.image // null)}' 2>/dev/null
@@ -26,7 +28,6 @@ snapshot() {
 
 evidence() {
   show_pair json image.json
-  show_actual json "$(printf '{"pods": %s}' "${pods:-null}")"
   show_why "$1"
 }
 
@@ -34,7 +35,8 @@ names=$(kubectl -n "$ns" get deploy "$dep" \
   -o jsonpath='{.spec.template.spec.containers[*].name}' 2>/dev/null)
 has_name "$names" api || {
   echo "no container named 'api' in deploy/$dep (found: $(name_list "$names"))"
-  evidence "This check reads the container the question named, 'api', inside the Pod template of Deployment telemetry-api in Namespace orion. An empty pane means no such Deployment exists — recreating it under another name, or in another Namespace, puts it beyond every check here. A pane listing other names means the container was renamed, which is not something this question asked for."
+  show_actual text "containers that exist: $(name_list "$names")"
+  show_why "This check reads the container the question named, 'api', inside the Pod template of Deployment telemetry-api in Namespace orion. An empty pane means no such Deployment exists — recreating it under another name, or in another Namespace, puts it beyond every check here. A pane listing other names means the container was renamed, which is not something this question asked for."
   exit 1
 }
 
