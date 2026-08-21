@@ -901,7 +901,7 @@ export const strings = {
       "These documents are too long to compare line by line, so neither pane is marked up. Both are shown in full.",
 
     actualOnlyNote:
-      "This check grades a reading rather than a document — whether something became ready, how many of a thing there are, or whether two live values still agree — so there is no authored counterpart to set beside it. The message above names what it measured.",
+      "There is no expected document to set beside this pane. Either this check grades a reading rather than a document — whether something became ready, how many of a thing there are, or whether two live values still agree — or the object it would compare against was never found. The message above names what it measured.",
 
     expectedOnlyNote:
       "This is what the check was looking for. Nothing was captured from your cluster to sit beside it, which usually means the object does not exist yet.",
