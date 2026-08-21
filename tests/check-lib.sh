@@ -226,6 +226,49 @@ ok "show_actual still degrades an empty body to text" "$(show_actual yaml '')" \
 
 unset -f snapshot
 
+# ------------------------------------------------------------------- capture
+
+# The trap is installed at source time, so it can only be exercised by running
+# a real script rather than by calling a function in this shell.
+cat > "$tmp/cap.sh" <<CAPTURE
+. $PWD/banks/_lib/checks.sh
+spec='{"ports":[{"containerPort":8080}]}'
+snapshot() { printf '%s' "\$spec" | jq -S '{ports: .ports}'; }
+echo "the readiness probe targets 80, want 8080"
+show_pair json probe.json
+show_why "A probe aimed at a port nothing listens on never succeeds."
+CAPTURE
+
+ok "capture emits the snapshot after the sentinel" \
+   "$(SIM_CAPTURE_EXPECTED=1 bash "$tmp/cap.sh" | awk 'f {print} /^---8<--- sim:capture$/ {f=1}')" \
+   "$(printf '{\n  "ports": [\n    {\n      "containerPort": 8080\n    }\n  ]\n}')"
+
+case "$(SIM_CAPTURE_EXPECTED=1 bash "$tmp/cap.sh")" in
+  *sim:artifact*) echo "FAIL: capture mode still emitted a grading artifact"; FAIL=$((FAIL+1)) ;;
+  *)              PASS=$((PASS+1)) ;;
+esac
+
+case "$(bash "$tmp/cap.sh")" in
+  *sim:capture*) echo "FAIL: a normal run emitted a capture block"; FAIL=$((FAIL+1)) ;;
+  *)             PASS=$((PASS+1)) ;;
+esac
+
+# An opt-out check declares no snapshot. Capture must be silent, not an error:
+# the harness skips it by declaration, and a stray line here would be read as a
+# document.
+cat > "$tmp/nosnap.sh" <<NOSNAP
+. $PWD/banks/_lib/checks.sh
+echo "the node is not Ready"
+exit 1
+NOSNAP
+ok "capture is silent for a check with no snapshot" \
+   "$(SIM_CAPTURE_EXPECTED=1 bash "$tmp/nosnap.sh" | grep -c 'sim:capture')" "0"
+
+printf '. %s/banks/_lib/checks.sh\nsnapshot() { printf "ok\\n"; }\necho nope\nexit 1\n' "$PWD" > "$tmp/exit1.sh"
+ok "capture fires on a check that exits 1" \
+   "$(SIM_CAPTURE_EXPECTED=1 bash "$tmp/exit1.sh" | awk 'f {print} /^---8<--- sim:capture$/ {f=1}')" \
+   "ok"
+
 if command -v yq >/dev/null 2>&1; then
   printf '%s\n' \
     'apiVersion: v1' \
