@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # points: 1
 # desc: the rewritten Job reached 4 successful Pods and reports Complete
+# expected: none — the check grades whether the Job's own status has reached
+#           its terminal Complete condition with 4 successful Pods, a reading
+#           taken at a moment rather than a document the candidate authored.
+#           The message already names the count and condition seen.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

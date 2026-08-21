@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: the adapter really rewrites the app's output into key/value lines
+# expected: none — the check execs into the adapter and reads whatever its
+#           command currently emits, a live process reading taken at the
+#           moment the check runs rather than a document the candidate wrote;
+#           the message and evidence pane already carry the actual output.
 set -uo pipefail
 . /banks/_lib/checks.sh
 out=$(kubectl -n pictor exec telemetry -c adapter -- \

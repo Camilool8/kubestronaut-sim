@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: object-cache is a deployed sim-cache release carrying those values
+# expected: none — this grades which chart backs the release (a name), the
+#           release's status reaching deployed (an event), and whether the
+#           values file's overrides actually reached the live release object
+#           (a relationship between the file and the release) — none of
+#           which is a fresh document the candidate authored. The values
+#           themselves are already the subject of 10_values-file.sh's paired
+#           document. Each criterion's message already names the value it
+#           found.
 set -uo pipefail
 . /banks/_lib/checks.sh
 export HELM_NAMESPACE=caelum

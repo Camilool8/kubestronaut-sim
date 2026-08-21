@@ -1,12 +1,26 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: LimitRange container-defaults sets default requests and limits for containers
+# expected: limitrange.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
 lr=$(kubectl -n fornax get limitrange container-defaults -o json 2>/dev/null)
+
+# Only the Container-typed entry's default/defaultRequest maps are graded —
+# not max/min (a different pair of fields, rejecting rather than filling in)
+# and not a Pod-typed entry the question never asked for. A pane wider than
+# that would mark an extra, ungraded entry as an error of its own.
+snapshot() {
+  printf '%s' "${lr:-null}" \
+    | jq -S '(first(.spec.limits[]? | select(.type == "Container")) // {})
+        | {default: {cpu: (.default.cpu // null), memory: (.default.memory // null)},
+           defaultRequest: {cpu: (.defaultRequest.cpu // null), memory: (.defaultRequest.memory // null)}}' \
+      2>/dev/null
+}
+
 evidence() {
-  show_actual json "$(printf '%s' "$lr" | jq '[.spec.limits[]? | {type, default, defaultRequest, max, min}]' 2>/dev/null)"
+  show_pair json limitrange.json
   show_why "$1"
 }
 

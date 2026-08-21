@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: fixed.yaml uses current apiVersions and legacy.yaml was left alone
+# expected: fixed-versions.txt text
 set -uo pipefail
 . /banks/_lib/checks.sh
 [ -f /opt/course/18/fixed.yaml ] || {
@@ -29,8 +30,17 @@ else
 fi
 
 versions=$(yaml_api_versions /opt/course/18/fixed.yaml | tr '\n' ' ')
-fixed() {
-  show_actual yaml "$(cat /opt/course/18/fixed.yaml 2>/dev/null)"
+
+# Every criterion below is a fact about this one list — the set of
+# apiVersions the file's two documents declare — so the pane is that list,
+# not the whole two-document file: schedule, image, ingress rules and
+# everything else in it are graded elsewhere, against the live cluster.
+snapshot() {
+  yaml_api_versions /opt/course/18/fixed.yaml
+}
+
+evidence() {
+  show_pair text fixed-versions.txt
   show_why "$1"
 }
 
@@ -51,5 +61,5 @@ crit 1 "the Ingress is on networking.k8s.io/v1" \
   "The Ingress is the half that is a real migration rather than a rename, so its apiVersion moving is only the first of several changes it needs. A missing document is the other way to reach this — the file has to keep both resources." \
   -- has_name "$versions" 'networking.k8s.io/v1'
 
-crit_all_passed || fixed "$(crit_why)"
+crit_all_passed || evidence "$(crit_why)"
 report "apiVersions updated"

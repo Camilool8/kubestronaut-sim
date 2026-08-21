@@ -1,16 +1,24 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the CronJob exists in lynx with its original schedule and command
+# expected: cronjob.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
-evidence() {
-  show_actual yaml "$(kubectl -n lynx get cronjob nightly-report -o yaml 2>/dev/null | k8s_clean)"
-  show_why "$1"
-}
 
 sched=$(kubectl -n lynx get cronjob nightly-report -o jsonpath='{.spec.schedule}' 2>/dev/null)
 img=$(kubectl -n lynx get cronjob nightly-report \
   -o jsonpath='{.spec.jobTemplate.spec.template.spec.containers[?(@.name=="report")].image}' 2>/dev/null)
+
+snapshot() {
+  jq -n --arg sched "${sched:-}" --arg img "${img:-}" '
+    {schedule: (if $sched == "" then null else $sched end),
+     image: (if $img == "" then null else $img end)}' 2>/dev/null
+}
+
+evidence() {
+  show_pair json cronjob.json
+  show_why "$1"
+}
 
 crit 1 "kept its original schedule" \
   "schedule is '$sched', want '0 2 * * *'" \

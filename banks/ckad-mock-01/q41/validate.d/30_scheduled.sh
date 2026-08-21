@@ -1,13 +1,23 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: archive-indexer was replaced with a request the cluster can satisfy and is Running
+# expected: pod.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
+# Only the authored half — the indexer container's image and its memory
+# request — gets a generated document. phase is a live scheduling reading
+# graded by its own criterion below, and node is not graded at all; neither
+# belongs beside a fixed reference (node assignment in particular is not
+# something the candidate wrote).
+snapshot() {
+  kubectl -n columba get pod archive-indexer -o json 2>/dev/null \
+    | jq -S '(first(.spec.containers[]? | select(.name=="indexer")) // {})
+             | {image: (.image // null), requests: (.resources.requests // null)}'
+}
+
 evidence() {
-  show_actual json "$(kubectl -n columba get pod archive-indexer -o json 2>/dev/null \
-    | jq '{phase: .status.phase, node: .spec.nodeName,
-           containers: [.spec.containers[] | {name, image, requests: .resources.requests}]}')"
+  show_pair json pod.json
   show_why "$1"
 }
 

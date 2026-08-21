@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: report-reader may read ConfigMaps in crater and may do nothing more
+# expected: none — every criterion here is a SubjectAccessReview answer
+#           ('kubectl auth can-i --as'), a decision the API server computes
+#           on the fly from the union of every RoleBinding and
+#           ClusterRoleBinding naming this subject. It is a relationship
+#           between two live values (the subject and the resolved grants),
+#           not a document the candidate authored — the Role and
+#           RoleBinding those grants come from are what q30/10_role.sh and
+#           q30/20_binding.sh already pair.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

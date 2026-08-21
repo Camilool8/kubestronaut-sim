@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the scheduler's own message about the Pod was captured verbatim
+# expected: none — the file is expected to carry text copied from the Pod's
+#           own events/description, and both `kubectl describe pod` and
+#           `kubectl get events` bake the Pod's live node, IP and a
+#           continuously-advancing relative age into the very same text as
+#           the predicate name — so even two captures of the identical,
+#           correctly-solved cluster never come out byte-for-byte alike. The
+#           check itself only tests for that one stable predicate fragment,
+#           an event fact rather than a document with a pinned shape.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # points: 5
 # desc: the node port really answers, from a node address inside the cluster
+# expected: none — this grades whether a curl sent to a node's own address on
+#           30081 gets an answer, a reading taken at a moment against
+#           infrastructure (the node's IP, kube-proxy's programming) rather
+#           than anything the candidate wrote. There is no document to
+#           compare it against.
 set -uo pipefail
 . /banks/_lib/checks.sh
 node=$(kubectl get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null \

@@ -1,14 +1,25 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: both containers declare imagePullPolicy Never in the Deployment's Pod template
+# expected: podspec.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
+# Shared with 20_grace.sh: both checks grade fields of the same edited Pod
+# template, so they document it once. imagePullPolicy is read back by name in
+# both checks, never by position, so the containers array is sorted here too —
+# a template that is otherwise correct but lists refresher before cache must
+# not read as a diff.
+snapshot() {
+  kubectl -n volans get deploy edge-cache -o json 2>/dev/null \
+    | jq -S '{
+        terminationGracePeriodSeconds: .spec.template.spec.terminationGracePeriodSeconds,
+        containers: ([.spec.template.spec.containers[]? | {name, imagePullPolicy}] | sort_by(.name))
+      }' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "$(kubectl -n volans get deploy edge-cache -o json 2>/dev/null \
-    | jq '{terminationGracePeriodSeconds: .spec.template.spec.terminationGracePeriodSeconds,
-           containers: [.spec.template.spec.containers[] | {name, image, imagePullPolicy}]}')"
-  show_expected json "/banks/${BANK:-ckad-mock-01}/q26/expected/podspec.json"
+  show_pair json podspec.json
   show_why "$1"
 }
 
@@ -19,7 +30,8 @@ present=$(kubectl -n volans get deploy edge-cache \
 for c in cache refresher; do
   has_name "$present" "$c" || {
     echo "the Deployment has no container named ${c} (found: $(name_list "$present"))"
-    evidence "The two containers are the workload as it stands. Renaming or removing one answers a different question, and the pull policy still has to be set on whatever is left."
+    show_actual text "containers that exist: $(name_list "$present")"
+    show_why "The two containers are the workload as it stands. Renaming or removing one answers a different question, and the pull policy still has to be set on whatever is left."
     exit 1
   }
 done

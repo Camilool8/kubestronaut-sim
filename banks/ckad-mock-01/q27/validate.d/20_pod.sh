@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: Pod unspecified is Running and carries the defaulted requests and limits
+# expected: none — the manifest deliberately carries no resources block, so
+#           the requests and limits read back here were written by the
+#           LimitRanger admission plugin at creation time, not by the
+#           candidate. This is a relationship between two live values (the
+#           LimitRange's defaults and what admission actually stamped onto
+#           the Pod) plus a phase reading, not a document to author.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

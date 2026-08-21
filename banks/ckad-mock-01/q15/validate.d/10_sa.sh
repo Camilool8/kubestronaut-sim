@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: ServiceAccount pipeline-runner exists and the pipeline Deployment uses it
+# expected: serviceaccount.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 kubectl -n phoenix get serviceaccount pipeline-runner >/dev/null 2>&1 || {
@@ -14,8 +15,15 @@ sa=$(kubectl -n phoenix get deploy pipeline \
   -o jsonpath='{.spec.template.spec.serviceAccountName}' 2>/dev/null)
 ready=$(kubectl -n phoenix get deploy pipeline -o jsonpath='{.status.readyReplicas}' 2>/dev/null)
 
+# serviceAccountName is the only field this check grades — automount is a
+# different question's concern. readyReplicas is a live rollout reading and
+# rides on its own crit message via pod_pane instead of a second pane.
+snapshot() {
+  jq -nS --arg sa "${sa:-}" '{serviceAccountName: (if $sa == "" then null else $sa end)}' 2>/dev/null
+}
+
 spec_pane() {
-  show_actual json "$(kubectl -n phoenix get deploy pipeline -o json 2>/dev/null | jq '.spec.template.spec | {serviceAccountName, automountServiceAccountToken}')"
+  show_pair json serviceaccount.json
   show_why "$1"
 }
 pod_pane() {

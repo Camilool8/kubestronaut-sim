@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the untouched Service is backed by 5 ready endpoints, 1 of them canary
+# expected: none — this grades a live count of ready endpoints in a
+#           controller-written EndpointSlice, and whether the canary's own
+#           Pods are among them by name — a reading taken at a moment and a
+#           set-membership relationship, not a document the candidate
+#           authored. EndpointSlice and Pod names carry a random suffix, so a
+#           captured document would only ever list names that were never
+#           going to be the candidate's. The gates above it protect the
+#           Service, which the question rules out editing; there is nothing
+#           there for the candidate to author either. Every failure already
+#           names the counts or the field it found.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

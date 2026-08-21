@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # points: 1
 # desc: search-stable was scaled to 4 and still runs what it ran before
+# expected: none — this grades whether the scale action reached its replica
+#           count (spec.replicas and status.readyReplicas both at 4), read at
+#           a moment, together with a guard that the image is still exactly
+#           what it was seeded with — a live-vs-baseline comparison rather
+#           than a document the candidate authored. The message already
+#           names all three values.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

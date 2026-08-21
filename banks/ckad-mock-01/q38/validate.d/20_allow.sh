@@ -1,10 +1,30 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: allow-teller opens exactly one path — role=teller to role=ledger on TCP 80
+# expected: allow.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
+
+# The grading below is provably order-independent — peers/ports both flatten
+# across every rule and compare via same_set — so the pane has to be too:
+# each rule's own peers and ports are sorted (ports normalised to an explicit
+# protocol first, since an omitted protocol and a written 'TCP' are the same
+# rule and must not render as one), and the outer ingress rule array is
+# sorted too.
+snapshot() {
+  printf '%s' "${pol:-null}" | jq -S '
+    def norm_ports: (. // []) | map({port: .port, protocol: (.protocol // "TCP")}) | sort_by(.protocol, .port);
+    {
+      podSelector: (.spec.podSelector // {}),
+      ingress: ((.spec.ingress // [])
+        | map({from: ((.from // []) | sort), ports: (.ports | norm_ports)})
+        | sort)
+    }
+  ' 2>/dev/null
+}
+
 evidence() {
-  show_actual yaml "$(kubectl -n reticulum get netpol allow-teller -o yaml 2>/dev/null | k8s_clean)"
+  show_pair json allow.json
   show_why "$1"
 }
 

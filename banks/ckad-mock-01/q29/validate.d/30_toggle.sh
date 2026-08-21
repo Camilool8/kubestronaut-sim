@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 5
 # desc: FeatureToggle dark-mode exists in sextans with the requested field values
+# expected: toggle.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -18,8 +19,18 @@ enabled=$(printf '%s' "$obj" | jq -r '.spec.enabled | if . == null then "" else 
 rollout=$(printf '%s' "$obj" | jq -r '.spec.rollout | if . == null then "" else tostring end' 2>/dev/null)
 owner=$(printf '%s' "$obj" | jq -r '.spec.owner // ""' 2>/dev/null)
 
+# Direct field access rather than `//`, deliberately: jq's // treats false
+# as absent (the same trap the enabled/rollout reads above call out), which
+# would turn a candidate's correctly-typed `enabled: false` into a null in
+# this pane. `.spec.enabled` alone already reads null when the key is
+# missing, since jq indexes null safely — no fallback needed.
+snapshot() {
+  printf '%s' "${obj:-null}" \
+    | jq -S '{enabled: .spec.enabled, rollout: .spec.rollout, owner: .spec.owner}' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "$(printf '%s' "$obj" | jq '{apiVersion, kind, name: .metadata.name, spec}' 2>/dev/null)"
+  show_pair json toggle.json
   show_why "$1"
 }
 

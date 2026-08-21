@@ -1,8 +1,22 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: one Bound claim per ordinal, data-ledger-0 and data-ledger-1, both recorded
+# expected: claims.txt text
 set -uo pipefail
 . /banks/_lib/checks.sh
+
+# Only the recorded-names criterion gets a generated document. Whether each
+# PVC has actually reached Bound is a live status reading taken at grading
+# time, not a document either side authored, and its outcome already rides
+# on its own crit message below.
+snapshot() {
+  file_lines_sorted /opt/course/40/claims
+}
+
+evidence() {
+  show_pair text claims.txt
+  show_why "$1"
+}
 
 phase() { kubectl -n cepheus get pvc "$1" -o jsonpath='{.status.phase}' 2>/dev/null; }
 zero=$(phase data-ledger-0)
@@ -25,8 +39,5 @@ crit 1 "both claim names recorded on the instance" \
   "The names are the controller's, not yours, which is why the question asks you to read them back. Names only, one per line: a kubectl table, a resource-prefixed 'persistentvolumeclaim/...' form or a line of prose is not the name, even with the name inside it." \
   -- [ "$recorded" = "$want" ]
 
-crit_all_passed || {
-  show_actual text "$(kubectl -n cepheus get pvc 2>&1; echo; echo '/opt/course/40/claims:'; cat /opt/course/40/claims 2>&1)"
-  show_why "$(crit_why)"
-}
+crit_all_passed || evidence "$(crit_why)"
 report "one bound claim per replica, recorded"

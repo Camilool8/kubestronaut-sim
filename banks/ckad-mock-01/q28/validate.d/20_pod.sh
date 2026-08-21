@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: Pod puller presents registry-cred as an image pull secret and is Running
+# expected: pod.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -17,8 +18,22 @@ names=$(printf '%s' "$pod" | jq -r '[.spec.containers[].name] | join(" ")' 2>/de
 img=$(printf '%s' "$pod" | jq -r '[.spec.containers[] | select(.name == "web") | .image] | first // ""' 2>/dev/null)
 phase=$(printf '%s' "$pod" | jq -r '.status.phase // ""' 2>/dev/null)
 
+# Only the two authored criteria go in the pane — imagePullSecrets and the
+# container's name/image. Whether the Pod actually reached Running is a
+# behavioural reading and rides on its own crit message below instead;
+# pairing it too would collide with this pane in the UI, which shows one
+# actual/expected pair per check. Neither list's order is graded (membership
+# is checked by name), so both are sorted.
+snapshot() {
+  printf '%s' "${pod:-null}" \
+    | jq -S '{
+        imagePullSecrets: ([.spec.imagePullSecrets[]?.name] | sort),
+        containers: ([.spec.containers[]? | {name, image}] | sort_by(.name))
+      }' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "$(printf '%s' "$pod" | jq '{imagePullSecrets: .spec.imagePullSecrets, containers: [.spec.containers[] | {name, image, imagePullPolicy}], phase: .status.phase}' 2>/dev/null)"
+  show_pair json pod.json
   show_why "$1"
 }
 

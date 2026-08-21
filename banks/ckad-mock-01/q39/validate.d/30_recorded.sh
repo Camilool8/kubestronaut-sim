@@ -1,11 +1,21 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the recorded file holds the per-Pod DNS name of each of the three Pods
+# expected: shard-names.txt text
 set -uo pipefail
 . /banks/_lib/checks.sh
 
 FILE=/opt/course/39/shard-names
 SUFFIX=.shard.telescopium.svc.cluster.local
+
+# Grading below sorts and de-duplicates before comparing (a trailing dot is
+# the DNS root and is normalised away too), so a candidate who lists the
+# three names in a different order is exactly as correct as the reference
+# solution's own order, and the pane has to agree with that rather than
+# show a raw diff.
+snapshot() {
+  file_lines_sorted "$FILE" | sed 's/\.$//' | sort -u
+}
 
 # The Pods the Service publishes, named rather than addressed. targetRef is the
 # Pod behind each endpoint, and <pod>.<service>.<namespace>.svc.cluster.local is
@@ -23,7 +33,7 @@ lines=$(printf '%s\n' "$got" | grep -c '.')
 named=$(printf '%s\n' "$got" | grep -c '^shard-[0-9][0-9]*\.shard\.telescopium\.svc\.cluster\.local$')
 
 evidence() {
-  show_actual text "$(cat "$FILE" 2>/dev/null)"
+  show_pair text shard-names.txt
   show_why "$1"
 }
 

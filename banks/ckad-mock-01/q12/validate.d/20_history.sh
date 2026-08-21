@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the upgrade really happened, was annotated, and was undone via rollout
+# expected: change-cause.txt text
 set -uo pipefail
 . /banks/_lib/checks.sh
-evidence() {
-  show_actual text "$(kubectl -n draco rollout history deploy payments-api 2>/dev/null)"
-  show_why "$1"
-}
 
 rev=$(kubectl -n draco get deploy payments-api \
   -o jsonpath='{.metadata.annotations.deployment\.kubernetes\.io/revision}' 2>/dev/null)
@@ -15,6 +12,20 @@ causes=$(kubectl -n draco get replicaset -l app=payments-api -o json 2>/dev/null
 
 rolled_forward() { [ -n "$rev" ] && [ "$rev" -ge 3 ] 2>/dev/null; }
 recorded_cause() { printf '%s' "$causes" | grep -q 'upgrade to nginx 1.29'; }
+
+# Only the change-cause text is a shape the candidate authored, when they
+# annotated the rollout. Which ReplicaSet carries it, and how many revisions
+# exist, is a lifecycle reading and rides on its own crit message below —
+# sorted because which of possibly several ReplicaSets holds a cause is not
+# meaningful order, only whether the right text is present at all.
+snapshot() {
+  printf '%s' "${causes:-}" | sort
+}
+
+evidence() {
+  show_pair text change-cause.txt
+  show_why "$1"
+}
 
 crit 2 "the undo was done through the rollout history" \
   "deployment is at revision '$rev'; an upgrade followed by an undo should reach at least 3" \

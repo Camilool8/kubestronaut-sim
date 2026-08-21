@@ -1,21 +1,11 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: volumeClaimTemplates entry data asks for 128Mi RWO and is mounted at /data
+# expected: claim-template.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
 sts=$(kubectl -n cepheus get statefulset ledger -o json 2>/dev/null)
-
-evidence() {
-  show_actual json "$(printf '%s' "$sts" | jq '{
-    volumeClaimTemplates: [.spec.volumeClaimTemplates[]? | {
-      name: .metadata.name,
-      accessModes: .spec.accessModes,
-      storage: .spec.resources.requests.storage,
-      storageClassName: .spec.storageClassName}],
-    containers: [.spec.template.spec.containers[]? | {name, volumeMounts}]}' 2>/dev/null)"
-  show_why "$1"
-}
 
 tpl=$(printf '%s' "$sts" \
   | jq -r '[.spec.volumeClaimTemplates[]? | select(.metadata.name == "data")] | first // {}' 2>/dev/null)
@@ -26,6 +16,28 @@ cnames=$(printf '%s' "$sts" | jq -r '[.spec.template.spec.containers[]?.name] | 
 mpath=$(printf '%s' "$sts" | jq -r '[.spec.template.spec.containers[]?
   | select(.name == "ledger") | .volumeMounts[]?
   | select(.name == "data") | .mountPath] | first // ""' 2>/dev/null)
+
+# accessModes is sorted because same_set already treats its order as
+# meaningless — a candidate who writes a second mode ahead of ReadWriteOnce
+# is exactly as correct and must not render as a diff. storageClassName and
+# the other containers/mounts are left out: nothing here grades them.
+snapshot() {
+  jq -n --argjson tpl "${tpl:-null}" --arg mpath "${mpath:-}" '
+    ($tpl // {}) as $t
+    | {
+        volumeClaimTemplate: {
+          name: ($t.metadata.name // null),
+          accessModes: (($t.spec.accessModes // []) | sort),
+          storage: ($t.spec.resources.requests.storage // null)
+        },
+        mountPath: (if $mpath == "" then null else $mpath end)
+      }' 2>/dev/null
+}
+
+evidence() {
+  show_pair json claim-template.json
+  show_why "$1"
+}
 
 crit 1 "a volumeClaimTemplate named data" \
   "no volumeClaimTemplates entry named 'data'" \

@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: payments-api is back on nginx:1.27-alpine with 4 ready replicas
+# expected: none — the check grades a rollback round trip: the image tag is
+#           only meaningful matched against the Deployment's own revision
+#           counter, since the tag alone is as true of a Deployment nobody
+#           touched as of one that was upgraded and rolled back — that is a
+#           relationship between two live values, not a document. The
+#           replica counts beside it are readings taken at a moment too.
 set -uo pipefail
 . /banks/_lib/checks.sh
 evidence() {

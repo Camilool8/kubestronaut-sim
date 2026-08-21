@@ -1,17 +1,22 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: StatefulSet ledger runs 2 replicas governed by the headless Service ledger
+# expected: statefulset.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
 sts=$(kubectl -n cepheus get statefulset ledger -o json 2>/dev/null \
-  | jq '{replicas: .spec.replicas, serviceName: .spec.serviceName, selector: .spec.selector.matchLabels}')
+  | jq '{replicas: .spec.replicas, serviceName: .spec.serviceName}')
 svc=$(kubectl -n cepheus get svc ledger -o json 2>/dev/null \
-  | jq '{clusterIP: .spec.clusterIP, selector: .spec.selector}')
+  | jq '{clusterIP: .spec.clusterIP}')
+
+snapshot() {
+  jq -n --argjson sts "${sts:-null}" --argjson svc "${svc:-null}" \
+    '{"statefulset ledger": $sts, "service ledger": $svc}' 2>/dev/null
+}
 
 evidence() {
-  show_actual json "$(jq -n --argjson sts "${sts:-null}" --argjson svc "${svc:-null}" \
-    '{"statefulset ledger": $sts, "service ledger": $svc}' 2>/dev/null)"
+  show_pair json statefulset.json
   show_why "$1"
 }
 

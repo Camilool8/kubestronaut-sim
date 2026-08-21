@@ -1,12 +1,26 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the Service selects exactly the green release's Pods and still publishes port 80
+# expected: service.yaml yaml
 set -uo pipefail
 . /banks/_lib/checks.sh
 
+# Only the Service's own authored fields — selector and the published port —
+# go into the pane. Which live Pods that selector actually resolves to is a
+# name list with a random suffix on every one, the same reason an
+# EndpointSlice never gets an authored document (docs/bank-spec.md); it is
+# read only to accept the selector, and its detail rides on the crit message
+# and match_pane below instead. 30_blue-standby.sh grades the same Service and
+# shares this document rather than declaring its own.
+snapshot() {
+  kubectl -n lacerta get svc checkout -o json 2>/dev/null | jq -S '
+    {selector: (.spec.selector // {}),
+     port: ((.spec.ports[]? | select(.port == 80) | .port) // null)}' \
+    | yq -p json -o yaml -P 2>/dev/null
+}
+
 evidence() {
-  show_actual yaml "$(kubectl -n lacerta get svc checkout -o yaml 2>/dev/null | k8s_clean)"
-  show_expected yaml "/banks/${BANK:-ckad-mock-01}/q23/expected/service.yaml"
+  show_pair yaml service.yaml
   show_why "$1"
 }
 

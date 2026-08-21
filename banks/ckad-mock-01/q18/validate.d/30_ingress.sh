@@ -1,19 +1,44 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the Ingress was migrated to the v1 backend schema, host and rule intact
+# expected: ingress.yaml yaml
 set -uo pipefail
 . /banks/_lib/checks.sh
+
+obj=$(kubectl -n lynx get ingress reports -o json 2>/dev/null)
+
+# Only ingressClassName and the one rule the criteria below name — not the
+# whole Ingress, which also carries defaultBackend, tls and annotations that
+# neither criterion grades.
+snapshot() {
+  printf '%s' "${obj:-null}" | jq -S '
+    (.spec.rules[0]) as $r |     # lint: allow-index (one rule in legacy.yaml)
+    ($r.http.paths[0]) as $p |   # lint: allow-index (one path in legacy.yaml)
+    {
+      ingressClassName: (.spec.ingressClassName // null),
+      rule: (if $r == null then null else {
+        host: ($r.host // null),
+        path: ($p.path // null),
+        pathType: ($p.pathType // null),
+        backend: {
+          service: ($p.backend.service.name // null),
+          port: ($p.backend.service.port.number // null)
+        }
+      } end)
+    }
+  ' | yq -p json -o yaml -P 2>/dev/null
+}
+
 evidence() {
-  show_actual yaml "$(kubectl -n lynx get ingress reports -o yaml 2>/dev/null | k8s_clean)"
-  show_expected yaml "/banks/${BANK:-ckad-mock-01}/q18/expected/ingress.yaml"
+  show_pair yaml ingress.yaml
   show_why "$1"
 }
 
 class=$(kubectl -n lynx get ingress reports -o jsonpath='{.spec.ingressClassName}' 2>/dev/null)
-out=$(kubectl -n lynx get ingress reports -o json 2>/dev/null | jq -r '
+out=$(printf '%s' "$obj" | jq -r '
   .spec.rules[0] as $r |     # lint: allow-index (one rule in legacy.yaml)
   $r.http.paths[0] as $p |   # lint: allow-index (one path in legacy.yaml)
-  "\($r.host)|\($p.path)|\($p.pathType)|\($p.backend.service.name)|\($p.backend.service.port.number)"')
+  "\($r.host)|\($p.path)|\($p.pathType)|\($p.backend.service.name)|\($p.backend.service.port.number)"' 2>/dev/null)
 want='reports.sim.local|/|Prefix|reports|80'
 
 crit 1 "the class moved to ingressClassName" \

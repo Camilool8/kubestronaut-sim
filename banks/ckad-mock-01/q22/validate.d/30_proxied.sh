@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: the app reaches the backend through localhost, and only through it
+# expected: none — the check execs a live request from inside the app
+#           container and reads whatever comes back at that moment, an event
+#           rather than a document the candidate authored; the message and
+#           evidence pane already carry the actual response/log.
 set -uo pipefail
 . /banks/_lib/checks.sh
 out=$(kubectl -n dorado exec checkout -c app -- \

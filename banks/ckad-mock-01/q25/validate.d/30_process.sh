@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the api container's main process was recorded from the shared process namespace
+# expected: none — the recorded file is a `ps`-style process listing, and
+#           every field but the one substring this check greps for (a PID, a
+#           start time) is different on every run; an authored copy would
+#           only teach the candidate to look for numbers that were never
+#           going to be theirs, the same reason an EndpointSlice never gets
+#           one (docs/bank-spec.md).
 set -uo pipefail
 . /banks/_lib/checks.sh
 

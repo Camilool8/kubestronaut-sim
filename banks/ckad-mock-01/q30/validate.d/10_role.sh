@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: Role configmap-reader grants get, list and watch on core ConfigMaps only
+# expected: role.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -16,8 +17,23 @@ verbs=$(printf '%s' "$role" | jq -r '[.rules[]?.verbs[]?] | unique | join(" ")' 
 res=$(printf '%s' "$role" | jq -r '[.rules[]?.resources[]?] | unique | join(" ")' 2>/dev/null)
 groups=$(printf '%s' "$role" | jq -r '[.rules[]?.apiGroups[]?] | unique | map(if . == "" then "(core)" else . end) | join(" ")' 2>/dev/null)
 
+# Both criteria below check the flattened, deduped set across every rule —
+# how the candidate split verbs/resources/apiGroups across rules is not
+# graded, only which triple the union of rules grants — so the pane is the
+# same union rather than the raw .rules array. jq's `unique` sorts as it
+# dedups, which is exactly the canonicalisation this needs: ["get","list"]
+# and ["list","get"] must render as the same Role.
+snapshot() {
+  printf '%s' "${role:-null}" \
+    | jq -S '{
+        verbs: ([.rules[]?.verbs[]?] | unique),
+        resources: ([.rules[]?.resources[]?] | unique),
+        apiGroups: ([.rules[]?.apiGroups[]?] | unique)
+      }' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "$(printf '%s' "$role" | jq '.rules' 2>/dev/null)"
+  show_pair json role.json
   show_why "$1"
 }
 

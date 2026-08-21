@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # points: 5
 # desc: the Service has both endpoints and really answers from inside the cluster
+# expected: none — this grades whether the EndpointSlice carries ready
+#           addresses and whether a curl from inside the cluster gets an
+#           answer, both readings taken at a moment rather than a document
+#           the candidate authored. The EndpointSlice itself is written by a
+#           controller, with a random name suffix and Pod IPs as addresses,
+#           so a hand-written "expected" one would only teach the candidate
+#           to look for numbers that were never going to be theirs.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

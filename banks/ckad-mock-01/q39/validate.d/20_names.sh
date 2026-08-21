@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: all three Pods are ready endpoints and each answers on its own DNS name
+# expected: none — an EndpointSlice is written by a controller, with a random
+#           name suffix and Pod IPs for addresses, so an authored "expected"
+#           one would only teach a candidate to look for numbers that were
+#           never going to be theirs; and whether curl from inside shard-0
+#           resolves each per-Pod name is a live behavioural reading, not a
+#           document either. Both criteria's messages already name what
+#           they saw.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the rollout completed and the live Pods carry the new settings
+# expected: none — this grades whether the rollout finished (readyReplicas
+#           against spec.replicas) and whether the settings 10_pull-policy.sh
+#           and 20_grace.sh already pair are actually live on the running
+#           Pods, not just on the template. Both are readings taken at a
+#           moment — a relationship between the template and the Pods it
+#           produced — rather than a shape the candidate authored here.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

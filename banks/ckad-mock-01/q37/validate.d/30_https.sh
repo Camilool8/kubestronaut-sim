@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: the controller really serves the portal over HTTPS, with the Secret's certificate
+# expected: none — this execs into a Pod and curls the controller over TLS,
+#           grading whether the response body arrives and which certificate
+#           the handshake actually served, both live readings taken at probe
+#           time rather than a document either side authored. The messages
+#           already name what came back.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

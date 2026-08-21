@@ -1,15 +1,9 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the overlay was applied to norma and is running
+# expected: rendered.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
-evidence() {
-  show_actual json "$(kubectl -n norma get deploy ledger-api -o json 2>/dev/null \
-    | jq '{ready: .status.readyReplicas,
-            container: [.spec.template.spec.containers[] | select(.name == "api")
-                        | {env, readinessProbe}]}')"
-  show_why "$1"
-}
 
 kubectl -n norma get deploy ledger-api >/dev/null 2>&1 || {
   echo "Deployment ledger-api does not exist in namespace norma"
@@ -24,6 +18,23 @@ mode=$(printf '%s' "$spec" | jq -r '[.spec.template.spec.containers[] | select(.
 delay=$(kubectl -n norma get deploy ledger-api \
   -o jsonpath='{.spec.template.spec.containers[?(@.name=="api")].readinessProbe.initialDelaySeconds}' 2>/dev/null)
 ready=$(printf '%s' "$spec" | jq -r '.status.readyReplicas // 0')
+
+# Same document as 10_rendered.sh: LEDGER_MODE and the readinessProbe of the
+# api container, now read from the live cluster instead of the kustomize
+# build. readyReplicas is a live rollout reading and rides on its own crit
+# message below instead of a second pane.
+snapshot() {
+  printf '%s' "${spec:-null}" | jq -S '
+    (.spec.template.spec.containers[]? | select(.name == "api")) as $c
+    | (($c.env // []) | map(select(.name == "LEDGER_MODE")) | first) as $e
+    | {LEDGER_MODE: ($e.value // null), readinessProbe: ($c.readinessProbe // null)}
+  ' 2>/dev/null
+}
+
+evidence() {
+  show_pair json rendered.json
+  show_why "$1"
+}
 
 patch_landed() { [ "$mode" = "prod" ] && [ "$delay" = "5" ]; }
 

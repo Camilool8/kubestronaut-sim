@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # points: 4
 # desc: the report carries the three named columns and a correct line per Deployment
+# expected: report.txt text
 set -uo pipefail
 . /banks/_lib/checks.sh
 
@@ -23,8 +24,12 @@ lines=$(squeeze /opt/course/42/report)
 head_line=$(printf '%s\n' "$lines" | head -1 | tr '[:lower:]' '[:upper:]')
 body=$(printf '%s\n' "$lines" | tail -n +2)
 
+snapshot() {
+  cat /opt/course/42/report 2>/dev/null
+}
+
 evidence() {
-  show_actual text "$(cat /opt/course/42/report 2>/dev/null)"
+  show_pair text report.txt
   show_why "$1"
 }
 

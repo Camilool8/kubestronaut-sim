@@ -1,14 +1,22 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: search-canary runs one Pod of nginx:1.29-alpine labelled into the Service
+# expected: canary.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
+
+# readyReplicas is a live rollout reading and rides on its own crit message
+# below; the image and the Pod template labels are the authored fields.
+snapshot() {
+  printf '%s' "${spec:-null}" | jq -S '{
+    image: ([.spec.template.spec.containers[]?.image] | join(",")),
+    labels: {app: (.spec.template.metadata.labels.app // null),
+             track: (.spec.template.metadata.labels.track // null)}
+  }' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "$(kubectl -n lupus get deploy search-canary -o json 2>/dev/null \
-    | jq '{replicas: .spec.replicas, ready: .status.readyReplicas,
-           selector: .spec.selector.matchLabels,
-           templateLabels: .spec.template.metadata.labels,
-           images: [.spec.template.spec.containers[].image]}')"
+  show_pair json canary.json
   show_why "$1"
 }
 

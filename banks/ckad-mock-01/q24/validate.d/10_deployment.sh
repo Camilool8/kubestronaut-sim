@@ -1,14 +1,23 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: Deployment report-runner runs 3 ready replicas of the same container, labelled app=report-runner
+# expected: deployment.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
+# readyReplicas is deliberately left out: it is a behavioural reading (has the
+# rollout actually reached its count), not a shape the candidate authored, and
+# its own crit below already carries the actual/want numbers in its message.
+# A failure there routes to pod_pane, not this pane.
+snapshot() {
+  kubectl -n auriga get deploy report-runner -o json 2>/dev/null \
+    | jq -S '{replicas: .spec.replicas,
+              app: (.spec.template.metadata.labels.app // null),
+              containers: ([.spec.template.spec.containers[]? | {name, image}] | sort_by(.name))}' 2>/dev/null
+}
+
 evidence() {
-  show_actual json "$(kubectl -n auriga get deploy report-runner -o json 2>/dev/null \
-    | jq '{replicas: .spec.replicas, readyReplicas: .status.readyReplicas,
-           labels: .spec.template.metadata.labels,
-           containers: [.spec.template.spec.containers[] | {name, image}]}')"
+  show_pair json deployment.json
   show_why "$1"
 }
 

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the bare Pod was replaced by the Deployment and then deleted
+# expected: none — the check grades whether the original bare Pod still
+#           exists, a presence reading taken at a moment rather than a
+#           document the candidate authored. The message already names
+#           which state it found.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

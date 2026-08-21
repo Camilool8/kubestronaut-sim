@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the rollout finished and the Pods now serving have stopped restarting
+# expected: none — both criteria are live scheduling/restart readings taken at
+#           a moment (how many Pods carry the corrected probe and are ready,
+#           whether any of them are still churning through kills) rather than
+#           a document the candidate authored. The messages already name the
+#           counts and restart history seen.
 set -uo pipefail
 . /banks/_lib/checks.sh
 

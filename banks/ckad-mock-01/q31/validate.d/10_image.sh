@@ -1,20 +1,29 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: feed-api ends on nginx:1.29-alpine with 3 ready replicas
+# expected: image.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
-evidence() {
-  show_actual text "$(kubectl -n pyxis get deploy feed-api -o wide 2>/dev/null; echo; kubectl -n pyxis get pods 2>/dev/null)"
-  show_why "$1"
-}
 
 img=$(kubectl -n pyxis get deploy feed-api \
   -o jsonpath='{.spec.template.spec.containers[?(@.name=="api")].image}' 2>/dev/null)
 ready=$(kubectl -n pyxis get deploy feed-api -o jsonpath='{.status.readyReplicas}' 2>/dev/null)
 
+# readyReplicas is a live rollout reading and rides on its own crit message
+# below instead of a second pane; the image is the one authored field here.
+snapshot() {
+  jq -nS --arg img "${img:-}" '{image: (if $img == "" then null else $img end)}' 2>/dev/null
+}
+
+evidence() {
+  show_pair json image.json
+  show_why "$1"
+}
+
 kubectl -n pyxis get deploy feed-api >/dev/null 2>&1 || {
   echo "Deployment feed-api is gone from namespace pyxis"
-  evidence "The task stages a change on this Deployment and then releases it. Deleting and recreating it reaches a similar-looking cluster with no rollout history and no paused revision, which is the whole subject of the question."
+  show_actual text "$(kubectl -n pyxis get deploy 2>/dev/null)"
+  show_why "The task stages a change on this Deployment and then releases it. Deleting and recreating it reaches a similar-looking cluster with no rollout history and no paused revision, which is the whole subject of the question."
   exit 1
 }
 

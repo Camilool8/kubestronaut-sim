@@ -1,10 +1,22 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: Secret portal-tls is a kubernetes.io/tls Secret built from the generated key pair
+# expected: secret.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
+
+# Only the type field gets a generated document. Whether the key pair landed
+# on disk and whether tls.crt decodes to a real certificate are both live
+# readings over content each candidate generates uniquely with their own
+# openssl run — there is no single correct certificate to capture as a
+# reference, and their outcomes already ride on their own crit message and
+# why text below.
+snapshot() {
+  kubectl -n sculptor get secret portal-tls -o json 2>/dev/null | jq -S '{type: (.type // null)}'
+}
+
 evidence() {
-  show_actual text "$(kubectl -n sculptor get secret 2>/dev/null)"
+  show_pair json secret.json
   show_why "$1"
 }
 

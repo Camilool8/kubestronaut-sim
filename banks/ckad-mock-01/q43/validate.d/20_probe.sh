@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the liveness probe survives and now targets the port the container serves
+# expected: probe.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 
+# Only the authored field — the probe itself — gets a generated document.
+# containerPort is background the why text refers to but no criterion below
+# compares against it, so it stays out of the pane.
+snapshot() {
+  kubectl -n horologium get deploy session-store -o json 2>/dev/null \
+    | jq -S --arg c store '(first(.spec.template.spec.containers[]? | select(.name == $c)) // {})
+        | {livenessProbe: (.livenessProbe // null)}'
+}
+
 evidence() {
-  show_actual json "$(kubectl -n horologium get deploy session-store -o json 2>/dev/null \
-    | jq --arg c store '
-      if any(.spec.template.spec.containers[]; .name == $c)
-      then first(.spec.template.spec.containers[] | select(.name == $c))
-           | {name, ports, livenessProbe}
-      else {"no such container": $c,
-            "containers that exist": [.spec.template.spec.containers[].name]}
-      end')"
+  show_pair json probe.json
   show_why "$1"
 }
 
@@ -20,7 +23,8 @@ names=$(kubectl -n horologium get deploy session-store \
   -o jsonpath='{.spec.template.spec.containers[*].name}' 2>/dev/null)
 has_name "$names" store || {
   echo "the Deployment has no container named store (found: $(name_list "$names"))"
-  evidence "The container was to keep its name; only the probe's target was wrong. Renaming or replacing it answers a different question and leaves the same fault in place."
+  show_actual text "containers that exist: $(name_list "$names")"
+  show_why "The container was to keep its name; only the probe's target was wrong. Renaming or replacing it answers a different question and leaves the same fault in place."
   exit 1
 }
 

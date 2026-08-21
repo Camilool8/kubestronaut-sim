@@ -1,11 +1,21 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: /opt/course/34/cache-values.yaml overrides the replica count and the tag
+# expected: cache-values.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
 F=/opt/course/34/cache-values.yaml
+
+# Only the two keys this check grades — a key the chart does not use is not
+# an error, per its own reasoning below, so a whole-file pane would mark a
+# legitimately extra key as if it were wrong.
+snapshot() {
+  yq -o=json . "$F" 2>/dev/null \
+    | jq -S '{replicaCount: (.replicaCount // null), image: {tag: (.image.tag // null)}}' 2>/dev/null
+}
+
 evidence() {
-  show_actual text "$(cat "$F" 2>/dev/null)"
+  show_pair json cache-values.json
   show_why "$1"
 }
 

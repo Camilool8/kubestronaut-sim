@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: status-page is a NodePort Service on port 80 with node port 30081
+# expected: service.yaml yaml
 set -uo pipefail
 . /banks/_lib/checks.sh
 
-defaults='del(.spec.internalTrafficPolicy, .spec.externalTrafficPolicy,
-              .spec.ipFamilies, .spec.ipFamilyPolicy, .spec.sessionAffinity)'
+snapshot() {
+  kubectl -n aquila get svc status-page -o json 2>/dev/null | jq -S '
+    {type: (.spec.type // null),
+     nodePort: ((.spec.ports[]? | select(.port == 80) | .nodePort) // null)}' \
+    | yq -p json -o yaml -P 2>/dev/null
+}
+
 evidence() {
-  show_actual yaml "$(kubectl -n aquila get svc status-page -o yaml 2>/dev/null | k8s_clean | yq "$defaults")"
-  show_expected yaml "/banks/${BANK:-ckad-mock-01}/q20/expected/service.yaml"
+  show_pair yaml service.yaml
   show_why "$1"
 }
 

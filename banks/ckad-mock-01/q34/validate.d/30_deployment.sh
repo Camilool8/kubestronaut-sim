@@ -1,16 +1,24 @@
 #!/usr/bin/env bash
 # points: 2
 # desc: the rendered Deployment runs 3 ready replicas of nginx:1.27-alpine
+# expected: image.json json
 set -uo pipefail
 . /banks/_lib/checks.sh
-evidence() {
-  show_actual text "$(kubectl -n caelum get deploy,pod 2>/dev/null)"
-  show_why "$1"
-}
 
 img=$(kubectl -n caelum get deploy object-cache \
   -o jsonpath='{.spec.template.spec.containers[*].image}' 2>/dev/null)
 ready=$(kubectl -n caelum get deploy object-cache -o jsonpath='{.status.readyReplicas}' 2>/dev/null)
+
+# readyReplicas is a live rollout reading and rides on its own crit message
+# below; the rendered image is the tag override reaching the Pod template.
+snapshot() {
+  jq -nS --arg img "${img:-}" '{image: (if $img == "" then null else $img end)}' 2>/dev/null
+}
+
+evidence() {
+  show_pair json image.json
+  show_why "$1"
+}
 
 crit 1 "the tag override was rendered into the Pod template" \
   "the Deployment runs '$img', want nginx:1.27-alpine" \

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # points: 3
 # desc: the overlay was applied to pavo and is running
+# expected: none — every criterion here re-reads the LIVE cluster to see
+#           whether the overlay already paired in 10_overlay.sh actually
+#           reached it and is running: image delivery, replica readiness and
+#           Service presence are readings taken at a moment, not a second
+#           document for the same authored shape.
 set -uo pipefail
 . /banks/_lib/checks.sh
 evidence() {
