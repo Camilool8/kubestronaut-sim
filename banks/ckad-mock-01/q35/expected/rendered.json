@@ -1,15 +1,11 @@
 {
   "LEDGER_MODE": "prod",
   "readinessProbe": {
-    "failureThreshold": 3,
     "httpGet": {
       "path": "/",
-      "port": 80,
-      "scheme": "HTTP"
+      "port": 80
     },
     "initialDelaySeconds": 5,
-    "periodSeconds": 10,
-    "successThreshold": 1,
-    "timeoutSeconds": 1
+    "periodSeconds": 10
   }
 }
