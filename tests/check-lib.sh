@@ -194,6 +194,38 @@ ok "show_expected reads the file" "$(show_expected yaml "$tmp/expected.yaml")" \
 ok "show_expected missing file" "$(show_expected yaml "$tmp/nope.yaml")" ""
 succeeds "show_expected missing file succeeds" show_expected yaml "$tmp/nope.yaml"
 
+# ------------------------------------------------------- expected_dir / show_pair
+
+ok "expected_dir sits beside the check" \
+   "$(SIM_CHECK_PATH=banks/ckad-mock-01/q19/validate.d/10_service.sh expected_dir)" \
+   "banks/ckad-mock-01/q19/expected"
+ok "expected_dir handles an absolute grader path" \
+   "$(SIM_CHECK_PATH=/banks/cka-mock-01/q15/validate.d/10_gateway.sh expected_dir)" \
+   "/banks/cka-mock-01/q15/expected"
+
+mkdir -p "$tmp/q99/validate.d" "$tmp/q99/expected"
+printf 'kind: Service\nspec:\n  selector:\n    app: inventory\n' > "$tmp/q99/expected/service.yaml"
+snapshot() { printf 'kind: Service\nspec:\n  selector:\n    app: inventory-api\n'; }
+
+ok "show_pair emits both panes from one pipeline" \
+   "$(SIM_CHECK_PATH=$tmp/q99/validate.d/10_x.sh show_pair yaml service.yaml)" \
+   "$(printf -- '---8<--- sim:artifact actual yaml\nkind: Service\nspec:\n  selector:\n    app: inventory-api\n---8<--- sim:artifact expected yaml\nkind: Service\nspec:\n  selector:\n    app: inventory')"
+
+# An empty snapshot keeps the declared language. The lang is rendered as a chip
+# beside the pane title (ui/src/screens/Explain.tsx:366), so a placeholder
+# tagged 'text' next to an 'Expected / yaml' pane reads as two unrelated things
+# rather than as one missing half of a comparison.
+snapshot() { printf ''; }
+ok "show_pair keeps the declared lang when nothing was captured" \
+   "$(SIM_CHECK_PATH=$tmp/q99/validate.d/10_x.sh show_pair yaml service.yaml)" \
+   "$(printf -- '---8<--- sim:artifact actual yaml\n%s\n---8<--- sim:artifact expected yaml\nkind: Service\nspec:\n  selector:\n    app: inventory' "$ARTIFACT_EMPTY")"
+
+# show_actual is unchanged: an empty body there still degrades to text.
+ok "show_actual still degrades an empty body to text" "$(show_actual yaml '')" \
+   "$(printf -- '---8<--- sim:artifact actual text\n%s' "$ARTIFACT_EMPTY")"
+
+unset -f snapshot
+
 if command -v yq >/dev/null 2>&1; then
   printf '%s\n' \
     'apiVersion: v1' \
