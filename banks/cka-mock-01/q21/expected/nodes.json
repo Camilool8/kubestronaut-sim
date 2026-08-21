@@ -2,13 +2,7 @@
   {
     "labels.workload": null,
     "name": "sim-control-plane",
-    "taints": [
-      {
-        "effect": "NoSchedule",
-        "key": "node-role.kubernetes.io/control-plane",
-        "value": null
-      }
-    ]
+    "taints": []
   },
   {
     "labels.workload": null,
