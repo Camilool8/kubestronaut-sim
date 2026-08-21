@@ -204,25 +204,49 @@ declaration: **omission and decision must not look alike.**
 
 ## 4. The capture pipeline
 
-New script `tests/capture-expected.sh`, run against a live stack:
+**Capture is a mode of `tests/drill.sh`, not a new script.** A pooled bank does not
+seed its questions at boot (`images/k8s-env/bootstrap.sh:196-208`); a question's
+`setup.sh` runs only when an attempt **draws** it. So capture cannot simply solve a
+question — it has to drive the attempt API to get the question seeded first, which
+is precisely the sweep `tests/drill.sh` already performs: reset, start a
+domain-filtered attempt, read the drawn rows, solve each, grade, clear. Capture is
+that sweep with one extra payload per question. A separate script would duplicate
+~150 lines of attempt-driving and drift from it.
 
 ```
-tests/capture-expected.sh <bank> [qNN…] [--check]
-
-  ./sim reset                                     # fresh environment, no prior draw
-  for each question:
-    docker compose exec -T <instance> su - candidate \
-      -c 'bash /tests/solutions/<bank>/qNN.sh'
-    for each check declaring `# expected: <name> <lang>`:
-      docker compose exec -T <instance> env SIM_CAPTURE_EXPECTED=1 \
-        KUBECONFIG=/home/candidate/.kube/config BANK=<bank> \
-        bash /banks/<bank>/qNN/validate.d/<script>
-      → slice output after the sentinel → banks/<bank>/qNN/expected/<name>
+bash tests/drill.sh --capture [bank]     # writes expected/ documents
+bash tests/drill.sh --check   [bank]     # recapture + diff, and the divergence gate
+bash tests/drill.sh           [bank]     # unchanged: solve and grade to full marks
 ```
 
-The **instance** comes from that question's `instance:` field in `exam.yaml` — the
-same field the grader routes on. A check that reads instance-2's cluster must be
-captured from instance-2.
+Per attempt, in order:
+
+1. `./sim reset`, `start_attempt <domain> <seed>`, read the drawn rows
+   (`qid`, `instance`).
+2. **`--check` only — the divergence gate.** Before anything is solved, run each
+   paired check on the seeded-but-unsolved cluster and require its snapshot to
+   differ from the document on disk.
+3. Solve each drawn question (`tests/solutions/<bank>/<qid>.sh`).
+4. Grade the attempt.
+5. **For each question the grader just scored full marks**, run each check
+   declaring a document:
+   ```
+   docker compose exec -T <instance> env SIM_CAPTURE_EXPECTED=1 \
+     KUBECONFIG=/home/candidate/.kube/config BANK=<bank> \
+     bash /banks/<bank>/<qid>/validate.d/<script>
+   ```
+   then slice the output after the sentinel and write it to
+   `banks/<bank>/<qid>/expected/<name>` (`--capture`) or diff it against what is
+   there (`--check`).
+6. Clear the attempt.
+
+The **instance** comes from the drawn row — the same field the grader routes on. A
+check that reads instance-2's cluster is captured from instance-2.
+
+Step 5's precondition is the strongest refusal available and it is free, because the
+sweep already grades: **a document is only ever captured from a question the grader
+itself just scored full marks.** A solution script that exits 0 while leaving the
+cluster subtly wrong cannot produce a document.
 
 ### 4.1 Why an EXIT trap
 
@@ -258,7 +282,7 @@ Each writes nothing and fails the run loudly:
 1. **An empty or `null` snapshot.** This is what an early `exit 1` from a gate
    produces, and it means the cluster was not actually solved. Writing that file
    would teach every future candidate that the correct answer is `null`.
-2. **A reference solution that did not exit clean.**
+2. **A question the grader did not score at full marks** (§4, step 5).
 3. **A declared document whose check produced no `sim:capture` block at all.**
 
 A header of `none` is skipped by declaration, not by failure.
@@ -369,15 +393,16 @@ Rules 4 and 5 close a real hole — `show_expected` today is
 `[ -f "$2" ] || return 0` (`banks/_lib/checks.sh:102-106`), so a check pointing at a
 document that does not exist silently shows no pane and nothing anywhere reports it.
 
-### 6.2 Live — run where `tests/drill.sh` runs
+### 6.2 Live — `bash tests/drill.sh --check`
 
-6. **`tests/capture-expected.sh --check`** — recapture against a freshly solved
-   cluster and diff. Drift fails.
-7. **Fresh-environment divergence.** Every paired check, run against an *unsolved*
-   cluster, must produce two panes that differ. A pair that already matches before
-   any work is done proves nothing — its projection does not cover what the check
-   grades. This is the repository's "break it once before it counts as coverage"
-   rule applied to panes rather than to assertions.
+6. **Recapture and diff.** Every document is regenerated against a freshly solved
+   cluster and compared with what is committed. Drift fails.
+7. **Fresh-environment divergence.** Every paired check, run against the
+   seeded-but-unsolved cluster, must produce a snapshot that differs from its
+   document. A pair that already matches before any work is done proves nothing —
+   its projection does not cover what the check grades. This is the repository's
+   "break it once before it counts as coverage" rule applied to panes rather than
+   to assertions.
 
 Neither live gate can run in CI: both need a cluster.
 
@@ -417,7 +442,6 @@ the graded field. Live gate 7 is what catches that before a candidate sees it.
 ## 8. Files
 
 **Created**
-- `tests/capture-expected.sh` — the capture harness and its `--check` mode
 - `tests/check-expected.sh` — offline gate, rules 1–5
 - `banks/<bank>/<qid>/expected/<name>` — one per paired check, less those shared
   by sibling checks in the same question, so on the order of 120–145 documents
@@ -428,7 +452,8 @@ the graded field. Live gate 7 is what catches that before a candidate sees it.
 - `banks/cka-mock-01/q*/validate.d/*.sh`, `banks/ckad-mock-01/q*/validate.d/*.sh` —
   all 212 checks
 - `tests/check-evidence.sh` — export `SIM_CHECK_PATH`
-- `tests/drill.sh` — invoke the two live gates
+- `tests/check-lib.sh` — unit cases for the new library functions
+- `tests/drill.sh` — `--capture` and `--check` modes and the two live gates
 - `.github/workflows/ci.yml` — run `tests/check-expected.sh`
 - `ui/src/strings.ts` — `actualOnlyNote`, `noEvidenceBody`, `diffLegend`
 - `ui/src/screens/Explain.tsx` — render the legend whenever a pair is shown
@@ -438,9 +463,9 @@ the graded field. Live gate 7 is what catches that before a candidate sees it.
 
 ## 9. Order
 
-1. **Prep commit** — `checks.sh`, `tests/capture-expected.sh`,
-   `tests/check-expected.sh`, `docs/bank-spec.md`. Every agent reads these, so they
-   land first and land whole.
+1. **Prep commit** — `checks.sh`, `tests/check-lib.sh`, `tests/check-expected.sh`,
+   `tests/drill.sh`, `docs/bank-spec.md`. Every agent reads these, so they land
+   first and land whole.
 2. **Sweep waves** — ~16 agents over the 70 question directories. Offline only.
    `tests/check-expected.sh` rules 1–3 go green here; rules 4–5 stay red until
    capture, which is expected and documented.
@@ -492,7 +517,7 @@ should have held.
    documents.
 2. Full offline suite green: lint, lib, evidence, weights, hints, figures, pins,
    shell, line-endings, sim-parity.
-3. `tests/capture-expected.sh --check` green on both banks against a live stack.
+3. `bash tests/drill.sh --check` green on both banks against a live stack.
 4. Fresh-environment divergence green for every paired check.
 5. `tests/drill.sh` green on both banks — every question still solved and graded to
    full marks after the refactor.
