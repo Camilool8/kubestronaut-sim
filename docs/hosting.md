@@ -167,13 +167,16 @@ Per practical session, across its eight containers:
   `sessions.practical.banks.<id>.resources`. Seats are unaffected: one
   pool, one queue, a differently sized Pod in it.
 - The chart ships one such entry: `cka-mock-01` raises the k8s-env
-  memory limit to **12Gi**, because that exam builds a five-node main
-  cluster and its questions can add up to four single-node `aux-*`
-  clusters inside the same container. Only the limit is raised — the
-  request stays at the manifest's 2Gi, the same overcommitment bet the
-  base sizing makes. If your CKA seats share nodes with anything you
-  care about, reserve the peak instead:
-  `sessions.practical.banks.cka-mock-01.resources.k8s-env.requests.memory: 6Gi`.
+  memory limit to **12Gi** and the cpu limit to **4**, because that exam
+  builds a five-node main cluster and its questions can add up to four
+  single-node `aux-*` clusters inside the same container. The cpu limit
+  matters as much as the memory one here: `kubeadm join` has its own
+  4-minute kubelet-health deadline, and the manifest's 2 cores — sized
+  for a two-node cluster — can throttle a five-node join past it. Only
+  the limits are raised — requests stay at the manifest's 2Gi/300m, the
+  same overcommitment bet the base sizing makes. If your CKA seats share
+  nodes with anything you care about, reserve the peak instead:
+  `sessions.practical.banks.cka-mock-01.resources.k8s-env.requests: {memory: 6Gi, cpu: "1"}`.
 
 **Overcommitment is deliberate.** Three sessions request 11.8Gi and
 could demand 35Gi — 53.4Gi if all three sit `cka-mock-01`. If several

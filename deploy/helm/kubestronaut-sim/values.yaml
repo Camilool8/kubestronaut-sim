@@ -177,16 +177,26 @@ sessions:
     #
     # cka-mock-01 builds a five-node main cluster and up to four
     # single-node aux clusters inside one k8s-env, so its ceiling is
-    # double the manifest's 6Gi. Only the limit is raised: the
-    # scheduler-visible request stays at the manifest's measured 2Gi,
-    # the same deliberate overcommitment the base sizing makes (see
-    # docs/hosting.md#sizing). To reserve the peak instead, add
-    # `requests: {memory: 6Gi}` in your own values.
+    # double the manifest's 6Gi and 2000m. Only the limits are raised:
+    # the scheduler-visible requests stay at the manifest's measured
+    # 2Gi/300m, the same deliberate overcommitment the base sizing makes
+    # (see docs/hosting.md#sizing). To reserve the peak instead, add
+    # `requests: {memory: 6Gi, cpu: "1"}` in your own values.
+    #
+    # The cpu limit was memory-only until it was caught starving a real
+    # session: kubeadm join has its own internal 4-minute kubelet-health
+    # deadline, and the manifest's 2 cores — sized for a two-node cluster
+    # — throttled the second worker's join of a five-node one past it.
+    # Measured on the cgroup mid-failure: 16 of 2493 periods throttled,
+    # all inside that one join's ~4-minute busy window. Worse on a VM
+    # session node (fewer real cycles per vCPU than bare metal) than on
+    # one with headroom to spare, but the manifest's limit was the
+    # ceiling everywhere; raising it is not a workaround for one node.
     banks:
       cka-mock-01:
         resources:
           k8s-env:
-            limits: {memory: 12Gi}
+            limits: {memory: 12Gi, cpu: "4"}
 
   mcq:
     # An MCQ session is a facilitator and 128Mi. It needs no cluster, no
