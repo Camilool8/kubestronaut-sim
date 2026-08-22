@@ -92,6 +92,26 @@ func TestAFinePointerIsAdmitted(t *testing.T) {
 	}
 }
 
+// The facilitator's own "begin an attempt" call, made from inside an
+// already-admitted MCQ session to choose training/speed/exam, carries no
+// bank — the exam is already fixed. It must not fall through to
+// DefaultKind (practical) and refuse a touch-only device that was never
+// running a desktop to begin with.
+func TestAPhoneMayBeginAnAttemptInAnExistingMcqSession(t *testing.T) {
+	s, c := hostedWithExams(t, okHandler())
+	if w := ready(t, s, c, `{"bank":"kcna-mock"}`); w.Code != http.StatusOK {
+		t.Fatalf("start: %d %s", w.Code, body(t, w))
+	}
+
+	r := coarse(httptest.NewRequest(http.MethodPost, "/api/session/start", strings.NewReader(`{"mode":"exam"}`)))
+	r.AddCookie(c)
+	w := do(s, r)
+
+	if w.Code == http.StatusConflict && codeOf(t, w) == codeDesktopRequired {
+		t.Fatalf("beginning an attempt in an existing mcq session was refused as needing a desktop: %s", w.Body)
+	}
+}
+
 func TestASwitchToAHandsOnExamIsRefusedOnAPhone(t *testing.T) {
 	s, c := hostedWithExams(t, okHandler())
 	if w := ready(t, s, c, `{"bank":"ckad-mock-01"}`); w.Code != http.StatusOK {
