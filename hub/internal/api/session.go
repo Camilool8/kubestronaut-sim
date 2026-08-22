@@ -62,7 +62,18 @@ func (s *Server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 		kind = session.KindOf(entry.ExamType)
 	}
 
-	if refuseTouchOnlyPractical(w, r, kind) {
+	// A user who already has a live session is resuming it, not starting a
+	// new one — Start() below returns that session untouched regardless of
+	// kind or bank. Gate on what it actually is: the in-session "begin an
+	// attempt" call (choosing training/speed/exam) carries no bank, since
+	// the exam is already fixed, and would otherwise fall through to
+	// DefaultKind (practical) here and refuse a touch-only device sitting
+	// an MCQ exam that never needed a desktop.
+	if existing, err := s.Sessions.Get(user.UserID); err == nil {
+		if refuseTouchOnlyPractical(w, r, existing.Kind) {
+			return
+		}
+	} else if refuseTouchOnlyPractical(w, r, kind) {
 		return
 	}
 
