@@ -3,9 +3,9 @@ name: kubestronaut-sim
 description: A hosted kubestronaut-sim — the hub, and the session Pods it creates
 type: application
 
-version: 0.9.1
+version: 0.9.2
 
-appVersion: "v0.9.1"
+appVersion: "v0.9.2"
 
 home: https://github.com/Camilool8/kubestronaut-sim
 sources:
