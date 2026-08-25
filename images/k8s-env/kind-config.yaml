@@ -8,6 +8,18 @@ networking:
   podSubnet: "10.244.0.0/16"
 nodes:
   - role: control-plane
+    # etcd's data dir defaults to the node's own root filesystem, which here is
+    # overlay2-on-overlay2-on-overlay2 (host ext4 -> k3s containerd snapshot ->
+    # k8s-env's own dind overlay2 -> this node's overlay2 root). Measured fsync
+    # latency there: 24-250ms, against etcd's own >100ms "apply request took
+    # too long" threshold — so any write burst (Calico's ~20 CRDs are exactly
+    # that) queues up requests until one crosses etcd's client timeout and
+    # `kubectl apply` fails with "etcdserver: request timed out". bootstrap.sh
+    # mounts tmpfs at /mnt/etcd-tmpfs before cluster creation; pointing etcd at
+    # it here removes the overlay stack from every fsync.
+    extraMounts:
+      - hostPath: /mnt/etcd-tmpfs
+        containerPath: /var/lib/etcd-tmpfs
     kubeadmConfigPatches:
       - |
         kind: ClusterConfiguration
@@ -16,6 +28,9 @@ nodes:
             - "k8s-env"
             - "localhost"
             - "127.0.0.1"
+        etcd:
+          local:
+            dataDir: /var/lib/etcd-tmpfs
     extraPortMappings:
       # Node ssh (CKA contract port table): 2200 is the control plane; workers
       # get 2201+ appended by bootstrap.sh as it adds worker entries. Present

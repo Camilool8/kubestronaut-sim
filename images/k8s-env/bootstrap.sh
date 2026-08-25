@@ -192,6 +192,16 @@ while [ "$worker" -lt "$nodes" ]; do
   worker=$((worker + 1))
 done
 
+# tmpfs for the control plane's etcd data dir (see kind-config.yaml). Guarded
+# by mountpoint so a resume that never lost this container's mount namespace
+# does not shadow the live tmpfs backing an already-running etcd with an empty
+# one; a resume that DID lose it (the k8s-env container itself restarted)
+# starts fresh here, same as the rest of the inner dockerd state on the "dind"
+# emptyDir.
+etcd_tmpfs=/mnt/etcd-tmpfs
+mkdir -p "${etcd_tmpfs}"
+mountpoint -q "${etcd_tmpfs}" || mount -t tmpfs -o size=512m tmpfs "${etcd_tmpfs}"
+
 phase create-cluster "Creating the Kubernetes cluster" 3
 created=0
 if ! kind get clusters 2>/dev/null | grep -qx sim; then
