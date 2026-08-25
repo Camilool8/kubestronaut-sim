@@ -95,6 +95,18 @@ _artifact() {
       [ -n "${4:-}" ] || set -- "$1" text "$body"
       ;;
   esac
+  # A pane built by hand — printf gluing together a jq -c value here and a
+  # plain jq one there — is valid JSON but arbitrary whitespace, which is what
+  # forces a code block into horizontal scrolling instead of wrapping onto
+  # short lines. Re-serialising through jq once, right before the pane is
+  # rendered, makes every check's formatting choice invisible to the reader
+  # instead of a per-script habit to remember. A body that fails to parse
+  # (the ARTIFACT_EMPTY sentence riding under a keep-lang json pane) is left
+  # exactly as it was.
+  if [ "$2" = json ]; then
+    local pretty
+    pretty=$(printf '%s' "$body" | jq . 2>/dev/null) && [ -n "$pretty" ] && body=$pretty
+  fi
   printf '%s %s %s\n%s\n' '---8<--- sim:artifact' "$1" "$2" "$body"
 }
 
