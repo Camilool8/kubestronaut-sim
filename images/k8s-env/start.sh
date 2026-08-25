@@ -6,6 +6,23 @@ NODE_IMAGE="${NODE_IMAGE:-$(cat /opt/sim/node-image)}"
 . /opt/sim/phase.sh
 rm -f /shared/ready
 
+# A kind node's kubelet calls inotify_init for cAdvisor and its cert
+# watcher; a nested node container gets its own copy of these limits at
+# the moment `docker run` creates it, frozen from then on — raising them
+# on an ALREADY-RUNNING node does nothing. This must happen before `kind
+# create cluster` creates any node, not after. Measured live: cka-mock-01
+# building five nodes at once (up to nine with aux clusters) exhausted
+# the kernel default of 128 instances, and every one of the five crashed
+# forever on "Failed to start cAdvisor: inotify_init: too many open
+# files" — never once became healthy, so kubeadm's kubelet-check always
+# hit its own 4-minute deadline. Recreating a node after raising these
+# fixed it on the spot. 8192/524288 is what was verified live to let a
+# fresh node's kubelet start clean; kind's own docs recommend 512/524288
+# for multi-node setups, but this bank can stack aux clusters on top of
+# the main five, so the instance ceiling is padded well past that.
+echo 8192 > /proc/sys/fs/inotify/max_user_instances
+echo 524288 > /proc/sys/fs/inotify/max_user_watches
+
 phase dockerd "Starting the container runtime" 1
 dockerd-entrypoint.sh &
 dockerd_pid=$!
