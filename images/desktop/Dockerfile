@@ -1,4 +1,4 @@
-FROM golang:1.26-alpine AS opener
+FROM golang:1.27-alpine AS opener
 WORKDIR /src
 COPY opener/ ./
 ENV CGO_ENABLED=0 GOFLAGS=-buildvcs=false
