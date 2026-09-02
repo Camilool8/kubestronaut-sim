@@ -107,7 +107,9 @@ RUN ARCH=$(uname -m); case "$ARCH" in x86_64) ARCH=amd64 ;; aarch64) ARCH=arm64 
 
 # The node image the clusters actually run: the pinned kind image plus root
 # sshd (the candidate has root ssh to every node — see the CKA plan's freedom
-# model) and the assets the aux questions need staged on the node. The stage
+# model) and the assets the aux questions need staged on the node. vim and nano
+# ride along in both node stages: kindest/node ships no editor, the real exam's
+# nodes do, and the aux questions are on-node edits of static pod manifests. The stage
 # ends by tarring its own rootfs; the preload stage ships that tar and start.sh
 # / banks/_lib/aux-cluster.sh `docker import` it under the pristine tag inside the
 # inner dockerd, reapplying the image config recorded in the .changes file.
@@ -122,7 +124,7 @@ FROM ${NODE_IMAGE} AS node-ssh
 COPY --from=fetch /pkg/etcdctl /pkg/etcdutl /usr/local/bin/
 COPY --from=sim /opt/sim/calico.yaml /opt/packages/calico.yaml
 RUN apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openssh-server \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openssh-server vim nano \
     && rm -rf /var/lib/apt/lists/* \
     && (systemctl disable ssh.socket 2>/dev/null || true) \
     && systemctl enable ssh \
@@ -143,7 +145,7 @@ COPY --from=fetch /pkg/etcdctl /pkg/etcdutl /usr/local/bin/
 COPY --from=fetch /pkg/kubeadm /pkg/kubelet /pkg/kubectl /opt/packages/
 COPY --from=sim /opt/sim/calico.yaml /opt/packages/calico.yaml
 RUN apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openssh-server \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openssh-server vim nano \
     && rm -rf /var/lib/apt/lists/* \
     && (systemctl disable ssh.socket 2>/dev/null || true) \
     && systemctl enable ssh \
