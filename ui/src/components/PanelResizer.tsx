@@ -7,7 +7,7 @@ const STORAGE_KEY = "sim.panelWidth";
 
 const DEFAULT_WIDTH = 420;
 const MIN_WIDTH = 280;
-const MAX_WIDTH = 600;
+const MAX_WIDTH = 900;
 const STEP = 16;
 const COARSE_STEP = 64;
 

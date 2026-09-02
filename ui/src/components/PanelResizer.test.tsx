@@ -64,7 +64,7 @@ describe("PanelResizer accessibility contract", () => {
     expect(sep).toHaveAttribute("aria-controls", "question-panel");
     expect(sep).toHaveAttribute("aria-valuenow", "420");
     expect(sep).toHaveAttribute("aria-valuemin", "280");
-    expect(sep).toHaveAttribute("aria-valuemax", "600");
+    expect(sep).toHaveAttribute("aria-valuemax", "900");
     expect(sep).toHaveAccessibleName(/resize/i);
     expect(sep).toHaveAttribute("tabindex", "0");
   });
@@ -92,9 +92,9 @@ describe("PanelResizer keyboard", () => {
     sep.focus();
 
     await userEvent.keyboard("{End}");
-    expect(sep).toHaveAttribute("aria-valuenow", "600");
+    expect(sep).toHaveAttribute("aria-valuenow", "900");
     await userEvent.keyboard("{ArrowRight}");
-    expect(sep).toHaveAttribute("aria-valuenow", "600");
+    expect(sep).toHaveAttribute("aria-valuenow", "900");
 
     await userEvent.keyboard("{Home}");
     expect(sep).toHaveAttribute("aria-valuenow", "280");

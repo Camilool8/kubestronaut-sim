@@ -1264,7 +1264,7 @@ button.nav-menu-item:hover {
   background: var(--surface);
   border-right: 1px solid var(--border);
 
-  width: clamp(280px, var(--panel-width, var(--task-pane-width)), min(600px, 50vw));
+  width: clamp(280px, var(--panel-width, var(--task-pane-width)), min(900px, 60vw));
   flex-shrink: 0;
   position: relative;
 
