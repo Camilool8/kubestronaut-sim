@@ -3,7 +3,79 @@ set -euo pipefail
 cd "$(dirname "$0")"
 cmd=${1:-help}
 
+# Engine selection — docker by default, podman when SIM_ENGINE=PODMAN.
+# podman ships a `compose` subcommand that takes the same arguments as `docker compose`
+select_engine () {
+  case "${SIM_ENGINE:-docker}" in
+    [Pp][Oo][Dd][Mm][Aa][Nn])
+      DOCKER=podman
+      COMPOSE="podman compose"
+      ENGINE_NAME=podman 
+      check_podman ;;
+    *)
+      DOCKER=docker
+      COMPOSE="docker compose"
+      ENGINE_NAME=docker ;;
+  esac
+}
+
 UI=http://localhost:8080
+
+# When podman is the engine, make sure it's actually reachable before dispatching. 
+# On macOS podman runs inside a VM (`podman machine`), On Linux podman is rootless and talks to the local runtime directly.
+check_podman () {
+  if [ "$ENGINE_NAME" = "podman" ] && [ "$cmd" != "help" ] && [ "$cmd" != "doctor" ]; then
+    if ! command -v "$DOCKER" >/dev/null 2>&1; then
+      echo "podman is not installed — the '$DOCKER' binary was not found on PATH." >&2
+      exit 1
+    fi
+    if ! "$DOCKER" info >/dev/null 2>&1; then
+      echo "podman is installed but not reachable." >&2
+      case "$(uname -s)" in
+        Darwin)
+          echo "On macOS podman runs in a VM that must be started first." >&2
+          if "$DOCKER" machine list --format '{{.Name}}' 2>/dev/null | grep -q .; then
+            echo "A machine exists — start it with:  podman machine start" >&2
+          else
+            echo "No podman machine exists yet. Create and start one with:" >&2
+            echo "  podman machine init && podman machine start" >&2
+          fi ;;
+        *)
+          echo "Check that your user can run rootless containers (add yourself to the" >&2
+          echo "podman group, or run rootful via sudo), or start a machine:  podman machine start" >&2 ;;
+      esac
+      exit 1
+    fi
+  fi
+}
+
+# Raise the podman-machine VM's inotify sysctls before kind builds nodes.
+# Rootless containers can't write these (start.sh skips them); the nodes run
+# on the VM kernel, so set them there. macOS only — Linux podman has no VM to
+# ssh into (set on the host with sudo sysctl). Only raises, never lowers.
+raise_podman_inotify() {
+  [ "$(uname -s)" = Darwin ] || return 0
+  $DOCKER machine ssh --username root '
+    for k in fs.inotify.max_user_instances:8192 fs.inotify.max_user_watches:524288; do
+      key=${k%:*}; want=${k#*:}; cur=$(sysctl -n "$key" 2>/dev/null || echo 0)
+      [ "$cur" -ge "$want" ] || sysctl -w "$key=$want"
+    done' 2>/dev/null \
+    || echo "  warning: could not raise VM inotify sysctls (podman machine ssh failed) — kind nodes may exhaust inotify" >&2
+}
+
+# kind needs real-root access to host device nodes (e.g. /dev/mapper/control,
+# mode 0600 root-owned) that rootless podman's mapped uid can't open —
+# --privileged doesn't change the uid mapping. Require a rootful machine (macOS).
+require_podman_rootful() {
+  [ "$(uname -s)" = Darwin ] || return 0
+  rootful=$($DOCKER machine inspect --format '{{.Rootful}}' 2>/dev/null || echo false)
+  if [ "$rootful" != "true" ]; then
+    echo "podman machine is rootless — kind needs real-root device access it can't grant." >&2
+    echo "Switch to rootful and restart:" >&2
+    echo "  podman machine stop && podman machine set --rootful=true && podman machine start" >&2
+    exit 1
+  fi
+}
 
 json_field() { python3 -c "import json,sys; print(json.load(sys.stdin).get('$1',''))" 2>/dev/null || true; }
 
@@ -60,7 +132,7 @@ read_boot_fields() {
 # The trailing `|| true` keeps a failing `docker info` (or a missing
 # `docker` binary entirely, exit 127) from tripping `set -o pipefail` and
 # aborting doctor under `set -e` -- doctor's whole job is to survive that.
-docker_info_field() { docker info --format "$1" 2>/dev/null | tail -n1 || true; }
+docker_info_field() { $DOCKER info --format "$1" 2>/dev/null | tail -n1 || true; }
 
 # A clone made before .gitattributes landed (5471f83) keeps a CRLF working
 # tree forever: git does not re-check-out files a pull did not otherwise
@@ -89,11 +161,13 @@ normalize_line_endings() {
   [ "$fixed" -eq 0 ] || echo "Repaired CRLF line endings in ${fixed} script(s) — they cannot run inside the containers."
 }
 
+select_engine
 case "$cmd" in
   up)
 
     normalize_line_endings
-    BANK=${2:-} docker compose up -d --build
+    if [ "$ENGINE_NAME" = "podman" ]; then require_podman_rootful; raise_podman_inotify; fi
+    BANK=${2:-} $COMPOSE up -d --build
 
     budget=${SIM_BOOT_BUDGET:-3600}
     deadline=$((SECONDS + budget))
@@ -105,7 +179,7 @@ case "$cmd" in
         if [ "$SECONDS" -ge "$shell_deadline" ]; then
           echo
           echo "The environment did not finish starting up. Check with:"
-          echo "  docker compose logs k8s-env"
+          echo "  $COMPOSE logs k8s-env"
           exit 1
         fi
         boot=$(curl -fsS --max-time 5 "${UI}/api/boot" 2>/dev/null) || { sleep 2; continue; }
@@ -127,7 +201,7 @@ case "$cmd" in
             echo "The environment failed to start:"
             printf '  %s\n' "$(printf '%s' "$boot" | json_field error)"
             echo
-            echo "Full output:  docker compose logs k8s-env"
+            echo "Full output:  $COMPOSE logs k8s-env"
             exit 1 ;;
         esac
         sleep 2
@@ -138,7 +212,7 @@ case "$cmd" in
       if [ "$SECONDS" -ge "$deadline" ]; then
         echo
         echo "Gave up waiting after ${budget}s. The environment may still be working;"
-        echo "check with:  docker compose logs -f k8s-env"
+        echo "check with:  $COMPOSE logs -f k8s-env"
         echo "Raise the budget with SIM_BOOT_BUDGET=<seconds> ./sim up"
         exit 1
       fi
@@ -160,47 +234,47 @@ case "$cmd" in
           echo "The environment failed to start:"
           printf '  %s\n' "$(printf '%s' "$boot" | json_field error)"
           echo
-          echo "Full output:  docker compose logs k8s-env"
+          echo "Full output:  $COMPOSE logs k8s-env"
           exit 1 ;;
       esac
       sleep 3
     done
     echo "Exam environment ready. Exam UI: ${UI} — or ./sim ssh instance-1" ;;
-  down)  docker compose down --remove-orphans ;;
+  down)  $COMPOSE down --remove-orphans ;;
   purge)
 
     case "${2:-}" in
       "")
 
-        project=$(docker compose config --format json 2>/dev/null | json_field name)
+        project=$($COMPOSE config --format json 2>/dev/null | json_field name)
         if [ -z "$project" ]; then
           echo "Could not determine the compose project name; refusing to guess which"
           echo "volumes are ours. Nothing was removed — the environment is untouched."
           echo "Remove everything, attempt history included, with: ./sim purge --all"
           exit 1
         fi
-        docker compose down --remove-orphans
+        $COMPOSE down --remove-orphans
         kept=0
         unreadable=0
-        for vol in $(docker volume ls -q --filter "label=com.docker.compose.project=${project}"); do
+        for vol in $($DOCKER volume ls -q --filter "label=com.docker.compose.project=${project}"); do
           # Fail closed: if the label can't be read, we do NOT know whether
           # this is the attempt-history volume, so it must NOT be deleted.
           # Letting it fall through to `docker volume rm` on a read failure
           # (the old `key=$(... || true)` did exactly that, since an empty
           # $key just silently skips the "state" match) is how the state
           # volume itself gets destroyed by a transient inspect error.
-          if ! key=$(docker volume inspect -f '{{index .Labels "com.docker.compose.volume"}}' "$vol" 2>/dev/null); then
-            echo "  could not read ${vol}'s label (docker volume inspect failed) — leaving it in place"
+          if ! key=$($DOCKER volume inspect -f '{{index .Labels "com.docker.compose.volume"}}' "$vol" 2>/dev/null); then
+            echo "  could not read ${vol}'s label ($DOCKER volume inspect failed) — leaving it in place"
             unreadable=$((unreadable + 1))
             continue
           fi
           if [ "$key" = "state" ]; then kept=1; continue; fi
-          docker volume rm "$vol" >/dev/null || echo "  could not remove ${vol} (still in use?)"
+          $DOCKER volume rm "$vol" >/dev/null || echo "  could not remove ${vol} (still in use?)"
         done
         if [ "$kept" = "1" ]; then
           echo "Purged. Attempt history was kept — remove it too with: ./sim purge --all"
         elif [ "$unreadable" -gt 0 ]; then
-          echo "Purged. ${unreadable} volume(s) could not be checked and were left in place, just in case — see: docker volume ls"
+          echo "Purged. ${unreadable} volume(s) could not be checked and were left in place, just in case — see: $DOCKER volume ls"
         else
           echo "Purged. There was no attempt history to keep."
         fi ;;
@@ -208,7 +282,7 @@ case "$cmd" in
         echo "Removing EVERY volume, including attempt history: every attempt graded on"
         echo "this machine is deleted, there is no backup, and there is no undo."
         echo "(Export it first from the app if you want to keep it.)"
-        docker compose down -v --remove-orphans
+        $COMPOSE down -v --remove-orphans
         echo "Purged, attempt history included." ;;
       *)
         echo "usage: ./sim purge [--all]" >&2
@@ -226,9 +300,9 @@ case "$cmd" in
       *) host="$os" ;;
     esac
     printf 'host              : %s\n' "$host"
-    dver=$(docker version --format '{{.Server.Version}}' 2>/dev/null | tail -n1 || true)
-    printf 'docker            : %s\n' "${dver:-NOT REACHABLE}"
-    cver=$(docker compose version --short 2>/dev/null | tail -n1 || true)
+    dver=$($DOCKER version --format '{{.Server.Version}}' 2>/dev/null | tail -n1 || true)
+    printf '%s            : %s\n' "$ENGINE_NAME" "${dver:-NOT REACHABLE}"
+    cver=$($COMPOSE version --short 2>/dev/null | tail -n1 || true)
     printf 'compose           : %s\n' "${cver:-MISSING}"
     printf 'container OS      : '
     ostype=$(docker_info_field '{{.OSType}}')
@@ -236,7 +310,11 @@ case "$cmd" in
     if [ "$ostype" = "linux" ]; then
       echo "linux   ok"
     else
-      echo "${ostype}   << must be linux — switch Docker Desktop to Linux containers"
+      if [ "$ENGINE_NAME" = "podman" ]; then
+        echo "${ostype}   << must be linux — recreate the podman machine with a linux distro"
+      else
+        echo "${ostype}   << must be linux — switch Docker Desktop to Linux containers"
+      fi
     fi
     printf 'python3           : '; python3 --version 2>/dev/null || echo "MISSING (./sim up needs it)"
 
@@ -255,7 +333,7 @@ case "$cmd" in
       ''|*[!0-9]*) mem=0 ;;
     esac
     memgb=$(( mem / 1024 / 1024 / 1024 ))
-    printf 'RAM to docker     : %sGB' "$memgb"
+    printf 'RAM to %-6s     : %sGB' "$ENGINE_NAME" "$memgb"
     if [ "$memgb" -lt 8 ]; then
       case "$host" in
         WSL) echo "   << LOW: raise it in %UserProfile%\\.wslconfig (memory=10GB), then wsl --shutdown" ;;
@@ -265,7 +343,7 @@ case "$cmd" in
       echo "   ok"
     fi
 
-    avail=$(docker run --rm -v /var/lib/docker alpine:3.21 \
+    avail=$($DOCKER run --rm -v /var/lib/docker alpine:3.21 \
       sh -c 'df -Pk /var/lib/docker | awk "NR==2{print int(\$4/1024/1024)}"' 2>/dev/null || echo "?")
     printf 'disk for images   : %sGB' "$avail"
     if [ "$avail" != "?" ] && [ "$avail" -lt 25 ]; then echo "   << LOW: images alone are ~10GB"; else echo "   ok"; fi
@@ -280,7 +358,7 @@ case "$cmd" in
     fi
 
     printf 'warm volumes      : '
-    warm=$(docker volume ls -q --filter name=kubestronaut-sim 2>/dev/null | wc -l | tr -d ' ') || true
+    warm=$($DOCKER volume ls -q --filter name=kubestronaut-sim 2>/dev/null | wc -l | tr -d ' ') || true
     case "$warm" in
       ''|*[!0-9]*) warm=0 ;;
     esac
@@ -298,11 +376,11 @@ case "$cmd" in
       esac
     fi
     if [ "$host" = "Linux" ]; then
-      printf 'docker access     : '
-      if docker info >/dev/null 2>&1; then
+      printf '%-18s: ' "$ENGINE_NAME access"
+      if $DOCKER info >/dev/null 2>&1; then
         echo "ok"
       else
-        echo "cannot reach the daemon as $(id -un) — add yourself to the docker group, or use sudo"
+        echo "cannot reach the $ENGINE_NAME daemon as $(id -un) — add yourself to the $ENGINE_NAME group, or use sudo"
       fi
     fi
 
@@ -332,9 +410,9 @@ case "$cmd" in
     err=$(printf '%s' "$status" | python3 -c 'import json,sys; print((json.load(sys.stdin).get("lastJob") or {}).get("error",""))')
     [ -z "$err" ] || { echo "Reset failed: $err"; exit 1; }
     echo "Fresh exam ready." ;;
-  ssh)   docker compose exec "${2:-instance-1}" su - candidate ;;
-  status) docker compose ps ;;
-  grade) docker compose exec facilitator /entrypoint.sh grade ;;
+  ssh)   $COMPOSE exec "${2:-instance-1}" su - candidate ;;
+  status) $COMPOSE ps ;;
+  grade) $COMPOSE exec facilitator /entrypoint.sh grade ;;
   help)  echo "usage: ./sim {up [bank]|down|reset|purge [--all]|doctor|ssh [instance]|status|grade}" ;;
   *) echo "usage: ./sim {up [bank]|down|reset|purge [--all]|doctor|ssh [instance]|status|grade}"; exit 1 ;;
 esac
