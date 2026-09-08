@@ -1389,6 +1389,7 @@ The exam catalog the exam selector renders. Always 200.
     {"id": "ckad-mock-01", "title": "CKAD Mock Exam", "certification": "CKAD", "description": "Developer-track exercises...", "examType": "hands-on", "durationSeconds": 7200, "passingScore": 66, "kubernetesVersion": "1.35", "questionCount": 17, "poolCount": 44, "available": true},
     {"id": "cka-mock-01", "title": "CKA Mock Exam", "certification": "CKA", "description": "Administrator-track exercises...", "examType": "hands-on", "durationSeconds": 7200, "passingScore": 66, "kubernetesVersion": "1.35", "questionCount": 16, "poolCount": 26, "available": true},
     {"id": "kcna-mock", "title": "KCNA Mock Exam", "certification": "KCNA", "description": "65 questions drawn each attempt...", "examType": "mcq", "durationSeconds": 5400, "passingScore": 75, "questionCount": 65, "poolCount": 97, "available": true},
+    {"id": "ckne-mock", "title": "CKNE Mock Exam", "certification": "CKNE", "description": "75 questions drawn each attempt...", "examType": "mcq", "durationSeconds": 5400, "passingScore": 66, "questionCount": 75, "poolCount": 170, "available": true},
     {"id": "cks-mock", "title": "CKS Mock Exam", "certification": "CKS", "examType": "hands-on", "available": false, "comingSoon": true, "note": "Requires security add-ons not in the kind environment yet"}
   ]
 }

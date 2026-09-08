@@ -37,7 +37,7 @@ export const strings = {
 
   exams: {
     title: "Path to Kubestronaut",
-    lead: "Five certifications. Pick one to drill, or resume where you stopped.",
+    lead: "The five Kubestronaut certifications, plus CKNE. Pick one to drill, or resume where you stopped.",
 
     coverageLabel: "Progress",
     coverage: (passed: number, total: number) => `${passed} of ${total} passed`,
@@ -84,6 +84,7 @@ export const strings = {
       CKS: "Certified Kubernetes Security Specialist",
       KCNA: "Kubernetes and Cloud Native Associate",
       KCSA: "Kubernetes and Cloud Native Security Associate",
+      CKNE: "Certified Kubernetes Network Engineer",
     } as Record<string, string>,
     catalogErrorTitle: "Couldn't load the exam catalog",
     catalogErrorBody: (detail: string) =>
@@ -384,7 +385,7 @@ export const strings = {
       "Scores here measure practice progress. They do not predict a real exam result.",
     disclaimerTitle: "Independent project",
     disclaimerBody:
-      "Kubestronaut Sim is an independent open-source study tool. It is not affiliated with, endorsed by, or associated with the Cloud Native Computing Foundation, The Linux Foundation, or PSI. Kubernetes and the certification names (CKA, CKAD, CKS, KCNA, KCSA) are trademarks of The Linux Foundation.",
+      "Kubestronaut Sim is an independent open-source study tool. It is not affiliated with, endorsed by, or associated with the Cloud Native Computing Foundation, The Linux Foundation, or PSI. Kubernetes and the certification names (CKA, CKAD, CKS, KCNA, KCSA, CKNE) are trademarks of The Linux Foundation.",
     licensesTitle: "Licenses and credits",
     authorName: "Camilo Joga",
     authorUrl: "https://cjoga.cloud",
