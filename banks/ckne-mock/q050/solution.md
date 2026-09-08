@@ -1,0 +1,1 @@
+**Datapath flow logs (Hubble, Calico, VPC flow logs)** is correct: Common confusion: apiserver audit logs audit API operations. For network traffic, use CNI/datapath flow logs — source, destination, port, verdict, policy — exportable to a SIEM.

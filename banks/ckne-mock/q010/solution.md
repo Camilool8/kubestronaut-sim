@@ -1,0 +1,1 @@
+**It shares the node's network namespace and uses the node's IP** is correct: With `hostNetwork: true`, the pod gets no netns of its own: it uses the node's IP and interfaces. Open ports compete with host processes, and podSelector-based NetworkPolicies usually don't apply as expected.

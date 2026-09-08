@@ -1,0 +1,1 @@
+**sessionAffinity: ClientIP** is correct: `sessionAffinity: ClientIP` keeps affinity by source IP (with `timeoutSeconds`, default 3h). It's the only native L4 affinity — cookie-based affinity requires an L7 proxy (Ingress/Gateway).

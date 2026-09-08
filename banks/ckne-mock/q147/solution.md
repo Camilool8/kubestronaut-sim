@@ -1,0 +1,1 @@
+**A VIP provider (LB-IPAM/MetalLB) for the address is missing** is correct: Same root as the classic "LoadBalancer pending": the Gateway implementation asks for an address, and on bare metal nobody answers. LB-IPAM/MetalLB allocate the IP; L2 or BGP announce it.

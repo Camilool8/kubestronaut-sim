@@ -1,0 +1,1 @@
+**port is the Service's own port** is correct: The client hits `ClusterIP:port`; kube-proxy DNATs to `podIP:targetPort`; if the type exposes nodes, `nodePort` is the external port on each node. Confusing port with targetPort is a common cause of "connection refused".

@@ -1,0 +1,1 @@
+**They can't filter by hostname/L7** is correct: The native API is L3/L4: no FQDN rules, HTTP methods, explicit deny, priority or logging. CNIs extend this — `toFQDNs` and HTTP rules in Cilium, `action: Deny/Log` in Calico. Policies apply without restarting pods.

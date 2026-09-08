@@ -1,0 +1,1 @@
+**Sharing the same root CA / trust domain** is correct: Federated identity requires a common root: each cluster with its own self-generated CA = two islands of trust. Issue intermediates from the same root (or use SPIRE federation) before connecting the meshes.

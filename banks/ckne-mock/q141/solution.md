@@ -1,0 +1,1 @@
+**The application binds only to localhost** is correct: Trap number 1 for "refused" with everything apparently right: loopback bind. DNAT delivers to the pod IP, where nobody listens. `ss -tlnp` inside the pod reveals it instantly.

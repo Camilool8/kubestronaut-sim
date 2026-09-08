@@ -1,0 +1,1 @@
+**dns, drop, tcp, flow, icmp, http** is correct: Enabling `hubble.metrics.enabled={dns,drop,tcp,flow,icmp,http}`, Hubble exposes series per namespace/workload: DNS queries and errors, drop reasons (policy, CT), TCP flags and HTTP codes/latencies — the basis of the Grafana/Cilium network dashboards.

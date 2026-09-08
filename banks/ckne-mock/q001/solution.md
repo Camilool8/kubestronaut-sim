@@ -1,0 +1,1 @@
+**/etc/cni/net.d/** is correct: Configuration files (*.conf / *.conflist) live in `/etc/cni/net.d/`. The plugin binaries live in `/opt/cni/bin/`. If the config directory is empty, nodes stay NotReady with the error "cni plugin not initialized".

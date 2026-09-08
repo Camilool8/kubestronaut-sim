@@ -1,0 +1,1 @@
+**Caches responses for up to 30 s, cutting upstream load** is correct: The `cache` plugin stores responses (success and denial) for up to the given time, honoring lower TTLs. It's one of the highest-impact DNS performance knobs, along with adequate CoreDNS replicas.

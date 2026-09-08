@@ -1,0 +1,1 @@
+**Normal ndots:5 behavior: external names get expanded through the search domains generating legitimate NXDOMAINs before the right answer** is correct: Before crying "attack", look at the SUFFIX of the failed queries: if they're external names + search domains, it's ndots. NXDOMAIN metrics need this context to avoid false alerts.

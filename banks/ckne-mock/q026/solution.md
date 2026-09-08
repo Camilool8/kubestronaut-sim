@@ -1,0 +1,1 @@
+**Configure an Egress Gateway** is correct: Egress gateways concentrate egress on specific nodes/IPs: in Cilium, a `CiliumEgressGatewayPolicy` SNATs to the egressIP of a gateway node; in Istio, traffic leaves through the mesh's egress gateway. Without it, the egress IP is whatever node the pod runs on.

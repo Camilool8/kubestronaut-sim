@@ -1,0 +1,1 @@
+**Gateways route by path/header/SNI, not by body** is correct: Classic routing doesn't inspect payloads. The Body-Based Routing extension (Envoy ext-proc in the Inference Gateway) parses the JSON, promotes `model` to a header, and normal HTTPRoute/InferencePool routing decides the destination.

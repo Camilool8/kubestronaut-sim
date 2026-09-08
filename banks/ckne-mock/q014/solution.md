@@ -1,0 +1,1 @@
+**Add a server block to the Corefile** is correct: The Corefile (ConfigMap `coredns` in kube-system) accepts multiple server blocks. A dedicated block with the `forward` plugin creates a stub domain. Other useful plugins: `rewrite`, `hosts`, `log`.

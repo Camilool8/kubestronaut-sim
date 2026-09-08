@@ -1,0 +1,1 @@
+**Multus CNI with a NetworkAttachmentDefinition and the k8s.v1.cni.cncf.io/networks annotation on the pod** is correct: `Multus` acts as a meta CNI plugin: it keeps the default network and adds extra interfaces (net1, net2…) defined by `NetworkAttachmentDefinition` CRDs (macvlan, SR-IOV, bridge, etc.), selected via a pod annotation.

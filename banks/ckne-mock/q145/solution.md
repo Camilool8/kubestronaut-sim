@@ -1,0 +1,1 @@
+**Everything on the hostname(s)/listener** is correct: With no explicit matches, `PathPrefix /` is assumed. Combined with precedence rules (most specific wins), a misplaced catch-all explains many "why did this route serve it?" cases.

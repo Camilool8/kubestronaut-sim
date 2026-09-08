@@ -1,0 +1,1 @@
+**30000–32767** is correct: The default is `30000–32767`, configurable on the kube-apiserver with `--service-node-port-range`. Each NodePort is opened on every node, forwarding to the Service endpoints.

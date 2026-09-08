@@ -1,0 +1,1 @@
+**Yes, with Globalnet: virtual CIDRs + cross-cluster NAT** is correct: Overlapping CIDRs prevent direct routing (same network on both sides). Submariner Globalnet creates virtual globalCIDRs + ingress/egress NAT — the specific solution for brownfields with repeated ranges.

@@ -1,0 +1,1 @@
+**Hubble (observe, UI, metrics)** is correct: `Hubble` reads eBPF datapath events: `hubble observe --verdict DROPPED` shows which flow was blocked and by which policy. It also exports flow/DNS/HTTP metrics to Prometheus.

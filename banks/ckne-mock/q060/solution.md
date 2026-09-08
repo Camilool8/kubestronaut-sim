@@ -1,0 +1,1 @@
+**Routes to the other nodes' podCIDRs via the neighbor node IP** is correct: In direct/native routing mode, packets aren't encapsulated: each node must know the neighbor's podCIDR is reachable via the neighbor's IP. These routes are installed by the CNI or learned via BGP. Their absence breaks cross-node traffic.

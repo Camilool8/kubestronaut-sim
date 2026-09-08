@@ -1,0 +1,1 @@
+**Synthetic monitoring with Blackbox Exporter** is correct: Internal metrics don't capture public DNS failures, external LB or expired certificates. Synthetic probes test the full path at regular intervals — Blackbox Exporter's `probe_success`/`probe_duration_seconds` become the external availability SLI.

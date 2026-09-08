@@ -1,0 +1,1 @@
+**CNI DEL; without it, IP leases are orphaned in IPAM** is correct: The runtime calls `CNI_COMMAND=DEL` on removal. Crashes can skip that step — the origin of ghost leases in `/var/lib/cni/networks` and the "no IP addresses available" error weeks later.

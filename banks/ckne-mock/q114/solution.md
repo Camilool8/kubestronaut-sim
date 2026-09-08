@@ -1,0 +1,1 @@
+**DNS-01 (a TXT record _acme-challenge in DNS)** is correct: Let's Encrypt policy requires proof of DNS control for wildcards: only `DNS-01`, which creates a TXT at _acme-challenge via cert-manager's integration with the DNS provider (Route53, Cloudflare…). HTTP-01 validates exact hostnames only.

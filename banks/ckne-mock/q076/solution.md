@@ -1,0 +1,1 @@
+**SRV in the form _port._proto.service.ns.svc.cluster.local** is correct: For each named port, an SRV `_http._tcp.my-svc.default.svc.cluster.local` is created returning port and host. Applications can discover the port dynamically via SRV, without hardcoding.

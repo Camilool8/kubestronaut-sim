@@ -1,0 +1,1 @@
+**On the Gateway listener, with tls.mode: Terminate and certificateRefs** is correct: The listener declares `protocol: HTTPS`, `tls.mode: Terminate` and `certificateRefs` to `kubernetes.io/tls` Secrets. A Secret in another namespace requires a `ReferenceGrant`.

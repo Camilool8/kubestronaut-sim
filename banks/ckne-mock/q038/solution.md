@@ -1,0 +1,1 @@
+**WireGuard or IPsec encryption in the CNI** is correct: Cilium and Calico offer transparent node-to-node encryption: WireGuard (automatic per-node keys) or IPsec (rotation via secret). It covers on-the-wire traffic between nodes — complementary to application mTLS.

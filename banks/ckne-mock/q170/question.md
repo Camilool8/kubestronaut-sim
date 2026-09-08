@@ -1,0 +1,1 @@
+hubble observe shows drops with verdict "Policy denied" in the pod→kube-dns direction AFTER you applied an egress policy to the namespace. Applications complain about names not resolving. What is the correct reading of the flow?

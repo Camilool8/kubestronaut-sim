@@ -1,0 +1,1 @@
+**Returns a CNAME to an external DNS name, no proxy, no endpoints** is correct: `ExternalName` is purely DNS: queries return a CNAME to `spec.externalName`. There is no VIP, no kube-proxy, no balancing — useful for abstracting external services behind internal names.

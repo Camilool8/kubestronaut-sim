@@ -1,0 +1,1 @@
+**All traffic for a VIP enters through ONE elected node** is correct: In L2, a single node answers ARP for the VIP: inbound bandwidth is limited to that node and failover depends on gratuitous ARP (seconds of unavailability). BGP+ECMP solves both — hence the preferred production mode.

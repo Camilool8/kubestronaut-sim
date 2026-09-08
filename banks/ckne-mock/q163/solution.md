@@ -1,0 +1,1 @@
+**A conntrack race condition with parallel UDP queries** is correct: The "cursed 5 seconds": drops from an insertion race in conntrack with UDP. NodeLocal DNSCache removes NAT from the path (and goes upstream via TCP) — the most recommended structural fix.

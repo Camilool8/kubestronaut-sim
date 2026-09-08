@@ -1,0 +1,1 @@
+**Keeping traffic within the same availability zone** is correct: With hints, each kube-proxy prefers same-zone endpoints — cutting cross-AZ traffic fees and latency. If a zone has too few endpoints for its traffic share, local overload can occur; the mechanism disables hints on very asymmetric distributions.

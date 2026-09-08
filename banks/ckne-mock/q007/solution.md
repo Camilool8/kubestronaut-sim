@@ -1,0 +1,1 @@
+**The VXLAN UDP port is blocked between the nodes** is correct: Inter-node traffic depends on the encapsulation. If a firewall blocks the VXLAN UDP port (8472 for Flannel/Cilium, 4789 IANA default), cross-node communication fails. Check with `tcpdump -i any udp port 8472` and the firewall/security group rules.

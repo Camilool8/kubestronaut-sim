@@ -1,0 +1,1 @@
+**ServiceEntry** is correct: `ServiceEntry` adds external hosts to Istio's registry. Combined with VirtualService/DestinationRule and an egress gateway, it lets you control, monitor and encrypt traffic leaving the mesh — including REGISTRY_ONLY blocking undeclared destinations.

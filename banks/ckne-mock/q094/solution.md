@@ -1,0 +1,1 @@
+**Same name/namespace + the service.cilium.io/global annotation** is correct: With the global annotation, Cilium merges the backends of all clusters into balancing. Extras: `service.cilium.io/affinity: local` prefers local-cluster endpoints, with automatic failover to remote ones if locals go down.

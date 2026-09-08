@@ -1,0 +1,1 @@
+**SNAT/masquerade: the source IP becomes the node's IP** is correct: CNIs apply masquerade for destinations outside the cluster CIDRs: the external server sees the node's IP. This is tunable (e.g., `ip-masq-agent` with nonMasqueradeCIDRs) when pod IPs are routable on the company network.

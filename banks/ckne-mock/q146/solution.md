@@ -1,0 +1,1 @@
+**Whether the header match sits in the SAME rule as the weights** is correct: Structure trap: header-based canary requires a separate rule (header match) evaluated as more specific; the weights-only rule stays as fallback. Mixing everything in one rule produces a weighted lottery for everyone.

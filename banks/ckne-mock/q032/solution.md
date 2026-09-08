@@ -1,0 +1,1 @@
+**Increase the request/idle timeouts on the Gateway/HTTPRoute** is correct: Proxies apply default timeouts (30–60s). Token streaming requires raising `timeouts.request`/`backendRequest` on the HTTPRoute (GEP-1742) or equivalent, and keeping buffering disabled for SSE.

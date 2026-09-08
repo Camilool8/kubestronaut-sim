@@ -1,0 +1,1 @@
+**Graceful Restart (keeps routes during restart) and BFD (ms detection)** is correct: Graceful Restart distinguishes "planned restart" from "dead node", preserving forwarding; BFD speeds detection when the node REALLY dies. Together: upgrades without blackholes and sub-second failover.

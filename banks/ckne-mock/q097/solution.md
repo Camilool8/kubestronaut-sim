@@ -1,0 +1,1 @@
+**TCPRoute attached to a TCP listener on the Gateway** is correct: `TCPRoute` routes arbitrary TCP connections from a listener to backendRefs — no HTTP semantics. There are also `UDPRoute`, `TLSRoute` (SNI) and `GRPCRoute`. Databases, queues and proprietary protocols use TCPRoute.

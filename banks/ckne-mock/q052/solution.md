@@ -1,0 +1,1 @@
+**kubeproxy_sync_proxy_rules_duration_seconds** is correct: `kubeproxy_sync_proxy_rules_duration_seconds` measures rule sync time. In large clusters in iptables mode this grows — windows where new endpoints don't yet receive traffic. High values justify IPVS or eBPF.

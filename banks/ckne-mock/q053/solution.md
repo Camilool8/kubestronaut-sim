@@ -1,0 +1,1 @@
+**Packet loss on the path (MTU/fragmentation, full queues, bad link) forcing TCP retransmissions** is correct: TCP retransmissions = packet loss. Frequent culprit: wrong MTU with an overlay (VXLAN consumes ~50 bytes). Validate with `ping -M do -s 1472`, `tcpdump` and the CNI's MTU.

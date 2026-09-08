@@ -1,0 +1,1 @@
+**AuthorizationPolicy with from.source.principals and to.operation** is correct: `AuthorizationPolicy` evaluates the mTLS identity (SPIFFE principal), methods, paths and headers — per-workload L7 authorization. Native NetworkPolicy is L3/L4 only; RBAC controls the API, not service-to-service traffic.

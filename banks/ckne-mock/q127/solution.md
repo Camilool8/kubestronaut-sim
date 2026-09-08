@@ -1,0 +1,1 @@
+**hostPort opens the port ONLY on the node where the pod runs** is correct: `hostPort` ties pod↔node (port collisions limit scheduling); NodePort is implemented by kube-proxy on every node. Confusing them causes "works on one node, fails on the others".

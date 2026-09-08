@@ -1,0 +1,1 @@
+**MetalLB — L2 mode (ARP/NDP) or BGP mode** is correct: MetalLB allocates IPs from a pool and announces them: in **L2**, one node answers ARP for the VIP; in **BGP**, nodes announce the VIP to the routers, with ECMP. Cilium also offers a native BGP Control Plane and LB-IPAM.

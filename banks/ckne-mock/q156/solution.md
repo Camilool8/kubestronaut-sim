@@ -1,0 +1,1 @@
+**Its traffic originates from the NODE's IP, not a pod IP with identity** is correct: hostNetwork pods "are the node" to the network. Many CNIs treat node IPs specially (kubelet probes must pass). Result: pod-identity policies don't restrict them as expected — careful with what runs in hostNetwork.

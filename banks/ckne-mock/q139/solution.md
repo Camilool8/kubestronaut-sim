@@ -1,0 +1,1 @@
+**A direct tunnel to ONE pod via the apiserver, off the Service path** is correct: The port-forward tunnel skips the Service datapath. It can work with broken DNS, blocking policies and a dead kube-proxy. To validate the real path, test from INSIDE a pod.

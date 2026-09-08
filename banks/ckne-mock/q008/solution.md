@@ -1,0 +1,1 @@
+**The search and ndots entries in the pod's /etc/resolv.conf** is correct: Short names depend on the `search` domains (e.g., `default.svc.cluster.local svc.cluster.local`) and `ndots:5`. If dnsPolicy/dnsConfig was changed, or the pod is in another namespace, the short name doesn't expand to the right FQDN.

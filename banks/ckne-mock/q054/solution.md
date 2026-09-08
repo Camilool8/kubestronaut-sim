@@ -1,0 +1,1 @@
+**Chaining: plugins run in sequence** is correct: CNI chaining executes plugins in order: the first (main) creates and configures the interface; chained ones receive the previous result (prevResult) and add capabilities like `portmap` (hostPort) and `bandwidth` (kubernetes.io/ingress-bandwidth annotations).

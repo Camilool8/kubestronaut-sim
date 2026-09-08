@@ -1,0 +1,1 @@
+**A selector-less Service + a manual EndpointSlice with the external IPs** is correct: A Service without a `selector` generates no automatic endpoints; you create the `EndpointSlice` (with the kubernetes.io/service-name label) manually with the external IPs. Unlike ExternalName (CNAME), here you get a real VIP and balancing.

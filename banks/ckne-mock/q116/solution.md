@@ -1,0 +1,1 @@
+**RequestAuthentication + AuthorizationPolicy requiring requestPrincipals** is correct: `RequestAuthentication` defines how to validate the token (issuer, JWKS keys); alone, it only rejects INVALID tokens. The `AuthorizationPolicy` with `requestPrincipals: ["*"]` is what requires a valid token to be present — the two layers (workload + user) complement each other.

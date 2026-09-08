@@ -1,0 +1,1 @@
+Applications complain about slowness resolving external names (e.g., api.github.com) from inside pods. tcpdump shows several NXDOMAIN queries before the right answer. What is the cause and the mitigation?

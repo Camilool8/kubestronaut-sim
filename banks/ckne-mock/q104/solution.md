@@ -1,0 +1,1 @@
+**Use port: 30000 with endPort: 32767 in the same entry** is correct: The `endPort` field defines the end of the range started at `port` (requires a numeric, not named, port). Stable since Kubernetes 1.25.

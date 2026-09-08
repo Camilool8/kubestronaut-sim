@@ -1,0 +1,1 @@
+**A short globalThisStub for compromised certificates, no reliance on revocation** is correct: Short life = short exposure: a leaked certificate is worth hours, not years, and revocation (historically broken) becomes unnecessary. istio-agent/SPIRE renew SVIDs automatically before expiry, without restarting workloads.

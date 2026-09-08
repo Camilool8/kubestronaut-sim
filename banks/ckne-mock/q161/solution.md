@@ -1,0 +1,1 @@
+**It DENIES all traffic in the namespace** is correct: Cruel inversion: having an ALLOW AuthorizationPolicy that matches nothing = nothing is allowed. It's even the idiomatic way to do deny-all. Compare with NetworkPolicy `ingress: [{}]` (allows everything) — the empties have opposite semantics!

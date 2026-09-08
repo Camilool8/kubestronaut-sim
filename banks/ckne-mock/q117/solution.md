@@ -1,0 +1,1 @@
+**No: encryption covers traffic crossing the network BETWEEN nodes** is correct: The goal is protecting on-the-wire traffic against interception on the network. Packets between same-node pods travel only through local memory/bridge. If the requirement is to encrypt and authenticate EVERY logical hop, combine with mesh mTLS.

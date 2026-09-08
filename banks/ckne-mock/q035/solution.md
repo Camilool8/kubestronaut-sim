@@ -1,0 +1,1 @@
+**Policies are additive (allow-list)** is correct: Native NetworkPolicies only allow: selecting a pod isolates it, and what's allowed is the union of all policies. There is no explicit deny or precedence — and enforcement depends on the CNI (plain Flannel ignores policies). Cilium/Calico CRDs add deny and priority.

@@ -1,0 +1,1 @@
+**selectors, destinationCIDRs and egressGateway with egressIP** is correct: The policy matches the traffic (selected pods → destination CIDRs) and redirects it to the gateway node, which SNATs to the configured `egressIP` — providing a fixed, auditable egress IP for external firewalls.

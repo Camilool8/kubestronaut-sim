@@ -1,0 +1,1 @@
+**ClusterSetIP provides a single VIP balancing across clusters** is correct: It mirrors single-cluster behavior: `ClusterSetIP` gives a VIP for balanced consumption; `Headless` exposes each backend with its own records — needed when the client must talk to specific instances across clusters.

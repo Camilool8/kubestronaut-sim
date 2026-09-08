@@ -1,0 +1,1 @@
+**Requests have extremely variable cost** is correct: One request may generate 10 tokens and another 4,000; responses are streaming (SSE) and long. Inference-aware balancers use per-replica queue/KV-cache pressure and prefix affinity, plus tuned timeouts.

@@ -1,0 +1,1 @@
+**Whether the CNI DaemonSet runs on the node and a config exists in /etc/cni/net.d/** is correct: That condition means the kubelet found no working CNI: usually the CNI pod (DaemonSet) didn't start on the node (taints, image pull) or didn't write the config. Without CNI, only hostNetwork pods can run.

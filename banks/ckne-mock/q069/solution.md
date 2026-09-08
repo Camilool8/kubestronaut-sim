@@ -1,0 +1,1 @@
+**ndots:5 expansion via search domains (use a trailing-dot FQDN)** is correct: With `ndots:5`, any name with fewer than 5 dots is expanded through the search domains before the absolute query — producing 3–5 extra (NXDOMAIN) queries per resolution. A trailing dot forces an absolute query; `dnsConfig.options ndots:1` changes the behavior per pod.

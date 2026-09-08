@@ -1,0 +1,1 @@
+**VIPs are DNAT rules, with no interface to answer ICMP** is correct: Troubleshooting trap: the VIP isn't assigned to any interface; iptables/IPVS/eBPF only translate `VIP:port`. Test Services with `nc -zv`/`curl`, never with ping.

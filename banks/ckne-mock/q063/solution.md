@@ -1,0 +1,1 @@
+**Multus + SR-IOV CNI + device plugin, handing NIC VFs to the pod** is correct: SR-IOV splits the physical NIC into Virtual Functions (VFs) handed directly to the pod (bypassing the host stack), with the device plugin managing allocation and Multus attaching the interface — standard in telco/NFV and low-latency workloads.

@@ -1,0 +1,1 @@
+**A dedicated east-west gateway exposes services across clusters (mTLS)** is correct: When pods of different clusters can't reach each other directly, Istio routes cross-cluster traffic through east-west gateways (a dedicated LoadBalancer), keeping mTLS and unified endpoint discovery across networks.

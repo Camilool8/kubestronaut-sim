@@ -1,0 +1,1 @@
+**The target's certificate is for api.partner.com (SAN mismatch)** is correct: TLS trap: validation uses the name the CLIENT requested. Fix: call the real name, configure proper SNI/verification, or use a proxy that rewrites Host/SNI.

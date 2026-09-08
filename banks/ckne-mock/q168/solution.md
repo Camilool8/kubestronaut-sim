@@ -1,0 +1,1 @@
+**iperf3 between pods on the two nodes, compared with the same-node case** is correct: Without a baseline, every debate is opinion. The iperf3 pair measures the datapath's real ceiling (including encapsulation/encryption overhead); the same-node vs. cross-node comparison isolates where the degradation lives.

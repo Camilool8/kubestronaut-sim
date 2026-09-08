@@ -1,0 +1,1 @@
+**Raise the physical MTU to 9000 and set pods to 8950** is correct: The pod limit is always physical MTU − overhead (~50 for VXLAN). With end-to-end jumbo frames, 8950 on the pods multiplies data-workload throughput. The common mistake is raising only one side.

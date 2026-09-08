@@ -1,0 +1,1 @@
+**The Gateway's listeners.allowedRoutes.namespaces field** is correct: By default, `allowedRoutes.namespaces.from` is `Same`. To accept routes from other namespaces, use `from: All` or `from: Selector` on the listener. For backends in other namespaces you also need a `ReferenceGrant`.

@@ -1,0 +1,1 @@
+**podSelector: {} with policyTypes: [Ingress, Egress] and no ingress/egress rules** is correct: Selecting everything and declaring both policyTypes with no rules = total default deny. The variant with `[{}]` allows everything (an empty rule matches any source/destination) — the classic exam trap. From there, each access is granted by additional policies.

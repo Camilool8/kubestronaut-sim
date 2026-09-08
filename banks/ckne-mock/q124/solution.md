@@ -1,0 +1,1 @@
+**hubble observe --verdict DROPPED** is correct: `hubble observe --verdict DROPPED` lists each drop with source→destination, port and reason (Policy denied, CT: connection tracking, unsupported L3...). It's the fastest path to find which NetworkPolicy is blocking a flow.
