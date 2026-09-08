@@ -292,6 +292,15 @@ over.
 when it does not; the client draws no entry point at all in that case,
 because a control that opens an empty sheet is worse than none.
 
+`language` is what the bank's own files are written in (`en` when
+`spec.language` is absent) and `translations` the other languages every
+question can be served in (`spec.translations`, see
+[bank-spec.md](bank-spec.md#translations-speclanguage-and-spectranslations)).
+Both are omitted for a bank with no translations, so a client written
+before they existed sees an unchanged shape. A language is chosen at
+[POST /api/session/start](#post-apisessionstart) and fixed for the
+attempt.
+
 ### GET /api/exam/tips
 
 The active bank's `tips.md` — how to sit *this* exam quickly, read from
@@ -330,14 +339,21 @@ answer key, which reaches the client only inside graded results
 (`facilitator/internal/api/api.go`):
 
 ```json
-{"id": "q01", "domain": "Kubernetes Fundamentals", "markdown": "...", "options": ["...", "...", "...", "..."], "multi": false}
+{"id": "q01", "domain": "Kubernetes Fundamentals", "markdown": "...", "options": ["...", "...", "...", "..."], "multi": false, "language": "en"}
 ```
+
+`language` is the language the markdown and options are in. For an
+attempt started in one of the bank's `translations`, both come from the
+question's `i18n/<lang>.md` instead of `question.md` and exam.yaml, in
+the same option order — an answer index means the same thing whichever
+language it was chosen in. The field is omitted when the bank declares
+no `spec.language`.
 
 | Code | When |
 |---|---|
 | 200 | `id` names a question in the loaded exam. |
 | 404 | It does not (`facilitator/internal/api/api.go`). |
-| 500 | `question.md` could not be read (`facilitator/internal/api/api.go`). |
+| 500 | `question.md`, or the attempt's `i18n/<lang>.md`, could not be read (`facilitator/internal/api/api.go`). The load proved every translation present, so this is a bank edited mid-attempt. |
 
 ### GET /api/questions/{id}/solution
 
@@ -488,8 +504,13 @@ seed, which is what `./sim` and `tests/smoke.sh` send — they POST with
 no body at all and no `Content-Type`.
 
 ```json
-{"mode": "training", "seed": "a1b2c3", "domains": ["Kubernetes Fundamentals"], "poolDigest": "3f9c1a2b7e04"}
+{"mode": "training", "seed": "a1b2c3", "domains": ["Kubernetes Fundamentals"], "poolDigest": "3f9c1a2b7e04", "language": "pt"}
 ```
+
+`language` picks one of the bank's `translations` for the whole attempt:
+questions, options, solutions and the option text in the graded results
+come back in it. Omitted, or naming the bank's own `language`, means the
+bank's own files. Hints, docs links and tips stay in the bank's language.
 
 The response is the session shape documented under
 [GET /api/session](#get-apisession), plus `"poolChanged": true` when the
@@ -500,7 +521,7 @@ one field appears here and nowhere else.
 |---|---|
 | 200 | Started. The clock is running. |
 | 202 | **Drawn, not started** — a pooled hands-on bank only. The cluster is being prepared for the questions just drawn and the clock has not begun. See [Preparing an attempt](#preparing-an-attempt). |
-| 400 | `mode` is not `exam`, `training` or `speed`; the body is non-empty and not JSON; `seed` is not six lowercase hex digits, or `domains` names a domain the bank does not have. |
+| 400 | `mode` is not `exam`, `training` or `speed`; the body is non-empty and not JSON; `seed` is not six lowercase hex digits; `domains` names a domain the bank does not have; or `language` names one the bank does not ship. |
 | 409 | The environment is still starting; the caller declared a coarse pointer and this is not an mcq exam (`code: "desktop_required"` — see [The device gate](#the-device-gate)); a session is already running or ended; a preparation is already in flight; the conductor refused or could not be reached (the body carries its own words); or — pooled hands-on only — **the cluster is still holding a different draw's objects**. |
 | 500 | The bank's pool cannot satisfy its own `domainWeights` at this draw size — an authoring bug `tests/bank-weights.sh` should have caught first. |
 | 503 | This build has no route to the conductor, so a pooled hands-on bank's cluster cannot be prepared. |
@@ -729,6 +750,10 @@ response can say how long it has been going.
 persisted with the attempt. All three are omitted while idle, and on an
 attempt started before seeding existed; `domainFilter` is also omitted
 for a whole-curriculum attempt, which is what its absence means.
+`language` travels the same way: present when the attempt was started in
+one of the bank's translations, omitted for the bank's own language, and
+kept across a resume so the question that comes back is in the language
+the clock started in.
 
 ### POST /api/session/end
 

@@ -464,7 +464,8 @@ Differences from the hands-on shape:
   "Choose all that apply." so the candidate knows the rules.
 - **The question directory holds `question.md` and `solution.md`
   only** — no `setup.sh`, `validate.d/` or `files/` (the gate enforces
-  their absence). `question.md` is the stem alone; the options render
+  their absence) — plus an `i18n/` directory when the bank declares
+  [translations](#translations-speclanguage-and-spectranslations). `question.md` is the stem alone; the options render
   from exam.yaml, so never enumerate them in the stem. `solution.md` is
   the explanation shown in review: why the correct answer is correct,
   then a "Why the others are wrong" bullet per distractor, bolding each
@@ -483,6 +484,10 @@ Differences from the hands-on shape:
 5. `domainWeights` sums to 100, with bidirectional domain coverage.
 6. No single option position is correct on more than half the
    single-answer questions. A degenerate key reads like a pattern.
+7. Every declared translation exists for every question, parses into
+   its three sections, carries exactly exam.yaml's option count, and
+   clears the explanation floor; no `i18n/` file exists for a language
+   the bank does not declare.
 
 The weight-versus-content check has **two modes**:
 
@@ -498,6 +503,69 @@ One trade-off to know when editing a shipped bank: answers are stored
 by option index, so reordering or editing `options` mid-attempt
 silently changes what a stored selection means. Reset the session after
 editing an mcq bank's options.
+
+## Translations: `spec.language` and `spec.translations`
+
+A bank is written in one language — `spec.language`, `en` when absent —
+and may ship every question in others:
+
+```yaml
+spec:
+  examType: mcq
+  language: en
+  translations: [pt, es]
+```
+
+Each translation is one file per question,
+`banks/<bank-id>/<qid>/i18n/<lang>.md`, in three sections:
+
+```markdown
+## Question
+
+Em qual diretório o kubelet procura os arquivos de configuração CNI?
+
+## Options
+
+- /etc/kubernetes/cni/
+- /opt/cni/bin/
+- /etc/cni/net.d/
+- /var/lib/cni/conf/
+
+## Solution
+
+**/etc/cni/net.d/** é a resposta correta: ...
+```
+
+- **The option order is exam.yaml's.** The key is shared: an answer is
+  stored as an index, so a translation that reorders its options would
+  silently change what a stored selection means. `exam.Load` refuses a
+  bank whose translation has a different option count, and
+  [bank-mcq.sh](../tests/bank-mcq.sh) checks the count offline.
+- `## Options` is for mcq banks; a hands-on translation carries
+  `## Question` and `## Solution` only.
+- Codes are two- or three-letter tags with an optional region (`pt`,
+  `pt-BR`), because the code names a file. The base language is never
+  listed in `translations`.
+- **Complete or absent.** Every question needs a file for every declared
+  language, and a file for an undeclared language fails the gate the way
+  an undeclared question directory does. A translation that an attempt
+  could be started in and then fail to serve mid-exam is worse than a
+  bank that refuses to load.
+- Read per request, like `question.md`, so editing one needs no restart.
+  Only presence and option count are checked at boot.
+- The `## Solution` is held to the same 200-character floor as
+  `solution.md`; it is the explanation in that language, not a summary.
+
+The candidate picks the language on the mode screen, before the clock
+starts, and it is fixed for the attempt: questions, options, solutions
+and the option text in the graded review come back in it. The interface
+around the question stays in English, and hints, `docs:` links and
+`tips.md` are served in the bank's language — those are technique, not
+the question. `GET /api/exam` advertises `language` and `translations`;
+see [api.md](api.md#get-apiexam).
+
+`ckne-mock` ships six translations this way; `tests/bank-mcq.sh`
+prints the languages it verified beside the bank's question count.
 
 ## Code blocks in question.md and solution.md
 

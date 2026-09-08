@@ -69,6 +69,11 @@ type Exam struct {
 	ExamLength int
 
 	HasTips bool
+
+	// Language is what the bank's own files are written in; Translations
+	// are the other languages every question ships an i18n file for.
+	Language     string
+	Translations []string
 }
 
 func Pooled(ex *Exam) bool {
@@ -133,6 +138,8 @@ type examDoc struct {
 		DomainWeights     map[string]int `json:"domainWeights"`
 		DifficultyMix     map[string]int `json:"difficultyMix"`
 		ExamLength        int            `json:"examLength"`
+		Language          string         `json:"language"`
+		Translations      []string       `json:"translations"`
 		Environment       struct {
 			Provider string `json:"provider"`
 			Nodes    int    `json:"nodes"`
@@ -202,6 +209,8 @@ func Load(examJSONPath, bankDir string) (*Exam, error) {
 		DomainWeights:     doc.Spec.DomainWeights,
 		DifficultyMix:     doc.Spec.DifficultyMix,
 		ExamLength:        doc.Spec.ExamLength,
+		Language:          doc.Spec.Language,
+		Translations:      doc.Spec.Translations,
 		Environment: Environment{
 			Provider: doc.Spec.Environment.Provider,
 			Nodes:    doc.Spec.Environment.Nodes,
@@ -254,6 +263,9 @@ func Load(examJSONPath, bankDir string) (*Exam, error) {
 	}
 
 	if err := validateDifficulty(e); err != nil {
+		return nil, err
+	}
+	if err := validateTranslations(e, bankDir); err != nil {
 		return nil, err
 	}
 

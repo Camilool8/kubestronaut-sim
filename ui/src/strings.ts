@@ -140,6 +140,25 @@ export const strings = {
 
     domainsPool: "Domains in the pool",
     domainsExam: "Domains in this exam",
+
+    languageTitle: "Sit it in your language",
+    languageLabel: "Language to sit the exam in",
+    languageNote:
+      "Questions, options and explanations come in the language you pick; the answer key is the same in every one. Fixed once the clock starts.",
+    languageNames: {
+      en: "English",
+      pt: "Português",
+      es: "Español",
+      de: "Deutsch",
+      fr: "Français",
+      it: "Italiano",
+      ru: "Русский",
+      ar: "العربية",
+      ja: "日本語",
+      zh: "中文",
+      ko: "한국어",
+      hi: "हिन्दी",
+    } as Record<string, string>,
     examFailed: (detail: string) =>
       `Couldn't load this exam (${detail}). The facilitator may still be starting; check it with \`docker compose ps facilitator\`.`,
 

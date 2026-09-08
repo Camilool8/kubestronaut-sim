@@ -72,8 +72,8 @@ what creates its cluster, and the page shows each phase as it completes.
   its bank pins.
 - KCNA and CKNE ship a full explanation for every question.
 - The real CKNE is performance-based; its bank here is multiple choice and
-  drills the knowledge behind the five published domains. The same 170
-  questions ship in six more languages as hidden banks — see
+  drills the knowledge behind the five published domains. It can be sat
+  in seven languages — pick one on the mode screen — see
   [banks/ckne-mock/README.md](banks/ckne-mock/README.md).
 - KCSA and CKS appear in the catalog as coming soon.
 

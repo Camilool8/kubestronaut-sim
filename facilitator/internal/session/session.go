@@ -86,6 +86,9 @@ type Draw struct {
 	PoolDigest string
 
 	DomainFilter []string
+
+	// Language the attempt was started in; empty is the bank's own.
+	Language string
 }
 
 type Snapshot struct {
@@ -104,6 +107,7 @@ type Snapshot struct {
 	Seed         string
 	PoolDigest   string
 	DomainFilter []string
+	Language     string
 }
 
 type persistedState struct {
@@ -126,6 +130,7 @@ type persistedState struct {
 	Seed         string   `json:"seed,omitempty"`
 	PoolDigest   string   `json:"poolDigest,omitempty"`
 	DomainFilter []string `json:"domainFilter,omitempty"`
+	Language     string   `json:"language,omitempty"`
 
 	TimeSpent map[string]int `json:"timeSpent,omitempty"`
 }
@@ -210,6 +215,7 @@ func New(path, bank string, dur time.Duration, clock func() time.Time, onExpire 
 		Seed:         doc.Seed,
 		PoolDigest:   doc.PoolDigest,
 		DomainFilter: doc.DomainFilter,
+		Language:     doc.Language,
 	}
 	m.timeSpent = doc.TimeSpent
 	if doc.EndedAt != nil {
@@ -274,7 +280,7 @@ func (m *Manager) StartDraw(mode string, dur time.Duration, draw Draw) (Snapshot
 }
 
 func cloneDraw(d Draw) Draw {
-	out := Draw{Seed: d.Seed, PoolDigest: d.PoolDigest}
+	out := Draw{Seed: d.Seed, PoolDigest: d.PoolDigest, Language: d.Language}
 	if len(d.QuestionIDs) > 0 {
 		out.QuestionIDs = append([]string(nil), d.QuestionIDs...)
 	}
@@ -663,6 +669,7 @@ func (m *Manager) snapshotLocked() Snapshot {
 		ElapsedSeconds:  int(m.elapsedLocked().Seconds()),
 		Seed:            m.draw.Seed,
 		PoolDigest:      m.draw.PoolDigest,
+		Language:        m.draw.Language,
 	}
 	if len(m.draw.DomainFilter) > 0 {
 		snap.DomainFilter = append([]string(nil), m.draw.DomainFilter...)
@@ -706,6 +713,7 @@ func (m *Manager) persistLocked() error {
 		Seed:            m.draw.Seed,
 		PoolDigest:      m.draw.PoolDigest,
 		DomainFilter:    m.draw.DomainFilter,
+		Language:        m.draw.Language,
 		TimeSpent:       m.timeSpent,
 	}
 	if !m.endedAt.IsZero() {

@@ -171,7 +171,7 @@ func TestGradeRecordsTheAttempt(t *testing.T) {
 	store := newTestStore(t)
 	ex := recorderExam()
 
-	g := newGrader(ex, mgr, &countingRunner{}, time.Second)
+	g := newGrader(ex, "", mgr, &countingRunner{}, time.Second)
 	g.record = func(token string, snap session.Snapshot, res *evaluate.Results) error {
 		return recordAttempt(store, nil, ex, token, snap, res)
 	}
@@ -189,7 +189,7 @@ func TestGradeRecordsTheAttempt(t *testing.T) {
 
 func TestGradeSurvivesAHistoryWriteFailure(t *testing.T) {
 	mgr := newTestManager(t)
-	g := newGrader(recorderExam(), mgr, &countingRunner{}, time.Second)
+	g := newGrader(recorderExam(), "", mgr, &countingRunner{}, time.Second)
 	g.record = func(string, session.Snapshot, *evaluate.Results) error {
 		return errRecorder
 	}

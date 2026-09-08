@@ -173,6 +173,60 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
             fail(bank, f"{qid} is multi but lists {len(correct)} correct indices, "
                        f"want 2..{n - 1}")
 
+    # Translations: spec.translations names the languages every question
+    # ships an i18n/<lang>.md for, in three sections, with exactly as many
+    # options as exam.yaml — the answer key is shared, so the order is too.
+    # A file for a language the bank does not declare is cruft nothing
+    # serves, and fails the same way an undeclared question directory does.
+    lm = re.search(r"^\s*language:\s*(\S+)\s*$", text, re.M)
+    base_lang = lm.group(1) if lm else "en"
+    tm = re.search(r"^\s*translations:\s*\[([^\]]*)\]\s*$", text, re.M)
+    translations = [t.strip() for t in tm.group(1).split(",") if t.strip()] if tm else []
+    if not re.match(r"^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$", base_lang):
+        fail(bank, f"spec.language {base_lang!r} is not a language code")
+    for lang in translations:
+        if not re.match(r"^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$", lang):
+            fail(bank, f"spec.translations entry {lang!r} is not a language code")
+    if len(set(translations)) != len(translations) or base_lang in translations:
+        fail(bank, f"spec.translations repeats a language or lists the base language {base_lang}")
+
+    SECTION_RE = re.compile(r"^##\s+(Question|Options|Solution)\s*$", re.M | re.I)
+    for q in questions:
+        qid = q["id"]
+        qdir = os.path.join(bank_dir, qid)
+        opts = parse_options(q["options"]) or []
+        i18n_dir = os.path.join(qdir, "i18n")
+        on_disk_langs = sorted(
+            f[:-3] for f in os.listdir(i18n_dir) if f.endswith(".md")
+        ) if os.path.isdir(i18n_dir) else []
+        for extra in sorted(set(on_disk_langs) - set(translations)):
+            fail(bank, f"{qid}/i18n/{extra}.md exists but spec.translations does not list {extra}")
+        for lang in translations:
+            path = os.path.join(i18n_dir, lang + ".md")
+            if not os.path.isfile(path):
+                fail(bank, f"{qid}/i18n/{lang}.md is missing — spec.translations promises every question in {lang}")
+                continue
+            body = open(path, encoding="utf-8").read().replace("\r\n", "\n")
+            heads = [m.group(1).lower() for m in SECTION_RE.finditer(body)]
+            if heads.count("question") != 1 or heads.count("solution") != 1 or heads.count("options") != 1:
+                fail(bank, f"{qid}/i18n/{lang}.md must have one `## Question`, one `## Options` and one `## Solution`")
+                continue
+            parts = {}
+            locs = list(SECTION_RE.finditer(body))
+            for i, m in enumerate(locs):
+                end = locs[i + 1].start() if i + 1 < len(locs) else len(body)
+                parts[m.group(1).lower()] = body[m.end():end].strip()
+            if not parts["question"]:
+                fail(bank, f"{qid}/i18n/{lang}.md has an empty `## Question`")
+            lines = [l.strip() for l in parts["options"].splitlines() if l.strip()]
+            if any(not l.startswith("- ") for l in lines):
+                fail(bank, f"{qid}/i18n/{lang}.md: `## Options` must be one `- option` per line")
+            elif len(lines) != len(opts):
+                fail(bank, f"{qid}/i18n/{lang}.md has {len(lines)} options, exam.yaml has {len(opts)}")
+            if len(parts["solution"]) < MIN_SOLUTION:
+                fail(bank, f"{qid}/i18n/{lang}.md: `## Solution` is {len(parts['solution'])} characters, "
+                           f"minimum {MIN_SOLUTION}")
+
     singles = [q for q in questions if q["multi"] == "false"]
     counts = {}
     for q in singles:
@@ -210,7 +264,8 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
     n = exam_length(text)
     pooled = n is not None and n < len(questions)
     print(f"{bank}: {len(questions)} questions, {grand} points"
-          + (f", examLength {n}" if pooled else ""))
+          + (f", examLength {n}" if pooled else "")
+          + (f", languages {base_lang}+{'/'.join(translations)}" if translations else ""))
 
     if pooled:
         domain_order = []
