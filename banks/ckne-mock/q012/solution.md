@@ -1,0 +1,1 @@
+**O(1) forwarding complexity and balancing algorithms** is correct: In iptables mode, rules grow with the number of Services and are evaluated sequentially. IPVS uses in-kernel hash tables (~O(1) lookup) and offers round-robin, least-connections, source-hash. Both remain L4.

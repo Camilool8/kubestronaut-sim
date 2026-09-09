@@ -887,6 +887,78 @@ button.nav-menu-item:hover {
   margin: 0;
 }
 
+/* Language picker: one pill per language a bank ships; the pressed one is
+   filled, like a primary action, because it is the decision that governs
+   every question that follows. Sits above the mode cards. */
+.lang-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  margin: 0 0 var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-l);
+}
+
+.lang-panel-lead {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.lang-panel h2 {
+  margin: 0;
+  font-size: var(--text-l);
+  font-weight: 600;
+}
+
+.lang-panel p {
+  margin: var(--space-1) 0 0;
+  max-width: 52ch;
+  color: var(--text-muted);
+  font-size: var(--text-s);
+  line-height: 1.5;
+}
+
+.lang-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.lang-chip {
+  padding: var(--space-2) var(--space-4);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  color: var(--text-body);
+  font-family: inherit;
+  font-size: var(--text-m);
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.lang-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.lang-chip:active {
+  transform: translateY(1px);
+}
+
+.lang-chip[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
 .mode-grid {
   list-style: none;
   margin: 0 0 var(--space-5);

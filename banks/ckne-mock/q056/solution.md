@@ -1,0 +1,1 @@
+**host-local allocates per node, uncoordinated, and can duplicate IPs** is correct: `host-local` keeps state only on the node's disk — two nodes can hand out the same IP on the secondary network. `whereabouts` records allocations in cluster CRDs, guaranteeing uniqueness of the whole range across all nodes.

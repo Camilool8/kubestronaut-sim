@@ -1,0 +1,1 @@
+**The average hides the tail: p99 exposes the worst 1% of requests** is correct: Network problems tend to live in the tail (retransmissions, queues, conntrack). With `histogram_quantile(0.99, rate(..._bucket[5m]))` you see the worst 1% — what users actually feel.

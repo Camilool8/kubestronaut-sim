@@ -1,0 +1,1 @@
+**Delivers internal traffic only to endpoints on the client's node** is correct: It's the internal analogue of externalTrafficPolicy: useful for per-node daemons (e.g., log agent, node-local cache) where each pod should talk to its own node's instance — saving hops and latency.

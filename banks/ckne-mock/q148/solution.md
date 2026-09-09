@@ -1,0 +1,1 @@
+**It reuses the prefix KV-cache, avoiding a full prefill** is correct: Prefill is the expensive part. If the prefix (e.g., a long system prompt) is already in a replica's KV-cache, sending the same conversation there saves that cost. "Blind" balancing spreads and wastes cache.

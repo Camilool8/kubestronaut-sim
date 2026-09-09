@@ -1,0 +1,1 @@
+**Gateway API Inference Extension** is correct: The `Gateway API Inference Extension` adds CRDs like `InferencePool` and an Endpoint Picker that routes based on model-server metrics — queue depth, KV-cache utilization, LoRA adapters — instead of blind round-robin.

@@ -1,0 +1,1 @@
+**EndpointSlice** is correct: `EndpointSlice` partitions endpoints into slices (up to 100 per slice by default), reducing update cost for large Services and adding topology (zone, node). The old Endpoints object is kept for compatibility.

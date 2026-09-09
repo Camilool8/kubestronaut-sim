@@ -1,0 +1,1 @@
+**Forwards only to node-local endpoints, preserving the client IP** is correct: With `Local`, a node only forwards to local pods — no SNAT, so the real client IP is preserved. Nodes without endpoints are removed from the LB via healthCheckNodePort. With `Cluster` (default), there may be a second hop with SNAT.

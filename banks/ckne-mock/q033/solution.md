@@ -1,0 +1,1 @@
+**Unique, non-overlapping PodCIDRs and ClusterIDs, plus direct connectivity between the clusters' nodes** is correct: Cluster Mesh requires non-overlapping pod CIDRs, unique `cluster.id`/`cluster.name`, and mutual node reachability. With that you get global service discovery, cross-cluster balancing and policies across clusters.

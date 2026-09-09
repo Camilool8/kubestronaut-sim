@@ -1,0 +1,1 @@
+**Latency, bytes/s, 5xx/retrans errors and conntrack saturation** is correct: The four signals map directly: latency p99, throughput (bytes/pps), error rate (retrans/resets/drops/5xx) and saturation (conntrack entries/limit, qdisc drops, bandwidth utilization). Alerting on them covers most network degradations.

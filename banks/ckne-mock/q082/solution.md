@@ -1,0 +1,1 @@
+**That node's kube-proxy is down or didn't program the rules** is correct: ClusterIP is materialized PER NODE (iptables/IPVS/eBPF). If a single node fails to reach VIPs, local programming is broken: kube-proxy crashing, rules not synced or a local firewall conflict. Compare `iptables-save` across nodes.

@@ -1,0 +1,1 @@
+**Runtimes don't create named netns; use lsns -t net** is correct: `ip netns` only sees named netns (bind-mounted in /var/run/netns). Runtimes create anonymous per-process netns; `lsns -t net` lists them with PIDs, enabling `nsenter -t PID -n` for inspection.

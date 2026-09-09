@@ -1,0 +1,1 @@
+**Distributed tracing propagating the traceparent header** is correct: Distributed tracing correlates spans from each hop; without propagating the `traceparent` header (W3C Trace Context), spans become orphans. It's the right tool to find where latency happens.

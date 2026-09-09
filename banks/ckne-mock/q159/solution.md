@@ -1,0 +1,1 @@
+**L7 rules (e.g., CiliumNetworkPolicy with toPorts.rules.http method/path)** is correct: Filtering by method/path is L7: Cilium injects a transparent proxy for the flows covered by the rule. Exam implication: L7 policies add a proxy hop (latency) only where applied.

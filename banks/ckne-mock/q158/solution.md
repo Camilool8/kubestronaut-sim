@@ -1,0 +1,1 @@
+**namespaceSelector: {} (empty) matches ALL namespaces in the cluster** is correct: In Kubernetes selectors, empty = select everything. `namespaceSelector: {}` opens to the whole cluster — the opposite of the "empty = nothing" intuition. One of the most-tested traps.

@@ -1,0 +1,1 @@
+**CiliumNetworkPolicy with toFQDNs** is correct: Native NetworkPolicy only takes IPs/selectors. Cilium intercepts DNS (dns proxy), learns the IPs resolved for the allowed FQDN and authorizes them dynamically — the policy follows the name, not the IP. You must also allow DNS egress with toPorts 53 rules.

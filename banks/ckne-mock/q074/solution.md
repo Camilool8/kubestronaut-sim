@@ -1,0 +1,1 @@
+**The name references each pod's named containerPort** is correct: With `targetPort: http`, each pod defines `ports[].name: http` with any number it wants (8080, 3000…). The Service resolves it per pod — useful in migrations and rolling updates that change the app port.

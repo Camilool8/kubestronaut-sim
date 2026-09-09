@@ -1,0 +1,1 @@
+**A/AAAA records with the IPs of each ready pod matching the selector** is correct: Headless Services have no VIP: CoreDNS answers with the pod IPs. In StatefulSets, each pod also gets a stable record `pod.service.ns.svc.cluster.local` — essential for databases and identity-based discovery.

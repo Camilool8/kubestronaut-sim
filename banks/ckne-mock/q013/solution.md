@@ -1,0 +1,1 @@
+**Replacing Service logic with eBPF programs, without kube-proxy** is correct: Cilium implements ClusterIP/NodePort/LoadBalancer with eBPF (socket-level LB and XDP), eliminating kube-proxy and the iptables chains — reducing latency and improving scale. Check with `cilium status | grep KubeProxyReplacement`.

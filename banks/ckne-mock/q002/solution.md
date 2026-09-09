@@ -1,0 +1,1 @@
+**kube-controller-manager** is correct: The `kube-controller-manager` (via the NodeIPAM controller) splits the `--cluster-cidr` into subnets and assigns a `spec.podCIDR` to each node. Some CNIs (e.g., Calico with its own IPAM, Cilium cluster-pool) ignore this field and use their own IPAM.

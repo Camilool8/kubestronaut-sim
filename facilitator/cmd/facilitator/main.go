@@ -160,7 +160,7 @@ func runServer() error {
 	}
 
 	runner := evaluate.NewSSHRunner(cfg.sshKey)
-	g := newGrader(ex, mgr, runner, checkTimeout)
+	g := newGrader(ex, cfg.bankDir, mgr, runner, checkTimeout)
 	g.record = func(token string, snap session.Snapshot, res *evaluate.Results) error {
 		return recordAttempt(hist, mir, ex, token, snap, res)
 	}

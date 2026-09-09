@@ -1,0 +1,1 @@
+**A ReferenceGrant in "apps" allowing Gateways from "infra"** is correct: Cross-namespace references to Secrets require explicit consent from the Secret owner: a `ReferenceGrant` in "apps" with from (Gateway/infra) and to (Secret). Without it, the Gateway API denies for safety — preventing certificate exfiltration.

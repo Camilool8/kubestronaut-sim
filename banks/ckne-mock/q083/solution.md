@@ -1,0 +1,1 @@
+**Defining the implementation/controller that materializes Gateways** is correct: `GatewayClass` (cluster-scoped) says WHO implements: `controllerName` points at the controller (e.g., istio.io/gateway-controller, gateway.envoyproxy.io/...). A cluster can have several classes (internal, external, mesh) and each Gateway references one.

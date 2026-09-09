@@ -1,0 +1,1 @@
+**The CNI MTU minus the tunnel overhead (e.g., 1450)** is correct: The VXLAN header consumes ~50 bytes; if the pod sends 1500-byte frames, the encapsulated packet exceeds the physical MTU and gets dropped. Set the CNI MTU (the `mtu` field/auto-detection) to 1450 or enable jumbo frames (9000) on the physical network.

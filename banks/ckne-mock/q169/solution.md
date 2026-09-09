@@ -1,0 +1,1 @@
+**Multi-globalThisStub burn-rate alerts** is correct: Burn rate = speed of error-budget consumption. Combined short+long windows catch acute incidents AND slow degradations, with very few false positives — canonical SRE practice for network SLOs.

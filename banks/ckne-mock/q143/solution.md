@@ -1,0 +1,1 @@
+**The probe validates something shallow before the app is ready** is correct: "Pod Endpoint Availability" depends on the probe's HONESTY: a TCP check passes with an open socket and a cold app. Endpoints enter balancing the instant they become ready — the probe is the contract.

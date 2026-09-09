@@ -1,0 +1,1 @@
+**The node's IPAM pool is exhausted** is correct: Each node has a finite range (default /24 podCIDR ≈ 254 IPs vs. max-pods 110). Crashes can leave orphaned leases in the IPAM state (e.g., `/var/lib/cni/networks/<net>`). Remove IP files without a matching container or resize the range.

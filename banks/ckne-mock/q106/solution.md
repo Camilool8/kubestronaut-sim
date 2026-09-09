@@ -1,0 +1,1 @@
+**Calico policies with action: Deny and the order field** is correct: Calico policies have `order` and Allow/Deny/Log/Pass actions — a classic firewall model. A low-order Deny beats later allows. The native API lacks this; that's why regulated environments use CNI CRDs or AdminNetworkPolicy.

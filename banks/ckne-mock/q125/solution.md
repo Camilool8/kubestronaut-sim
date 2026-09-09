@@ -1,0 +1,1 @@
+**Samples in histogram buckets carrying trace IDs** is correct: Exemplars link metrics to traces: seeing p99 rise in Grafana, you click the slow bucket's exemplar and open the exact trace (Tempo/Jaeger) — uniting the three pillars (metrics → traces → logs) to find the hop responsible for the latency.

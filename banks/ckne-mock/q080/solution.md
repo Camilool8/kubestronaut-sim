@@ -1,0 +1,1 @@
+**Only the intersection is served** is correct: Listener↔route binding considers the hostname intersection: only names compatible with the listener hostname are programmed. The HTTPRoute status (Accepted/ResolvedRefs) shows the attach result — always check with `kubectl describe httproute`.

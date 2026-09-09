@@ -1,0 +1,1 @@
+**Rejected immediately (REJECT → "connection refused")** is correct: kube-proxy installs a reject rule for Services with no endpoints — the client gets an immediate "connection refused". Distinguishing refused (no endpoints/wrong port) from timeout (policy/route/firewall) speeds up troubleshooting a lot.

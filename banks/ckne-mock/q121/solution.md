@@ -1,0 +1,1 @@
+**pwru (packet, where are you?)** is correct: `pwru` (from Cilium) instruments the kernel with eBPF and prints the packet's journey function by function (netfilter hooks, routes, tc), including the drop reason/location — solving cases where tcpdump shows the packet entering but never leaving.

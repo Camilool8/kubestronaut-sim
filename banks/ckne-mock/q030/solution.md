@@ -1,0 +1,1 @@
+**Announce the pod CIDRs via BGP** is correct: BGP-capable CNIs establish sessions with the routers and announce each node's podCIDRs. The external network learns the routes and reaches pods directly, eliminating encapsulation/NAT.

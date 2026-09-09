@@ -1,0 +1,1 @@
+**nftables** is correct: The `nftables` mode (GA in Kubernetes 1.33) uses the successor API to iptables, with more efficient rule updates and better performance in clusters with many Services. eBPF (Cilium) remains the alternative outside kube-proxy.

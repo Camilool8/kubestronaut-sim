@@ -1,0 +1,1 @@
+**Identify the pod's veth interface on the host and run tcpdump -i vethXXXX** is correct: Each pod has a veth pair: one end inside the pod netns (eth0) and the other on the host (vethXXXX). Find the pair by comparing interface indexes and capture with `tcpdump -i vethXXXX`. Alternative: `nsenter -t <PID> -n tcpdump`.

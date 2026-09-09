@@ -18,6 +18,7 @@ type grader struct {
 
 	ex      *exam.Exam
 	bank    string
+	bankDir string
 	mgr     *session.Manager
 	runner  evaluate.Runner
 	timeout time.Duration
@@ -25,13 +26,13 @@ type grader struct {
 	record func(token string, snap session.Snapshot, res *evaluate.Results) error
 }
 
-func newGrader(ex *exam.Exam, mgr *session.Manager, runner evaluate.Runner, timeout time.Duration) *grader {
+func newGrader(ex *exam.Exam, bankDir string, mgr *session.Manager, runner evaluate.Runner, timeout time.Duration) *grader {
 
 	bank := ""
 	if ex != nil {
 		bank = ex.Name
 	}
-	return &grader{ex: ex, bank: bank, mgr: mgr, runner: runner, timeout: timeout}
+	return &grader{ex: ex, bank: bank, bankDir: bankDir, mgr: mgr, runner: runner, timeout: timeout}
 }
 
 func (g *grader) Grade() {
@@ -106,7 +107,7 @@ func (g *grader) evaluateResults() (*evaluate.Results, session.Snapshot, error) 
 
 	var res *evaluate.Results
 	if g.ex.Type == exam.TypeMCQ {
-		res = mcqgrade.Grade(g.ex, g.bank, g.mgr.Answers(), g.mgr.QuestionIDs())
+		res = mcqgrade.GradeIn(g.ex, g.bank, g.mgr.Answers(), g.mgr.QuestionIDs(), g.bankDir, snap.Language)
 	} else {
 		res = evaluate.Grade(g.ex, g.bank, g.runner, g.timeout, g.mgr.QuestionIDs())
 	}

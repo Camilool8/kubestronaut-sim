@@ -1,0 +1,1 @@
+**Sending to replicas that already have the LoRA adapter loaded** is correct: Servers like vLLM expose which LoRA adapters are loaded. The Endpoint Picker prioritizes replicas with the adapter hot — swapping adapters costs GPU time and degrades latency for everyone in the queue.

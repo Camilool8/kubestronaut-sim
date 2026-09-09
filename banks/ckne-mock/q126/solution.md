@@ -1,0 +1,1 @@
+**It inherits the NODE's resolv.conf** is correct: Classic naming trap: `Default` means "inherit from the node", breaking Service resolution. The policy actually applied to pods by default is `ClusterFirst`.

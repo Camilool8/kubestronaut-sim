@@ -1,0 +1,1 @@
+**Driver checksum offload miscomputed with VXLAN** is correct: A production classic: checksum offload on the VXLAN interface produces invalid checksums on certain kernel/driver combos. Disabling offload on the vtep fixes it — and explains "ping passes, the application hangs".

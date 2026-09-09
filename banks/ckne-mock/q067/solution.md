@@ -1,0 +1,1 @@
+**A restrictive L4 NetworkPolicy, or an MTU/PMTUD problem** is correct: Small ICMP crosses paths that drop large packets (MTU) and may be treated differently by policies. Test with `nc -zv`, compare small vs. large payloads (does `curl` of bigger files hang?) and review L4 policies.

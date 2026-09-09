@@ -1,0 +1,1 @@
+**In the cilium-ipsec-keys Secret** is correct: Cilium reads the key/algorithm from the `cilium-ipsec-keys` Secret. Rotation is operational: generate a new key with an incremented ID and the agents transition without downtime. WireGuard, in contrast, manages per-node keys automatically.

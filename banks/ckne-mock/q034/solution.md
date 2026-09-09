@@ -1,0 +1,1 @@
+**podSelector: {} with policyTypes: [Ingress] and no ingress rules** is correct: A `podSelector: {}` selects all pods; declaring `policyTypes: [Ingress]` with no rules blocks all inbound traffic. Careful: `ingress: [{}]` does the opposite — it allows everything.

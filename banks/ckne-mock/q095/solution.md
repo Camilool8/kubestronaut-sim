@@ -1,0 +1,1 @@
+**ECMP (Equal-Cost Multi-Path)** is correct: With ECMP, each flow (5-tuple hash) is sent to one of the announcing nodes — real network-layer balancing, with fast convergence when a node stops announcing (BFD speeds up detection).

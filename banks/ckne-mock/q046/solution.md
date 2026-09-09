@@ -1,0 +1,1 @@
+**coredns_dns_request_duration_seconds** is correct: Latency histograms, error rate by rcode and upstream healthcheck failures are the tripod of DNS monitoring. Rising SERVFAIL or p99 usually precedes widespread application failures.

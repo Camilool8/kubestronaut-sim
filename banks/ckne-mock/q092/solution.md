@@ -1,0 +1,1 @@
+**Broker, Gateway nodes and Lighthouse** is correct: The Broker (in one cluster or dedicated) syncs the endpoints; Gateway nodes establish encrypted tunnels between clusters (even with overlapping CIDRs, via Globalnet); Lighthouse resolves `clusterset.local`, implementing the MCS API.

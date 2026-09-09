@@ -1,0 +1,1 @@
+**The ClusterIP of the kube-dns Service** is correct: With `ClusterFirst`, the kubelet injects the ClusterIP of the `kube-dns` Service (set via `--cluster-dns`) as nameserver, plus search domains like `<ns>.svc.cluster.local` and `ndots:5`.

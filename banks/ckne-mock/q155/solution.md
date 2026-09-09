@@ -1,0 +1,1 @@
+**Pod IPs are ephemeral and may arrive SNATed; use selectors** is correct: Policies between workloads should use identity (labels), not addresses. The documentation itself restricts ipBlock to cluster-external IPs — the double risk: rotating IPs and NAT on the path.

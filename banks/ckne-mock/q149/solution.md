@@ -1,0 +1,1 @@
+**backendRefs references the InferencePool by group/kind** is correct: `backendRefs` is extensible by group/kind. Pointing at the InferencePool, the final endpoint decision leaves classic balancing and goes to the EPP (queue/KV-cache/LoRA metrics).

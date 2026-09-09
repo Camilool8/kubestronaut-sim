@@ -1,0 +1,1 @@
+**When the backend must terminate TLS itself** is correct: In `Passthrough`, the Gateway reads only the SNI from the ClientHello and forwards the encrypted bytes. You lose path/header routing (no L7 visibility), but the certificate stays under the backend's control.

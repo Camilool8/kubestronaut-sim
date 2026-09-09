@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type Certification = "KCNA" | "CKAD" | "CKA" | "CKS" | "KCSA";
+export type Certification = "KCNA" | "CKAD" | "CKA" | "CKS" | "KCSA" | "CKNE";
 
 const MARKS: Record<Certification, ReactNode> = {
   KCNA: (
@@ -40,6 +40,15 @@ const MARKS: Record<Certification, ReactNode> = {
       <rect x="4.4" y="10.6" width="15.2" height="10.2" rx="2.4" />
       <path d="M7.9 10.6V7.9a4.1 4.1 0 0 1 8.2 0v2.7" />
       <circle cx="12" cy="15.7" r="1.7" fill="currentColor" stroke="none" />
+    </>
+  ),
+
+  CKNE: (
+    <>
+      <rect x="8.5" y="2.5" width="7" height="5" rx="1.3" />
+      <rect x="2.5" y="15.5" width="7" height="5" rx="1.3" />
+      <rect x="14.5" y="15.5" width="7" height="5" rx="1.3" />
+      <path d="M12 7.5v4M6 15.5v-4h12v4" />
     </>
   ),
 };

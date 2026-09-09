@@ -1,0 +1,1 @@
+**ipBlock with cidr 203.0.113.0/24 and except 203.0.113.9/32** is correct: `ipBlock` accepts a `cidr` and an `except` list. Remember: with any egress policy, everything else gets blocked — including DNS; also allow port 53 to kube-dns.

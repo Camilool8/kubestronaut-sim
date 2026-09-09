@@ -1,0 +1,1 @@
+**Everything allowed between any pods (allow-any-any)** is correct: The Kubernetes network model is open by default: with no policies, there is no isolation at all. Hence the best practice of starting with per-namespace default-deny and explicitly allowing what's needed.

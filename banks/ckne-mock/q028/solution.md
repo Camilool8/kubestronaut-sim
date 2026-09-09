@@ -1,0 +1,1 @@
+**ServiceExport/ServiceImport** is correct: In the MCS API, exporting a Service with `ServiceExport` creates a `ServiceImport` in the other clusters, resolvable as `svc.ns.svc.clusterset.local`. Implementations: Cilium Cluster Mesh, Submariner, GKE MCS.

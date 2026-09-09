@@ -1,0 +1,1 @@
+**Ephemeral port exhaustion** is correct: The "open-close per request" pattern kills the client before the server: ~28k ephemeral ports ÷ 60s of TIME_WAIT ≈ a ceiling of ~470 new connections/s per destination. Pooling fixes it in the architecture, not in sysctl.

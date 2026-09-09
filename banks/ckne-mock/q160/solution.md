@@ -1,0 +1,1 @@
+**PERMISSIVE ALSO accepts plaintext** is correct: Audit trap: PERMISSIVE exists for migration (accepts mTLS AND plaintext). Verify with a sidecar-less test connection — if it gets in, there is no enforcement. Close it with STRICT per namespace.

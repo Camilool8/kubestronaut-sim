@@ -1,0 +1,1 @@
+**secretName, dnsNames and issuerRef** is correct: The Certificate declares the desired state; cert-manager issues via `issuerRef`, writes key+cert to the `secretName` Secret and renews automatically. The Gateway/Ingress then just references the Secret.

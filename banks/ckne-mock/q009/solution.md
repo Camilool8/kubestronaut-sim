@@ -1,0 +1,1 @@
+**Runs the plugin binary with CNI_COMMAND=ADD, config via stdin** is correct: CNI is a binary-execution contract: the runtime runs the plugin with env vars like `CNI_COMMAND=ADD`, `CNI_NETNS`, `CNI_IFNAME`, and the JSON config via stdin. The plugin returns JSON with IPs/routes. DEL is called on removal.

@@ -1,0 +1,1 @@
+**It receives NO new requests** is correct: Weight zero = fraction 0 of the traffic. It's intentionally valid: it keeps the backend "plugged in" so you can flip traffic instantly (0↔100) without editing the route structure.

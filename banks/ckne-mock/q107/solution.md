@@ -1,0 +1,1 @@
+**Cluster scope, priority and Allow/Deny/Pass actions** is correct: ANP gives administrators non-overridable guardrails (e.g., "never allow egress to cloud metadata") and BANP sets the cluster default when no user policy decides. Order: ANP → NetworkPolicy → BANP.

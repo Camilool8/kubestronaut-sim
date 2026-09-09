@@ -1,0 +1,1 @@
+**Including NOT-ready pods in DNS/endpoints too** is correct: Normally only ready pods enter DNS/endpoints — but a forming etcd/Cassandra cluster needs members to resolve each other BEFORE they're ready (chicken-and-egg). This field, common on StatefulSet headless Services, solves it.

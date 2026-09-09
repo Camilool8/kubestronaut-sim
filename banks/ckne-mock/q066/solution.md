@@ -1,0 +1,1 @@
+**kubectl run test --rm -it --image=busybox:1.36 -- nslookup kubernetes.default** is correct: This one-liner creates a pod, resolves `kubernetes.default` (exercising resolv.conf, search domains, CoreDNS and the kube-dns Service) and removes the pod on exit. Failures here point straight at the DNS/CNI subsystem.

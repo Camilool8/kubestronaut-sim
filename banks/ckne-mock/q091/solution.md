@@ -1,0 +1,1 @@
+**Configure the ip-masq-agent** is correct: `ip-masq-agent` controls masquerading per destination: CIDRs listed in nonMasqueradeCIDRs leave with the pod's original IP. CNIs have equivalents (Cilium ipMasqAgent, Calico natOutgoing per IPPool).

@@ -1,0 +1,1 @@
+**tcpdump -i any -n port 53 and host 10.0.1.5** is correct: `-i any` covers all interfaces (useful when you don't know the veth), `port 53` filters DNS (UDP and TCP) and `host 10.0.1.5` narrows to the pod. Add `-vvv` to see queried names and response rcodes.

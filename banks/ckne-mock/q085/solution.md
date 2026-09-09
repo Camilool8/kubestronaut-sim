@@ -1,0 +1,1 @@
+**A ReferenceGrant in the Service's namespace authorizing the route** is correct: Cross-namespace references are denied by default (protection against traffic "hijacking"). The destination namespace owner publishes a `ReferenceGrant` declaring from (kind/namespace) and to (kind/name) — only then does the route resolve.

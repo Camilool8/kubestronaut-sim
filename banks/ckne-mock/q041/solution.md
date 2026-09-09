@@ -1,0 +1,1 @@
+**cert-manager (Issuer/ClusterIssuer)** is correct: `cert-manager` issues certificates via Issuers (ACME, internal CA, Vault) and writes them to TLS Secrets, renewing before expiry. With the `cert-manager.io/cluster-issuer` annotation on the Gateway, it's all automatic.

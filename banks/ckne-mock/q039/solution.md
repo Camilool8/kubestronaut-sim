@@ -1,0 +1,1 @@
+**mTLS with automatically issued SPIFFE/SVID identities** is correct: Meshes give each workload a SPIFFE identity (e.g., `spiffe://cluster/ns/sa/…`) in short-lived X.509 certificates (SVIDs), establishing automatic mTLS based on ServiceAccount, not IP.

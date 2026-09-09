@@ -1,0 +1,1 @@
+**The Service selector doesn't match the pod labels** is correct: A Service without endpoints almost always means a mismatch between `spec.selector` and pod labels — or pods in another namespace, or none ready. Compare with `kubectl get pods --show-labels`.

@@ -1,0 +1,1 @@
+**No practical effect on the flow** is correct: Affinity is a function of the proxy over the VIP. Headless delivers pure DNS — the "balancer" is the resolver/client. Accepted configuration, null effect: an exam classic.

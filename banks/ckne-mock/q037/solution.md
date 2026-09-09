@@ -1,0 +1,1 @@
+**(A) is OR between the sources; (B) is AND (pods Y inside namespaces X)** is correct: Separate items in the `from` list are alternatives (OR); fields combined in the same item are joint conditions (AND). One extra dash completely changes the access scope.

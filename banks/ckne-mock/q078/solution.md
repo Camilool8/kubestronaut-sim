@@ -1,0 +1,1 @@
+**The more specific rule — longest path prefix** is correct: Gateway API precedence is deterministic: exact > longest prefix, then number of matched headers/query params; ties between HTTPRoutes go to the oldest (with alphabetical order as final tie-breaker). This avoids routing ambiguity.

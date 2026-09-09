@@ -1,0 +1,1 @@
+**requestMirror (shadow traffic)** is correct: `RequestMirror` implements shadowing: production keeps being served by the main backend while the new version receives identical traffic for error/latency validation — no user risk (unlike canary, which serves real responses).

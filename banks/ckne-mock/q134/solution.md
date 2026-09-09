@@ -1,0 +1,1 @@
+**Because ClusterIPs are virtual** is correct: They are distinct addressing planes processed by different mechanisms (routes/CNI vs. DNAT rules). Overlap produces the worst kind of bug: intermittent and rule-order dependent.

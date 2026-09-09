@@ -1,0 +1,1 @@
+**The pod's readinessProbe is failing, removing it from load balancing** is correct: The `readinessProbe` controls endpoint availability: while it fails, the pod stays not-ready in the EndpointSlice and receives no traffic. This is the core "Pod Endpoint Availability" mechanism. Check events with `kubectl describe pod`.

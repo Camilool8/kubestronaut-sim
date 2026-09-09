@@ -1,0 +1,1 @@
+**The rate() function detects counter resets** is correct: Essential PromQL semantics: `rate()`/`increase()` handle resets assuming continuity. Doing manual arithmetic with raw counters breaks on every restart — a common mistake in handcrafted queries.

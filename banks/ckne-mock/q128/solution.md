@@ -1,0 +1,1 @@
+**The second one fails with "address already in use"** is correct: The netns belongs to the sandbox (pause container); all the pod's containers share it — that's why localhost works between them and ports collide.

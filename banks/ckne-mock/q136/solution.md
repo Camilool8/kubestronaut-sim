@@ -1,0 +1,1 @@
+**ClusterIPs change on every Service recreation** is correct: The IP is dynamically allocated from the service range at creation (unless spec.clusterIP pins it). The stable Kubernetes contract is the NAME. Application-side DNS caching (JVM!) deserves attention after recreation.

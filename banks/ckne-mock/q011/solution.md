@@ -1,0 +1,1 @@
+**ClusterIP** is correct: `ClusterIP` is the default: a stable virtual IP, resolvable via internal DNS, with L4 balancing to the endpoints. NodePort opens a port on every node; LoadBalancer provisions an external LB; ExternalName is just a CNAME.

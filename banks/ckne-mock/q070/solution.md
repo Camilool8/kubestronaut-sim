@@ -1,0 +1,1 @@
+**Running a DNS cache on each node** is correct: NodeLocal DNSCache (a DaemonSet) intercepts queries on the node itself at a link-local IP (e.g., 169.254.20.10), answering from cache and upgrading to TCP toward CoreDNS — mitigating the classic conntrack races with DNS/UDP.

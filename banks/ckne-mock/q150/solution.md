@@ -1,0 +1,1 @@
+**SNAT source-port exhaustion** is correct: SNAT multiplexes everything into (egressIP, port): the tuple (proto, srcIP, srcPort, dst) must be unique. At scale, the ~64k ports run out — port exhaustion. The typical symptom of a centralized NAT funnel.

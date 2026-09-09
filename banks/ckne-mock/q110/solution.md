@@ -1,0 +1,1 @@
+**PeerAuthentication with mtls.mode: STRICT** is correct: `PeerAuthentication STRICT` (per namespace or mesh-wide) makes sidecars/ztunnel accept only mTLS. PERMISSIVE mode (default) accepts both — useful during migration, but should be closed in production.

@@ -1,0 +1,1 @@
+**Exploding cardinality: labels per ephemeral pod/veth/IP** is correct: Series per ephemeral entity (pod hash, veth, IP) accumulate forever. The golden rule of network observability: label by the STABLE (namespace/workload), not the ephemeral.

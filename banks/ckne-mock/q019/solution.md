@@ -1,0 +1,1 @@
+**Gateway is managed by the infrastructure operator and defines listeners/addresses** is correct: Persona-oriented model: `GatewayClass` (implementation), `Gateway` (infra: listeners, ports, TLS) and `HTTPRoute` (app: matches, filters, backends). The route references the Gateway in `parentRefs` and Services in `backendRefs`.

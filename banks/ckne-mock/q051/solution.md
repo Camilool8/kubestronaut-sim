@@ -1,0 +1,1 @@
+**Compare node_nf_conntrack_entries with node_nf_conntrack_entries_limit** is correct: Every NATed connection occupies a conntrack entry. Full table = silent drops and intermittent failures. Monitor the entries/limit ratio in node_exporter and tune `nf_conntrack_max`.

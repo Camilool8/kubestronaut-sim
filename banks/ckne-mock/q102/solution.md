@@ -1,0 +1,1 @@
+**No: NetworkPolicy is namespaced** is correct: The `spec.podSelector` selects targets ONLY in the policy's namespace. The `namespaceSelector` appears only in from/to rules (defining allowed sources/destinations), never to choose who gets isolated. For cluster scope, use AdminNetworkPolicy or CNI CRDs.

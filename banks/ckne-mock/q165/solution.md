@@ -1,0 +1,1 @@
+**cilium connectivity test** is correct: `cilium connectivity test` is the canonical post-install/upgrade smoke test: it covers cases manual tests forget (hairpin, local/remote NodePort, L3–L7 policies, DNS) and pinpoints the exact failing scenario.

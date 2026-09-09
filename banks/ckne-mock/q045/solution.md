@@ -1,0 +1,1 @@
+**Allow egress to the kube-dns pods** is correct: With deny-all egress, even queries to CoreDNS are blocked — classic symptom: `could not resolve host` for everything. Allow UDP and TCP 53 (TCP is used for large/truncated responses).

@@ -1,0 +1,1 @@
+**requestHeaderModifier** is correct: The `RequestHeaderModifier` filter adds/sets/removes headers on the request path (there's also ResponseHeaderModifier). `URLRewrite` changes hostname/path; `RequestMirror` mirrors traffic to another backend.

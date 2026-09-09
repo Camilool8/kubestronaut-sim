@@ -1,0 +1,1 @@
+**KUBE-SERVICES** is correct: The `KUBE-SERVICES` chain (called from PREROUTING/OUTPUT in the nat table) holds one rule per Service, jumping to `KUBE-SVC-*` chains that balance to `KUBE-SEP-*` chains (endpoints, where DNAT happens). Debug with `iptables -t nat -L KUBE-SERVICES`.

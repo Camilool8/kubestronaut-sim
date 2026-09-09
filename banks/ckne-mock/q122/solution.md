@@ -1,0 +1,1 @@
+**Add the log plugin to the Corefile block** is correct: The `log` plugin prints each query (name, type, rcode, duration) to CoreDNS stdout. Given the volume, use temporarily or scoped (e.g., `log example.com`). For continuous, per-pod auditing, prefer Hubble DNS metrics/flows.

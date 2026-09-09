@@ -1,0 +1,1 @@
+**crictl inspect to get the PID, then nsenter -t `<PID>` -n** is correct: `crictl ps` + `crictl inspect --output go-template --template '{{.info.pid}}'` give the PID; `nsenter -t PID -n ip addr` (or ss, tcpdump…) runs commands inside the pod netns using the host's tools.

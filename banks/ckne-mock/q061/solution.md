@@ -1,0 +1,1 @@
+**cluster-cidr and service-cluster-ip-range with two blocks** is correct: Dual-stack requires dual CIDRs in the control plane, a compatible CNI and, per Service, the `ipFamilyPolicy` field (SingleStack, PreferDualStack, RequireDualStack) + `ipFamilies`. Pods get one IP of each family in `status.podIPs`.

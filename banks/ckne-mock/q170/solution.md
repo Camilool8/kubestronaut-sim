@@ -1,0 +1,1 @@
+**The flow log confirms the root cause** is correct: DROPPED flows targeting kube-dns:53 right after applying an egress policy = the unmistakable signature of the forgotten DNS rule. Hubble turns "DNS mysteriously stopped" into visible cause and effect.

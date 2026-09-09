@@ -1,0 +1,1 @@
+**Yes: enforcement is stateful** is correct: NetworkPolicies operate on connections (conntrack), not packet by packet: allowing the initiating direction is enough. Confusing this with stateless ACLs leads to redundant, misleading "response" policies.

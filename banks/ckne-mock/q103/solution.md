@@ -1,0 +1,1 @@
+**namespaceSelector with the kubernetes.io/metadata.name label** is correct: Every namespace automatically gets the immutable label `kubernetes.io/metadata.name`. Using it in the namespaceSelector lets you reference namespaces by name without relying on manual labels.

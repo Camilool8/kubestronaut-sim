@@ -1,0 +1,1 @@
+**Two backendRefs on the HTTPRoute with weights 90 and 10** is correct: HTTPRoute supports native traffic splitting: multiple `backendRefs` with weights. You can also route the canary by header/cookie with `matches.headers` in a separate rule.

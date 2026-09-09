@@ -1,0 +1,1558 @@
+apiVersion: sim.kubestronaut.dev/v1alpha2
+kind: Exam
+metadata:
+  name: ckne-mock
+  title: CKNE Mock Exam
+  certification: CKNE
+  description: >-
+    Kubernetes networking end to end: CNI and IPAM, Services and DNS,
+    Gateway API, NetworkPolicy and encryption, observability. 75 of 170
+    questions each attempt, weighted to the five domains the Linux
+    Foundation published, every answer explained, in seven languages.
+    The real CKNE is hands-on; this bank drills the knowledge behind it.
+spec:
+  examType: mcq
+  duration: 90m
+  speedDuration: 45m
+  passingScore: 66
+  kubernetesVersion: "1.35"
+  domainWeights:
+    Core Infrastructure and CNI: 15
+    Service Networking and DNS: 25
+    Advanced Traffic Management: 20
+    Network Security and Policy: 25
+    Observability: 15
+  examLength: 75
+  language: en
+  translations: [pt, es, de, fr, ru, ar]
+  questions:
+    - id: q001
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "/etc/kubernetes/cni/"
+        - "/opt/cni/bin/"
+        - "/etc/cni/net.d/"
+        - "/var/lib/cni/conf/"
+      correct: [2]
+    - id: q002
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "kubelet"
+        - "kube-controller-manager"
+        - "kube-scheduler at pod bind time"
+        - "kube-proxy in IPVS mode"
+      correct: [1]
+    - id: q003
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "tcpdump -i eth0 on the node, since all pod traffic passes through eth0 unchanged"
+        - "It's not possible; tcpdump only works inside the pod"
+        - "Identify the pod's veth interface on the host and run tcpdump -i vethXXXX"
+        - "Run tcpdump -i lo, since pods use the host loopback"
+      correct: [2]
+    - id: q004
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "The CoreDNS pod IP directly"
+        - "The ClusterIP of the kube-dns Service"
+        - "127.0.0.53 (systemd-resolved)"
+        - "The node's resolv.conf, copied unchanged"
+      correct: [1]
+    - id: q005
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "KUBE-NODEPORTS"
+        - "KUBE-SERVICES"
+        - "CNI-ISOLATION"
+        - "KUBE-FORWARD"
+      correct: [1]
+    - id: q006
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "Create two Services pointing to the same pod"
+        - "Multus CNI with a NetworkAttachmentDefinition and the k8s.v1.cni.cncf.io/networks annotation on the pod"
+        - "Enable hostNetwork: true on the pod"
+        - "kubectl expose with --interfaces=2 to generate a managed second NIC"
+      correct: [1]
+    - id: q007
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "kube-scheduler is misconfigured"
+        - "The VXLAN UDP port is blocked between the nodes"
+        - "Pods need hostPort for cross-node traffic"
+        - "CoreDNS is down"
+      correct: [1]
+    - id: q008
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "The node's kernel version"
+        - "The search and ndots entries in the pod's /etc/resolv.conf"
+        - "Whether the pod has hostNetwork enabled in its spec"
+        - "Whether kube-proxy is in IPVS or iptables mode"
+      correct: [1]
+    - id: q009
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "Sends a NetworkRequest CRD to the apiserver"
+        - "Writes directly into the pod netns routing tables"
+        - "Calls the CNI plugin's REST API over HTTPS"
+        - "Runs the plugin binary with CNI_COMMAND=ADD, config via stdin"
+      correct: [3]
+    - id: q010
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "Loses external connectivity"
+        - "Gets an IP from the pod CIDR as usual"
+        - "Only talks to pods in the same namespace"
+        - "It shares the node's network namespace and uses the node's IP"
+      correct: [3]
+    - id: q011
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "NodePort"
+        - "ClusterIP"
+        - "ExternalName"
+        - "LoadBalancer"
+      correct: [1]
+    - id: q012
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "Native L7 (HTTP) balancing support with header inspection"
+        - "O(1) forwarding complexity and balancing algorithms"
+        - "It doesn't need the conntrack module"
+        - "It encrypts pod-to-pod traffic"
+      correct: [1]
+    - id: q013
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "Delegating Service resolution to CoreDNS with a dedicated plugin"
+        - "Running two kube-proxy instances per node"
+        - "Replacing Service logic with eBPF programs, without kube-proxy"
+        - "Using an HTTP proxy instead of kube-proxy"
+      correct: [2]
+    - id: q014
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "Add a server block to the Corefile"
+        - "Edit /etc/hosts on every node"
+        - "Create an ExternalName Service named corp.example.com"
+        - "Add the zone to the kubelet with --cluster-domain"
+      correct: [0]
+    - id: q015
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "A CNAME record to the kube-apiserver"
+        - "The Service's ClusterIP"
+        - "Always NXDOMAIN"
+        - "A/AAAA records with the IPs of each ready pod matching the selector"
+      correct: [3]
+    - id: q016
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "CoreDNS keeps crashing"
+        - "kube-proxy only works with pods declared ready: true in the manifest"
+        - "The pod's readinessProbe is failing, removing it from load balancing"
+        - "The ClusterIP expired"
+      correct: [2]
+    - id: q017
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "EndpointSlice"
+        - "PodDisruptionBudget"
+        - "BackendConfig"
+        - "ServiceEntry"
+      correct: [0]
+    - id: q018
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "publishNotReadyAddresses: true"
+        - "topologyKeys"
+        - "externalTrafficPolicy: Local"
+        - "sessionAffinity: ClientIP"
+      correct: [3]
+    - id: q019
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "Both do the same thing, HTTPRoute is just the new name"
+        - "Gateway defines routing rules; HTTPRoute defines listeners"
+        - "Gateway is managed by the infrastructure operator and defines listeners/addresses"
+        - "HTTPRoute replaces the Service; Gateway replaces the Deployment"
+      correct: [2]
+    - id: q020
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "The Gateway's listeners.allowedRoutes.namespaces field"
+        - "The backend Service must be NodePort"
+        - "HTTPRoutes only work in the Gateway's namespace, no exceptions"
+        - "The HTTPRoute needs hostNetwork"
+      correct: [0]
+    - id: q021
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "The ClusterIP is in use by another Service"
+        - "CoreDNS needs a restart"
+        - "The Service selector doesn't match the pod labels"
+        - "The Service lacks the endpoints annotation"
+      correct: [2]
+    - id: q022
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "8000–9000"
+        - "30000–32767"
+        - "1024–2048"
+        - "49152–65535"
+      correct: [1]
+    - id: q023
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "Forwards only to node-local endpoints, preserving the client IP"
+        - "Restricts access to clients on the same subnet"
+        - "Forces IPVS mode"
+        - "Disables balancing and sends everything to the first endpoint"
+      correct: [0]
+    - id: q024
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "Gateway API Inference Extension"
+        - "the CNCF LLMProxy Operator"
+        - "MetalLB AI mode"
+        - "Kubeflow Pipelines Serving"
+      correct: [0]
+    - id: q025
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "Requests have extremely variable cost"
+        - "GPUs can't handle more than one TCP connection"
+        - "LLMs don't use HTTP"
+        - "kube-proxy blocks AI traffic"
+      correct: [0]
+    - id: q026
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "Enlarge the pod CIDR"
+        - "Use hostPort on the pods"
+        - "Switch the Service to ExternalName"
+        - "Configure an Egress Gateway"
+      correct: [3]
+    - id: q027
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "Creates a NodePort with a custom name"
+        - "It requires a cloud-provisioned LoadBalancer to work"
+        - "Returns a CNAME to an external DNS name, no proxy, no endpoints"
+        - "Assigns a fixed external IP to the pod"
+      correct: [2]
+    - id: q028
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "ExternalDNS, with external.local"
+        - "ClusterFederation v1, with federated.local"
+        - "ServiceExport/ServiceImport"
+        - "Shared NodePort, with nodes.local"
+      correct: [2]
+    - id: q029
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "Restart kube-proxy — iptables or ipvs modes"
+        - "CoreDNS — forward or rewrite modes"
+        - "MetalLB — L2 mode (ARP/NDP) or BGP mode"
+        - "kubeadm — init or join modes"
+      correct: [2]
+    - id: q030
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "Create one NodePort per pod"
+        - "Announce the pod CIDRs via BGP"
+        - "Enable hostNetwork on all pods"
+        - "Increase ndots in resolv.conf"
+      correct: [1]
+    - id: q031
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "Create 10 replicas of the old version and 1 of the new"
+        - "sessionAffinity: Canary on the Service"
+        - "Two backendRefs on the HTTPRoute with weights 90 and 10"
+        - "Use two Gateways with the same hostname"
+      correct: [2]
+    - id: q032
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "Increase the request/idle timeouts on the Gateway/HTTPRoute"
+        - "Disable TLS to reduce handshake latency"
+        - "Lower the kernel keepalive"
+        - "Switch the Service to UDP, which has no timeouts"
+      correct: [0]
+    - id: q033
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "A single etcd shared across clusters"
+        - "Unique, non-overlapping PodCIDRs and ClusterIDs, plus direct connectivity between the clusters' nodes"
+        - "All clusters in the same availability zone"
+        - "The exact same kernel version on all nodes"
+      correct: [1]
+    - id: q034
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "podSelector: {} with policyTypes: [Ingress] and no ingress rules"
+        - "Excluding the namespace from the CNI"
+        - "podSelector: deny-all with policyTypes: [Ingress]"
+        - "A policy with ingress: [{}] covering all pods"
+      correct: [0]
+    - id: q035
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "Policies require numeric priority ordering"
+        - "The last applied policy overrides earlier ones"
+        - "Policies are additive (allow-list)"
+        - "Policies work even without CNI support"
+      correct: [2]
+    - id: q036
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "Add the host to /etc/hosts as a blackhole"
+        - "ipBlock doesn't support exceptions"
+        - "Two separate policies: one allow and one deny"
+        - "ipBlock with cidr 203.0.113.0/24 and except 203.0.113.9/32"
+      correct: [3]
+    - id: q037
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "(B) is syntactically invalid and rejected by the apiserver"
+        - "They are identical"
+        - "(A) is OR between the sources; (B) is AND (pods Y inside namespaces X)"
+        - "(A) applies only to egress; (B) only to ingress"
+      correct: [2]
+    - id: q038
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "kube-proxy in IPVS mode"
+        - "NetworkPolicy with an encrypt: true field"
+        - "WireGuard or IPsec encryption in the CNI"
+        - "TLS in CoreDNS"
+      correct: [2]
+    - id: q039
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "Basic Auth on the kubelet"
+        - "A shared password distributed in a ConfigMap"
+        - "The apiserver's NodeRestriction admission plugin"
+        - "mTLS with automatically issued SPIFFE/SVID identities"
+      correct: [3]
+    - id: q040
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "Mounting the certificate as a hostPath in each kube-proxy"
+        - "Via a tls=true annotation on the Service"
+        - "On the Gateway listener, with tls.mode: Terminate and certificateRefs"
+        - "On the HTTPRoute, spec.tls.cert field"
+      correct: [2]
+    - id: q041
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "kubeadm certs renew scheduled via a CronJob"
+        - "cert-manager (Issuer/ClusterIssuer)"
+        - "openssl-operator"
+        - "kubelet serving certs"
+      correct: [1]
+    - id: q042
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "When the backend must terminate TLS itself"
+        - "When no certificate is available on the backend"
+        - "Passthrough is only for UDP"
+        - "Always, since it's faster"
+      correct: [0]
+    - id: q043
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "RBAC Role + RoleBinding"
+        - "PodSecurityPolicy"
+        - "Native NetworkPolicy with an httpRules field per method"
+        - "AuthorizationPolicy with from.source.principals and to.operation"
+      correct: [3]
+    - id: q044
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "They can't filter by hostname/L7"
+        - "They only apply to the kube-system namespace"
+        - "They require pod restarts on every change"
+        - "They don't work with TCP"
+      correct: [0]
+    - id: q045
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "Allow ingress on port 443"
+        - "Recreate the kube-dns Service"
+        - "Allow egress to the kube-dns pods"
+        - "Move CoreDNS to hostNetwork"
+      correct: [2]
+    - id: q046
+      domain: Observability
+      multi: false
+      options:
+        - "kubelet_running_pods"
+        - "coredns_dns_request_duration_seconds"
+        - "node_cpu_seconds_total"
+        - "etcd_disk_wal_fsync_duration_seconds"
+      correct: [1]
+    - id: q047
+      domain: Observability
+      multi: false
+      options:
+        - "etcdctl watch /network"
+        - "CriticTool"
+        - "kubectl top pods --network"
+        - "Hubble (observe, UI, metrics)"
+      correct: [3]
+    - id: q048
+      domain: Observability
+      multi: false
+      options:
+        - "Ping with NTP-synchronized timestamps"
+        - "SNMP polling on the switches"
+        - "kubectl logs -f on all pods"
+        - "Distributed tracing propagating the traceparent header"
+      correct: [3]
+    - id: q049
+      domain: Observability
+      multi: false
+      options:
+        - "p99 uses less memory"
+        - "The average is impossible to compute in Prometheus"
+        - "There is no practical difference"
+        - "The average hides the tail: p99 exposes the worst 1% of requests"
+      correct: [3]
+    - id: q050
+      domain: Observability
+      multi: false
+      options:
+        - "kube-scheduler logs"
+        - "Datapath flow logs (Hubble, Calico, VPC flow logs)"
+        - "kubectl get events"
+        - "kube-apiserver audit log at RequestResponse level"
+      correct: [1]
+    - id: q051
+      domain: Observability
+      multi: false
+      options:
+        - "Restarting the CNI fixes it for good"
+        - "Compare node_nf_conntrack_entries with node_nf_conntrack_entries_limit"
+        - "Watch apiserver_request_total; scale the apiserver"
+        - "Check coredns_cache_hits_total; clear the CoreDNS cache"
+      correct: [1]
+    - id: q052
+      domain: Observability
+      multi: false
+      options:
+        - "node_boot_time_seconds"
+        - "container_fs_usage_bytes"
+        - "kubeproxy_dns_latency_seconds_total"
+        - "kubeproxy_sync_proxy_rules_duration_seconds"
+      correct: [3]
+    - id: q053
+      domain: Observability
+      multi: false
+      options:
+        - "Packet loss on the path (MTU/fragmentation, full queues, bad link) forcing TCP retransmissions"
+        - "That DNS is slow"
+        - "That etcd needs compaction"
+        - "That the Deployment lacks replicas"
+      correct: [0]
+    - id: q054
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "Choosing the plugin based on the pod's namespace"
+        - "Running each plugin on a different node"
+        - "Defining alternative plugins, used only if the first one fails"
+        - "Chaining: plugins run in sequence"
+      correct: [3]
+    - id: q055
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "Restart the kubelet with --debug-netns"
+        - "Editing the node's /etc/network/interfaces and reloading"
+        - "crictl inspect to get the PID, then nsenter -t `<PID>` -n"
+        - "ssh directly to the pod IP"
+      correct: [2]
+    - id: q056
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "Because host-local requires external DHCP"
+        - "host-local allocates per node, uncoordinated, and can duplicate IPs"
+        - "Because it is faster on every CNI ADD and DEL operation"
+        - "Because whereabouts only supports IPv6"
+      correct: [1]
+    - id: q057
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "The cluster DNS is down"
+        - "The node's IPAM pool is exhausted"
+        - "The kubelet is out of memory"
+        - "The apiserver is throttling requests"
+      correct: [1]
+    - id: q058
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "free -m"
+        - "lsof -i"
+        - "systemctl status conntrack"
+        - "conntrack -L | grep `<pod-IP>`"
+      correct: [3]
+    - id: q059
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "tcpdump -i lo udp port 53 -c 100"
+        - "tcpdump -i any -n port 53 and host 10.0.1.5"
+        - "tcpdump -n tcp port 80 and host 10.0.1.5"
+        - "tcpdump -i eth0 icmp and host 10.0.1.5"
+      correct: [1]
+    - id: q060
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "Routes to the other nodes' podCIDRs via the neighbor node IP"
+        - "/32 routes for every pod in the entire cluster"
+        - "No pod-related routes"
+        - "Only the default route pointing at the physical gateway"
+      correct: [0]
+    - id: q061
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "Just swapping the CNI"
+        - "Dual-stack is not supported in Kubernetes"
+        - "Only adding AAAA records to CoreDNS"
+        - "cluster-cidr and service-cluster-ip-range with two blocks"
+      correct: [3]
+    - id: q062
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "The CNI MTU minus the tunnel overhead (e.g., 1450)"
+        - "Reduce the replica count"
+        - "Raise the pod MTU to 9000"
+        - "Disable TCP and use only UDP in the pods"
+      correct: [0]
+    - id: q063
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "Two kube-proxy replicas"
+        - "Raising CPU requests"
+        - "hostPort + NodePort combined on the same physical port"
+        - "Multus + SR-IOV CNI + device plugin, handing NIC VFs to the pod"
+      correct: [3]
+    - id: q064
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "Whether etcd is compacted and free of space alarms"
+        - "Whether the node has a GPU"
+        - "Whether the CNI DaemonSet runs on the node and a config exists in /etc/cni/net.d/"
+        - "Whether kube-scheduler is on the node"
+      correct: [2]
+    - id: q065
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "None — the pod IP is always internet-routable"
+        - "It is converted to IPv6"
+        - "SNAT/masquerade: the source IP becomes the node's IP"
+        - "Traffic is blocked by default"
+      correct: [2]
+    - id: q066
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "ping 8.8.8.8 from your machine"
+        - "kubectl get nodes -o wide checking INTERNAL-IP and version"
+        - "kubectl run test --rm -it --image=busybox:1.36 -- nslookup kubernetes.default"
+        - "kubectl top pods --containers across kube-system"
+      correct: [2]
+    - id: q067
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "A restrictive L4 NetworkPolicy, or an MTU/PMTUD problem"
+        - "ICMP is disabled in both nodes' kernels"
+        - "DNS is down in the pod's namespace"
+        - "The pod needs root privileges"
+      correct: [0]
+    - id: q068
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "Because the command was deprecated"
+        - "Runtimes don't create named netns; use lsns -t net"
+        - "Because you must be root and use sudo twice"
+        - "Because pods don't use namespaces"
+      correct: [1]
+    - id: q069
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "CoreDNS is corrupted and answers late"
+        - "The record TTL is zero"
+        - "ndots:5 expansion via search domains (use a trailing-dot FQDN)"
+        - "Insufficient bandwidth between the nodes and CoreDNS"
+      correct: [2]
+    - id: q070
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "Blocking external queries"
+        - "Running a DNS cache on each node"
+        - "Replacing CoreDNS"
+        - "Serving only PTR records"
+      correct: [1]
+    - id: q071
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "Caches responses for up to 30 s, cutting upstream load"
+        - "Limits each pod to 30 queries"
+        - "Raises every record's TTL to 30 minutes"
+        - "Creates 30 CoreDNS replicas"
+      correct: [0]
+    - id: q072
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "socketd"
+        - "ebtables"
+        - "nftables"
+        - "tc"
+      correct: [2]
+    - id: q073
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "They are synonyms"
+        - "port is the Service's own port"
+        - "Only nodePort is mandatory"
+        - "port belongs to the container, targetPort to the node, nodePort to the Service"
+      correct: [1]
+    - id: q074
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "It's faster"
+        - "The name references each pod's named containerPort"
+        - "It avoids conflicts with NodePort"
+        - "Port names are mandatory in the Gateway API"
+      correct: [1]
+    - id: q075
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "Including NOT-ready pods in DNS/endpoints too"
+        - "Ignoring the livenessProbe"
+        - "Publishing the Service on the internet via LoadBalancer"
+        - "Duplicating the endpoints"
+      correct: [0]
+    - id: q076
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "TXT records with the Service YAML"
+        - "SRV in the form _port._proto.service.ns.svc.cluster.local"
+        - "MX records for each named port of the Service"
+        - "NS records per namespace"
+      correct: [1]
+    - id: q077
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "A selector-less Service + a manual EndpointSlice with the external IPs"
+        - "Installing the database in-cluster as a StatefulSet"
+        - "Impossible without rewriting kube-proxy"
+        - "Use hostNetwork"
+      correct: [0]
+    - id: q078
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "Always the first in the YAML"
+        - "The choice is random"
+        - "Neither; the request is rejected with a 404"
+        - "The more specific rule — longest path prefix"
+      correct: [3]
+    - id: q079
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "requestHeaderModifier"
+        - "corsPolicy"
+        - "urlRewrite"
+        - "requestMirror"
+      correct: [0]
+    - id: q080
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "Both hostnames work"
+        - "Only the intersection is served"
+        - "The Gateway adopts app.other.com automatically"
+        - "The whole route is rejected"
+      correct: [1]
+    - id: q081
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "Blocks all traffic coming from outside the cluster"
+        - "Replaces CoreDNS"
+        - "Delivers internal traffic only to endpoints on the client's node"
+        - "Enables internal mTLS"
+      correct: [2]
+    - id: q082
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "CoreDNS is down on every replica"
+        - "That node's kube-proxy is down or didn't program the rules"
+        - "The namespace is being deleted in the background"
+        - "The container image is wrong"
+      correct: [1]
+    - id: q083
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "Defining the implementation/controller that materializes Gateways"
+        - "Grouping HTTPRoutes by version"
+        - "Defining TLS certificates"
+        - "Mandatorily replacing IngressClass across the cluster"
+      correct: [0]
+    - id: q084
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "They are redirected to the apiserver"
+        - "Rejected immediately (REJECT → \"connection refused\")"
+        - "They queue in the kernel until a pod comes up"
+        - "They get an HTTP 404 generated by kube-proxy itself"
+      correct: [1]
+    - id: q085
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "Recreate the Service as NodePort"
+        - "A ReferenceGrant in the Service's namespace authorizing the route"
+        - "Nothing, cross-namespace references are allowed by default"
+        - "Put the Gateway in kube-system"
+      correct: [1]
+    - id: q086
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "Training the model inside the cluster"
+        - "Mapping the model name to an InferencePool, with criticality"
+        - "Defining how many GPUs each node exposes to the scheduler"
+        - "Replacing the model server's Deployment"
+      correct: [1]
+    - id: q087
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "It's not a problem; gateways read JSON natively"
+        - "Switch the protocol to UDP"
+        - "Use NodePort"
+        - "Gateways route by path/header/SNI, not by body"
+      correct: [3]
+    - id: q088
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "Using only NVIDIA GPUs"
+        - "Sending to replicas that already have the LoRA adapter loaded"
+        - "Compressing responses"
+        - "Balancing by prompt hash across all replicas"
+      correct: [1]
+    - id: q089
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "ServiceEntry"
+        - "EgressClass"
+        - "OutboundPolicy"
+        - "ExternalName"
+      correct: [0]
+    - id: q090
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "selectors, destinationCIDRs and egressGateway with egressIP"
+        - "the resource's name, namespace, labels and annotations"
+        - "port, targetPort and nodePort"
+        - "ingress, egress and policyTypes"
+      correct: [0]
+    - id: q091
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "Use hostNetwork on all pods"
+        - "Configure the ip-masq-agent"
+        - "Turn off kube-proxy"
+        - "Impossible without a service mesh"
+      correct: [1]
+    - id: q092
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "Broker, Gateway nodes and Lighthouse"
+        - "Hub, Spoke and Wheel"
+        - "Master, Worker and Etcd"
+        - "Ingress, Egress and Midgress"
+      correct: [0]
+    - id: q093
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "ClusterSetIP provides a single VIP balancing across clusters"
+        - "There is no difference"
+        - "ClusterSetIP is IPv4-only and Headless is IPv6-only"
+        - "Headless is always faster than ClusterSetIP"
+      correct: [0]
+    - id: q094
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "Same name/namespace + the service.cilium.io/global annotation"
+        - "Expose via NodePort on all nodes"
+        - "Copy the ClusterIP manually"
+        - "Only via an Ingress shared between the clusters"
+      correct: [0]
+    - id: q095
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "ECMP (Equal-Cost Multi-Path)"
+        - "Reverse NAT at the edge router"
+        - "DNS round-robin with a low TTL"
+        - "STP (Spanning Tree Protocol) between the switches"
+      correct: [0]
+    - id: q096
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "It requires a commercial MetalLB Enterprise license"
+        - "All traffic for a VIP enters through ONE elected node"
+        - "It doesn't support TCP, only UDP"
+        - "It doesn't work with IPv4, only dual-stack IPv6"
+      correct: [1]
+    - id: q097
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "TCPRoute attached to a TCP listener on the Gateway"
+        - "UDPRoute"
+        - "HTTPRoute with a /postgres path match"
+        - "GRPCRoute"
+      correct: [0]
+    - id: q098
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "requestMirror (shadow traffic)"
+        - "urlRewrite"
+        - "retryPolicy"
+        - "backendRefs with weight 50/50"
+      correct: [0]
+    - id: q099
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "One NodePort per service opened in every cluster"
+        - "A dedicated east-west gateway exposes services across clusters (mTLS)"
+        - "Permanent kubectl port-forward"
+        - "VPN on developers' laptops"
+      correct: [1]
+    - id: q100
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "Encrypting all traffic; the trade-off is CPU usage"
+        - "Keeping traffic within the same availability zone"
+        - "Reducing DNS lookups; the trade-off is cache"
+        - "Increasing replicas; the trade-off is memory"
+      correct: [1]
+    - id: q101
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "Only traffic within the same namespace is allowed"
+        - "Only TCP traffic is allowed"
+        - "Everything blocked by default"
+        - "Everything allowed between any pods (allow-any-any)"
+      correct: [3]
+    - id: q102
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "Only if the CNI is Calico"
+        - "Yes, with the cross-namespace annotation"
+        - "No: NetworkPolicy is namespaced"
+        - "Yes, if it uses namespaceSelector"
+      correct: [2]
+    - id: q103
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "ipBlock with the namespace CIDR"
+        - "Writing the literal name into a from.namespace field"
+        - "namespaceSelector with the kubernetes.io/metadata.name label"
+        - "It's not possible to select by name"
+      correct: [2]
+    - id: q104
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "NetworkPolicy doesn't support ranges"
+        - "Use the RANGE protocol"
+        - "Listing all 2768 ports one by one in several rules"
+        - "Use port: 30000 with endPort: 32767 in the same entry"
+      correct: [3]
+    - id: q105
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "hostAliases on the pod"
+        - "Native NetworkPolicy with a dns field"
+        - "CiliumNetworkPolicy with toFQDNs"
+        - "ipBlock with all GitHub ranges updated manually"
+      correct: [2]
+    - id: q106
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "Explicit deny is impossible in any CNI"
+        - "Calico policies with action: Deny and the order field"
+        - "With a deny=true annotation on the native policy"
+        - "By deleting the CNI"
+      correct: [1]
+    - id: q107
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "A firewall for the internet only"
+        - "It replaces RBAC for network traffic"
+        - "Cluster scope, priority and Allow/Deny/Pass actions"
+        - "Nothing, it's just a NetworkPolicy rename"
+      correct: [2]
+    - id: q108
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "cilium status | grep Encryption"
+        - "kubectl get secrets"
+        - "ping between the pods"
+        - "Look at the pod colors in the dashboard"
+      correct: [0]
+    - id: q109
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "Hardcoded in the agent image"
+        - "In a file on the admin's laptop"
+        - "In the cilium-ipsec-keys Secret"
+        - "No key is needed with IPsec"
+      correct: [2]
+    - id: q110
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "NetworkPolicy with a tls field"
+        - "Gateway with allowInsecure: false"
+        - "PeerAuthentication with mtls.mode: STRICT"
+        - "DestinationRule with tls: DISABLE"
+      correct: [2]
+    - id: q111
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "To save disk space on the nodes"
+        - "To force daily pod restarts"
+        - "A short globalThisStub for compromised certificates, no reliance on revocation"
+        - "Because TLS mandates 24h expiry per an IETF rule"
+      correct: [2]
+    - id: q112
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "Put the Gateway in kube-system"
+        - "Annotate the Secret as public"
+        - "A ReferenceGrant in \"apps\" allowing Gateways from \"infra\""
+        - "Copy the Secret manually into the infra namespace"
+      correct: [2]
+    - id: q113
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "key, cert and ca in plain text"
+        - "host, path and backend"
+        - "secretName, dnsNames and issuerRef"
+        - "image, replicas and ports"
+      correct: [2]
+    - id: q114
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "DNS-01 (a TXT record _acme-challenge in DNS)"
+        - "TLS-ALPN-01 only, on port 443"
+        - "No challenge, wildcards are issued automatically"
+        - "HTTP-01"
+      correct: [0]
+    - id: q115
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "TCPRoute with the tls: true field enabled"
+        - "HTTPRoute in Secure mode"
+        - "CertRoute with automatic SNI"
+        - "TLSRoute, on a TLS listener in Passthrough mode"
+      correct: [3]
+    - id: q116
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "RequestAuthentication + AuthorizationPolicy requiring requestPrincipals"
+        - "Native NetworkPolicy with a dedicated jwt field"
+        - "Basic Auth in a ConfigMap"
+        - "Validation only in the frontend, before reaching the gateway"
+      correct: [0]
+    - id: q117
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "No: encryption covers traffic crossing the network BETWEEN nodes"
+        - "Yes, always"
+        - "Only for UDP"
+        - "Only if the pods are in different namespaces"
+      correct: [0]
+    - id: q118
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "Delete all Services"
+        - "Only policyTypes: [Ingress] with podSelector: {}"
+        - "podSelector: {} with policyTypes: [Ingress, Egress] and no ingress/egress rules"
+        - "podSelector: {} with ingress: [{}] and egress: [{}] declared"
+      correct: [2]
+    - id: q119
+      domain: Observability
+      multi: false
+      options:
+        - "Only CPU usage"
+        - "dns, drop, tcp, flow, icmp, http"
+        - "Cloud billing metrics"
+        - "Only text logs"
+      correct: [1]
+    - id: q120
+      domain: Observability
+      multi: false
+      options:
+        - "Replicas, nodes, namespaces and CRDs installed in the cluster"
+        - "Latency, bytes/s, 5xx/retrans errors and conntrack saturation"
+        - "Commits, builds, deploys and rollbacks per day"
+        - "CPU, memory, disk and uptime of the worker nodes"
+      correct: [1]
+    - id: q121
+      domain: Observability
+      multi: false
+      options:
+        - "a detailed kubectl describe pod"
+        - "df -h"
+        - "top"
+        - "pwru (packet, where are you?)"
+      correct: [3]
+    - id: q122
+      domain: Observability
+      multi: false
+      options:
+        - "Add the log plugin to the Corefile block"
+        - "Permanent tcpdump on all nodes"
+        - "Enable audit on the kube-apiserver"
+        - "DNS logging is not possible"
+      correct: [0]
+    - id: q123
+      domain: Observability
+      multi: false
+      options:
+        - "Synthetic monitoring with Blackbox Exporter"
+        - "Only pod logs"
+        - "kubectl get events every minute via cron"
+        - "Adding Prometheus and Grafana replicas"
+      correct: [0]
+    - id: q124
+      domain: Observability
+      multi: false
+      options:
+        - "hubble observe --verdict DROPPED"
+        - "kubectl logs cilium"
+        - "hubble encrypt --all --follow"
+        - "hubble delete flows --verdict ALL"
+      correct: [0]
+    - id: q125
+      domain: Observability
+      multi: false
+      options:
+        - "Ready-made Grafana dashboards"
+        - "Email alerts with charts attached"
+        - "Prometheus backup replicas"
+        - "Samples in histogram buckets carrying trace IDs"
+      correct: [3]
+    - id: q126
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "It uses a fixed 8.8.8.8"
+        - "It disables DNS entirely"
+        - "It inherits the NODE's resolv.conf"
+        - "It uses the cluster DNS, as the name suggests"
+      correct: [2]
+    - id: q127
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "They are identical"
+        - "NodePort only works in the cloud"
+        - "hostPort is safer and balances better"
+        - "hostPort opens the port ONLY on the node where the pod runs"
+      correct: [3]
+    - id: q128
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "It works: each container has its own network namespace"
+        - "The kubelet creates a second IP"
+        - "Traffic is balanced between them"
+        - "The second one fails with \"address already in use\""
+      correct: [3]
+    - id: q129
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "ICMP requires NodePort"
+        - "The Service is broken and curl uses a cache"
+        - "VIPs are DNAT rules, with no interface to answer ICMP"
+        - "The firewall blocks curl"
+      correct: [2]
+    - id: q130
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "IPIP uses IP protocol 4 (not TCP/UDP), often blocked by cloud security groups/firewalls that only allow TCP/UDP/ICMP"
+        - "The MTU increased by itself"
+        - "IPIP no longer exists"
+        - "kube-proxy hates IPIP"
+      correct: [0]
+    - id: q131
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "The kernel doesn't support TCP over VXLAN"
+        - "Out of memory"
+        - "MTU set too high on every physical interface"
+        - "Driver checksum offload miscomputed with VXLAN"
+      correct: [3]
+    - id: q132
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "Disable VXLAN"
+        - "MTU 65535 on the pods"
+        - "Raise the physical MTU to 9000 and set pods to 8950"
+        - "Keeping 1450 — mandatory with any VXLAN"
+      correct: [2]
+    - id: q133
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "CNI DEL; without it, IP leases are orphaned in IPAM"
+        - "CNI FLUSH; etcd removes the IP"
+        - "None; the kernel always cleans everything itself"
+        - "CNI REMOVE; nothing happens"
+      correct: [0]
+    - id: q134
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "Because DNS requires equal ranges"
+        - "Because ClusterIPs are virtual"
+        - "They can overlap without issues"
+        - "For configuration aesthetics"
+      correct: [1]
+    - id: q135
+      domain: Core Infrastructure and CNI
+      multi: false
+      options:
+        - "LOWERLAYERDOWN is the normal state"
+        - "The pod needs more CPU"
+        - "DNS is misconfigured"
+        - "The other end of the veth pair"
+      correct: [3]
+    - id: q136
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "The old IP comes back in 24h"
+        - "They should use the pod IP directly"
+        - "Services cannot be recreated"
+        - "ClusterIPs change on every Service recreation"
+      correct: [3]
+    - id: q137
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "CoreDNS blocks TLS"
+        - "The ExternalName type supports neither HTTPS nor TLS passthrough"
+        - "A NodePort exposing port 443 is missing"
+        - "The target's certificate is for api.partner.com (SAN mismatch)"
+      correct: [3]
+    - id: q138
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "No practical effect on the flow"
+        - "It turns the Service into NodePort"
+        - "Always a validation error"
+        - "Perfect per-client affinity"
+      correct: [0]
+    - id: q139
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "A direct tunnel to ONE pod via the apiserver, off the Service path"
+        - "Production always uses another cluster and image"
+        - "port-forward uses UDP"
+        - "port-forward is slower"
+      correct: [0]
+    - id: q140
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "Missing RBAC for the CoreDNS ServiceAccount"
+        - "A corrupted image in the internal registry"
+        - "The node's resolv.conf points to 127.0.0.53"
+        - "Too many replicas"
+      correct: [2]
+    - id: q141
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "kube-proxy is down on that node"
+        - "The application binds only to localhost"
+        - "It needs hostNetwork"
+        - "Port 8080 is reserved by the kubelet"
+      correct: [1]
+    - id: q142
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "pod-name.cluster.local"
+        - "The dashed IP: 10-244-1-5.default.pod.cluster.local"
+        - "pods.default.svc"
+        - "No record is ever created for pods"
+      correct: [1]
+    - id: q143
+      domain: Service Networking and DNS
+      multi: false
+      options:
+        - "The probe validates something shallow before the app is ready"
+        - "kube-proxy is always too slow"
+        - "EndpointSlices have a mandatory 3s delay"
+        - "502s are normal in rollouts"
+      correct: [0]
+    - id: q144
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "It still receives half the traffic"
+        - "The route is rejected"
+        - "weight: 0 is invalid"
+        - "It receives NO new requests"
+      correct: [3]
+    - id: q145
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "Nothing — matches is mandatory"
+        - "Everything on the hostname(s)/listener"
+        - "Only GET /"
+        - "Only HTTPS"
+      correct: [1]
+    - id: q146
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "The browser strips headers"
+        - "The Gateway API doesn't support header matches"
+        - "Whether the header match sits in the SAME rule as the weights"
+        - "Weights always beat headers"
+      correct: [2]
+    - id: q147
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "Annotate the Gateway with the master node's static-ip"
+        - "The HTTPRoute must come before the Gateway"
+        - "A VIP provider (LB-IPAM/MetalLB) for the address is missing"
+        - "Restart the apiserver"
+      correct: [2]
+    - id: q148
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "It reduces response size"
+        - "It compresses the model before each request"
+        - "It avoids the TLS handshake between the gateway and each replica"
+        - "It reuses the prefix KV-cache, avoiding a full prefill"
+      correct: [3]
+    - id: q149
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "backendRefs references the InferencePool by group/kind"
+        - "Via an inference=true annotation"
+        - "By swapping the Gateway for a DaemonSet"
+        - "Impossible; backendRefs only accepts Service"
+      correct: [0]
+    - id: q150
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "DNS limit"
+        - "The kernel bandwidth limit on the gateway node"
+        - "Pods-per-node limit"
+        - "SNAT source-port exhaustion"
+      correct: [3]
+    - id: q151
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "Only if one cluster is IPv6"
+        - "No, overlapping CIDRs prevent any connection"
+        - "Yes, with Globalnet: virtual CIDRs + cross-cluster NAT"
+        - "Yes, with no configuration at all"
+      correct: [2]
+    - id: q152
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "Switching BGP to L2 always"
+        - "Graceful Restart (keeps routes during restart) and BFD (ms detection)"
+        - "Adding CoreDNS and kube-apiserver replicas during the upgrade"
+        - "Lowering the tunnel MTU between the nodes"
+      correct: [1]
+    - id: q153
+      domain: Advanced Traffic Management
+      multi: false
+      options:
+        - "Sharing the same root CA / trust domain"
+        - "Using the same namespace in both"
+        - "Temporarily turning off mTLS between the clusters"
+        - "Assigning public IPs to every pod in the mesh"
+      correct: [0]
+    - id: q154
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "It is applied normally"
+        - "It blocks all egress"
+        - "It causes a validation error"
+        - "It is ignored: policyTypes decides what is enforced"
+      correct: [3]
+    - id: q155
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "ipBlock expires in 24h and must be renewed"
+        - "A /32 CIDR is invalid in NetworkPolicy rules"
+        - "The frontend needs hostNetwork to be selectable"
+        - "Pod IPs are ephemeral and may arrive SNATed; use selectors"
+      correct: [3]
+    - id: q156
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "hostNetwork enables an administrative network mode"
+        - "NetworkPolicies have a known bug with TCP keepalive"
+        - "The policy only covers TCP, and the access uses UDP"
+        - "Its traffic originates from the NODE's IP, not a pod IP with identity"
+      correct: [3]
+    - id: q157
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "Only for 30 seconds"
+        - "No, the response must be allowed in egress"
+        - "Yes: enforcement is stateful"
+        - "Only with UDP"
+      correct: [2]
+    - id: q158
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "namespaceSelector: {} (empty) matches ALL namespaces in the cluster"
+        - "The empty selector matches no namespace (empty set)"
+        - "The empty selector is invalid syntax rejected at admission"
+        - "No difference"
+      correct: [0]
+    - id: q159
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "Native NetworkPolicy with an httpRules field for HTTP methods"
+        - "Only an external firewall at the datacenter edge"
+        - "L7 rules (e.g., CiliumNetworkPolicy with toPorts.rules.http method/path)"
+        - "endPort covering the HTTP port range is enough"
+      correct: [2]
+    - id: q160
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "PERMISSIVE encrypts only half the packets"
+        - "STRICT breaks TLS"
+        - "None, PERMISSIVE is safe"
+        - "PERMISSIVE ALSO accepts plaintext"
+      correct: [3]
+    - id: q161
+      domain: Network Security and Policy
+      multi: false
+      options:
+        - "It only logs, without blocking"
+        - "A validation error"
+        - "It allows everything (empty spec = no restriction)"
+        - "It DENIES all traffic in the namespace"
+      correct: [3]
+    - id: q162
+      domain: Observability
+      multi: false
+      options:
+        - "CoreDNS is out of memory"
+        - "CoreDNS was compromised"
+        - "A DNS tunneling attack"
+        - "Normal ndots:5 behavior: external names get expanded through the search domains generating legitimate NXDOMAINs before the right answer"
+      correct: [3]
+    - id: q163
+      domain: Observability
+      multi: false
+      options:
+        - "A bad network cable on one of the nodes"
+        - "CoreDNS is slow under any load"
+        - "Zero TTL on the records returned by upstream"
+        - "A conntrack race condition with parallel UDP queries"
+      correct: [3]
+    - id: q164
+      domain: Observability
+      multi: false
+      options:
+        - "The rate() function detects counter resets"
+        - "Prometheus forbids restarts"
+        - "Counters never reset"
+        - "The kubelet resends the old data"
+      correct: [0]
+    - id: q165
+      domain: Observability
+      multi: false
+      options:
+        - "ping -c 1 8.8.8.8"
+        - "kubectl get all"
+        - "cilium delete --all"
+        - "cilium connectivity test"
+      correct: [3]
+    - id: q166
+      domain: Observability
+      multi: false
+      options:
+        - "The kernel is corrupted"
+        - "Low MTU"
+        - "Missing DNS"
+        - "Ephemeral port exhaustion"
+      correct: [3]
+    - id: q167
+      domain: Observability
+      multi: false
+      options:
+        - "Grafana's dark theme"
+        - "Charts with too many colors"
+        - "Too many dashboards open at once"
+        - "Exploding cardinality: labels per ephemeral pod/veth/IP"
+      correct: [3]
+    - id: q168
+      domain: Observability
+      multi: false
+      options:
+        - "kubectl top nodes during peak hours"
+        - "Adding service replicas and watching the graphs"
+        - "iperf3 between pods on the two nodes, compared with the same-node case"
+        - "Reading the datacenter capacity documentation"
+      correct: [2]
+    - id: q169
+      domain: Observability
+      multi: false
+      options:
+        - "A single fixed alert at 1% errors"
+        - "Multi-globalThisStub burn-rate alerts"
+        - "Turning alerts off at night"
+        - "Alert on every individual error"
+      correct: [1]
+    - id: q170
+      domain: Observability
+      multi: false
+      options:
+        - "kube-dns changed ports"
+        - "The flow log confirms the root cause"
+        - "CoreDNS crashed, taking resolution down"
+        - "Hubble is wrong for this kind of flow"
+      correct: [1]

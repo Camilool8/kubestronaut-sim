@@ -1,0 +1,1 @@
+**conntrack -L | grep `<pod-IP>`** is correct: `conntrack -L` lists the kernel connection-tracking table: you see the original tuple (pod→ClusterIP) and the translated one (pod→endpoint) after kube-proxy's DNAT — essential to confirm the Service NAT is happening.

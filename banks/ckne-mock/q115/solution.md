@@ -1,0 +1,1 @@
+**TLSRoute, on a TLS listener in Passthrough mode** is correct: `TLSRoute` matches the ClientHello SNI and forwards the encrypted stream intact to the backend (which terminates TLS). It's the mechanism to expose multiple end-to-end TLS services behind a single IP.

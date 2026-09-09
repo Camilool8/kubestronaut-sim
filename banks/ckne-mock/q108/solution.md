@@ -1,0 +1,1 @@
+**cilium status | grep Encryption** is correct: Three-layer validation: the agent reports the mode, `wg show` confirms peers with recent handshakes, and a capture on the physical NIC must show only WireGuard packets (UDP 51871) instead of clear payload between pod IPs.

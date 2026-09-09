@@ -1,0 +1,1 @@
+**Mapping the model name to an InferencePool, with criticality** is correct: `InferenceModel` associates the logical model name (what the client requests) with the `InferencePool` serving it, defines criticality (for prioritization/shedding under load) and enables canary between model versions/adapters.

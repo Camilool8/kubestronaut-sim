@@ -1,0 +1,1 @@
+**The node's resolv.conf points to 127.0.0.53** is correct: The `loop` plugin exists exactly to catch this cycle: forward → local stub → CoreDNS again. The kubelet's `--resolv-conf` flag (or equivalent config) solves it.
