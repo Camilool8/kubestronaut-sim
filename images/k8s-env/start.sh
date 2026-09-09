@@ -20,8 +20,14 @@ rm -f /shared/ready
 # fresh node's kubelet start clean; kind's own docs recommend 512/524288
 # for multi-node setups, but this bank can stack aux clusters on top of
 # the main five, so the instance ceiling is padded well past that.
-echo 8192 > /proc/sys/fs/inotify/max_user_instances
-echo 524288 > /proc/sys/fs/inotify/max_user_watches
+# Non-namespaced sysctls: a rootless container (podman machine's default)
+# gets EPERM and can't raise them — the sim wrapper sets them on the VM
+# instead. Fail soft here so rootless boots don't abort; rootful engines
+# (Docker Desktop, rootful podman) still write through to the host/VM kernel.
+echo 8192 > /proc/sys/fs/inotify/max_user_instances 2>/dev/null || \
+  echo "warning: could not set fs.inotify.max_user_instances (expected under rootless podman)" >&2
+echo 524288 > /proc/sys/fs/inotify/max_user_watches 2>/dev/null || \
+  echo "warning: could not set fs.inotify.max_user_watches (expected under rootless podman)" >&2
 
 phase dockerd "Starting the container runtime" 1
 dockerd-entrypoint.sh &

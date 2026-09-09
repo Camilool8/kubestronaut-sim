@@ -267,6 +267,21 @@ aux_up() {
     sleep 2
   done
 
+  # Same kubeadm:cluster-admins binding gap as the main cluster (bootstrap.sh);
+  # without it the aux admin.conf is Forbidden and the question's setup.sh
+  # apply calls fail. Apply via the node's super-admin.conf.
+  docker exec -i "${cluster}-control-plane" kubectl \
+    --kubeconfig /etc/kubernetes/super-admin.conf apply -f - <<'EOF'
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: kubeadm:cluster-admins}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: cluster-admin}
+subjects:
+  - kind: Group
+    name: kubeadm:cluster-admins
+    apiGroup: rbac.authorization.k8s.io
+EOF
+
   # Then the contract's reachability promise: root ssh on the reserved port.
   deadline=$(( $(date +%s) + 60 ))
   until ssh -i /shared/ssh/id_ed25519 -p "$ssh_port" \

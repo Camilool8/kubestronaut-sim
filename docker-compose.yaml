@@ -38,7 +38,9 @@ services:
       - course-1:/opt/course
       - containers-1:/var/lib/containers
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
-    cap_add: [SYS_ADMIN, SYS_CHROOT, MKNOD, SETFCAP, SYS_RESOURCE]
+    # sshd's PAM session writes an audit record on login/logout (needs
+    # CAP_AUDIT_WRITE); podman drops it from defaults, Docker ships it.
+    cap_add: [SYS_ADMIN, SYS_CHROOT, MKNOD, SETFCAP, SYS_RESOURCE, AUDIT_WRITE]
     security_opt: ["seccomp=unconfined", "apparmor=unconfined"]
     devices: ["/dev/fuse"]
     cgroup: host
@@ -61,7 +63,9 @@ services:
       - course-2:/opt/course
       - containers-2:/var/lib/containers
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
-    cap_add: [SYS_ADMIN, SYS_CHROOT, MKNOD, SETFCAP, SYS_RESOURCE]
+    # sshd's PAM session writes an audit record on login/logout (needs
+    # CAP_AUDIT_WRITE); podman drops it from defaults, Docker ships it.
+    cap_add: [SYS_ADMIN, SYS_CHROOT, MKNOD, SETFCAP, SYS_RESOURCE, AUDIT_WRITE]
     security_opt: ["seccomp=unconfined", "apparmor=unconfined"]
     devices: ["/dev/fuse"]
     cgroup: host
@@ -109,6 +113,10 @@ services:
   conductor:
     build: conductor
     hostname: conductor
+    # Under rootless podman (SELinux Enforcing) /var/run/docker.sock is a
+    # symlink to a user_tmp_t socket the container_t conductor can't reach;
+    # label=disable lifts that. No-op on Docker Desktop (no SELinux).
+    security_opt: ["label=disable"]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./banks:/banks:ro

@@ -233,6 +233,22 @@ for i in $(seq 1 60); do
   sleep 3
 done
 
+# kubeadm 1.30+ ships admin.conf with O=kubeadm:cluster-admins (super-admin.conf
+# keeps system:masters), but kindest/node v1.35 omits the kubeadm:cluster-admins
+# -> cluster-admin binding, so admin.conf is Forbidden and the Calico apply below
+# would fail. Create it via the node's super-admin.conf (always system:masters).
+docker exec -i sim-control-plane kubectl \
+  --kubeconfig /etc/kubernetes/super-admin.conf apply -f - <<'EOF'
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: kubeadm:cluster-admins}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: cluster-admin}
+subjects:
+  - kind: Group
+    name: kubeadm:cluster-admins
+    apiGroup: rbac.authorization.k8s.io
+EOF
+
 phase cni "Installing the pod network" 5
 echo "installing Calico (NetworkPolicy enforcement)..."
 preload_images /opt/sim/calico.yaml
