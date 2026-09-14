@@ -206,6 +206,20 @@ phase create-cluster "Creating the Kubernetes cluster" 3
 created=0
 if ! kind get clusters 2>/dev/null | grep -qx sim; then
 
+  # A new cluster needs an empty data dir. The tmpfs outlives every cluster
+  # built on it: `kind delete cluster` destroys the node containers, but the
+  # etcd data lives in THIS container's mount namespace, so it is still there
+  # when the next create bind-mounts it into a brand new control plane. etcd
+  # then resumes the previous cluster instead of bootstrapping one. kubeadm
+  # init survives that, and the worker join dies on the Node object the old
+  # cluster left behind -- `a Node with name "sim-worker" and status "Ready"
+  # already exists`, which is the whole recreate failing at step 3. A
+  # single-node bank has no join to fail on, so it silently comes up holding
+  # the previous attempt's namespaces instead. Clearing on the create path
+  # only leaves the resume path, where this is a live etcd's data dir,
+  # untouched.
+  find "${etcd_tmpfs}" -mindepth 1 -delete
+
   node_ref="${NODE_IMAGE}"
   [ -f /opt/sim/images/_node.tar ] && node_ref="${NODE_IMAGE%%@*}"
   echo "creating a ${nodes}-node cluster"
