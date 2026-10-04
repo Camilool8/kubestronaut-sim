@@ -160,6 +160,11 @@ type examResponse struct {
 	// per-question tier deliberately stays server-side: it shapes the
 	// draw, it is not something to brace a candidate with mid-attempt.
 	LevelMixed bool `json:"levelMixed,omitempty"`
+
+	// The language the bank is written in, and the others every question
+	// can be served in. Absent translations means the bank has none.
+	Language     string   `json:"language,omitempty"`
+	Translations []string `json:"translations,omitempty"`
 }
 
 type environmentInfo struct {
@@ -218,6 +223,8 @@ func (s *server) handleExam(w http.ResponseWriter, r *http.Request) {
 		QuestionCount:     s.declaredQuestionCount(),
 		HasTips:           s.ex.HasTips,
 		LevelMixed:        len(s.ex.DifficultyMix) > 0,
+		Language:          s.ex.Language,
+		Translations:      s.ex.Translations,
 
 		Questions: make([]examQuestionInfo, 0, len(pool)),
 	}
@@ -362,6 +369,21 @@ type questionResponse struct {
 	Markdown string   `json:"markdown"`
 	Options  []string `json:"options,omitempty"`
 	Multi    bool     `json:"multi,omitempty"`
+
+	// The language the markdown and options are in.
+	Language string `json:"language,omitempty"`
+}
+
+// attemptLanguage is the language the running (or ended) attempt was
+// started in, or the bank's own when none was asked for. A translation
+// that vanished since the start is a bank edit mid-attempt, which the
+// caller reports as a 500 rather than silently falling back to English.
+func (s *server) attemptLanguage() string {
+	lang := s.mgr.Snapshot().Language
+	if !s.ex.Translated(lang) {
+		return s.ex.Language
+	}
+	return lang
 }
 
 func (s *server) handleQuestion(w http.ResponseWriter, r *http.Request) {
@@ -375,26 +397,41 @@ func (s *server) handleQuestion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	md, err := os.ReadFile(filepath.Join(s.bankDir, id, "question.md"))
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	writeJSON(w, http.StatusOK, questionResponse{
+	resp := questionResponse{
 		ID:       q.ID,
 		Title:    q.Title,
 		Instance: q.Instance,
 		Domain:   q.Domain,
-		Markdown: string(md),
 		Options:  q.Options,
 		Multi:    q.Multi,
-	})
+		Language: s.attemptLanguage(),
+	}
+	if s.ex.Translated(resp.Language) {
+		tr, err := exam.ReadTranslation(s.bankDir, id, resp.Language)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		resp.Markdown = tr.Question
+		if len(tr.Options) > 0 {
+			resp.Options = tr.Options
+		}
+	} else {
+		md, err := os.ReadFile(filepath.Join(s.bankDir, id, "question.md"))
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		resp.Markdown = string(md)
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 type solutionResponse struct {
 	ID       string `json:"id"`
 	Markdown string `json:"markdown"`
+	Language string `json:"language,omitempty"`
 
 	Docs []solutionDoc `json:"docs,omitempty"`
 }
@@ -419,13 +456,23 @@ func (s *server) handleSolution(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	md, err := os.ReadFile(filepath.Join(s.bankDir, id, "solution.md"))
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, err.Error())
-		return
+	resp := solutionResponse{ID: id, Language: s.attemptLanguage()}
+	if s.ex.Translated(resp.Language) {
+		tr, err := exam.ReadTranslation(s.bankDir, id, resp.Language)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		resp.Markdown = tr.Solution
+	} else {
+		md, err := os.ReadFile(filepath.Join(s.bankDir, id, "solution.md"))
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		resp.Markdown = string(md)
 	}
 
-	resp := solutionResponse{ID: id, Markdown: string(md)}
 	for _, d := range q.Docs {
 		resp.Docs = append(resp.Docs, solutionDoc{Label: d.Label, URL: d.URL})
 	}
@@ -601,6 +648,7 @@ type sessionResponse struct {
 	Seed         string   `json:"seed,omitempty"`
 	PoolDigest   string   `json:"poolDigest,omitempty"`
 	DomainFilter []string `json:"domainFilter,omitempty"`
+	Language     string   `json:"language,omitempty"`
 
 	Preparing *preparingInfo `json:"preparing,omitempty"`
 
@@ -620,6 +668,7 @@ func toSessionResponse(snap session.Snapshot) sessionResponse {
 		Seed:             snap.Seed,
 		PoolDigest:       snap.PoolDigest,
 		DomainFilter:     snap.DomainFilter,
+		Language:         snap.Language,
 	}
 	if !snap.StartedAt.IsZero() {
 		resp.StartedAt = snap.StartedAt.Format(time.RFC3339Nano)
@@ -660,6 +709,13 @@ func (s *server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "unknown mode "+body.Mode)
 		return
 	}
+	if !s.ex.HasLanguage(body.Language) {
+		writeJSONError(w, http.StatusBadRequest, "this exam is not available in language "+body.Language)
+		return
+	}
+	if !s.ex.Translated(body.Language) {
+		body.Language = ""
+	}
 
 	drawn, err := exam.Draw(s.ex, exam.DrawOptions{Seed: body.Seed, Domains: body.Domains})
 	if err != nil {
@@ -679,6 +735,7 @@ func (s *server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 		Seed:         drawn.Seed,
 		PoolDigest:   drawn.PoolDigest,
 		DomainFilter: drawn.Domains,
+		Language:     body.Language,
 	}
 
 	if s.seedRequired() {
@@ -747,6 +804,10 @@ type startRequest struct {
 	Domains []string `json:"domains"`
 
 	PoolDigest string `json:"poolDigest"`
+
+	// One of the bank's languages; empty or the base language means the
+	// bank's own files.
+	Language string `json:"language"`
 }
 
 func (s *server) handleSessionFocus(w http.ResponseWriter, r *http.Request) {

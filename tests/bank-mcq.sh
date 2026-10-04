@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 python3 - "$@" <<'PY'
-import os, re, sys, glob
+import glob, hashlib, json, os, re, sys
 
 TOLERANCE = 2.0
 MIN_SOLUTION = 200
@@ -173,6 +173,125 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
             fail(bank, f"{qid} is multi but lists {len(correct)} correct indices, "
                        f"want 2..{n - 1}")
 
+    # Translations: spec.translations names the languages every question
+    # ships an i18n/<lang>.md for, in three sections, with exactly as many
+    # options as exam.yaml — the answer key is shared, so the order is too.
+    # A file for a language the bank does not declare is cruft nothing
+    # serves, and fails the same way an undeclared question directory does.
+    lm = re.search(r"^\s*language:\s*(\S+)\s*$", text, re.M)
+    base_lang = lm.group(1) if lm else "en"
+    tm = re.search(r"^\s*translations:\s*\[([^\]]*)\]\s*$", text, re.M)
+    translations = [t.strip() for t in tm.group(1).split(",") if t.strip()] if tm else []
+    if not re.match(r"^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$", base_lang):
+        fail(bank, f"spec.language {base_lang!r} is not a language code")
+    for lang in translations:
+        if not re.match(r"^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$", lang):
+            fail(bank, f"spec.translations entry {lang!r} is not a language code")
+    if len(set(translations)) != len(translations) or base_lang in translations:
+        fail(bank, f"spec.translations repeats a language or lists the base language {base_lang}")
+
+    SECTION_RE = re.compile(r"^##\s+(Question|Options|Solution)\s*$", re.M | re.I)
+    DIGEST_RE = re.compile(r"^<!--\s*options-digest:\s*([0-9a-f]{12})\s*-->\s*$", re.M)
+
+    def scalar(val):
+        """The value exam.yaml's reader hands the facilitator: a double-
+        quoted scalar unescaped, a single-quoted one with '' folded."""
+        if len(val) >= 2 and val[0] == val[-1] == '"':
+            try:
+                return json.loads(val)
+            except ValueError:
+                return val[1:-1]
+        if len(val) >= 2 and val[0] == val[-1] == "'":
+            return val[1:-1].replace("''", "'")
+        return val
+
+    def options_digest(raw_options):
+        return hashlib.sha256("\n".join(scalar(o) for o in raw_options).encode("utf-8")).hexdigest()[:12]
+
+    for q in questions:
+        qid = q["id"]
+        qdir = os.path.join(bank_dir, qid)
+        opts = parse_options(q["options"]) or []
+        i18n_dir = os.path.join(qdir, "i18n")
+        on_disk_langs = sorted(
+            f[:-3] for f in os.listdir(i18n_dir) if f.endswith(".md")
+        ) if os.path.isdir(i18n_dir) else []
+        for extra in sorted(set(on_disk_langs) - set(translations)):
+            fail(bank, f"{qid}/i18n/{extra}.md exists but spec.translations does not list {extra}")
+        for lang in translations:
+            path = os.path.join(i18n_dir, lang + ".md")
+            if not os.path.isfile(path):
+                fail(bank, f"{qid}/i18n/{lang}.md is missing — spec.translations promises every question in {lang}")
+                continue
+            body = open(path, encoding="utf-8").read().replace("\r\n", "\n")
+            heads = [m.group(1).lower() for m in SECTION_RE.finditer(body)]
+            if heads.count("question") != 1 or heads.count("solution") != 1 or heads.count("options") != 1:
+                fail(bank, f"{qid}/i18n/{lang}.md must have one `## Question`, one `## Options` and one `## Solution`")
+                continue
+            parts = {}
+            locs = list(SECTION_RE.finditer(body))
+            for i, m in enumerate(locs):
+                end = locs[i + 1].start() if i + 1 < len(locs) else len(body)
+                parts[m.group(1).lower()] = body[m.end():end].strip()
+            if not parts["question"]:
+                fail(bank, f"{qid}/i18n/{lang}.md has an empty `## Question`")
+            lines = [l.strip() for l in parts["options"].splitlines() if l.strip()]
+            if any(not l.startswith("- ") for l in lines):
+                fail(bank, f"{qid}/i18n/{lang}.md: `## Options` must be one `- option` per line")
+            elif len(lines) != len(opts):
+                fail(bank, f"{qid}/i18n/{lang}.md has {len(lines)} options, exam.yaml has {len(opts)}")
+            else:
+                # The translation says which option list it was made from
+                # (text and order); any option the translator left in the
+                # original language must not have moved. Both mirror the
+                # facilitator's load-time checks in exam/i18n.go.
+                want = options_digest([m.group(1) for m in re.finditer(r"[ \t]+-[ \t]+(\S.*?)\s*$", q["options"], re.M)])
+                dm = DIGEST_RE.search(body)
+                if dm is None:
+                    fail(bank, f"{qid}/i18n/{lang}.md has no `<!-- options-digest: {want} -->` line")
+                elif dm.group(1) != want:
+                    fail(bank, f"{qid}/i18n/{lang}.md was made from a different option list "
+                               f"(digest {dm.group(1)}, exam.yaml is now {want}); redo the translation")
+                base = {scalar(o): i for i, o in enumerate(
+                    m.group(1) for m in re.finditer(r"[ \t]+-[ \t]+(\S.*?)\s*$", q["options"], re.M))}
+                for i, l in enumerate(lines):
+                    o = l[2:].strip()
+                    if o in base and base[o] != i:
+                        fail(bank, f"{qid}/i18n/{lang}.md lists {o!r} at position {i + 1}, exam.yaml has it "
+                                   f"at {base[o] + 1}; the option order is exam.yaml's in every language")
+            if len(parts["solution"]) < MIN_SOLUTION:
+                fail(bank, f"{qid}/i18n/{lang}.md: `## Solution` is {len(parts['solution'])} characters, "
+                           f"minimum {MIN_SOLUTION}")
+
+    # The solution contract: after the paragraph on the correct answer, a
+    # "Why the other(s) ... wrong" section with one bullet per distractor
+    # that bolds the option's text verbatim, so a candidate who picked it
+    # finds their own choice named and refuted. The length floor above
+    # cannot tell an explanation from a paragraph that only repeats why
+    # the key is right; this can.
+    WHY_RE = re.compile(r"(?m)^Why the other")
+    for q in questions:
+        qid = q["id"]
+        opts = parse_options(q["options"]) or []
+        correct = set(parse_correct(q["correct"]))
+        sol_path = os.path.join(bank_dir, qid, "solution.md")
+        if not os.path.isfile(sol_path):
+            continue
+        sol = open(sol_path, encoding="utf-8").read()
+        m = WHY_RE.search(sol)
+        if m is None:
+            fail(bank, f"{qid}/solution.md has no `Why the others are wrong` section — "
+                       f"a candidate who picked a distractor must find it named and refuted")
+            continue
+        tail = sol[m.start():]
+        for i, opt in enumerate(opts):
+            if i in correct:
+                continue
+            otext = scalar(opt)
+            if f"**{otext}**" not in tail:
+                fail(bank, f"{qid}/solution.md: no bullet bolds distractor {otext!r} verbatim "
+                           f"under the `Why the others are wrong` section")
+
     singles = [q for q in questions if q["multi"] == "false"]
     counts = {}
     for q in singles:
@@ -210,7 +329,8 @@ for exam_path in sorted(glob.glob("banks/*/exam.yaml")):
     n = exam_length(text)
     pooled = n is not None and n < len(questions)
     print(f"{bank}: {len(questions)} questions, {grand} points"
-          + (f", examLength {n}" if pooled else ""))
+          + (f", examLength {n}" if pooled else "")
+          + (f", languages {base_lang}+{'/'.join(translations)}" if translations else ""))
 
     if pooled:
         domain_order = []

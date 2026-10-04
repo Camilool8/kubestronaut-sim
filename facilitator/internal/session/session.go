@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -49,13 +50,16 @@ const reasonExpired = "expired"
 var ErrConflict = errors.New("session: invalid state transition")
 
 type Manager struct {
-	mu       sync.Mutex
-	path     string
-	bank     string
-	dur      time.Duration
-	clock    func() time.Time
-	onExpire func()
-	timer    *time.Timer
+	mu   sync.Mutex
+	path string
+	bank string
+	dur  time.Duration
+	// languageOK, when set, decides whether a language read from disk is
+	// one the bank ships; see WithLanguages.
+	languageOK func(string) bool
+	clock      func() time.Time
+	onExpire   func()
+	timer      *time.Timer
 
 	mode       string
 	attemptDur time.Duration
@@ -86,6 +90,9 @@ type Draw struct {
 	PoolDigest string
 
 	DomainFilter []string
+
+	// Language the attempt was started in; empty is the bank's own.
+	Language string
 }
 
 type Snapshot struct {
@@ -104,6 +111,7 @@ type Snapshot struct {
 	Seed         string
 	PoolDigest   string
 	DomainFilter []string
+	Language     string
 }
 
 type persistedState struct {
@@ -126,6 +134,7 @@ type persistedState struct {
 	Seed         string   `json:"seed,omitempty"`
 	PoolDigest   string   `json:"poolDigest,omitempty"`
 	DomainFilter []string `json:"domainFilter,omitempty"`
+	Language     string   `json:"language,omitempty"`
 
 	TimeSpent map[string]int `json:"timeSpent,omitempty"`
 }
@@ -150,7 +159,23 @@ func DrawnIDs(path string) ([]string, error) {
 	return append([]string(nil), doc.QuestionIDs...), nil
 }
 
-func New(path, bank string, dur time.Duration, clock func() time.Time, onExpire func()) (*Manager, error) {
+// An Option adjusts how New reads the file it is handed.
+type Option func(*Manager)
+
+// WithLanguages names the languages the bank can serve, the base language
+// included. A persisted attempt in any other language is kept, but its
+// language is dropped so the bank's own text is served — the guard sits
+// here, where the file is trusted, rather than on the one HTTP call site
+// that validates a language on the way in.
+func WithLanguages(languages []string) Option {
+	set := make(map[string]bool, len(languages))
+	for _, l := range languages {
+		set[l] = true
+	}
+	return func(m *Manager) { m.languageOK = func(l string) bool { return set[l] } }
+}
+
+func New(path, bank string, dur time.Duration, clock func() time.Time, onExpire func(), opts ...Option) (*Manager, error) {
 	m := &Manager{
 		path:     path,
 		bank:     bank,
@@ -158,6 +183,9 @@ func New(path, bank string, dur time.Duration, clock func() time.Time, onExpire 
 		clock:    clock,
 		onExpire: onExpire,
 		state:    stateIdle,
+	}
+	for _, opt := range opts {
+		opt(m)
 	}
 
 	raw, err := os.ReadFile(path)
@@ -210,6 +238,14 @@ func New(path, bank string, dur time.Duration, clock func() time.Time, onExpire 
 		Seed:         doc.Seed,
 		PoolDigest:   doc.PoolDigest,
 		DomainFilter: doc.DomainFilter,
+		Language:     doc.Language,
+	}
+	if m.draw.Language != "" && m.languageOK != nil && !m.languageOK(m.draw.Language) {
+		// The file says the attempt was started in a language the bank no
+		// longer ships. The attempt is worth more than its language: keep
+		// it, serve the bank's own text, and note that we did.
+		log.Printf("session: attempt was started in language %q the bank does not ship; continuing in the bank's own", m.draw.Language)
+		m.draw.Language = ""
 	}
 	m.timeSpent = doc.TimeSpent
 	if doc.EndedAt != nil {
@@ -274,7 +310,7 @@ func (m *Manager) StartDraw(mode string, dur time.Duration, draw Draw) (Snapshot
 }
 
 func cloneDraw(d Draw) Draw {
-	out := Draw{Seed: d.Seed, PoolDigest: d.PoolDigest}
+	out := Draw{Seed: d.Seed, PoolDigest: d.PoolDigest, Language: d.Language}
 	if len(d.QuestionIDs) > 0 {
 		out.QuestionIDs = append([]string(nil), d.QuestionIDs...)
 	}
@@ -663,6 +699,7 @@ func (m *Manager) snapshotLocked() Snapshot {
 		ElapsedSeconds:  int(m.elapsedLocked().Seconds()),
 		Seed:            m.draw.Seed,
 		PoolDigest:      m.draw.PoolDigest,
+		Language:        m.draw.Language,
 	}
 	if len(m.draw.DomainFilter) > 0 {
 		snap.DomainFilter = append([]string(nil), m.draw.DomainFilter...)
@@ -706,6 +743,7 @@ func (m *Manager) persistLocked() error {
 		Seed:            m.draw.Seed,
 		PoolDigest:      m.draw.PoolDigest,
 		DomainFilter:    m.draw.DomainFilter,
+		Language:        m.draw.Language,
 		TimeSpent:       m.timeSpent,
 	}
 	if !m.endedAt.IsZero() {

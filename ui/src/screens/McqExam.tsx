@@ -29,6 +29,7 @@ import { NavMenuFact, NavMenuItem } from "../components/NavMenu";
 import { Dialog } from "../components/Dialog";
 import { Icon } from "../components/Icon";
 import { InlineCode, Markdown } from "../components/Markdown";
+import { textDirection } from "../lib/language";
 import { CheckList } from "../components/CheckList";
 import { HintTray } from "../components/HintTray";
 import { Navigator, type NavigatorQuestion } from "../components/Navigator";
@@ -481,8 +482,10 @@ function McqQuestion({
           {(data) => (
             <>
 
-              <Markdown copyable={false}>{data.markdown}</Markdown>
-              <fieldset className="mcq-options">
+              <div {...textDirection(data.language)}>
+                <Markdown copyable={false}>{data.markdown}</Markdown>
+              </div>
+              <fieldset className="mcq-options" {...textDirection(data.language)}>
                 <legend>
                   {info.multi ? strings.mcq.selectAll : strings.mcq.selectOne}
                 </legend>
@@ -664,7 +667,11 @@ function McqCheckAnswer({ questionId }: { questionId: string }) {
       </summary>
       {loading && <p>{strings.mcq.loadingAnswer}</p>}
       {error && <p className="error-text">{error}</p>}
-      {solution && <Markdown copyable={false}>{solution.markdown}</Markdown>}
+      {solution && (
+        <div {...textDirection(solution.language)}>
+          <Markdown copyable={false}>{solution.markdown}</Markdown>
+        </div>
+      )}
     </details>
   );
 }
