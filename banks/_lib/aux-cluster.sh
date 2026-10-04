@@ -137,6 +137,39 @@ _aux_stage_listed_images() {
   done < "$list"
 }
 
+# kind create, with one retry. On a loaded session the new API server can take
+# longer to start than kubeadm will wait for it: kubeadm init's admin-user
+# bootstrap has a fixed 60s deadline (the v1beta4 `timeouts.kubernetesAPICall`),
+# and kind v0.32 writes a v1beta3 config, which has no field to raise it.
+# Measured on a 4-vCPU worker that was also running the main cluster and
+# aux-sched: load average 42, the API server refused connections for the full
+# 60s, and the same create run by hand a few minutes later took about 15s.
+# kind deletes a cluster that failed to create unless it is passed --retain;
+# the delete here makes sure of that before the retry.
+#
+# The conductor reports only the last 500 characters of a failed setup.sh,
+# and kubeadm prints its reason above a stack trace longer than that. So the
+# last error line is printed again at the end, where that tail can show it.
+_aux_kind_create() {
+  local cluster=$1 attempt log
+  shift
+  log=$(mktemp)
+  for attempt in 1 2; do
+    if [ "$attempt" -eq 2 ]; then
+      echo "aux_up: creating ${cluster} failed; deleting it and trying once more" >&2
+      kind delete cluster --name "$cluster" >/dev/null 2>&1 || true
+    fi
+    kind create cluster --name "$cluster" "$@" 2>&1 | tee "$log"
+    if [ "${PIPESTATUS[0]}" -eq 0 ]; then
+      rm -f "$log"
+      return 0
+    fi
+  done
+  grep -E '^(error|ERROR): ' "$log" | tail -1 >&2
+  rm -f "$log"
+  return 1
+}
+
 aux_up() {
   local name=${1:?aux_up: cluster name required (sched, cni, upgrade, etcd)}
   shift
@@ -199,7 +232,7 @@ aux_up() {
     # that does not exist — 300s, past the 240s a question's setup.sh is given —
     # and the message it finally prints blames readiness for a failure that
     # happened three minutes earlier.
-    if ! kind create cluster --name "$cluster" --config "$cfg" --image "$image" \
+    if ! _aux_kind_create "$cluster" --config "$cfg" --image "$image" \
         --kubeconfig "/tmp/aux-${name}.kubeconfig"; then
       echo "aux_up: kind could not create the ${cluster} cluster" >&2
       rm -f "$cfg"
