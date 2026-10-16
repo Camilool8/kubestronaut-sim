@@ -9,7 +9,7 @@ Give it a shell of its own and the rest of the commands stay short:
 export KUBECONFIG=~/.kube/aux-cni
 kubectl get nodes
 # NAME                    STATUS     ROLES           AGE   VERSION
-# aux-cni-control-plane   NotReady   control-plane   6m    v1.35.5
+# aux-cni-control-plane   NotReady   control-plane   6m    v1.37.0
 ```
 
 ## Read the condition, not the status column
@@ -125,7 +125,7 @@ block on rather than a `get nodes` loop. Once it returns, the rest follows:
 ```bash
 kubectl get nodes
 # NAME                    STATUS   ROLES           AGE   VERSION
-# aux-cni-control-plane   Ready    control-plane   9m    v1.35.5
+# aux-cni-control-plane   Ready    control-plane   9m    v1.37.0
 
 kubectl get pod -A
 # every Pending Pod above is now Running — CoreDNS takes another half-minute

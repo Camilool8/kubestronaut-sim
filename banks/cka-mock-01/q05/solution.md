@@ -10,7 +10,7 @@ task carries `--kubeconfig`:
 export KUBECONFIG=~/.kube/aux-sched     # or --kubeconfig on every command
 k get nodes
 # NAME                      STATUS   ROLES           AGE   VERSION
-# aux-sched-control-plane   Ready    control-plane   14m   v1.35.5
+# aux-sched-control-plane   Ready    control-plane   14m   v1.37.0
 ```
 
 One node, `Ready`, with no taints on it — a single-node kind cluster runs
@@ -28,7 +28,7 @@ k get pod -o wide
 ## The silence is the clue
 
 ```bash
-k describe pod -l app=orbit-planner | tail -1
+k describe pod -l app=orbit-planner --show-events | tail -1
 # Events:  <none>
 
 k get pod -l app=orbit-planner \

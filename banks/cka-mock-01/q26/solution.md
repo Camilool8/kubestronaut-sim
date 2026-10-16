@@ -9,7 +9,7 @@ type here can hurt it:
 ```bash
 k --kubeconfig ~/.kube/aux-etcd get nodes
 # NAME                     STATUS   ROLES           AGE   VERSION
-# aux-etcd-control-plane   Ready    control-plane   14m   v1.35.5
+# aux-etcd-control-plane   Ready    control-plane   14m   v1.37.0
 
 k --kubeconfig ~/.kube/aux-etcd -n q26-fleet get cm
 # NAME               DATA   AGE
@@ -74,7 +74,7 @@ etcdctl --endpoints=https://127.0.0.1:2379 \
   snapshot save /opt/backup/etcd-before-restore.db
 # {"level":"info","msg":"saved","path":"/opt/backup/etcd-before-restore.db"}
 # Snapshot saved at /opt/backup/etcd-before-restore.db
-# Server version 3.6.0
+# Server version 3.7.0
 ```
 
 It takes well under a second and lands about 14 MB. Check it, because a file
@@ -82,7 +82,7 @@ with the right name is not the same thing as a snapshot:
 
 ```bash
 etcdutl -w json snapshot status /opt/backup/etcd-before-restore.db
-# {"hash":36842089,"revision":9902,"totalKey":1081,"totalSize":13664256,"version":"3.6.0"}
+# {"hash":36842089,"revision":9902,"totalKey":1081,"totalSize":13664256,"version":"3.7.0"}
 ```
 
 Leave that file where it is. Together with the directory etcd is using now, it
@@ -102,7 +102,7 @@ ls /var/lib/etcd-restore/member
 
 Two things about that command:
 
-- it is `etcdutl`, not `etcdctl`. On etcd 3.6 the offline half of the tooling
+- it is `etcdutl`, not `etcdctl`. Since etcd 3.6 the offline half of the tooling
   moved out: `etcdctl` keeps `snapshot save`, which needs a live server, while
   `snapshot status` and `snapshot restore` — which only ever read a file —
   belong to `etcdutl`. `etcdctl snapshot status` on this version answers with

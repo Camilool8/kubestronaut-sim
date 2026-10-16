@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # points: 4
-# desc: the aux-upgrade node runs kubelet v1.35.6 or newer, is Ready, and was left schedulable
+# desc: the aux-upgrade node runs kubelet v1.37.1 or newer, is Ready, and was left schedulable
 # expected: none — this grades the node's live kubeletVersion, Ready
 #           condition and cordon state, all readings the kubelet and the node
 #           lifecycle controller write themselves once a real upgrade has
@@ -9,7 +9,7 @@
 set -uo pipefail
 . /banks/_lib/checks.sh
 
-TARGET=v1.35.6
+TARGET=v1.37.1
 KUBECONFIG_AUX=/home/candidate/.kube/aux-upgrade
 
 # A second cluster, read from this instance. Three things can be wrong with it

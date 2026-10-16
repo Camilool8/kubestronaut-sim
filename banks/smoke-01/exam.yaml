@@ -14,7 +14,7 @@ spec:
   examType: hands-on
   duration: 120m
   passingScore: 66
-  kubernetesVersion: "1.35"
+  kubernetesVersion: "1.37"
   environment:
     provider: kind
     nodes: 2

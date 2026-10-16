@@ -9,7 +9,7 @@ set -euo pipefail
 # which the API can reach — and the result is read back through the aux
 # kubeconfig, which is where the checks read it too.
 
-TARGET=v1.35.6
+TARGET=v1.37.1
 KC=/home/candidate/.kube/aux-upgrade
 NODE=aux-upgrade-control-plane
 

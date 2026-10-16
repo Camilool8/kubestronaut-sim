@@ -39,7 +39,7 @@ Pods — which is a reason to set the other one first.
 Order matters in one direction only. Change the template before the class
 exists and the ReplicaSet is refused every Pod it tries to create — and with
 `maxUnavailable: 0` the old Pods stay up and serving, so nothing looks
-broken. `k -n reticulum describe rs` is where that shows up.
+broken. `k -n reticulum describe rs --show-events` is where that shows up.
 
 Finish by reading what the Pods actually got, not what the template asks
 for:

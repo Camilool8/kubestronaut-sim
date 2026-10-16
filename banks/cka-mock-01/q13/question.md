@@ -16,21 +16,21 @@ ssh cka-aux-upgrade
 The node's real name — the one the API knows it by — is
 `aux-upgrade-control-plane`.
 
-Upgrade that cluster to **v1.35.6** with `kubeadm`.
+Upgrade that cluster to **v1.37.1** with `kubeadm`.
 
-1. Upgrade the control plane to `v1.35.6`.
-2. Upgrade the node's own `kubelet` to `v1.35.6` and get it running, so the node
+1. Upgrade the control plane to `v1.37.1`.
+2. Upgrade the node's own `kubelet` to `v1.37.1` and get it running, so the node
    reports the new version to the API.
 3. Leave the node `Ready` and schedulable when you are done.
 
 Everything the upgrade needs is already on the node:
 
 - `/opt/packages/kubeadm`, `/opt/packages/kubelet` and `/opt/packages/kubectl`,
-  all at `v1.35.6`. The `kubeadm` that is installed on the node is the old one
+  all at `v1.37.1`. The `kubeadm` that is installed on the node is the old one
   and will not apply an upgrade to a version above itself.
-- The `v1.35.6` control-plane images, already in the node's container runtime.
+- The `v1.37.1` control-plane images, already in the node's container runtime.
 
-`kubeadm upgrade plan` may offer you versions other than `v1.35.6` — a newer
-patch release, or the newest patch of the version you are on. `v1.35.6` is the
+`kubeadm upgrade plan` may offer you versions other than `v1.37.1` — a newer
+patch release, or the newest patch of the version you are on. `v1.37.1` is the
 one this environment has binaries and images for, so it is the one to ask for by
 name.

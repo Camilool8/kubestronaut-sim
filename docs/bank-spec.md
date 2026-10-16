@@ -41,7 +41,7 @@ spec:
   duration: 120m
   speedDuration: 60m
   passingScore: 66
-  kubernetesVersion: "1.35"
+  kubernetesVersion: "1.37"
   domainWeights:
     Application Design and Build: 20
     Application Deployment: 20

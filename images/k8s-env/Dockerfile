@@ -1,18 +1,18 @@
 # The node images are ARGs above the first FROM because two build stages derive
 # from them. AUX_NODE_IMAGE is the one-minor-older image q13's kubeadm-upgrade
 # aux cluster starts from; tests/check-k8s-pins.sh reads it by exactly this
-# name — do not rename it. Both are digest-pinned; kind v0.32.0's release notes
+# name — do not rename it. Both are digest-pinned; kind v0.33.0's release notes
 # are the source of the digests.
-ARG NODE_IMAGE=kindest/node:v1.35.5@sha256:ce977ae6d65918d0b58a5f8b5e940429c2ce42fa3a5619ec2bbc60b949c0ac95
-ARG AUX_NODE_IMAGE=kindest/node:v1.34.8@sha256:02722c2dedddcfc00febf5d27fbeb9b7b2c14294c82109ff4a85d89ac9ba3256
+ARG NODE_IMAGE=kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+ARG AUX_NODE_IMAGE=kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
 
 FROM docker:27-dind AS sim
 ARG NODE_IMAGE
 ARG AUX_NODE_IMAGE
-ARG KIND_VERSION=v0.32.0
-ARG KUBECTL_VERSION=v1.35.6
-ARG HELM_VERSION=v3.21.3
-ARG CALICO_VERSION=v3.32.1
+ARG KIND_VERSION=v0.33.0
+ARG KUBECTL_VERSION=v1.37.1
+ARG HELM_VERSION=v3.22.0
+ARG CALICO_VERSION=v3.33.0
 ARG INGRESS_NGINX_VERSION=controller-v1.15.1
 # The gateway-api addon: nginx-gateway-fabric, its data-plane nginx image, and
 # the Gateway API CRD release NGF pins (config/crd/gateway-api in the NGF repo
@@ -87,14 +87,14 @@ RUN sed -i 's/\r$//' /start.sh /opt/sim/bootstrap.sh /opt/sim/phase.sh /opt/sim/
 
 # Downloads destined for the node images. Fetched here because the kind node
 # image ships no curl; both derived node stages COPY out of /pkg.
-#   - v1.35 kubeadm/kubelet/kubectl: q13's upgrade target, staged on the v1.34
+#   - v1.37 kubeadm/kubelet/kubectl: q13's upgrade target, staged on the v1.36
 #     aux node at /opt/packages
 #   - etcdctl/etcdutl: q26's restore happens while the apiserver (and with it
 #     `kubectl exec` into the etcd pod) is down, so the tools must live on the
 #     node itself, on PATH
 FROM sim AS fetch
-ARG KUBE_UPGRADE_VERSION=v1.35.6
-ARG ETCD_VERSION=v3.6.14
+ARG KUBE_UPGRADE_VERSION=v1.37.1
+ARG ETCD_VERSION=v3.7.2
 RUN ARCH=$(uname -m); case "$ARCH" in x86_64) ARCH=amd64 ;; aarch64) ARCH=arm64 ;; esac \
     && mkdir -p /pkg \
     && for b in kubeadm kubelet kubectl; do \
@@ -134,13 +134,13 @@ RUN tar --numeric-owner --xattrs --one-file-system \
       --exclude=./_rootfs.tar --exclude=./proc --exclude=./sys \
       --exclude=./dev --exclude=./run -C / -cf /_rootfs.tar .
 
-# Same derivation from the older image: q13's aux cluster boots this at v1.34
-# and the candidate upgrades it with the staged v1.35 binaries. kubeadm itself
+# Same derivation from the older image: q13's aux cluster boots this at v1.36
+# and the candidate upgrades it with the staged v1.37 binaries. kubeadm itself
 # names the control-plane images the upgrade will need; that list is baked as
 # archives below and banks/_lib/aux-cluster.sh loads them into the aux-upgrade cluster
 # so the upgrade never needs the network.
 FROM ${AUX_NODE_IMAGE} AS aux-node-ssh
-ARG KUBE_UPGRADE_VERSION=v1.35.6
+ARG KUBE_UPGRADE_VERSION=v1.37.1
 COPY --from=fetch /pkg/etcdctl /pkg/etcdutl /usr/local/bin/
 COPY --from=fetch /pkg/kubeadm /pkg/kubelet /pkg/kubectl /opt/packages/
 COPY --from=sim /opt/sim/calico.yaml /opt/packages/calico.yaml

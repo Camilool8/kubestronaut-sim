@@ -14,7 +14,7 @@ k -n orion get pod
 tag and was told no. `describe` names the tag it asked for:
 
 ```bash
-k -n orion describe pod -l app=telemetry-api | grep -A2 Events
+k -n orion describe pod -l app=telemetry-api --show-events | grep -A2 Events
 # Failed to pull image "nginx:1.99": ... not found
 ```
 

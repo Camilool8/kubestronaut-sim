@@ -58,7 +58,7 @@ done
 # rebuilds the image from the tar, and the .changes file baked next to it
 # restores the original image config (ENTRYPOINT, ENV, STOPSIGNAL) that a
 # rootfs tar cannot carry. Twin of _aux_import_node_tar in banks/_lib/aux-cluster.sh,
-# which lazily imports the v1.34 aux tar the same way.
+# which lazily imports the v1.36 aux tar the same way.
 import_node_tar() {
   local tar=$1 ref=$2 line
   local args=()

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # points: 3
-# desc: the aux-upgrade API server itself serves v1.35.6 or newer
+# desc: the aux-upgrade API server itself serves v1.37.1 or newer
 # expected: none — this grades what the aux-upgrade API server reports about
 #           itself from /version, a live reading of the running binary
 #           rather than a document; a static Pod manifest edited on disk
@@ -9,7 +9,7 @@
 set -uo pipefail
 . /banks/_lib/checks.sh
 
-TARGET=v1.35.6
+TARGET=v1.37.1
 KUBECONFIG_AUX=/home/candidate/.kube/aux-upgrade
 
 aux() { kubectl --kubeconfig "$KUBECONFIG_AUX" --request-timeout=5s "$@"; }

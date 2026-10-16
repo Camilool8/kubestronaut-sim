@@ -23,7 +23,7 @@ Bring the ConfigMap back, from that snapshot:
    have its contents.
 
 Both `/opt/backup` paths are on the `aux-etcd` node, not on this machine.
-`etcdctl` and `etcdutl` are already on the node's `PATH`; this is etcd **3.6**,
+`etcdctl` and `etcdutl` are already on the node's `PATH`; this is etcd **3.7**,
 where taking a snapshot and working on a snapshot file are no longer the same
 binary.
 

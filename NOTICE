@@ -50,20 +50,20 @@ version below is the pin it is built from — the build arguments in
 images/k8s-env/Dockerfile and images/instance/Dockerfile — so a bump
 there is a change here:
 
-  Calico v3.32.1 — Apache License 2.0
+  Calico v3.33.0 — Apache License 2.0
   https://github.com/projectcalico/calico
 
   ingress-nginx controller-v1.15.1 — Apache License 2.0
   https://github.com/kubernetes/ingress-nginx
 
-  kind v0.32.0, and the kindest/node:v1.35.5 image it builds the
+  kind v0.33.0, and the kindest/node:v1.37.0 image it builds the
   cluster from — Apache License 2.0
   https://github.com/kubernetes-sigs/kind
 
-  Helm v3.21.3 — Apache License 2.0
+  Helm v3.22.0 — Apache License 2.0
   https://github.com/helm/helm
 
-  kubectl v1.35.6 on the cluster host, v1.35.0 on the exam instances —
+  kubectl v1.37.1 on the cluster host and on the exam instances —
   Apache License 2.0
   https://github.com/kubernetes/kubernetes
 

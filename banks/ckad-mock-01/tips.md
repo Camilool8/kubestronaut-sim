@@ -96,6 +96,15 @@ k -n volans get deploy edge-cache \
   -o jsonpath='{range .spec.template.spec.containers[*]}{.name}{"\t"}{.imagePullPolicy}{"\n"}{end}'
 ```
 
+Since kubectl 1.36, `describe` prints events only when it describes exactly
+one object. A selector or a bare `describe pod` that matches several leaves
+the Events section out of every one of them. Name the Pod, or add
+`--show-events`:
+
+```bash
+k -n <ns> describe pod -l app=<name> --show-events
+```
+
 Editing something that exists is usually faster than replacing it:
 
 ```bash

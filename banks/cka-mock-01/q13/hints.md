@@ -32,21 +32,21 @@ Run it by its full path, or put it where `kubeadm` is found first.
 `kubeadm upgrade plan` is worth running for the table it prints — it names every
 component and what it would become. Read it, but name the version you want
 yourself rather than taking the one it recommends: it looks for the newest
-release it can find, and the binaries here are for `v1.35.6`.
+release it can find, and the binaries here are for `v1.37.1`.
 
 ## Hint 2
 
 The control plane, in one command, from the node:
 
 ```bash
-/opt/packages/kubeadm upgrade apply v1.35.6
+/opt/packages/kubeadm upgrade apply v1.37.1
 ```
 
 It asks for confirmation (`-y` skips the prompt), then takes the components in
 turn — etcd, apiserver, controller-manager, scheduler — and waits for each one
 to come back before starting on the next. Give it a couple of minutes, and
 expect the API to be unreachable for part of it. It ends with
-`SUCCESS! A control plane node of your cluster was upgraded to "v1.35.6"`.
+`SUCCESS! A control plane node of your cluster was upgraded to "v1.37.1"`.
 
 Then the kubelet, which is a plain file swap and a service restart — with one
 trap in it:

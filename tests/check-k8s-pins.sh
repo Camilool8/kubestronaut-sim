@@ -7,9 +7,10 @@
 # they are not. This compares them.
 #
 # Only the MINOR series is compared. The patch levels differ on purpose:
-# images/k8s-env pins kubectl v1.35.6 against kindest/node v1.35.5, and
-# images/instance ships v1.35.0. kubectl is supported one minor either side of
-# the API server, so patch drift is not a defect. A minor drift is.
+# images/k8s-env pins kubectl v1.37.1 against kindest/node v1.37.0, because
+# kind publishes node images for fewer patches than Kubernetes releases.
+# kubectl is supported one minor either side of the API server, so patch
+# drift is not a defect. A minor drift is.
 #
 #   check-k8s-pins.sh          compare every pin and report
 #   check-k8s-pins.sh --list   print the pin table and stop. One row per pin,
@@ -141,7 +142,7 @@ while IFS=: read -r file name kind; do
       ver=${raw#v}
       ;;
     node)
-      # kindest/node:v1.35.5@sha256:ce97… — the digest is the point of the pin,
+      # kindest/node:v1.37.0@sha256:a1ed… — the digest is the point of the pin,
       # so demand it, then cut it off before reading the tag. Reading the tag
       # first would drag 64 hex characters into the version.
       if ! [[ $raw =~ $DIGEST_RE ]]; then

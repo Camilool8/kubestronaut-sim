@@ -15,5 +15,5 @@ the other never gets a Pod running at all, so look at events.
 output. Without `--previous` you get the current run, which may not
 contain the message.
 
-The bad image reference is in `kubectl -n corvus describe pod` events,
+The bad image reference is in `kubectl -n corvus describe pod -l app=mailer` events,
 and also in the Deployment's own spec.
