@@ -40,6 +40,7 @@ doctor before a first boot on a new machine.
 | `up` prints no phase lines and never finishes | `python3` is missing, so every poll yields an empty state | Install `python3` |
 | The UI shows boot progress, not the exam selector | Expected. The facilitator answers before the cluster is ready | Wait. The page shows the same phases the terminal does |
 | `API server not ready after 180s` on an `up` after a `down` | On older versions the cluster's network could land on the same subnet as a compose network recreated around it, and the API server's port then forwarded out of the wrong interface | Update, then `./sim up`. The boot detects the collision and rebuilds the cluster on a free range, which costs that attempt |
+| `kubectl` is `Forbidden` for `kubernetes-admin`, or every Namespace is gone, after `./sim down` and `./sim up` | On older versions etcd's data lived on a tmpfs that did not survive the k8s-env container, so the cluster resumed onto an empty etcd | Update, then `./sim up`. The boot rebuilds such a cluster once; after that, `down` and `up` keep it |
 | The next `up` rebuilds from scratch | The volumes were removed. `./sim purge` does this; `./sim down` does not | Use `down` to stop and resume — see [cli.md](cli.md#choosing-between-down-reset-and-purge) |
 
 ## During an attempt

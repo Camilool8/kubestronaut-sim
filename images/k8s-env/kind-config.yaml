@@ -14,12 +14,18 @@ nodes:
     # latency there: 24-250ms, against etcd's own >100ms "apply request took
     # too long" threshold — so any write burst (Calico's ~20 CRDs are exactly
     # that) queues up requests until one crosses etcd's client timeout and
-    # `kubectl apply` fails with "etcdserver: request timed out". bootstrap.sh
-    # mounts tmpfs at /mnt/etcd-tmpfs before cluster creation; pointing etcd at
-    # it here removes the overlay stack from every fsync.
+    # `kubectl apply` fails with "etcdserver: request timed out". The data dir
+    # is a directory on the dind volume instead, which is the host's own disk
+    # locally and a disk-backed emptyDir hosted: no overlay in either, measured
+    # ~3ms per sync write. It used to be a tmpfs, faster still, but a tmpfs did
+    # not outlive the k8s-env container, while the node containers in the dind
+    # volume did — so every `./sim down` / `./sim up` resumed the nodes onto an
+    # empty etcd: a brand-new cluster with the old certificates and no RBAC,
+    # where even kubernetes-admin was Forbidden. On the volume, etcd's data
+    # lives and dies with the nodes it belongs to.
     extraMounts:
-      - hostPath: /mnt/etcd-tmpfs
-        containerPath: /var/lib/etcd-tmpfs
+      - hostPath: /var/lib/docker/sim-etcd
+        containerPath: /var/lib/etcd-data
     kubeadmConfigPatches:
       - |
         kind: ClusterConfiguration
@@ -30,7 +36,7 @@ nodes:
             - "127.0.0.1"
         etcd:
           local:
-            dataDir: /var/lib/etcd-tmpfs
+            dataDir: /var/lib/etcd-data
     extraPortMappings:
       # Node ssh (CKA contract port table): 2200 is the control plane; workers
       # get 2201+ appended by bootstrap.sh as it adds worker entries. Present
