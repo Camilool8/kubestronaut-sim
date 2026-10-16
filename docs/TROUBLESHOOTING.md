@@ -39,6 +39,7 @@ doctor before a first boot on a new machine.
 | `Gave up waiting after 3600s.` | Boot budget elapsed. It may still be working | `docker compose logs -f k8s-env`. Raise with `SIM_BOOT_BUDGET=<seconds> ./sim up` |
 | `up` prints no phase lines and never finishes | `python3` is missing, so every poll yields an empty state | Install `python3` |
 | The UI shows boot progress, not the exam selector | Expected. The facilitator answers before the cluster is ready | Wait. The page shows the same phases the terminal does |
+| `API server not ready after 180s` on an `up` after a `down` | On older versions the cluster's network could land on the same subnet as a compose network recreated around it, and the API server's port then forwarded out of the wrong interface | Update, then `./sim up`. The boot detects the collision and rebuilds the cluster on a free range, which costs that attempt |
 | The next `up` rebuilds from scratch | The volumes were removed. `./sim purge` does this; `./sim down` does not | Use `down` to stop and resume — see [cli.md](cli.md#choosing-between-down-reset-and-purge) |
 
 ## During an attempt
@@ -49,7 +50,7 @@ doctor before a first boot on a new machine.
 | A pasted em dash arrives as a hyphen | The clipboard channel reduces to ASCII | Expected |
 | A documentation page will not load in the exam Firefox | The site is outside the proxy allowlist | Expected — see [SECURITY.md](../SECURITY.md) |
 | A question needs an image the cluster does not have | Nothing verifies `images/k8s-env/preload.txt` against what the banks reference | Report it |
-| A Pod's image will not pull: `lookup registry-1.docker.io on 172.x.0.1:53: server misbehaving` | An inner Docker network inside k8s-env holds the address of your host's DNS server, so lookups never leave the container. Hosts whose Docker sets `"dns": ["172.17.0.1"]` (Omarchy does) hit this on older versions | Update, then `./sim up`. If `docker compose logs k8s-env` still prints `upstream DNS server ... is inside an inner Docker network`, `./sim purge` and `./sim up` |
+| A Pod's image will not pull: `lookup registry-1.docker.io on 172.x.0.1:53: server misbehaving` | An inner Docker network inside k8s-env holds the address of your host's DNS server, so lookups never leave the container. Hosts whose Docker sets `"dns": ["172.17.0.1"]` (Omarchy does) hit this on older versions | Update, then `./sim up`. A cluster network an older version left in the way is rebuilt at boot, which costs that attempt |
 | Building an image is slow and disk-hungry | Podman uses the `vfs` storage driver on the instances | Expected. The questions' images are small enough that it measures the same |
 | `podman run` reports a cgroup controller is unavailable | Cgroup creation is disabled — podman sits below a hierarchy it does not own | Expected. Plain `podman run` works as typed |
 | An Ingress is rejected on `kubectl apply` | The ingress `ValidatingWebhookConfiguration` is left in place, matching the real exam | Fix the Ingress. The rejection is intended |

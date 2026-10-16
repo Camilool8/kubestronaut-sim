@@ -73,9 +73,9 @@ Then prove it from a node's own address, from inside the cluster, using
 a Pod the question already runs:
 
 ```bash
-k get nodes -o wide       # note an INTERNAL-IP, e.g. 172.18.0.4
+k get nodes -o wide       # note an INTERNAL-IP, e.g. 10.61.0.4
 
-k -n gemini exec deploy/pollux-web -- curl -s http://172.18.0.4:30081/
+k -n gemini exec deploy/pollux-web -- curl -s http://10.61.0.4:30081/
 # pollux-ok
 ```
 

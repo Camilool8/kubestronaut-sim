@@ -17,17 +17,9 @@ ok() {
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-# The /16 bases in the pool, space-separated.
-bases() { dockerd_config "$1" | jq -r '[."default-address-pools"[].base] | join(" ")'; }
-
-all_but() {
-  local n out=""
-  for n in $(seq 18 31); do
-    case " $* " in *" $n "*) continue ;; esac
-    out+="${out:+ }172.${n}.0.0/16"
-  done
-  printf '%s' "$out"
-}
+# The pool as "base/size", e.g. "10.61.0.0/16/24". Extra arguments are this
+# container's own addresses.
+pool() { dockerd_config "$@" | jq -r '."default-address-pools" | map("\(.base)/\(.size)") | join(" ")'; }
 
 # Verbatim from an Omarchy host, whose Docker daemon sets
 # "dns": ["172.17.0.1"] for a systemd-resolved stub on its own docker0. The
@@ -48,7 +40,7 @@ options edns0 trust-ad ndots:0
 EOF
 ok "omarchy: upstreams" "$(upstream_dns "$tmp/omarchy" | tr '\n' ' ')" "172.17.0.1 "
 ok "omarchy: no default bridge" "$(dockerd_config "$tmp/omarchy" | jq -r .bridge)" "none"
-ok "omarchy: pool" "$(bases "$tmp/omarchy")" "$(all_but)"
+ok "omarchy: pool" "$(pool "$tmp/omarchy")" "10.61.0.0/16/24"
 dockerd_config "$tmp/omarchy" | jq -e . >/dev/null
 ok "omarchy: valid JSON" "$?" "0"
 
@@ -63,15 +55,15 @@ options ndots:0
 # Overrides: []
 EOF
 ok "loopback: upstreams" "$(upstream_dns "$tmp/loopback")" ""
-ok "loopback: pool" "$(bases "$tmp/loopback")" "$(all_but)"
+ok "loopback: pool" "$(pool "$tmp/loopback")" "10.61.0.0/16/24"
 
-# An upstream inside the pool takes its /16 out; one outside 172.16/12 does not.
+# Upstreams outside the candidates leave the plan alone.
 cat > "$tmp/lan" <<'EOF'
 nameserver 127.0.0.11
 # ExtServers: [172.20.0.53 192.168.100.1 host(127.0.0.53)]
 EOF
 ok "lan: upstreams" "$(upstream_dns "$tmp/lan" | tr '\n' ' ')" "172.20.0.53 192.168.100.1 "
-ok "lan: pool" "$(bases "$tmp/lan")" "$(all_but 20)"
+ok "lan: pool" "$(pool "$tmp/lan")" "10.61.0.0/16/24"
 
 # Hosted: a Pod names its cluster DNS directly. EKS gives clusters in a 10/8
 # VPC a 172.20.0.0/16 service range, so kube-dns sits at 172.20.0.10.
@@ -82,24 +74,36 @@ nameserver fd00::a
 options ndots:5
 EOF
 ok "eks: upstreams" "$(upstream_dns "$tmp/eks")" "172.20.0.10"
-ok "eks: pool" "$(bases "$tmp/eks")" "$(all_but 20)"
+ok "eks: pool" "$(pool "$tmp/eks")" "10.61.0.0/16/24"
 
 cat > "$tmp/k3s" <<'EOF'
 nameserver 10.43.0.10
 options ndots:5
 EOF
-ok "k3s: pool" "$(bases "$tmp/k3s")" "$(all_but)"
+ok "k3s: pool" "$(pool "$tmp/k3s")" "10.61.0.0/16/24"
+
+# An upstream inside a candidate moves the plan to the next one.
+cat > "$tmp/in-pool" <<'EOF'
+nameserver 10.61.0.10
+EOF
+ok "dns in 10.61: pool" "$(pool "$tmp/in-pool")" "10.62.0.0/16/24"
+
+# So does one of this container's own addresses, with or without a prefix:
+# the compose networks around k8s-env are numbered by the outer Docker, and an
+# inner network on the same subnet loses its route to theirs.
+ok "own address in 10.61: pool" "$(pool "$tmp/k3s" 10.61.7.3/24 172.19.0.5/16)" "10.62.0.0/16/24"
+ok "own addresses in 10.61 and 10.62: pool" "$(pool "$tmp/k3s" 10.61.7.3 10.62.0.9/20)" "10.63.0.0/16/24"
+ok "outer 172.x addresses: pool" "$(pool "$tmp/omarchy" 172.19.0.5/16 172.18.0.3/16)" "10.61.0.0/16/24"
 
 # No pool at all is a failure, never an empty list: dockerd reads [] as its
-# defaults, 172.17.0.0/16 included.
-{ printf '# ExtServers: ['; for n in $(seq 18 31); do printf '172.%s.0.1 ' "$n"; done; printf ']\n'; } > "$tmp/full"
-out=$(dockerd_config "$tmp/full" 2>/dev/null); rc=$?
+# defaults, which are the outer Docker's ranges too.
+out=$(dockerd_config "$tmp/k3s" 10.61.0.1 10.62.0.1 10.63.0.1 10.64.0.1 10.65.0.1 10.66.0.1 10.67.0.1 2>/dev/null); rc=$?
 ok "full: refuses" "$rc" "1"
 ok "full: prints nothing" "$out" ""
 
 # The image's ash, not just bash, must produce the same plan.
 if command -v busybox >/dev/null 2>&1; then
-  ok "ash: same plan" "$(busybox sh -c '. images/k8s-env/dockerd-config.sh; dockerd_config "$1"' _ "$tmp/omarchy")" "$(dockerd_config "$tmp/omarchy")"
+  ok "ash: same plan" "$(busybox sh -c '. images/k8s-env/dockerd-config.sh; dockerd_config "$1" 10.61.7.3/24' _ "$tmp/omarchy")" "$(dockerd_config "$tmp/omarchy" 10.61.7.3/24)"
 fi
 
 echo "check-dockerd-config: ${PASS} passed, ${FAIL} failed"

@@ -27,8 +27,9 @@ echo 524288 > /proc/sys/fs/inotify/max_user_watches
 
 phase dockerd "Starting the container runtime" 1
 mkdir -p /etc/docker
-if ! dockerd_config > /etc/docker/daemon.json; then
-  boot_failed "no free address range for the inner Docker networks — every candidate holds an upstream DNS server"
+# shellcheck disable=SC2046 # one word per address, by design
+if ! dockerd_config /etc/resolv.conf $(ip -4 -o addr show | awk '{print $4}') > /etc/docker/daemon.json; then
+  boot_failed "no free address range for the inner Docker networks — every candidate holds an upstream DNS server or one of this container's own addresses"
   tail -f /dev/null
 fi
 dockerd-entrypoint.sh &
@@ -46,11 +47,22 @@ until docker info >/dev/null 2>&1; do
   sleep 1
 done
 echo "inner dockerd up"
-for ns in $(shadowed_dns); do
-  echo "WARNING: upstream DNS server ${ns} is inside an inner Docker network an older version created." >&2
-  echo "  The cluster nodes cannot resolve names, so any image that is not preloaded fails to pull." >&2
-  echo "  './sim purge' then './sim up' recreates the network clear of it." >&2
-done
+# A kept `kind` network that cannot work is replaced rather than resumed: the
+# attempt on it is lost either way, and a fresh cluster is the only one that
+# boots. Every kind cluster shares the network, so every one of them goes.
+unusable=$(kind_network_unusable)
+if [ -n "$unusable" ]; then
+  echo "the kind network kept from an earlier boot cannot be used: ${unusable}" >&2
+  echo "deleting every kind cluster and the network; the boot builds a fresh cluster" >&2
+  detail "rebuilding the cluster: its network collides with this host's"
+  for cluster in $(kind get clusters 2>/dev/null); do
+    kind delete cluster --name "$cluster" || true
+  done
+  if ! docker network rm kind >/dev/null; then
+    boot_failed "the kind network collides with this host's networks and could not be removed — run './sim purge', then './sim up'"
+    tail -f /dev/null
+  fi
+fi
 
 # The node tars are rootfs exports of the ssh-enabled derived images (see the
 # node-ssh stages in the Dockerfile), not docker archives — a derived build

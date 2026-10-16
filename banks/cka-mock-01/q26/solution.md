@@ -38,7 +38,7 @@ grep -E 'listen-client-urls|cert-file|key-file|trusted-ca-file|data-dir' \
 #     - --cert-file=/etc/kubernetes/pki/etcd/server.crt
 #     - --data-dir=/var/lib/etcd
 #     - --key-file=/etc/kubernetes/pki/etcd/server.key
-#     - --listen-client-urls=https://127.0.0.1:2379,https://172.18.0.2:2379
+#     - --listen-client-urls=https://127.0.0.1:2379,https://10.61.0.2:2379
 #     - --trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt
 ```
 

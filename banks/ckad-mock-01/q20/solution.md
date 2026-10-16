@@ -35,10 +35,10 @@ k -n aquila get svc status-page
 Then confirm from a node address, and save the answer:
 
 ```bash
-k get nodes -o wide     # note an INTERNAL-IP, e.g. 172.18.0.3
+k get nodes -o wide     # note an INTERNAL-IP, e.g. 10.61.0.3
 
 k -n aquila run probe --rm -i --restart=Never --image=nginx:1.29-alpine -- \
-  curl -s http://172.18.0.3:30081/ > /opt/course/20/nodeport-check
+  curl -s http://10.61.0.3:30081/ > /opt/course/20/nodeport-check
 cat /opt/course/20/nodeport-check
 # status-ok
 ```
