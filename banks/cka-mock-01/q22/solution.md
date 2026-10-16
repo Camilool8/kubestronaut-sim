@@ -206,7 +206,7 @@ does not exist; it is the **Pods** that are refused, one by one, by the
 admission plugin:
 
 ```bash
-k -n reticulum describe rs -l app=checkout-api
+k -n reticulum describe rs -l app=checkout-api --show-events
 ```
 
 ```

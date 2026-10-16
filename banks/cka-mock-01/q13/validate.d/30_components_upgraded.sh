@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # points: 2
-# desc: the scheduler and the controller-manager on aux-upgrade run v1.35.6 or newer too
+# desc: the scheduler and the controller-manager on aux-upgrade run v1.37.1 or newer too
 # expected: none — this grades the image tags kube-scheduler and
 #           kube-controller-manager are actually running under right now,
 #           read from their live static Pods rather than from a manifest the
@@ -10,7 +10,7 @@
 set -uo pipefail
 . /banks/_lib/checks.sh
 
-TARGET=v1.35.6
+TARGET=v1.37.1
 KUBECONFIG_AUX=/home/candidate/.kube/aux-upgrade
 
 aux() { kubectl --kubeconfig "$KUBECONFIG_AUX" --request-timeout=5s "$@"; }

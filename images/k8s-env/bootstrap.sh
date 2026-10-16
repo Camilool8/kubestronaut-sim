@@ -192,24 +192,32 @@ while [ "$worker" -lt "$nodes" ]; do
   worker=$((worker + 1))
 done
 
-# tmpfs for the control plane's etcd data dir (see kind-config.yaml). Guarded
-# by mountpoint so a resume that never lost this container's mount namespace
-# does not shadow the live tmpfs backing an already-running etcd with an empty
-# one; a resume that DID lose it (the k8s-env container itself restarted)
-# starts fresh here, same as the rest of the inner dockerd state on the "dind"
-# emptyDir.
-etcd_tmpfs=/mnt/etcd-tmpfs
-mkdir -p "${etcd_tmpfs}"
-mountpoint -q "${etcd_tmpfs}" || mount -t tmpfs -o size=512m tmpfs "${etcd_tmpfs}"
+# The control plane's etcd data dir, on the dind volume (see kind-config.yaml),
+# so it is kept and lost together with the node containers it belongs to.
+etcd_dir=/var/lib/docker/sim-etcd
+mkdir -p "${etcd_dir}"
 
 phase create-cluster "Creating the Kubernetes cluster" 3
+
+# A cluster created before the data dir moved kept its etcd on a tmpfs that
+# went with the last k8s-env container. Resuming it would start the control
+# plane on an empty etcd — no Namespaces, no RBAC, kubernetes-admin Forbidden —
+# so it is rebuilt instead. That costs the attempt it held, which was already
+# gone with its etcd.
+if kind get clusters 2>/dev/null | grep -qx sim \
+   && [ "$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/lib/etcd-data"}}{{.Source}}{{end}}{{end}}' sim-control-plane 2>/dev/null)" != "${etcd_dir}" ]; then
+  echo "the existing cluster's etcd did not outlive the last container; rebuilding the cluster"
+  detail "rebuilding the cluster: its etcd data was not kept"
+  kind delete cluster --name sim
+fi
+
 created=0
 if ! kind get clusters 2>/dev/null | grep -qx sim; then
 
-  # A new cluster needs an empty data dir. The tmpfs outlives every cluster
+  # A new cluster needs an empty data dir. The directory outlives every cluster
   # built on it: `kind delete cluster` destroys the node containers, but the
-  # etcd data lives in THIS container's mount namespace, so it is still there
-  # when the next create bind-mounts it into a brand new control plane. etcd
+  # etcd data lives in THIS container's filesystem, so it is still there when
+  # the next create bind-mounts it into a brand new control plane. etcd
   # then resumes the previous cluster instead of bootstrapping one. kubeadm
   # init survives that, and the worker join dies on the Node object the old
   # cluster left behind -- `a Node with name "sim-worker" and status "Ready"
@@ -218,7 +226,7 @@ if ! kind get clusters 2>/dev/null | grep -qx sim; then
   # the previous attempt's namespaces instead. Clearing on the create path
   # only leaves the resume path, where this is a live etcd's data dir,
   # untouched.
-  find "${etcd_tmpfs}" -mindepth 1 -delete
+  find "${etcd_dir}" -mindepth 1 -delete
 
   node_ref="${NODE_IMAGE}"
   [ -f /opt/sim/images/_node.tar ] && node_ref="${NODE_IMAGE%%@*}"

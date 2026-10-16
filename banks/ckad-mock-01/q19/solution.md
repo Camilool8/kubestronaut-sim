@@ -59,13 +59,21 @@ k -n serpens run probe --rm -it --restart=Never --image=nginx:1.29-alpine -- \
   curl -s http://inventory.serpens.svc:80/
 # inventory
 
-k -n serpens run probe --rm -i --restart=Never --image=nginx:1.29-alpine -- \
-  curl -s http://inventory.serpens.svc:80/ > /opt/course/19/service-check
+k -n serpens run svc-check --restart=Never --image=nginx:1.29-alpine -- \
+  curl -s http://inventory.serpens.svc:80/
+k -n serpens wait --for=jsonpath='{.status.phase}'=Succeeded pod/svc-check
+k -n serpens logs svc-check > /opt/course/19/service-check
+k -n serpens delete pod svc-check
 cat /opt/course/19/service-check
+# inventory
 ```
 
-Use `-i` without `-t` when redirecting to a file — `-t` allocates a TTY
-and litters the output with control characters.
+Save it from the Pod's log, not from an attached `kubectl run --rm -i`.
+Redirecting an attached run also captures kubectl's own `pod "…" deleted`
+line, and whether the container's output arrives once, twice or not at all
+depends on how the attach races a container that exits in milliseconds —
+kubectl 1.37 usually prints it twice. `kubectl logs` returns exactly what the
+container wrote, once.
 
 ## Why two faults
 

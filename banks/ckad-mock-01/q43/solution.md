@@ -22,7 +22,7 @@ k -n horologium logs session-store-6c9f8d5b7c-2xk4m --previous
 The events name the killer:
 
 ```bash
-k -n horologium describe pod -l app=session-store | tail -8
+k -n horologium describe pod -l app=session-store --show-events | tail -8
 # Events:
 #   Type     Reason     Age                 From     Message
 #   ----     ------     ----                ----     -------
@@ -35,8 +35,12 @@ k -n horologium describe pod -l app=session-store | tail -8
 Save that while it still exists:
 
 ```bash
-k -n horologium describe pod -l app=session-store > /opt/course/43/evidence
+k -n horologium describe pod -l app=session-store --show-events > /opt/course/43/evidence
 ```
+
+`--show-events` is not optional here. Since kubectl 1.36, `describe` prints
+events only when it describes exactly one object, and this selector matches
+two replicas — without the flag the file holds two specs and no evidence.
 
 `connection refused` on `8080`, from the kubelet, against the Pod's own
 address. Now look at what the container actually opens:

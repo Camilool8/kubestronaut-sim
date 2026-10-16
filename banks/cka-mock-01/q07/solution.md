@@ -5,11 +5,11 @@
 ```bash
 k get nodes
 # NAME                 STATUS     ROLES           AGE   VERSION
-# sim-control-plane    Ready      control-plane   51m   v1.35.5
-# sim-worker           Ready      <none>          50m   v1.35.5
-# sim-worker2          Ready      <none>          50m   v1.35.5
-# sim-worker3          NotReady   <none>          50m   v1.35.5
-# sim-worker4          Ready      <none>          50m   v1.35.5
+# sim-control-plane    Ready      control-plane   51m   v1.37.0
+# sim-worker           Ready      <none>          50m   v1.37.0
+# sim-worker2          Ready      <none>          50m   v1.37.0
+# sim-worker3          NotReady   <none>          50m   v1.37.0
+# sim-worker4          Ready      <none>          50m   v1.37.0
 ```
 
 `NotReady` in that column is a summary. The condition underneath it says more:
@@ -123,7 +123,7 @@ exit
 ```bash
 k get node sim-worker3
 # NAME          STATUS   ROLES    AGE   VERSION
-# sim-worker3   Ready    <none>   52m   v1.35.5
+# sim-worker3   Ready    <none>   52m   v1.37.0
 ```
 
 Ready comes back within about five seconds of the service starting: the kubelet

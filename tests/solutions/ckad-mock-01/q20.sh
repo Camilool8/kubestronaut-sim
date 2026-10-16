@@ -10,4 +10,4 @@ for _ in $(seq 1 20); do
   printf '%s' "$out" | grep -q 'status-ok' && break
   sleep 3
 done
-printf '%s' "$out" | grep -o 'status-ok' > /opt/course/20/nodeport-check
+printf '%s' "$out" | grep -o 'status-ok' | head -1 > /opt/course/20/nodeport-check

@@ -61,7 +61,7 @@ _aux_import_node_tar() {
 }
 
 # The default node image is imported by start.sh before any bank boots; only
-# the v1.34 aux tar is imported lazily, here, the first time a question asks
+# the v1.36 aux tar is imported lazily, here, the first time a question asks
 # for it — no bank but CKA pays its load time.
 _aux_ensure_node_image() {
   local ref=$1 baked
@@ -139,8 +139,8 @@ _aux_stage_listed_images() {
 
 # kind create, with one retry. On a loaded session the new API server can take
 # longer to start than kubeadm will wait for it: kubeadm init's admin-user
-# bootstrap has a fixed 60s deadline (the v1beta4 `timeouts.kubernetesAPICall`),
-# and kind v0.32 writes a v1beta3 config, which has no field to raise it.
+# bootstrap has a 60s deadline (the v1beta4 `timeouts.kubernetesAPICall`),
+# which the config kind writes leaves at its default.
 # Measured on a 4-vCPU worker that was also running the main cluster and
 # aux-sched: load average 42, the API server refused connections for the full
 # 60s, and the same create run by hand a few minutes later took about 15s.
@@ -253,7 +253,7 @@ aux_up() {
   # Staged images, checked on cold AND warm runs so a retry after a
   # part-failed cold run still converges. A CNI-less cluster (q12) gets the
   # Calico images its candidate will install — kind load needs no CNI. The
-  # upgrade cluster (q13) gets the v1.35 control-plane images kubeadm will
+  # upgrade cluster (q13) gets the v1.37 control-plane images kubeadm will
   # want, so the upgrade never reaches for the network.
   if [ -n "$config" ] && [ "$(yq -r '.networking.disableDefaultCNI // false' "$config")" = "true" ]; then
     _aux_stage_manifest_images "$cluster" /opt/sim/calico.yaml

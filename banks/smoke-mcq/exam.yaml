@@ -15,7 +15,7 @@ spec:
   duration: 90m
   speedDuration: 45m
   passingScore: 75
-  kubernetesVersion: "1.35"
+  kubernetesVersion: "1.37"
   domainWeights:
     Smoke: 100
   questions:

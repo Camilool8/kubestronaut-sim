@@ -4,7 +4,7 @@ set -euo pipefail
 # Capture the evidence before the repair: fixing the probe rolls the Pods that
 # carry these events out of existence.
 {
-  kubectl -n horologium describe pod -l app=session-store 2>/dev/null || true
+  kubectl -n horologium describe pod -l app=session-store --show-events 2>/dev/null || true
   kubectl -n horologium get events --field-selector reason=Unhealthy \
     -o jsonpath='{range .items[*]}{.reason}{": "}{.message}{"\n"}{end}' 2>/dev/null || true
 } > /opt/course/43/evidence

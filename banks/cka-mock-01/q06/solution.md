@@ -5,7 +5,7 @@
 ```bash
 k get node sim-worker4
 # NAME           STATUS   ROLES    AGE   VERSION
-# sim-worker4    Ready    <none>   42m   v1.35.0
+# sim-worker4    Ready    <none>   42m   v1.37.0
 
 k get pod -A -o wide --field-selector spec.nodeName=sim-worker4
 # NAMESPACE     NAME                                   READY   STATUS    NODE
@@ -65,7 +65,7 @@ actually gone — drain waits, it does not fire and forget.
 ```bash
 k get node sim-worker4
 # NAME          STATUS                     ROLES    AGE   VERSION
-# sim-worker4   Ready,SchedulingDisabled   <none>   43m   v1.35.0
+# sim-worker4   Ready,SchedulingDisabled   <none>   43m   v1.37.0
 
 k get node sim-worker4 -o jsonpath='{.spec.unschedulable}{"\n"}'
 # true
@@ -89,7 +89,7 @@ k -n aquila get pod -o wide
 # telemetry-collector-6c8b7d5f49-9j4kt   0/1     Pending   <none>   <none>
 # telemetry-collector-6c8b7d5f49-lmr7v   0/1     Pending   <none>   <none>
 
-k -n aquila describe pod -l app=telemetry-collector | tail -4
+k -n aquila describe pod -l app=telemetry-collector --show-events | tail -4
 # Events:
 #   Warning  FailedScheduling  ...  0/5 nodes are available: 1 node(s) were
 #   unschedulable, 3 node(s) didn't match Pod's node affinity/selector, 1 node(s)

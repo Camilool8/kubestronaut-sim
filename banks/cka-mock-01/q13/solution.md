@@ -14,7 +14,7 @@ like nothing happened at all.
 ```bash
 k --kubeconfig ~/.kube/aux-upgrade get nodes
 # NAME                        STATUS   ROLES           VERSION
-# aux-upgrade-control-plane   Ready    control-plane   v1.34.8
+# aux-upgrade-control-plane   Ready    control-plane   v1.36.4
 ```
 
 One node, and it is the control plane. Everything else happens over the login
@@ -31,14 +31,14 @@ on this node came with it:
 
 ```bash
 kubeadm version -o short
-# v1.34.8
+# v1.36.4
 /opt/packages/kubeadm version -o short
-# v1.35.6
+# v1.37.1
 ```
 
 So the staged binary is the one that runs. Either call it by its path, as below,
 or put it where `kubeadm` is found first — on the real exam the equivalent step
-is `apt-mark unhold kubeadm && apt-get install -y kubeadm=1.35.6-*`, which is the
+is `apt-mark unhold kubeadm && apt-get install -y kubeadm=1.37.1-*`, which is the
 same idea with a package manager doing the copy:
 
 ```bash
@@ -61,12 +61,12 @@ release it can reach and offers you that, plus the newest patch of the version
 you are already on. Follow it here and you will aim at a version this
 environment has no binaries and no images for, and the upgrade will fail
 somewhere in the middle rather than at the start. The staged version is
-`v1.35.6`; ask for it by name.
+`v1.37.1`; ask for it by name.
 
 ## The control plane
 
 ```bash
-/opt/packages/kubeadm upgrade apply v1.35.6 -y
+/opt/packages/kubeadm upgrade apply v1.37.1 -y
 ```
 
 Roughly two and a half minutes, and worth watching. It renews the control-plane
@@ -77,7 +77,7 @@ before it starts the next. The apiserver is unreachable for part of that, which
 is normal and not something to react to.
 
 ```
-[upgrade] SUCCESS! A control plane node of your cluster was upgraded to "v1.35.6". Enjoy!
+[upgrade] SUCCESS! A control plane node of your cluster was upgraded to "v1.37.1". Enjoy!
 [upgrade] Now please proceed with upgrading the kubelet if you haven't already done so.
 ```
 
@@ -86,10 +86,10 @@ That last line is the whole of the second half. From the instance:
 ```bash
 k --kubeconfig ~/.kube/aux-upgrade get nodes
 # NAME                        STATUS   ROLES           VERSION
-# aux-upgrade-control-plane   Ready    control-plane   v1.34.8
+# aux-upgrade-control-plane   Ready    control-plane   v1.36.4
 ```
 
-Still `v1.34.8` — and correctly so. The control plane is on the new version and
+Still `v1.36.4` — and correctly so. The control plane is on the new version and
 the kubelet is not.
 
 ## Empty the node
@@ -156,7 +156,7 @@ Then reload systemd and start it again:
 systemctl daemon-reload
 systemctl restart kubelet
 kubelet --version
-# Kubernetes v1.35.6
+# Kubernetes v1.37.1
 ```
 
 `daemon-reload` is in the procedure because an upgrade can change the unit's
@@ -186,17 +186,17 @@ one-node cluster, that is an upgraded cluster that runs nothing.
 ```bash
 k --kubeconfig ~/.kube/aux-upgrade get nodes
 # NAME                        STATUS   ROLES           VERSION
-# aux-upgrade-control-plane   Ready    control-plane   v1.35.6
+# aux-upgrade-control-plane   Ready    control-plane   v1.37.1
 
 k --kubeconfig ~/.kube/aux-upgrade version
-# Server Version: v1.35.6
+# Server Version: v1.37.1
 
 k --kubeconfig ~/.kube/aux-upgrade -n kube-system get pods -l tier=control-plane \
   -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.containers[*].image}{"\n"}{end}'
 # etcd-aux-upgrade-control-plane                     registry.k8s.io/etcd:3.6.6-0
-# kube-apiserver-aux-upgrade-control-plane           registry.k8s.io/kube-apiserver:v1.35.6
-# kube-controller-manager-aux-upgrade-control-plane  registry.k8s.io/kube-controller-manager:v1.35.6
-# kube-scheduler-aux-upgrade-control-plane           registry.k8s.io/kube-scheduler:v1.35.6
+# kube-apiserver-aux-upgrade-control-plane           registry.k8s.io/kube-apiserver:v1.37.1
+# kube-controller-manager-aux-upgrade-control-plane  registry.k8s.io/kube-controller-manager:v1.37.1
+# kube-scheduler-aux-upgrade-control-plane           registry.k8s.io/kube-scheduler:v1.37.1
 ```
 
 Three separate facts, and they fail separately. The node's `VERSION` is the
@@ -208,6 +208,6 @@ manifest — leaves the apiserver ahead of the other two. etcd is on its own
 numbering and `kubeadm` picks it for you; it is not something to match against
 the Kubernetes version.
 
-Anything at or above `v1.35.6` counts here. If you had a way to reach a newer
+Anything at or above `v1.37.1` counts here. If you had a way to reach a newer
 patch release and took `upgrade plan`'s advice all the way, that is still a
 cluster that was upgraded correctly.

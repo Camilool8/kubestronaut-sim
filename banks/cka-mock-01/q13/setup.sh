@@ -37,7 +37,7 @@ esac
 # checked against it here. A KUBE_UPGRADE_VERSION bump in the Dockerfile then
 # fails the seed loudly instead of shipping a question whose target has no
 # binaries and no images behind it.
-TARGET=v1.35.6
+TARGET=v1.37.1
 # `|| true` so the message below is the one that prints. Under `set -e` a
 # failing substitution ends the script where it stands, and a missing list would
 # then look like a crash rather than the explained mismatch it is.

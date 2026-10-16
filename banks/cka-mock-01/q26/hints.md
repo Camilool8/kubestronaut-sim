@@ -17,7 +17,7 @@ Two files on the node tell you almost everything you need:
 - the snapshot at `/opt/backup/etcd-nightly.db`, which is just a file. Ask a
   tool what is in it before you trust it.
 
-On etcd 3.6 those are two different tools. `etcdctl` talks to a *running* etcd
+Since etcd 3.6 those are two different tools. `etcdctl` talks to a *running* etcd
 over the network, so it needs endpoints and certificates. `etcdutl` works on
 files on disk, so it needs neither. If a subcommand answers you with its own
 help text, you are holding the wrong one.
