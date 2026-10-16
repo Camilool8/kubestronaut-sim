@@ -37,11 +37,21 @@ Then confirm from a node address, and save the answer:
 ```bash
 k get nodes -o wide     # note an INTERNAL-IP, e.g. 10.61.0.3
 
-k -n aquila run probe --rm -i --restart=Never --image=nginx:1.29-alpine -- \
-  curl -s http://10.61.0.3:30081/ > /opt/course/20/nodeport-check
+k -n aquila run np-check --restart=Never --image=nginx:1.29-alpine -- \
+  curl -s http://10.61.0.3:30081/
+k -n aquila wait --for=jsonpath='{.status.phase}'=Succeeded pod/np-check
+k -n aquila logs np-check > /opt/course/20/nodeport-check
+k -n aquila delete pod np-check
 cat /opt/course/20/nodeport-check
 # status-ok
 ```
+
+Save it from the Pod's log, not from an attached `kubectl run --rm -i`.
+Redirecting an attached run also captures kubectl's own `pod "…" deleted`
+line, and whether the container's output arrives once, twice or not at all
+depends on how the attach races a container that exits in milliseconds —
+kubectl 1.37 usually prints it twice. `kubectl logs` returns exactly what the
+container wrote, once.
 
 Testing the node address matters. A Service still on `ClusterIP` answers
 perfectly on its cluster IP, so curling the ClusterIP proves nothing

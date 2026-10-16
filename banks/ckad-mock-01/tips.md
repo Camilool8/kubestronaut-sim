@@ -105,6 +105,18 @@ the Events section out of every one of them. Name the Pod, or add
 k -n <ns> describe pod -l app=<name> --show-events
 ```
 
+When a task wants what a command printed inside the cluster saved to a
+file, save it from the Pod's log. An attached `kubectl run --rm -i`
+redirected to a file also captures kubectl's own `pod "…" deleted` line,
+and the container's output can arrive twice or not at all:
+
+```bash
+k -n <ns> run probe --restart=Never --image=nginx:1.29-alpine -- curl -s <url>
+k -n <ns> wait --for=jsonpath='{.status.phase}'=Succeeded pod/probe
+k -n <ns> logs probe > /opt/course/<n>/<file>
+k -n <ns> delete pod probe
+```
+
 Editing something that exists is usually faster than replacing it:
 
 ```bash
