@@ -147,6 +147,16 @@ rm -rf "$work"
 PODMAN
 [ $? -eq 0 ] || fail "podman build/push/run against registry:5000 failed on instance-1"
 
+# Every image a bank uses is preloaded from an archive, so a boot never
+# exercises the nodes' own DNS. A candidate's `kubectl run --image=nginx` does,
+# and it once failed on any host whose Docker resolves through 172.17.0.1 —
+# the address the inner default bridge also took. busybox:1.36.1 is in no bank.
+docker compose exec -T k8s-env docker exec sim-control-plane \
+  crictl pull busybox:1.36.1 >/dev/null 2>&1 \
+  || fail "a cluster node cannot pull an image that is not preloaded — the nodes' DNS or egress is broken"
+docker compose exec -T k8s-env docker exec sim-control-plane \
+  crictl rmi busybox:1.36.1 >/dev/null 2>&1 || true
+
 echo "== host -> cluster: an Ingress answers on the published port =="
 docker compose exec -T k8s-env sh <<'INGRESS'
 set -e

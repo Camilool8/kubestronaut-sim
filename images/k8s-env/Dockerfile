@@ -80,9 +80,9 @@ RUN curl -fsSL -o /opt/sim/gateway-api-crds.yaml \
     && yq -r 'select(.kind == "NginxProxy") | .spec.kubernetes.service.type' /opt/sim/ngf.yaml | grep -qx ClusterIP \
     && ! grep -q 'externalTrafficPolicy' /opt/sim/ngf.yaml
 
-COPY kind-config.yaml bootstrap.sh phase.sh preload.txt /opt/sim/
+COPY kind-config.yaml bootstrap.sh phase.sh dockerd-config.sh preload.txt /opt/sim/
 COPY start.sh /start.sh
-RUN sed -i 's/\r$//' /start.sh /opt/sim/bootstrap.sh /opt/sim/phase.sh /opt/sim/preload.txt \
+RUN sed -i 's/\r$//' /start.sh /opt/sim/bootstrap.sh /opt/sim/phase.sh /opt/sim/dockerd-config.sh /opt/sim/preload.txt \
  && chmod +x /start.sh /opt/sim/bootstrap.sh
 
 # Downloads destined for the node images. Fetched here because the kind node

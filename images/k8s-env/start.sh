@@ -4,6 +4,8 @@ HELM_REPO_PORT=${HELM_REPO_PORT:-8879}
 NODE_IMAGE="${NODE_IMAGE:-$(cat /opt/sim/node-image)}"
 # shellcheck source=phase.sh
 . /opt/sim/phase.sh
+# shellcheck source=dockerd-config.sh
+. /opt/sim/dockerd-config.sh
 rm -f /shared/ready
 
 # A kind node's kubelet calls inotify_init for cAdvisor and its cert
@@ -24,6 +26,11 @@ echo 8192 > /proc/sys/fs/inotify/max_user_instances
 echo 524288 > /proc/sys/fs/inotify/max_user_watches
 
 phase dockerd "Starting the container runtime" 1
+mkdir -p /etc/docker
+if ! dockerd_config > /etc/docker/daemon.json; then
+  boot_failed "no free address range for the inner Docker networks — every candidate holds an upstream DNS server"
+  tail -f /dev/null
+fi
 dockerd-entrypoint.sh &
 dockerd_pid=$!
 dockerd_deadline=$((SECONDS + 180))
@@ -39,6 +46,11 @@ until docker info >/dev/null 2>&1; do
   sleep 1
 done
 echo "inner dockerd up"
+for ns in $(shadowed_dns); do
+  echo "WARNING: upstream DNS server ${ns} is inside an inner Docker network an older version created." >&2
+  echo "  The cluster nodes cannot resolve names, so any image that is not preloaded fails to pull." >&2
+  echo "  './sim purge' then './sim up' recreates the network clear of it." >&2
+done
 
 # The node tars are rootfs exports of the ssh-enabled derived images (see the
 # node-ssh stages in the Dockerfile), not docker archives — a derived build
