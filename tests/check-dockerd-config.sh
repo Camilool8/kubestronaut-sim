@@ -40,6 +40,7 @@ options edns0 trust-ad ndots:0
 EOF
 ok "omarchy: upstreams" "$(upstream_dns "$tmp/omarchy" | tr '\n' ' ')" "172.17.0.1 "
 ok "omarchy: no default bridge" "$(dockerd_config "$tmp/omarchy" | jq -r .bridge)" "none"
+ok "omarchy: classic image store" "$(dockerd_config "$tmp/omarchy" | jq -r '.features."containerd-snapshotter"')" "false"
 ok "omarchy: pool" "$(pool "$tmp/omarchy")" "10.61.0.0/16/24"
 dockerd_config "$tmp/omarchy" | jq -e . >/dev/null
 ok "omarchy: valid JSON" "$?" "0"

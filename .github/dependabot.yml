@@ -49,7 +49,7 @@ updates:
   # the released images, so they come along and are worth the same attention.
   #
   # Deliberately not watched, to keep the pull request volume honest:
-  #   images/k8s-env       docker:27-dind. The dind major is a pin the cluster
+  #   images/k8s-env       docker:29-dind. The dind major is a pin the cluster
   #                        bootstrap is written against, and evaluating a bump
   #                        means booting a full cluster -- a human decision.
   #   images/instance      debian:13-slim only; the same base is already
