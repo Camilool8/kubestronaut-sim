@@ -36,6 +36,12 @@
 # on its own `kind` network — and one /16 from the candidates, split into /24
 # networks, that holds no upstream DNS server and none of this container's own
 # addresses.
+#
+# The classic image store is pinned too. Docker 29 makes the containerd store
+# the default on a fresh install only, and a purged dind volume is a fresh
+# install while an upgraded one is not, so leaving it to the default would give
+# two installs of the same version two different stores — and every image the
+# clusters run goes through this store on its way into kind.
 
 # The IPv4 upstreams, one per line. A Pod's resolv.conf names them directly.
 # Docker's names only its embedded 127.0.0.11 and records the real ones in a
@@ -62,7 +68,7 @@ dockerd_config() {
   done
   for n in 61 62 63 64 65 66 67; do
     case "$skip" in *" 10.${n} "*) continue ;; esac
-    printf '{"bridge":"none","default-address-pools":[{"base":"10.%s.0.0/16","size":24}]}\n' "$n"
+    printf '{"bridge":"none","default-address-pools":[{"base":"10.%s.0.0/16","size":24}],"features":{"containerd-snapshotter":false}}\n' "$n"
     return 0
   done
   echo "dockerd_config: every candidate range holds an upstream DNS server or one of this container's own addresses" >&2

@@ -73,7 +73,7 @@ there is a change here:
   yq v4.45.1 — MIT License
   https://github.com/mikefarah/yq
 
-The images are built on docker:27-dind (Docker Engine, Apache License
+The images are built on docker:29-dind (Docker Engine, Apache License
 2.0, https://github.com/moby/moby) and debian:13-slim (Debian 13, a
 distribution of packages under their own separate licences,
 https://www.debian.org/legal/licenses/).
