@@ -61,7 +61,7 @@ func newTestManager(t *testing.T) *session.Manager {
 func TestGradeNoOpWhileInFlight(t *testing.T) {
 	mgr := newTestManager(t)
 	runner := &countingRunner{}
-	g := newGrader(testExam(), mgr, runner, time.Second)
+	g := newGrader(testExam(), "", mgr, runner, time.Second)
 
 	g.inFlight.Store(true)
 	g.Grade()
@@ -74,7 +74,7 @@ func TestGradeNoOpWhileInFlight(t *testing.T) {
 func TestGradeSequentialRunsRecordResultsAndClearInFlight(t *testing.T) {
 	mgr := newTestManager(t)
 	runner := &countingRunner{}
-	g := newGrader(testExam(), mgr, runner, time.Second)
+	g := newGrader(testExam(), "", mgr, runner, time.Second)
 
 	g.Grade()
 	waitForGraded(t, mgr)
@@ -98,7 +98,7 @@ func TestGradeSequentialRunsRecordResultsAndClearInFlight(t *testing.T) {
 func TestGradePanicRecoveredAndAllowsRegrade(t *testing.T) {
 	mgr := newTestManager(t)
 	runner := &panickingRunner{}
-	g := newGrader(testExam(), mgr, runner, time.Second)
+	g := newGrader(testExam(), "", mgr, runner, time.Second)
 
 	g.Grade()
 	waitForCalls(t, &runner.calls, 1)
@@ -187,7 +187,7 @@ func TestGradeMCQUsesStoredAnswersAndNeverSSH(t *testing.T) {
 	}
 
 	runner := &countingRunner{}
-	g := newGrader(mcqTestExam(), mgr, runner, time.Second)
+	g := newGrader(mcqTestExam(), "", mgr, runner, time.Second)
 	g.Grade()
 	waitForGraded(t, mgr)
 
@@ -237,7 +237,7 @@ func TestGradeMCQPooledAttemptScoresOnlyItsDrawnSubset(t *testing.T) {
 	}
 
 	runner := &countingRunner{}
-	g := newGrader(mcqPooledTestExam(), mgr, runner, time.Second)
+	g := newGrader(mcqPooledTestExam(), "", mgr, runner, time.Second)
 	g.Grade()
 	waitForGraded(t, mgr)
 
@@ -272,7 +272,7 @@ func TestPracticeGradeMCQ(t *testing.T) {
 	}
 
 	runner := &countingRunner{}
-	g := newGrader(mcqTestExam(), mgr, runner, time.Second)
+	g := newGrader(mcqTestExam(), "", mgr, runner, time.Second)
 	raw, err := g.PracticeGrade()
 	if err != nil {
 		t.Fatalf("PracticeGrade: %v", err)

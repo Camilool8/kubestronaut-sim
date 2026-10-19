@@ -137,7 +137,7 @@ func runServer() error {
 		if fn := onExpire.Load(); fn != nil {
 			(*fn)()
 		}
-	})
+	}, sessionOptions(ex)...)
 	if err != nil {
 		return fmt.Errorf("session: %w", err)
 	}
@@ -160,7 +160,7 @@ func runServer() error {
 	}
 
 	runner := evaluate.NewSSHRunner(cfg.sshKey)
-	g := newGrader(ex, mgr, runner, checkTimeout)
+	g := newGrader(ex, cfg.bankDir, mgr, runner, checkTimeout)
 	g.record = func(token string, snap session.Snapshot, res *evaluate.Results) error {
 		return recordAttempt(hist, mir, ex, token, snap, res)
 	}
@@ -203,4 +203,16 @@ func runServer() error {
 	}
 	log.Printf("facilitator listening on %s", listen)
 	return srv.ListenAndServe()
+}
+
+// sessionOptions is what the session loader is told about the exam. With
+// no exam loaded — the lobby, before a bank is chosen — there is nothing
+// to check a persisted language against, so nothing is passed; the
+// attempt on disk, if any, belongs to a bank that is not the active one
+// and is handled by the bank check in session.New.
+func sessionOptions(ex *exam.Exam) []session.Option {
+	if ex == nil {
+		return nil
+	}
+	return []session.Option{session.WithLanguages(ex.Languages())}
 }

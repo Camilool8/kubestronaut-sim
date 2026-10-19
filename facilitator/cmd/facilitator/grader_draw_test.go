@@ -39,7 +39,7 @@ func TestGradeRefusesWhenThePoolChangedUnderTheAttempt(t *testing.T) {
 		}
 	}
 
-	g := newGrader(&edited, mgr, &countingRunner{}, time.Second)
+	g := newGrader(&edited, "", mgr, &countingRunner{}, time.Second)
 	g.Grade()
 	waitForGraded(t, mgr)
 
@@ -76,7 +76,7 @@ func TestGradeProceedsWhenTheDigestMatchesOrIsAbsent(t *testing.T) {
 				t.Fatalf("End: %v", err)
 			}
 
-			g := newGrader(ex, mgr, &countingRunner{}, time.Second)
+			g := newGrader(ex, "", mgr, &countingRunner{}, time.Second)
 			g.Grade()
 			waitForGraded(t, mgr)
 
@@ -118,7 +118,7 @@ func TestGradedResultsCarryTheAttemptAndItsTiming(t *testing.T) {
 		t.Fatalf("End: %v", err)
 	}
 
-	g := newGrader(ex, mgr, &countingRunner{}, time.Second)
+	g := newGrader(ex, "", mgr, &countingRunner{}, time.Second)
 	g.Grade()
 	waitForGraded(t, mgr)
 

@@ -1,0 +1,1 @@
+The Service is correct (port 80 → targetPort 8080), endpoints ready, but every connection gets "connection refused". Inside the pod, `ss -tlnp` shows the process listening on 127.0.0.1:8080. What's the problem?

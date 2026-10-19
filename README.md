@@ -56,6 +56,7 @@ what creates its cluster, and the page shows each phase as it completes.
 | CKA Mock Exam | Hands-on | 26 | 16 drawn | 120 min | 66% |
 | CKAD Mock Exam | Hands-on | 44 | 17 drawn | 120 min | 66% |
 | KCNA Mock Exam | Multiple choice | 97 | 65 drawn | 90 min | 75% |
+| CKNE Mock Exam | Multiple choice | 170 | 75 drawn | 90 min | 66% |
 
 - Every draw is stratified to the published curriculum weights.
 - CKA and CKAD also mix the draw across three levels — quick, core and
@@ -69,7 +70,11 @@ what creates its cluster, and the page shows each phase as it completes.
   question drawn — worst case ~15-16GB.
 - CKAD runs against a two-node kind cluster, at the Kubernetes version
   its bank pins.
-- KCNA ships a full explanation for every question.
+- KCNA and CKNE ship a full explanation for every question.
+- The real CKNE is performance-based; its bank here is multiple choice and
+  drills the knowledge behind the five published domains. It can be sat
+  in seven languages — pick one on the mode screen — see
+  [banks/ckne-mock/README.md](banks/ckne-mock/README.md).
 - KCSA and CKS appear in the catalog as coming soon.
 
 Hands-on questions are graded on **behaviour**, not on the shape of your

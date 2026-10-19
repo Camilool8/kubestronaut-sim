@@ -89,7 +89,7 @@ let exam: ExamInfo = ckad;
 let startStatus = 200;
 let startCalls: string[] = [];
 
-let startBodies: { mode: string; domains?: string[] }[] = [];
+let startBodies: { mode: string; domains?: string[]; language?: string }[] = [];
 const runningSession: SessionSnapshot = {
   state: "running",
   bank: "ckad-mock-01",
@@ -115,7 +115,7 @@ function mockApi() {
         return new Response(JSON.stringify(exam), { status: 200 });
       }
       if (url.endsWith("/api/session/start") && init?.method === "POST") {
-        const body = JSON.parse(String(init.body)) as { mode: string; domains?: string[] };
+        const body = JSON.parse(String(init.body)) as { mode: string; domains?: string[]; language?: string };
         startBodies.push(body);
         startCalls.push(body.mode);
         if (startStatus === 409) {
@@ -551,5 +551,54 @@ describe("what starting will actually do", () => {
     await screen.findByRole("heading", { name: "Exam" });
 
     expect(screen.queryByText(/sets them up on the cluster/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("choosing a language", () => {
+  const mcq: ExamInfo = {
+    ...ckad,
+    name: "ckne-mock",
+    title: "CKNE Mock Exam",
+    certification: "CKNE",
+    examType: "mcq",
+    language: "en",
+    translations: ["pt", "ar"],
+  };
+
+  test("a bank with translations offers them, the bank's own language pressed", async () => {
+    exam = mcq;
+    renderMode(() => {}, "ckne-mock");
+    const group = await screen.findByRole("group", { name: "Language to sit the exam in" });
+    const chips = within(group).getAllByRole("button");
+    expect(chips.map((c) => c.textContent)).toEqual(["English", "Português", "العربية"]);
+    expect(chips[0]).toHaveAttribute("aria-pressed", "true");
+    expect(chips[1]).toHaveAttribute("lang", "pt");
+  });
+
+  test("a bank without translations shows no language control at all", async () => {
+    renderMode();
+    await screen.findByRole("heading", { name: "Exam" });
+    expect(
+      screen.queryByRole("group", { name: "Language to sit the exam in" }),
+    ).not.toBeInTheDocument();
+  });
+
+  test("picking a translation sends it; the bank's own language sends nothing", async () => {
+    exam = mcq;
+    const user = userEvent.setup();
+    renderMode(() => {}, "ckne-mock");
+    await user.click(await screen.findByRole("button", { name: "Português" }));
+    await user.click(screen.getByRole("button", { name: "Start Exam" }));
+    await waitFor(() => expect(startBodies).toEqual([{ mode: "exam", language: "pt" }]));
+  });
+
+  test("switching back to the bank's own language drops the field", async () => {
+    exam = mcq;
+    const user = userEvent.setup();
+    renderMode(() => {}, "ckne-mock");
+    await user.click(await screen.findByRole("button", { name: "Português" }));
+    await user.click(screen.getByRole("button", { name: "English" }));
+    await user.click(screen.getByRole("button", { name: "Start Exam" }));
+    await waitFor(() => expect(startBodies).toEqual([{ mode: "exam" }]));
   });
 });

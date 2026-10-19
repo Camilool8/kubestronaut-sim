@@ -24,6 +24,9 @@ export interface SessionSnapshot {
 
   domainFilter?: string[];
 
+  /** Language the attempt was started in; absent means the bank's own. */
+  language?: string;
+
   preparing?: PreparingAttempt;
 
   prepareError?: string;
@@ -103,6 +106,10 @@ export interface ExamInfo {
 
   hasTips?: boolean;
   levelMixed?: boolean;
+
+  /** The language the bank is written in, and the others it can be sat in. */
+  language?: string;
+  translations?: string[];
 }
 
 export interface ExamEnvironment {
@@ -123,6 +130,8 @@ export interface QuestionDetail {
   options?: string[];
 
   multi?: boolean;
+
+  language?: string;
 }
 
 export interface SolutionDoc {
@@ -133,6 +142,7 @@ export interface SolutionDoc {
 export interface SolutionDetail {
   id: string;
   markdown: string;
+  language?: string;
 
   docs?: SolutionDoc[];
 }
@@ -403,6 +413,8 @@ export interface StartOptions {
   domains?: string[];
 
   poolDigest?: string;
+
+  language?: string;
 }
 
 export type StartSessionResponse =

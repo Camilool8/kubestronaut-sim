@@ -7,7 +7,9 @@ import {
   type ExamMode,
   type SessionMode,
   type SessionSnapshot,
+  type StartOptions,
 } from "../api";
+import { languageName } from "../lib/language";
 import { Async } from "../components/Async";
 import { DesktopRequired, useDesktopGate } from "../components/DesktopRequired";
 import { ExamIntro, markIntroSeen } from "../components/ExamIntro";
@@ -231,6 +233,45 @@ function DrawPanel({ exam, selected, onSelect }: DrawPanelProps) {
   );
 }
 
+interface LanguagePanelProps {
+  exam: ExamInfo;
+  selected: string;
+  onSelect: (lang: string) => void;
+}
+
+// One pill per language the bank ships, the bank's own first and pressed
+// by default. It sits above the mode cards on purpose: the language is
+// the first thing a candidate decides, it is fixed once the clock starts,
+// and a control below the fold is one they discover after pressing Start.
+function LanguagePanel({ exam, selected, onSelect }: LanguagePanelProps) {
+  const base = exam.language ?? "en";
+  const languages = [base, ...(exam.translations ?? [])];
+  if (languages.length < 2) return null;
+
+  return (
+    <section className="lang-panel" aria-labelledby="lang-panel-title">
+      <div className="lang-panel-lead">
+        <h2 id="lang-panel-title">{strings.mode.languageTitle}</h2>
+        <p>{strings.mode.languageNote}</p>
+      </div>
+      <div className="lang-chips" role="group" aria-label={strings.mode.languageLabel}>
+        {languages.map((code) => (
+          <button
+            key={code}
+            type="button"
+            className="lang-chip"
+            lang={code}
+            aria-pressed={selected === code}
+            onClick={() => onSelect(code)}
+          >
+            {languageName(code)}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 interface ModeProps {
   bankId: string;
   catalogVersion: number;
@@ -257,6 +298,7 @@ export function Mode({ bankId, catalogVersion, onSessionChange, onPreparing }: M
     [queryKey],
   );
   const [picked, setPicked] = useState<string[] | null>(null);
+  const [language, setLanguage] = useState<string | null>(null);
 
   const blocked = useDesktopGate() === "blocked" && !isMcq;
 
@@ -265,11 +307,14 @@ export function Mode({ bankId, catalogVersion, onSessionChange, onPreparing }: M
     if (wrongExam) navigate("/exams", { replace: true });
   }, [wrongExam]);
 
-  const handleStart = async (mode: Exclude<SessionMode, "">, domains: string[]) => {
+  const handleStart = async (mode: Exclude<SessionMode, "">, domains: string[], lang?: string) => {
     setStarting(mode);
     setStartError(null);
     try {
-      const result = await startSession(domains.length > 0 ? { mode, domains } : mode);
+      const options: StartOptions = { mode };
+      if (domains.length > 0) options.domains = domains;
+      if (lang) options.language = lang;
+      const result = await startSession(options.domains || options.language ? options : mode);
 
       if (result.ok && "session" in result) {
         onSessionChange(result.session);
@@ -333,6 +378,13 @@ export function Mode({ bankId, catalogVersion, onSessionChange, onPreparing }: M
           const available = new Set((loaded.domains ?? []).map((d) => d.name));
           const selected = (picked ?? presetDomains).filter((d) => available.has(d));
 
+          // A translation is sent only when one was picked; the bank's own
+          // language is the server's default and needs no field.
+          const base = loaded.language ?? "en";
+          const chosenLanguage = language && language !== base && (loaded.translations ?? []).includes(language)
+            ? language
+            : undefined;
+
           // Only a pooled hands-on bank seeds at start; everything else is
           // already sitting on the cluster and begins the moment it is pressed.
           const seeds = !isMcq && loaded.questions.length > (loaded.questionCount || 0);
@@ -340,6 +392,8 @@ export function Mode({ bankId, catalogVersion, onSessionChange, onPreparing }: M
 
           return (
             <>
+              <LanguagePanel exam={loaded} selected={chosenLanguage ?? base} onSelect={setLanguage} />
+
               <ul className="mode-grid">
                 {modes.map((m) => (
                   <ModeCard
@@ -349,7 +403,7 @@ export function Mode({ bankId, catalogVersion, onSessionChange, onPreparing }: M
                     starting={starting === m.id}
                     disabled={starting !== null && starting !== m.id}
                     filtered={selected.length > 0}
-                    onStart={() => handleStart(m.id, selected)}
+                    onStart={() => handleStart(m.id, selected, chosenLanguage)}
                   />
                 ))}
               </ul>
