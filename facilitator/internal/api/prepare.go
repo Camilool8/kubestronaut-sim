@@ -52,6 +52,10 @@ func WithSeeder(s Seeder) Option {
 	return func(srv *server) { srv.seeder = s }
 }
 
+func WithPrepFile(path string) Option {
+	return func(srv *server) { srv.prepFile = path }
+}
+
 const prepPollInterval = 500 * time.Millisecond
 
 const prepMaxPollErrors = 120
@@ -136,6 +140,7 @@ func (s *server) beginPrepare(ctx context.Context, mode string, dur time.Duratio
 		return prep{}, errPreparingCancelled
 	}
 	s.prep.jobID = jobID
+	s.persistPrepLocked()
 	current := *s.prep
 	s.prepMu.Unlock()
 
@@ -166,7 +171,7 @@ func (s *server) watchPrepare(p prep) {
 			errs = 0
 		case status.State == SeedDone:
 			if p.awaitStart {
-				s.markReady(p.gen)
+				s.markReady(p.gen, time.Now())
 				return
 			}
 			s.startPreparedAttempt(p)
@@ -192,14 +197,15 @@ func (s *server) startPreparedAttempt(p prep) {
 	s.clearPrep(p.gen, "")
 }
 
-func (s *server) markReady(gen uint64) {
+func (s *server) markReady(gen uint64, at time.Time) {
 	s.prepMu.Lock()
 	defer s.prepMu.Unlock()
 
 	if s.prep == nil || s.prep.gen != gen {
 		return
 	}
-	s.prep.readyAt = time.Now()
+	s.prep.readyAt = at
+	s.persistPrepLocked()
 	log.Printf("facilitator: %d question(s) seeded; waiting for the candidate to start the clock", len(s.prep.draw.QuestionIDs))
 }
 
@@ -222,6 +228,7 @@ func (s *server) beginReadyAttempt() (session.Snapshot, error) {
 	}
 	s.prep = nil
 	s.prepError = ""
+	s.persistPrepLocked()
 	return snap, nil
 }
 
@@ -242,6 +249,7 @@ func (s *server) clearPrep(gen uint64, msg string) {
 	}
 	s.prep = nil
 	s.prepError = msg
+	s.persistPrepLocked()
 }
 
 func (s *server) prepIsCurrent(gen uint64) bool {
@@ -257,6 +265,7 @@ func (s *server) cancelPrep() {
 	s.prep = nil
 	s.prepError = ""
 	s.prepGen++
+	s.persistPrepLocked()
 }
 
 type seededSet struct {
@@ -386,29 +395,41 @@ func (s *server) probeSeeded() {
 	s.prepError = errPreparationLost.Error()
 }
 
-func (s *server) conductorHeldSeedJob() bool {
+type conductorJob struct {
+	ID    string `json:"id"`
+	Op    string `json:"op"`
+	Error string `json:"error"`
+}
+
+type conductorStatus struct {
+	Job     *conductorJob `json:"job"`
+	LastJob *conductorJob `json:"lastJob"`
+}
+
+func (s *server) conductorStatus() (conductorStatus, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), prepPollTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "/api/control/status", nil)
 	if err != nil {
-		return false
+		return conductorStatus{}, err
 	}
 	rec := &bodyRecorder{header: http.Header{}, status: http.StatusOK}
 	s.control.ServeHTTP(rec, req)
 	if rec.status != http.StatusOK {
-		return false
+		return conductorStatus{}, fmt.Errorf("the environment service answered %d", rec.status)
 	}
 
-	var snap struct {
-		Job *struct {
-			Op string `json:"op"`
-		} `json:"job"`
-		LastJob *struct {
-			Op string `json:"op"`
-		} `json:"lastJob"`
-	}
+	var snap conductorStatus
 	if err := json.Unmarshal(rec.body.Bytes(), &snap); err != nil {
+		return conductorStatus{}, err
+	}
+	return snap, nil
+}
+
+func (s *server) conductorHeldSeedJob() bool {
+	snap, err := s.conductorStatus()
+	if err != nil {
 		return false
 	}
 	if snap.Job != nil && snap.Job.Op == seedJobOp {

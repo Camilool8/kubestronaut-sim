@@ -96,7 +96,7 @@ func newHandsOnPoolServer(t *testing.T, seeder api.Seeder, control http.Handler,
 	}
 
 	grader := &fakeGrader{}
-	opts := []api.Option{}
+	opts := []api.Option{api.WithPrepFile(session.PrepPath(sessionPath))}
 	if seeder != nil {
 		opts = append(opts, api.WithSeeder(seeder))
 	}

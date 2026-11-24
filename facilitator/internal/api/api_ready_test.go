@@ -302,33 +302,54 @@ func TestSecondStartWhileReadyConflicts(t *testing.T) {
 	}
 }
 
-func TestRestartWhileReadyNeverStartsAClock(t *testing.T) {
+func TestRestartWhileReadyKeepsTheAttemptReadyWithoutAClock(t *testing.T) {
 	sessionPath := t.TempDir() + "/session.json"
-	conductor := &conductorStub{status: `{"busy":false,"lastJob":{"id":"job-1","op":"seed"}}`}
+	conductor := &conductorStub{status: seedDoneStatus}
 	seeder := newFakeSeeder()
 	ts, _ := newHandsOnPoolServer(t, seeder, conductor, sessionPath)
 
-	prepareReady(t, ts, seeder)
+	before := prepareReady(t, ts, seeder)
+	asked := seeder.askedFor()
+	saved, ok := readPrepFile(t, sessionPath)
+	if !ok || !saved.Ready || saved.JobID != "job-1" || !saved.AwaitStart {
+		t.Fatalf("prep file = %+v (exists=%v), want a ready, gated record of job-1", saved, ok)
+	}
 
-	restarted, _ := newHandsOnPoolServer(t, newFakeSeeder(), conductor, sessionPath)
-	got := restarted.waitFor(t, "the lost ready attempt to be reported", func(s sessionBody) bool {
-		return s.PrepareError != ""
+	again := newFakeSeeder()
+	restarted, _ := newHandsOnPoolServer(t, again, conductor, sessionPath)
+	got := restarted.waitFor(t, "the ready attempt to come back", func(s sessionBody) bool {
+		return s.Preparing != nil && s.Preparing.Ready
 	})
-	if got.State != "idle" || got.Preparing != nil {
-		t.Errorf("state=%q preparing=%+v, want idle with nothing to resume", got.State, got.Preparing)
+	if got.State != "idle" || got.PrepareError != "" {
+		t.Fatalf("state=%q prepareError=%q, want idle and no error", got.State, got.PrepareError)
 	}
-	if !strings.Contains(got.PrepareError, "restarted") {
-		t.Errorf("prepareError = %q, want it to say what happened", got.PrepareError)
+	if got.Preparing.ReadyAt != before.Preparing.ReadyAt || got.Preparing.StartedAt != before.Preparing.StartedAt {
+		t.Errorf("preparing = %+v, want the saved timestamps of %+v", got.Preparing, before.Preparing)
 	}
-	if rec := restarted.doJSON(t, http.MethodPost, "/api/session/begin", ""); rec.Code != http.StatusConflict {
-		t.Fatalf("begin after restart: status = %d, want 409", rec.Code)
+	if got.Preparing.Seed != before.Preparing.Seed || got.Preparing.QuestionCount != 3 || got.Preparing.DurationSeconds != 3600 {
+		t.Errorf("preparing = %+v, want the saved draw of %+v", got.Preparing, before.Preparing)
 	}
-	if rec := restarted.doJSON(t, http.MethodPost, "/api/session/start", awaitBody); rec.Code != http.StatusConflict {
-		t.Fatalf("start after restart: status = %d, want 409 until the environment is reset", rec.Code)
+
+	time.Sleep(50 * time.Millisecond)
+	if still := restarted.session(t); still.State != "idle" {
+		t.Fatalf("state = %q, want idle: a restart must never start a clock", still.State)
 	}
-	time.Sleep(20 * time.Millisecond)
-	if again := restarted.session(t); again.State != "idle" {
-		t.Errorf("state = %q, want idle: a restart must never start a clock", again.State)
+	if n := again.starts(); n != 0 {
+		t.Errorf("the restarted service seeded %d time(s), want 0: the cluster already holds the draw", n)
+	}
+
+	rec := restarted.doJSON(t, http.MethodPost, "/api/session/begin", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("begin after restart: status = %d, want 200, body=%s", rec.Code, rec.Body.String())
+	}
+	if begun := decodeJSON[begunBody](t, rec); begun.State != "running" || begun.RemainingSeconds != 3600 {
+		t.Errorf("begin = %+v, want a running attempt with the whole 3600s", begun)
+	}
+	if ids := restarted.mgr.QuestionIDs(); strings.Join(ids, ",") != strings.Join(asked, ",") {
+		t.Errorf("attempt has %v, the cluster was seeded for %v", ids, asked)
+	}
+	if _, ok := readPrepFile(t, sessionPath); ok {
+		t.Error("the prep file outlived begin; another restart would offer a started attempt again")
 	}
 }
 

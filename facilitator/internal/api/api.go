@@ -48,6 +48,9 @@ type server struct {
 	prepGen   uint64
 	seeded    *seededSet
 	probeOnce sync.Once
+
+	prepFile string
+	prepBank string
 }
 
 func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desktop, control http.Handler, ui fs.FS, boot *bootstate.Reader, practice PracticeGrader, opts ...Option) http.Handler {
@@ -61,6 +64,8 @@ func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desk
 			s.seeded = newSeededSet(ids)
 		}
 	}
+	s.prepBank = mgr.Snapshot().Bank
+	s.restorePrep()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealthz)

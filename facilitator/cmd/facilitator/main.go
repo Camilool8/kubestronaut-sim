@@ -193,6 +193,7 @@ func runServer() error {
 		api.WithHistory(hist),
 		api.WithBanks(newBanksFetcher(conductorURL, conductorTransport)),
 		api.WithSeeder(newConductorSeeder(conductorURL, conductorTransport)),
+		api.WithPrepFile(session.PrepPath(sessionFile)),
 		api.WithDocsOpener(api.NewHTTPDocsOpener(desktopControlAddr)),
 	)
 
