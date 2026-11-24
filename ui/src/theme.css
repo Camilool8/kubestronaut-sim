@@ -668,6 +668,7 @@ button.nav-menu-item:hover {
   max-width: 64ch;
   color: var(--text-muted);
   line-height: 1.6;
+  text-wrap: pretty;
 }
 
 .page-loading,
@@ -684,6 +685,7 @@ button.nav-menu-item:hover {
 
 .page-tips li {
   margin-bottom: var(--space-1);
+  text-wrap: pretty;
 }
 
 .page-footer {
@@ -1185,6 +1187,7 @@ button.nav-menu-item:hover {
   color: var(--text-muted);
   font-size: var(--text-s);
   line-height: 1.6;
+  text-wrap: pretty;
 }
 
 .draw-panel-domains {
