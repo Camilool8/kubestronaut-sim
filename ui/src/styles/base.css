@@ -94,6 +94,12 @@ h3 {
     border-width: 3px;
   }
 
+  .navigator-tile.is-viewed::after,
+  .navigator-swatch-viewed::after {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+
   .btn:disabled {
     color: GrayText;
   }

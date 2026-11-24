@@ -34,3 +34,13 @@ describe("selected tiles share one full accent ring", () => {
     expect(forced![1]).toContain("outline: 2px solid Highlight");
   });
 });
+
+describe("the viewed dot survives forced colours", () => {
+  test("its fill is a system colour the forced palette keeps", async () => {
+    const css = await readBaseCss();
+    const forced = /@media \(forced-colors: active\) \{([\s\S]*?)\n\}/.exec(css)![1];
+    expect(forced).toContain(".navigator-tile.is-viewed::after");
+    expect(forced).toContain(".navigator-swatch-viewed::after");
+    expect(forced).toContain("background: CanvasText");
+  });
+});
