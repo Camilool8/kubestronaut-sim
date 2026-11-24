@@ -779,6 +779,7 @@ button.nav-menu-item:hover {
 }
 
 .exam-card {
+  container: exam-card / inline-size;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -856,14 +857,23 @@ button.nav-menu-item:hover {
 }
 
 .exam-stats {
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: space-between;
+  column-gap: var(--space-4);
   margin: 0;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
 }
 
+@container exam-card (max-width: 19rem) {
+  .exam-stats {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .exam-stats > div {
-  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column-reverse;
@@ -875,10 +885,12 @@ button.nav-menu-item:hover {
 .exam-stats dt {
   font-size: var(--text-xs);
   color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .exam-stats dd {
   margin: 0;
+  white-space: nowrap;
   font-family: var(--font-mono);
   font-size: var(--text-l);
   font-weight: 600;
@@ -1246,7 +1258,7 @@ button.nav-menu-item:hover {
 }
 
 .draw-chip-mark {
-  visibility: hidden;
+  display: none;
   color: var(--accent);
 }
 
@@ -1257,7 +1269,7 @@ button.nav-menu-item:hover {
 }
 
 .draw-chip[aria-pressed="true"] .draw-chip-mark {
-  visibility: visible;
+  display: block;
 }
 
 .draw-chip[aria-pressed="true"] .domain-count {
