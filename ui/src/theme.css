@@ -94,6 +94,10 @@
   gap: var(--space-3);
   min-width: 0;
   flex: 1 1 auto;
+  align-self: stretch;
+  overflow: clip;
+  padding-inline: var(--space-3) var(--space-1);
+  margin-inline: calc(-1 * var(--space-3)) calc(-1 * var(--space-1));
 }
 
 .navbar-home {
@@ -234,11 +238,115 @@
 }
 
 .navbar-submit {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   flex-shrink: 0;
   white-space: nowrap;
+}
+
+.btn.navbar-submit {
+  background: var(--surface);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.btn.navbar-submit:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.navbar-submit::after {
+  content: "";
+  position: absolute;
+  inset: calc((100% - var(--tap-min)) / 2) 0;
+}
+
+.navbar-exam .navbar-lead {
+  flex: 0 1 auto;
+  min-width: 11rem;
+}
+
+.navbar-exam .navbar-tail {
+  flex: 1 0 auto;
+  justify-content: flex-end;
+}
+
+.navbar-titles {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.navbar-titles .navbar-crumb {
+  max-width: 100%;
+  padding-block: 0;
+}
+
+.navbar-subtitle {
+  display: flex;
+  padding-inline: var(--space-2);
+}
+
+.navbar-subtitle .mode-chip {
+  font-size: var(--text-xs);
+}
+
+@media (max-width: 1279px) {
+  .navbar-exam .navbar-wordmark {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 900px) {
+  .navbar-exam .exam-progress-track {
+    display: none;
+  }
+}
+
+@media (max-width: 48rem) {
+  .navbar-exam .exam-progress {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .navbar-exam .navbar-lead {
+    min-width: 4.5rem;
+  }
+
+  .navbar-exam .navbar-home,
+  .navbar-submit .icon {
+    display: none;
+  }
+
+  .navbar-exam .navbar-crumb {
+    padding-inline: 0;
+  }
+
+  .navbar-subtitle {
+    padding-inline: 0;
+  }
+
+  .btn.navbar-submit {
+    padding-inline: var(--space-3);
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar-exam .navbar-tail .info-button {
+    display: none;
+  }
 }
 
 .nav-menu {
@@ -450,6 +558,16 @@ button.nav-menu-item:hover {
     clip-path: inset(50%);
     white-space: nowrap;
     border: 0;
+  }
+
+  .navbar-home {
+    position: relative;
+  }
+
+  .navbar-home::after {
+    content: "";
+    position: absolute;
+    inset: calc((var(--tap-min) - 100%) / -2);
   }
 
   .navbar-back {
@@ -1176,13 +1294,20 @@ button.nav-menu-item:hover {
 }
 
 .exam-env {
-  flex: 1 1 8rem;
+  flex: 1 1 0;
   min-width: 0;
+  contain: inline-size;
   font-size: var(--text-s);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+@media (max-width: 1099px) {
+  .exam-env {
+    display: none;
+  }
 }
 
 .exam-progress {

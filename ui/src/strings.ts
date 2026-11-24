@@ -168,6 +168,7 @@ export const strings = {
       `Couldn't load the question list (${detail}). The timer and the exam desktop are unaffected. The questions are served by the facilitator, so check it is up with \`docker compose ps facilitator\`.`,
 
     endAttempt: (mode: string) => (mode === "training" ? "Submit session" : "Submit exam"),
+    endAttemptShort: "Submit",
     ending: "Ending…",
 
     positionShort: (n: number, total: number) => `${n}/${total}`,
