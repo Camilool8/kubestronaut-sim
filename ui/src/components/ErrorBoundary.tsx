@@ -3,6 +3,7 @@ import { strings } from "../strings";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
+  fallback?: (error: Error) => ReactNode;
 }
 
 interface ErrorBoundaryState {
@@ -18,6 +19,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   render() {
     if (this.state.error) {
+      if (this.props.fallback) return this.props.fallback(this.state.error);
       return (
         <div className="error-boundary" role="alert">
           <h1>{strings.errorBoundary.title}</h1>
@@ -30,4 +32,28 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     }
     return this.props.children;
   }
+}
+
+interface PaneFallbackProps {
+  title: string;
+  onRetry: () => void;
+  children?: ReactNode;
+}
+
+export function PaneFallback({ title, onRetry, children }: PaneFallbackProps) {
+  return (
+    <div className="pane-fallback" role="alert">
+      <p className="pane-fallback-title">{title}</p>
+      <p className="pane-fallback-body">{strings.paneError.safe}</p>
+      <div className="pane-fallback-actions">
+        <button type="button" className="btn" onClick={onRetry}>
+          {strings.paneError.retry}
+        </button>
+        <button type="button" className="btn btn-quiet" onClick={() => window.location.reload()}>
+          {strings.paneError.reloadPage}
+        </button>
+      </div>
+      {children}
+    </div>
+  );
 }

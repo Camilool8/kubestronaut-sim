@@ -1,11 +1,12 @@
 import type { ReactElement, ReactNode } from "react";
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import type { MarkdownComponents } from "./MarkdownRenderer";
 import { desktopClipboard } from "../lib/desktopClipboard";
 import { pasteChordLabel } from "../lib/desktopKeymap";
 import { highlightTo } from "../lib/highlight";
 import { strings } from "../strings";
 import { toastStore } from "./toastStore";
+import { ErrorBoundary, PaneFallback } from "./ErrorBoundary";
 
 function CopyableCode({ children }: { children: ReactNode }) {
   const value = typeof children === "string" ? children : String(children ?? "");
@@ -146,7 +147,9 @@ const COMPONENTS_STATIC = {
   code: ({ children, className }: CodeChildProps) => <code className={className}>{children}</code>,
 };
 
-const MarkdownRenderer = lazy(() => import("./MarkdownRenderer"));
+const loadMarkdownRenderer = () => import("./MarkdownRenderer");
+
+let MarkdownRenderer = lazy(loadMarkdownRenderer);
 
 export function Markdown({
   children,
@@ -156,11 +159,25 @@ export function Markdown({
   copyable?: boolean;
 }) {
   const components: MarkdownComponents = copyable ? COMPONENTS : COMPONENTS_STATIC;
+  const [mounts, setMounts] = useState(0);
+  const retry = useCallback(() => {
+    MarkdownRenderer = lazy(loadMarkdownRenderer);
+    setMounts((n) => n + 1);
+  }, []);
   return (
     <div className="md">
-      <Suspense fallback={null}>
-        <MarkdownRenderer components={components}>{children}</MarkdownRenderer>
-      </Suspense>
+      <ErrorBoundary
+        key={mounts}
+        fallback={() => (
+          <PaneFallback title={strings.paneError.markdownTitle} onRetry={retry}>
+            <pre className="md-plain">{children}</pre>
+          </PaneFallback>
+        )}
+      >
+        <Suspense fallback={null}>
+          <MarkdownRenderer components={components}>{children}</MarkdownRenderer>
+        </Suspense>
+      </ErrorBoundary>
     </div>
   );
 }

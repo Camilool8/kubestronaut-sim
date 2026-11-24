@@ -304,8 +304,6 @@ export const strings = {
   toast: {
     dismiss: "Dismiss notification",
     timeWarning: (minutes: number) => `${minutes} minutes remaining.`,
-    desktopReconnecting: "Desktop connection lost. Reconnecting…",
-    desktopRestored: "Desktop connection restored.",
   },
 
   tips: {
@@ -408,11 +406,32 @@ export const strings = {
   desktop: {
     connecting: "Connecting to the exam desktop…",
 
-    reconnecting: (attempt: number) =>
-      attempt > 1
-        ? `Desktop connection lost. Reconnecting, attempt ${attempt}.`
-        : "Desktop connection lost. Reconnecting…",
-    skip: "Skip past the exam desktop (it captures Tab while focused)",
+    skip: "Skip past the exam desktop to Submit",
+    regionLabel: "Exam desktop. Press Ctrl+Alt+Shift+Esc to move focus out of it.",
+    lostTitle: "The exam desktop is not connected",
+    lostWorkSafe:
+      "Your cluster and everything you have done on it are intact. Only the view of the desktop is interrupted.",
+    lostClockTimed: "The exam clock is still running",
+    lostClockUntimed: "Elapsed time keeps counting",
+    lostRetrying: "Reconnecting automatically.",
+    stuckTitle: "This is taking longer than usual",
+    stuckCause:
+      "The usual cause is a network that blocks the live connection the desktop needs (WebSockets), as some office, school and hotel networks do. Try a phone hotspot or another network, or switch a VPN on or off.",
+    stuckKeepWorking: "You can keep reading the tasks while this retries. Reloading the page is also safe.",
+    reload: "Reload the desktop",
+    announceLost:
+      "Exam desktop disconnected. Your work is safe and the clock is still running. Reconnecting automatically.",
+    announceStuck:
+      "The exam desktop is still not connected. A Reload the desktop button is now available in the desktop pane.",
+    announceRestored: "Exam desktop connection restored.",
+  },
+
+  paneError: {
+    desktopTitle: "The exam desktop could not be shown",
+    markdownTitle: "This task's formatting could not be loaded. Showing it as plain text.",
+    safe: "The clock, your tasks and your cluster are unaffected. This is usually a brief network problem or a new version of the simulator.",
+    retry: "Try again",
+    reloadPage: "Reload the page",
   },
 
   lobby: {
@@ -570,6 +589,7 @@ export const strings = {
       ["F", "Flag this question, or the tile you are on"],
       ["?", "This list"],
       ["Esc", "Close a panel or dialog"],
+      ["Ctrl + Alt + Shift + Esc", "Leave the exam desktop, which keeps Tab for itself (Control + Option + Shift + Esc on a Mac)"],
       ["← / →", "Resize the question panel (when the divider has focus)"],
       ["Shift + ← / →", "Resize in bigger steps"],
       ["Home / End", "Narrowest / widest panel"],

@@ -17,6 +17,7 @@ const session: SessionSnapshot = {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-08-02T10:03:43.000Z"));
   document.title = "kubestronaut-sim";
 });
 

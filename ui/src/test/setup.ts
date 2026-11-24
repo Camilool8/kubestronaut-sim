@@ -39,6 +39,15 @@ Object.defineProperty(window, "sessionStorage", {
   configurable: true,
 });
 
+afterEach(() => {
+  const marks: string[] = [];
+  for (let i = 0; i < window.localStorage.length; i++) {
+    const key = window.localStorage.key(i);
+    if (key?.startsWith("sim.marks.")) marks.push(key);
+  }
+  for (const key of marks) window.localStorage.removeItem(key);
+});
+
 for (const method of ["setPointerCapture", "releasePointerCapture"] as const) {
   Object.defineProperty(Element.prototype, method, {
     value: () => {},

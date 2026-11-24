@@ -219,10 +219,10 @@ describe("QuestionPanel when its inputs really do change", () => {
 });
 
 describe("the exam desktop across a session poll", () => {
-  // DesktopViewport puts [onStateChange] on the effect that owns the whole VNC
-  // connection. Exam's handleDesktopState is wrapped in useCallback for exactly
-  // this reason: without it, every poll would tear the desktop down and re-dial
-  // it mid-exam.
+  // DesktopViewport now receives the session and fetchedAt on every poll, but
+  // the effect that owns the VNC connection depends only on the pane's own
+  // reload counter. If that ever changes, every poll would tear the desktop
+  // down and re-dial it mid-exam.
   test("a poll does not tear down and re-dial the candidate's desktop", async () => {
     const { rerender } = render(
       <Exam session={runningSession} fetchedAt={Date.now()} onSessionChange={() => {}} />,

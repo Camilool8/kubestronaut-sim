@@ -45,6 +45,12 @@ class ToastStore {
     this.remove(id);
   }
 
+  dismissKey(dedupeKey: string): void {
+    for (const toast of this.toasts) {
+      if (toast.dedupeKey === dedupeKey) this.remove(toast.id);
+    }
+  }
+
   clear(): void {
     for (const timer of this.timers.values()) window.clearTimeout(timer);
     this.timers.clear();
