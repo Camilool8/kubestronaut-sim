@@ -3,9 +3,9 @@ comingSoon:
     title: KCSA Mock Exam
     certification: KCSA
     examType: mcq
-    note: Bank not written yet
+    note: The questions for this exam are still being written.
   - id: cks-mock
     title: CKS Mock Exam
     certification: CKS
     examType: hands-on
-    note: Requires security add-ons (AppArmor, Falco) not in the kind environment yet
+    note: Needs security tooling (AppArmor, Falco) that the practice cluster does not run yet.
