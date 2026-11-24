@@ -23,7 +23,8 @@ export type IconName =
   | "send"
   | "home"
   | "book"
-  | "clock";
+  | "clock"
+  | "panel";
 
 const SUN_RAYS = [
   "M12 2.4v2.2",
@@ -152,6 +153,12 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <circle cx="12" cy="12" r="8" />
       <path d="M12 7.5V12l3 2" />
+    </>
+  ),
+  panel: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <path d="M9.5 4.5v15" />
     </>
   ),
 };

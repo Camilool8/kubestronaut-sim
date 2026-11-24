@@ -217,6 +217,10 @@ export const strings = {
 
     resizePanelValue: (px: number) => `${px} pixels`,
 
+    tasksHide: "Hide tasks",
+    tasksShow: "Show tasks",
+    tasksPosition: (n: number, total: number) => `Task ${n} of ${total}`,
+
     timeRemaining: (spoken: string) => `Time remaining: ${spoken}`,
 
     timeElapsed: (span: string) => `Time elapsed: ${span}`,

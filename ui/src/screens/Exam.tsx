@@ -35,11 +35,13 @@ import { Icon } from "../components/Icon";
 import { clipboardSync } from "../lib/clipboardSync";
 import { ExamIntro, introSeen, markIntroSeen } from "../components/ExamIntro";
 import { PanelResizer } from "../components/PanelResizer";
+import { TaskPanelToggle, useTaskPanelCollapsed } from "../components/TaskPanelToggle";
 import { PendingBar } from "../components/Pending";
 import { toastStore } from "../components/toastStore";
 import { marksStore } from "../components/marksStore";
 import { isTypingTarget } from "../lib/typing";
 import { singleKeyShortcuts } from "../lib/singleKeyShortcuts";
+import { NARROW_QUERY, useMediaQuery } from "../lib/useMediaQuery";
 import { strings } from "../strings";
 
 const loadDesktopViewport = () =>
@@ -183,6 +185,27 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
   const questions = exam?.questions ?? NO_QUESTIONS;
 
   const selectedId = pickedId ?? questions[0]?.id ?? null;
+  const selectedIndex = questions.findIndex((q) => q.id === selectedId);
+
+  const narrow = useMediaQuery(NARROW_QUERY);
+  const [tasksCollapsed, setTasksCollapsed] = useTaskPanelCollapsed();
+  const collapsed = narrow && tasksCollapsed;
+
+  useEffect(() => {
+    if (!collapsed) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "g" && event.key !== "G") return;
+      if (!singleKeyShortcuts.enabled) return;
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".desktop-pane")) return;
+      if (isTypingTarget(target)) return;
+      if (document.querySelector('[role="dialog"]')) return;
+      setTasksCollapsed(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [collapsed, setTasksCollapsed]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -205,11 +228,15 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
 
   const closeConfirm = useCallback(() => setConfirmOpen(false), []);
   const focusTaskTitle = useRef(false);
-  const jumpToTask = useCallback((id: string) => {
-    setConfirmOpen(false);
-    focusTaskTitle.current = true;
-    setPickedId(id);
-  }, []);
+  const jumpToTask = useCallback(
+    (id: string) => {
+      setConfirmOpen(false);
+      setTasksCollapsed(false);
+      focusTaskTitle.current = true;
+      setPickedId(id);
+    },
+    [setTasksCollapsed],
+  );
 
   useEffect(() => {
     if (!focusTaskTitle.current) return;
@@ -315,7 +342,16 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
           ) : undefined
         }
       />
-      <div className="exam-body">
+      {narrow && (
+        <TaskPanelToggle
+          panelId="question-panel"
+          collapsed={collapsed}
+          onToggle={() => setTasksCollapsed(!collapsed)}
+          position={selectedIndex + 1}
+          total={questions.length}
+        />
+      )}
+      <div className="exam-body" data-tasks={collapsed ? "collapsed" : undefined}>
         <QuestionPanel
           questions={questions}
           mode={session.mode}
