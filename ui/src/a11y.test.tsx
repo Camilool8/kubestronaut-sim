@@ -345,7 +345,7 @@ describe("axe: no WCAG violations", () => {
     );
     await screen.findByText("CKA", { selector: "h2" });
 
-    await user.click(screen.getAllByRole("button", { name: /choose a mode/i })[1]);
+    await user.click(screen.getAllByRole("button", { name: /^Load / })[0]);
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
@@ -499,7 +499,7 @@ describe("axe: no WCAG violations", () => {
   test("navbar at the top of the app", async () => {
     render(
       <NavBar
-        trail={[{ label: "Choose an exam" }]}
+        trail={[{ label: "Exams" }]}
         nav={[
           { label: "Exams", to: "/exams", icon: "grid" },
           { label: "Progress", to: "/progress", icon: "chart", current: true },
@@ -524,7 +524,7 @@ describe("axe: no WCAG violations", () => {
     const user = userEvent.setup();
     render(
       <NavBar
-        trail={[{ label: "Your path" }]}
+        trail={[{ label: "Progress" }]}
         nav={[
           { label: "Exams", to: "/exams", icon: "grid" },
           { label: "Progress", to: "/progress", icon: "chart", current: true },

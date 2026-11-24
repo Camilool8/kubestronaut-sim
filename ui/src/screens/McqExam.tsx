@@ -23,6 +23,7 @@ import {
 import { useAsync } from "../lib/useAsync";
 import { isTypingTarget } from "../lib/typing";
 import { singleKeyShortcuts, useSingleKeyShortcuts } from "../lib/singleKeyShortcuts";
+import { useHostedDeployment } from "../lib/deployment";
 import { MCQ_COMPACT_QUERY, useMediaQuery } from "../lib/useMediaQuery";
 import { Async } from "../components/Async";
 import { TimerBar } from "../components/TimerBar";
@@ -34,6 +35,8 @@ import { InlineCode, Markdown } from "../components/Markdown";
 import { CheckList } from "../components/CheckList";
 import { HintTray } from "../components/HintTray";
 import { Navigator, type NavigatorQuestion } from "../components/Navigator";
+import { ShortcutHelp } from "../components/ShortcutHelp";
+import { SubmitReview } from "../components/SubmitReview";
 import { Skeleton } from "../components/Pending";
 import { toastStore } from "../components/toastStore";
 import { marksStore } from "../components/marksStore";
@@ -47,6 +50,17 @@ interface McqExamProps {
 
 const LETTERS = "ABCDEF";
 
+const OPTION_LETTER_KEYS = "ABCDE";
+
+const NO_SELECTION: number[] = [];
+
+function optionForKey(key: string, count: number): number | null {
+  const letter = key.length === 1 ? OPTION_LETTER_KEYS.indexOf(key.toUpperCase()) : -1;
+  const digit = /^[1-9]$/.test(key) ? Number(key) - 1 : -1;
+  const index = letter >= 0 ? letter : digit;
+  return index >= 0 && index < count ? index : null;
+}
+
 export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -56,7 +70,9 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
   const [practice, setPractice] = useState<Results | null>(null);
   const [answers, setAnswers] = useState<Record<string, number[]>>({});
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
+  const hosted = useHostedDeployment();
   const examState = useAsync((signal) => getExam(signal), []);
   const exam = examState.data;
 
@@ -141,6 +157,20 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [prev, next, goTo]);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "?") return;
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      if (!singleKeyShortcuts.enabled) return;
+      if (isTypingTarget(event.target)) return;
+      if (document.querySelector('[role="dialog"]')) return;
+      event.preventDefault();
+      setHelpOpen(true);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const applySelection = useCallback(
     async (qid: string, selection: number[]) => {
       const previous = answers[qid] ?? [];
@@ -174,18 +204,26 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
     (q) => (answers[q.id] ?? []).length > 0,
   ).length;
 
+  const reviewItem = (q: ExamQuestionInfo, i: number) => ({
+    id: q.id,
+    label: String(i + 1),
+    jumpLabel: strings.exam.reviewJumpQuestion(i + 1),
+  });
   const unansweredIds = confirmOpen
-    ? questions
-        .map((q, i) => ({ q, i }))
-        .filter(({ q }) => (answers[q.id] ?? []).length === 0)
-        .map(({ i }) => strings.mcq.questionNumber(i + 1))
+    ? questions.flatMap((q, i) =>
+        (answers[q.id] ?? []).length === 0 ? [reviewItem(q, i)] : [],
+      )
     : [];
   const markedIds = confirmOpen
-    ? questions
-        .map((q, i) => ({ q, i }))
-        .filter(({ q }) => marksStore.isMarked(q.id))
-        .map(({ i }) => strings.mcq.questionNumber(i + 1))
+    ? questions.flatMap((q, i) => (marksStore.isMarked(q.id) ? [reviewItem(q, i)] : []))
     : [];
+
+  const closeConfirm = useCallback(() => setConfirmOpen(false), []);
+  const jumpToQuestion = useCallback((id: string) => {
+    setConfirmOpen(false);
+    focusHeading.current = true;
+    setPickedId(id);
+  }, []);
 
   const handleConfirmEnd = async () => {
     setEnding(true);
@@ -237,7 +275,22 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
         fetchedAt={fetchedAt}
         title={exam?.title ?? strings.exam.fallbackTitle}
         onEndClick={() => setConfirmOpen(true)}
-
+        barExtras={
+          questions.length > 0 && (
+            <span className="exam-progress-text mcq-answered">
+              {compact ? (
+                <>
+                  <span aria-hidden="true">{strings.mcq.answeredShort(answeredCount)}</span>
+                  <span className="sr-only">
+                    {strings.mcq.answeredCount(answeredCount, questions.length)}
+                  </span>
+                </>
+              ) : (
+                strings.mcq.answeredCount(answeredCount, questions.length)
+              )}
+            </span>
+          )
+        }
         extras={
           <>
             {questions.length > 0 && (
@@ -272,7 +325,7 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
         {examState.status === "error" && (
           <div className="pane-error" role="alert">
             <p className="error-text">
-              {strings.exam.questionsFailed(examState.error ?? "")}
+              {strings.exam.questionsFailed(examState.error ?? "", hosted)}
             </p>
             <button className="btn" onClick={examState.reload}>
               {strings.questionPanel.retry}
@@ -303,39 +356,45 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
         )}
       </div>
 
-      {keyboardOpen && <KeyboardSettings onClose={() => setKeyboardOpen(false)} />}
+      {keyboardOpen && (
+        <KeyboardSettings
+          onClose={() => setKeyboardOpen(false)}
+          onShowHelp={() => {
+            setKeyboardOpen(false);
+            setHelpOpen(true);
+          }}
+        />
+      )}
 
       {confirmOpen && (
         <Dialog
           title={strings.exam.confirmTitle(session.mode)}
-          onClose={() => setConfirmOpen(false)}
+          onClose={closeConfirm}
         >
           <p>{strings.mcq.confirmBody(session.mode)}</p>
-          <div className="submit-review">
-            {unansweredIds.length > 0 ? (
-              <p>
-                {strings.mcq.reviewUnanswered(unansweredIds.length)}{" "}
-                <span className="submit-review-ids">
-                  {unansweredIds.join(", ")}
-                </span>
-              </p>
-            ) : (
-              <p>{strings.mcq.allAnswered}</p>
-            )}
-            {markedIds.length > 0 && (
-              <p>
-                {strings.exam.reviewMarked(markedIds.length)}{" "}
-                <span className="submit-review-ids">
-                  {markedIds.join(", ")}
-                </span>
-              </p>
-            )}
-          </div>
+          <SubmitReview
+            session={session}
+            fetchedAt={fetchedAt}
+            groups={[
+              {
+                key: "unanswered",
+                heading: strings.mcq.reviewUnanswered(unansweredIds.length),
+                items: unansweredIds,
+              },
+              {
+                key: "marked",
+                heading: strings.exam.reviewQuestionsMarked(markedIds.length),
+                items: markedIds,
+              },
+            ]}
+            note={unansweredIds.length === 0 ? strings.mcq.allAnswered : undefined}
+            onJump={jumpToQuestion}
+          />
           {endError && <p className="error-text">{endError}</p>}
           <div className="confirm-actions">
             <button
               className="btn"
-              onClick={() => setConfirmOpen(false)}
+              onClick={closeConfirm}
               disabled={ending}
             >
               {strings.exam.cancel}
@@ -349,6 +408,14 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
             </button>
           </div>
         </Dialog>
+      )}
+
+      {helpOpen && (
+        <ShortcutHelp
+          onClose={() => setHelpOpen(false)}
+          shortcuts={strings.keyboard.mcqShortcuts}
+          desktop={false}
+        />
       )}
 
       {practice && (
@@ -426,22 +493,43 @@ function McqQuestion({
   );
   const question = useAsync(load, [info.id]);
 
-  const selection = answers[info.id] ?? [];
+  const selection = answers[info.id] ?? NO_SELECTION;
   const marked = marksStore.isMarked(info.id);
 
-  const toggleOption = (optionIndex: number) => {
-    if (info.multi) {
-      const next = selection.includes(optionIndex)
-        ? selection.filter((n) => n !== optionIndex)
-        : [...selection, optionIndex].sort((a, b) => a - b);
-      onAnswer(info.id, next);
-      return;
-    }
-    // A pick replaces a pick. Clearing back to unanswered existed only
-    // because this was a checkbox; a radio has no such gesture, and the
-    // real exam has none either.
-    onAnswer(info.id, [optionIndex]);
-  };
+  const toggleOption = useCallback(
+    (optionIndex: number) => {
+      if (info.multi) {
+        const next = selection.includes(optionIndex)
+          ? selection.filter((n) => n !== optionIndex)
+          : [...selection, optionIndex].sort((a, b) => a - b);
+        onAnswer(info.id, next);
+        return;
+      }
+      // A pick replaces a pick. Clearing back to unanswered existed only
+      // because this was a checkbox; a radio has no such gesture, and the
+      // real exam has none either.
+      onAnswer(info.id, [optionIndex]);
+    },
+    [info.id, info.multi, selection, onAnswer],
+  );
+
+  const optionCount = question.data?.options?.length ?? 0;
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.altKey || event.ctrlKey || event.metaKey || event.repeat) return;
+      if (event.defaultPrevented || jumpOpen) return;
+      if (!singleKeyShortcuts.enabled) return;
+      const target = event.target as HTMLElement | null;
+      if (isTypingTarget(target) || target?.closest(".navigator")) return;
+      if (document.querySelector('[role="dialog"]')) return;
+      const optionIndex = optionForKey(event.key, optionCount);
+      if (optionIndex === null) return;
+      event.preventDefault();
+      toggleOption(optionIndex);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [optionCount, jumpOpen, toggleOption]);
 
   const closeJump = (returnFocus: boolean) => {
     setJumpOpen(false);
@@ -517,7 +605,7 @@ function McqQuestion({
             <>
 
               <Markdown copyable={false} headingLevel={3}>{data.markdown}</Markdown>
-              <fieldset className="mcq-options">
+              <fieldset className="mcq-options" data-multi={info.multi ? "" : undefined}>
                 <legend>
                   {info.multi ? strings.mcq.selectAll : strings.mcq.selectOne}
                 </legend>
@@ -715,6 +803,6 @@ function toNavigator(
     label: strings.mcq.questionNumber(i + 1),
 
     detail: q.domain,
-    done: (answers[q.id] ?? []).length > 0,
+    reached: (answers[q.id] ?? []).length > 0,
   }));
 }

@@ -153,7 +153,9 @@ function QuestionPanelBody({
             </div>
 
             {selected && (
-              <h2 className="task-title">{selected.title ?? selected.id}</h2>
+              <h2 className="task-title" tabIndex={-1}>
+                {selected.title ?? selected.id}
+              </h2>
             )}
             {selected && <TaskChips question={selected} totalWeight={totalWeight} />}
           </header>
@@ -232,7 +234,7 @@ function QuestionPanelBody({
               questions={toNavigator(questions)}
               selectedId={selectedId}
 
-              progress="opened"
+              progress="viewed"
               onSelect={(id) => {
                 onSelect(id);
                 closeJump(true);
@@ -364,6 +366,6 @@ function toNavigator(questions: ExamQuestionInfo[]): NavigatorQuestion[] {
       .filter(Boolean)
       .join(", "),
 
-    done: marksStore.isViewed(q.id),
+    reached: marksStore.isViewed(q.id),
   }));
 }

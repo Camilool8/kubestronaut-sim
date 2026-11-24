@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Exam, ExamGateControls } from "./Exam";
 import type { SessionSnapshot } from "../api";
@@ -240,11 +240,11 @@ describe("Exam topbar and focus reporting", () => {
     expect(env).toHaveTextContent(/reachable over ssh/);
   });
 
-  test("progress counts what was OPENED, never what was answered", async () => {
+  test("progress counts what was VIEWED, and says so, never what was answered", async () => {
     stubFetch();
     render(<Exam session={idleSession} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
-    expect(await screen.findByText(/1 of 2 opened/)).toBeInTheDocument();
+    expect(await screen.findByText(/1 of 2 tasks viewed/)).toBeInTheDocument();
     expect(screen.queryByText(/answered/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/complete/i)).not.toBeInTheDocument();
   });
@@ -277,6 +277,41 @@ describe("Exam topbar and focus reporting", () => {
     expect(await screen.findByText("Namespaces & quotas")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(toastStore.list()).toHaveLength(0);
+  });
+
+  test("the submit review shows the clock and turns every unviewed task into a way back", async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    render(<Exam session={idleSession} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+    await screen.findByText("Namespaces & quotas");
+    expect(screen.queryByText("Expose a Deployment")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Submit exam" }));
+    const dialog = await screen.findByRole("dialog");
+
+    expect(within(dialog).getByText(/10:00 left on the clock/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/1 task was never viewed/)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Go to task 2" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const title = await screen.findByRole("heading", { level: 2, name: "Expose a Deployment" });
+    await waitFor(() => expect(title).toHaveFocus());
+  });
+
+  test("a flagged task is listed as a way back too", async () => {
+    stubFetch();
+    marksStore.setScope(idleSession.startedAt);
+    marksStore.toggleMark("q01");
+    const user = userEvent.setup();
+    render(<Exam session={idleSession} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+    await screen.findByText("Namespaces & quotas");
+
+    await user.click(screen.getByRole("button", { name: "Submit exam" }));
+    const dialog = await screen.findByRole("dialog");
+
+    expect(within(dialog).getByText(/1 task is marked for review/)).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Go to task 1" })).toBeInTheDocument();
   });
 
   test("Submit exam is in the bar, not behind the menu", async () => {

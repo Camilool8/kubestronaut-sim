@@ -93,9 +93,8 @@ export function ResultsBanner({ results, mode, endReason }: ResultsBannerProps) 
         {showRaw && <p>{strings.score.weightedNote(Math.round(raw))}</p>}
         {filtered && <p>{strings.score.filteredNote(listDomains(filter))}</p>}
 
-        {attemptMode !== "" && attemptMode !== "exam" && (
-          <p className="score-mode">{strings.score.modeNote(strings.modes[attemptMode].label)}</p>
-        )}
+        {attemptMode === "training" && <p className="score-mode">{strings.score.modeNoteTraining}</p>}
+        {attemptMode === "speed" && <p className="score-mode">{strings.score.modeNoteSpeed}</p>}
         {endReason && <p>{strings.score.endReason(endReason)}</p>}
       </div>
     </header>

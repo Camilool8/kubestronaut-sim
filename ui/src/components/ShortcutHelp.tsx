@@ -6,12 +6,17 @@ import { strings } from "../strings";
 
 interface ShortcutHelpProps {
   onClose: () => void;
+
+  shortcuts?: readonly (readonly [string, string])[];
+
+  desktop?: boolean;
 }
 
-export function ShortcutHelp({ onClose }: ShortcutHelpProps) {
-  useSyncExternalStore(desktopKeymap.subscribe, desktopKeymap.getVersion, desktopKeymap.getVersion);
-  const rows = desktopKeymap.rows();
-  const showDesktop = desktopKeymap.isMac && desktopKeymap.enabled;
+export function ShortcutHelp({
+  onClose,
+  shortcuts = strings.keyboard.browserShortcuts,
+  desktop = true,
+}: ShortcutHelpProps) {
   const singleKeys = useSingleKeyShortcuts();
 
   return (
@@ -20,7 +25,7 @@ export function ShortcutHelp({ onClose }: ShortcutHelpProps) {
       {!singleKeys && <p className="clipboard-hint">{strings.focus.singleKeysOff}</p>}
       <table className="shortcut-table">
         <tbody>
-          {strings.keyboard.browserShortcuts.map(([keys, does]) => (
+          {shortcuts.map(([keys, does]) => (
             <tr key={keys}>
               <td>
                 <kbd>{keys}</kbd>
@@ -31,6 +36,18 @@ export function ShortcutHelp({ onClose }: ShortcutHelpProps) {
         </tbody>
       </table>
 
+      {desktop && <DesktopShortcuts />}
+    </Dialog>
+  );
+}
+
+function DesktopShortcuts() {
+  useSyncExternalStore(desktopKeymap.subscribe, desktopKeymap.getVersion, desktopKeymap.getVersion);
+  const rows = desktopKeymap.rows();
+  const showDesktop = desktopKeymap.isMac && desktopKeymap.enabled;
+
+  return (
+    <>
       <h3 className="shortcut-group">{strings.keyboard.helpDesktop}</h3>
       {showDesktop ? (
         <>
@@ -61,6 +78,6 @@ export function ShortcutHelp({ onClose }: ShortcutHelpProps) {
       ) : (
         <p className="clipboard-hint">{strings.keyboard.noneMac}</p>
       )}
-    </Dialog>
+    </>
   );
 }

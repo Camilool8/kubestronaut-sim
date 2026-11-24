@@ -7,7 +7,7 @@ import { Icon } from "./Icon";
 import { marksStore } from "./marksStore";
 import { strings } from "../strings";
 
-export type NavigatorProgress = "opened" | "answered";
+export type NavigatorProgress = "viewed" | "answered";
 
 export interface NavigatorQuestion {
   id: string;
@@ -16,7 +16,7 @@ export interface NavigatorQuestion {
 
   detail?: string;
 
-  done: boolean;
+  reached: boolean;
 }
 
 interface NavigatorProps {
@@ -94,12 +94,12 @@ export function Navigator({
   });
 
   const flaggedCount = questions.filter((q) => marksStore.isMarked(q.id)).length;
-  const todoCount = questions.filter((q) => !q.done).length;
+  const todoCount = questions.filter((q) => !q.reached).length;
   const visible = questions.filter((q) =>
     filter === "flagged"
       ? marksStore.isMarked(q.id)
       : filter === "todo"
-        ? !q.done
+        ? !q.reached
         : true,
   );
 
@@ -170,7 +170,7 @@ export function Navigator({
   };
 
   const doneWord =
-    progress === "answered" ? strings.navigator.answered : strings.navigator.opened;
+    progress === "answered" ? strings.navigator.answered : strings.navigator.viewed;
   const todoWord =
     progress === "answered" ? strings.navigator.unanswered : strings.navigator.unseen;
   const todoChip =
@@ -238,7 +238,7 @@ export function Navigator({
             const current = q.id === selectedId;
             const flagged = marksStore.isMarked(q.id);
             const classes = ["navigator-tile"];
-            if (q.done) classes.push("is-done");
+            if (q.reached) classes.push(`is-${progress}`);
             if (flagged) classes.push("is-flagged");
             return (
               <li key={q.id}>
@@ -258,7 +258,7 @@ export function Navigator({
                   {flagged && <Icon name="flag-filled" className="navigator-tile-flag" />}
                   {" "}
                   <span className="sr-only">
-                    {[q.detail, q.done ? doneWord : todoWord, flagged ? strings.navigator.flagged : null]
+                    {[q.detail, q.reached ? doneWord : todoWord, flagged ? strings.navigator.flagged : null]
                       .filter(Boolean)
                       .join(", ")}
                   </span>
@@ -274,10 +274,10 @@ export function Navigator({
       <footer className="navigator-foot">
         <ul className="navigator-legend">
           <Legend variant="current">{strings.navigator.legendCurrent}</Legend>
-          <Legend variant="done">
+          <Legend variant={progress}>
             {progress === "answered"
               ? strings.navigator.legendAnswered
-              : strings.navigator.legendOpened}
+              : strings.navigator.legendViewed}
           </Legend>
           <Legend variant="flagged">{strings.navigator.legendFlagged}</Legend>
           <Legend variant="unseen">

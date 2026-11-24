@@ -766,15 +766,6 @@ button.nav-menu-item:hover {
   font-weight: 600;
 }
 
-.exam-stat-of {
-  font-weight: 400;
-  color: var(--text-muted);
-}
-
-.exam-stat-engine {
-  color: var(--exam-tint);
-}
-
 .exam-attempts {
   display: flex;
   flex-direction: column;
@@ -1590,7 +1581,7 @@ button.nav-menu-item:hover {
   cursor: pointer;
 }
 
-.navigator-tile.is-done {
+.navigator-tile.is-answered {
   background: var(--surface-raised);
   border-color: var(--border-strong);
 }
@@ -1603,7 +1594,7 @@ button.nav-menu-item:hover {
   background: var(--surface-hover);
 }
 
-.navigator-tile.is-done:hover:not([aria-current="true"]) {
+.navigator-tile.is-answered:hover:not([aria-current="true"]) {
   background: var(--raised-hover);
 }
 
@@ -1665,7 +1656,7 @@ button.nav-menu-item:hover {
   border-radius: var(--radius-xs);
 }
 
-.navigator-swatch-done {
+.navigator-swatch-answered {
   background: var(--surface-raised);
   border-color: var(--border-strong);
 }
@@ -2849,6 +2840,141 @@ button.nav-menu-item:hover {
 
 .submit-review-ids {
   font-family: var(--font-mono);
+}
+
+.submit-review-clock {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.submit-review-group + .submit-review-group {
+  margin-top: var(--space-3);
+}
+
+.submit-review .submit-review-ids {
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.submit-review-jump {
+  min-width: 2.25rem;
+  min-height: 2rem;
+  padding: 0 0.5em;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.submit-review-jump:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.submit-review .submit-review-hint {
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+@media (any-pointer: coarse) {
+  .submit-review-jump {
+    min-width: var(--tap-comfortable);
+    min-height: var(--tap-comfortable);
+  }
+}
+
+.exam-badge-loaded {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.exam-card[data-loaded] {
+  border-color: var(--accent);
+}
+
+.exam-card-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+}
+
+.exam-format {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--exam-tint);
+}
+
+.coverage-note {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.history-erase {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.navigator-tile.is-viewed::after,
+.navigator-swatch-viewed::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.navigator-tile.is-viewed::after {
+  bottom: 3px;
+}
+
+.navigator-swatch-viewed {
+  position: relative;
+}
+
+.navigator-swatch-viewed::after {
+  top: 50%;
+  margin-top: -2px;
+}
+
+.mcq-question .mcq-option {
+  position: relative;
+}
+
+.mcq-question .mcq-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mcq-question .mcq-option:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.mcq-question .mcq-options[data-multi] .mcq-option-letter {
+  border-radius: var(--radius-xs);
 }
 
 .domain-breakdown h2 {

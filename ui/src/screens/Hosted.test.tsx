@@ -6,6 +6,7 @@ import type { Me } from "../api";
 import { NARROW_QUERY } from "../lib/useMediaQuery";
 import { TOUCH_ONLY_QUERY } from "../lib/deviceCapability";
 import { matchMediaMock } from "../test/setup";
+import { isHostedDeployment, setHostedDeployment } from "../lib/deployment";
 import { strings } from "../strings";
 
 const now = Date.UTC(2026, 7, 4, 12, 0, 0);
@@ -193,17 +194,19 @@ afterEach(() => {
 
 test("a facilitator that 404s /api/me gets the local app and no sign-in", async () => {
   identity = null;
+  setHostedDeployment(true);
   render(<App />);
 
-  expect(await screen.findByRole("heading", { name: /path to kubestronaut/i })).toBeTruthy();
+  expect(await screen.findByRole("heading", { level: 1, name: "Exams" })).toBeTruthy();
   expect(screen.queryByRole("link", { name: /continue with github/i })).toBeNull();
+  expect(isHostedDeployment()).toBe(false);
 });
 
 test("a 200 that is not the hub's shape is still read as local", async () => {
   identity = { notAHub: true } as unknown as Me;
   render(<App />);
 
-  expect(await screen.findByRole("heading", { name: /path to kubestronaut/i })).toBeTruthy();
+  expect(await screen.findByRole("heading", { level: 1, name: "Exams" })).toBeTruthy();
 });
 
 test("a signed-out visitor gets the sign-in screen and the seat count", async () => {
@@ -517,9 +520,11 @@ test("a ready session renders the ordinary app with a lease countdown over it", 
       lastSeen: new Date(now).toISOString(),
     },
   });
+  setHostedDeployment(false);
   render(<App />);
 
-  expect(await screen.findByRole("heading", { name: /path to kubestronaut/i })).toBeTruthy();
+  expect(await screen.findByRole("heading", { level: 1, name: "Exams" })).toBeTruthy();
+  expect(isHostedDeployment()).toBe(true);
 
   expect(screen.getByText("2:00:00 left")).toBeTruthy();
 
@@ -571,26 +576,26 @@ function readySeat() {
 test("a Pod replacement raises no outage toast", async () => {
   identity = me({ session: readySeat() });
   render(<App />);
-  await screen.findByRole("heading", { name: /path to kubestronaut/i });
+  await screen.findByRole("heading", { level: 1, name: "Exams" });
 
   localStubs["/api/session"] = null;
   window.dispatchEvent(new Event("focus"));
   await vi.advanceTimersByTimeAsync(0);
 
   await waitFor(() => {
-    expect(screen.queryByText(/cannot reach facilitator/i)).toBeNull();
+    expect(screen.queryByText(/can.t reach the exam services/i)).toBeNull();
   });
 });
 
 test("a real failure still raises the toast", async () => {
   identity = me({ session: readySeat() });
   render(<App />);
-  await screen.findByRole("heading", { name: /path to kubestronaut/i });
+  await screen.findByRole("heading", { level: 1, name: "Exams" });
 
   localStubs["/api/session"] = "boom";
   window.dispatchEvent(new Event("focus"));
 
-  expect(await screen.findByText(/cannot reach facilitator/i)).toBeInTheDocument();
+  expect(await screen.findByText(/can.t reach the exam services/i)).toBeInTheDocument();
 });
 
 test("a rebuild says so, and a first boot still reads as a first boot", async () => {

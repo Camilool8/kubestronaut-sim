@@ -6,6 +6,7 @@ import type { CatalogResponse, ExamProgress } from "../api";
 import { NARROW_QUERY } from "../lib/useMediaQuery";
 import { TOUCH_ONLY_QUERY } from "../lib/deviceCapability";
 import { matchMediaMock } from "../test/setup";
+import { setHostedDeployment } from "../lib/deployment";
 
 const untouched: ExamProgress = { attempts: 0, counted: 0, passed: false, weakDomains: [] };
 
@@ -119,23 +120,32 @@ describe("the catalog", () => {
     expect(within(ckadCard).getByText("Certified Kubernetes Application Developer")).toBeInTheDocument();
     expect(within(ckadCard).getByText("2h")).toBeInTheDocument();
     expect(within(ckadCard).getByText("66%")).toBeInTheDocument();
-    expect(within(ckadCard).getByText("Practical")).toBeInTheDocument();
+    expect(within(ckadCard).getByText("Hands-on")).toBeInTheDocument();
+    expect(within(cardFor("KCNA")).getByText("Multiple choice")).toBeInTheDocument();
 
-    expect(within(ckadCard).getByText("Live")).toBeInTheDocument();
-    expect(within(cardFor("CKS")).getByText("Soon")).toBeInTheDocument();
+    expect(within(cardFor("CKS")).getByText("Coming soon")).toBeInTheDocument();
   });
 
-  test("a pooled exam shows the draw and the pool; an unpooled one shows one number", async () => {
+  test("only the exception gets a badge: the loaded exam, never a row of LIVE", async () => {
+    renderExams();
+    await screen.findByRole("heading", { name: "CKAD" });
+
+    expect(within(cardFor("CKAD")).getByText("Loaded")).toBeInTheDocument();
+    expect(within(cardFor("KCNA")).queryByText("Loaded")).toBeNull();
+    expect(screen.queryByText("Live")).toBeNull();
+  });
+
+  test("a pooled exam shows how many it asks and from how many; an unpooled one shows one number", async () => {
     renderExams();
     await screen.findByRole("heading", { name: "KCNA" });
     const kcnaCard = cardFor("KCNA");
 
-    expect(within(kcnaCard).getByText("Drawn / pool")).toBeInTheDocument();
-    expect(within(kcnaCard).getByText("/ 97")).toBeInTheDocument();
+    expect(within(kcnaCard).getByText("Questions, from 97")).toBeInTheDocument();
+    expect(within(kcnaCard).queryByText(/pool/i)).toBeNull();
 
     const ckadCard = cardFor("CKAD");
     expect(within(ckadCard).getByText("Tasks")).toBeInTheDocument();
-    expect(within(ckadCard).queryByText(/^\/ /)).not.toBeInTheDocument();
+    expect(within(ckadCard).queryByText(/from/)).not.toBeInTheDocument();
   });
 
   test("a coming-soon exam gives its reason and offers no way in", async () => {
@@ -149,11 +159,12 @@ describe("the catalog", () => {
     expect(within(card).queryByRole("button")).not.toBeInTheDocument();
   });
 
-  test("the capsule counts certifications passed, out of the whole path", async () => {
+  test("the capsule counts passes out of the exams you can sit, and says how many are still to come", async () => {
     banks = catalog("ckad-mock-01", [ckad, kcna, cks], { passedCount: 1, trackCount: 5 });
     renderExams();
-    expect(await screen.findByText("1 of 5 passed")).toBeInTheDocument();
-    expect(screen.getByText("Progress")).toBeInTheDocument();
+    expect(await screen.findByText("1 of 2 passed")).toBeInTheDocument();
+    expect(screen.getByText("1 more coming soon")).toBeInTheDocument();
+    expect(screen.getByText("Kubestronaut path")).toBeInTheDocument();
   });
 
   test("an exam with no attempts keeps its description instead of an empty bar", async () => {
@@ -247,18 +258,60 @@ describe("choosing an exam", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  test("any other exam is a confirmed rebuild, not a navigation", async () => {
+  test("the loaded exam keeps the one primary action; the others offer a load that names its cost", async () => {
+    banks = catalog("ckad-mock-01", [
+      ckad,
+      kcna,
+      { ...ckad, id: "cka-mock", title: "CKA Mock Exam", certification: "CKA" },
+      cks,
+    ]);
+    renderExams();
+    await screen.findByRole("heading", { name: "CKA" });
+
+    const primary = within(cardFor("CKAD")).getByRole("button", { name: "Choose a mode" });
+    expect(primary).toHaveClass("btn-primary");
+
+    const cka = within(cardFor("CKA")).getByRole("button", { name: "Load CKA (about 3 min)" });
+    expect(cka).not.toHaveClass("btn-primary");
+    const kcnaLoad = within(cardFor("KCNA")).getByRole("button", {
+      name: "Load KCNA (a few seconds)",
+    });
+    expect(kcnaLoad).not.toHaveClass("btn-primary");
+
+    expect(document.querySelectorAll(".exam-card .btn-primary")).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Choose a mode" })).toEqual([primary]);
+  });
+
+  test("loading a hands-on exam is a confirmed rebuild that says it wipes the cluster", async () => {
+    const user = userEvent.setup();
+    banks = catalog("kcna-mock");
+    renderExams(0, ((start: () => Promise<unknown>) => void start()) as never);
+    await screen.findByRole("heading", { name: "CKAD" });
+
+    await user.click(within(cardFor("CKAD")).getByRole("button", { name: /^Load CKAD/ }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent(/wipes all cluster/i);
+    expect(dialog).toHaveTextContent(/2-4 minutes/);
+
+    await user.click(within(dialog).getByRole("button", { name: "Load CKAD" }));
+    await waitFor(() => expect(switchCalls).toEqual(["ckad-mock-01"]));
+  });
+
+  test("loading a multiple-choice exam is confirmed, without claiming a cluster rebuild", async () => {
     const user = userEvent.setup();
     renderExams(0, ((start: () => Promise<unknown>) => void start()) as never);
     await screen.findByRole("heading", { name: "KCNA" });
 
-    await user.click(within(cardFor("KCNA")).getByRole("button", { name: "Choose a mode" }));
-    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    await user.click(within(cardFor("KCNA")).getByRole("button", { name: /^Load KCNA/ }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent(/needs no cluster/i);
+    expect(dialog).toHaveTextContent(/a few seconds/i);
+    expect(dialog).not.toHaveTextContent(/wipes all cluster/i);
 
     expect(switchCalls).toEqual([]);
     expect(window.location.hash).toBe("");
 
-    await user.click(screen.getByRole("button", { name: "Load it" }));
+    await user.click(within(dialog).getByRole("button", { name: "Load KCNA" }));
     await waitFor(() => expect(switchCalls).toEqual(["kcna-mock"]));
 
     expect(window.location.hash).toBe("");
@@ -274,13 +327,14 @@ describe("choosing an exam", () => {
       renderExams(0, ((start: () => Promise<unknown>) => void start()) as never);
       await screen.findByRole("heading", { name: "CKAD" });
 
-      await user.click(within(cardFor("CKAD")).getByRole("button", { name: "Choose a mode" }));
+      expect(within(cardFor("CKAD")).queryByText("Loaded")).toBeNull();
+      await user.click(within(cardFor("CKAD")).getByRole("button", { name: /^Load CKAD/ }));
       const dialog = await screen.findByRole("dialog");
       expect(dialog).not.toHaveTextContent(/wipes/i);
       expect(dialog).not.toHaveTextContent(/switching/i);
       expect(dialog).toHaveTextContent(/builds the Kubernetes cluster/i);
 
-      await user.click(screen.getByRole("button", { name: "Build it" }));
+      await user.click(screen.getByRole("button", { name: "Set up CKAD" }));
       await waitFor(() => expect(switchCalls).toEqual(["ckad-mock-01"]));
     });
 
@@ -289,7 +343,7 @@ describe("choosing an exam", () => {
       renderExams(0, ((start: () => Promise<unknown>) => void start()) as never);
       await screen.findByRole("heading", { name: "CKAD" });
 
-      await user.click(within(cardFor("CKAD")).getByRole("button", { name: "Choose a mode" }));
+      await user.click(within(cardFor("CKAD")).getByRole("button", { name: /^Load CKAD/ }));
       expect(await screen.findByRole("dialog")).toBeInTheDocument();
       expect(switchCalls).toEqual([]);
       expect(window.location.hash).toBe("");
@@ -301,7 +355,7 @@ describe("choosing an exam", () => {
     renderExams(0, ((start: () => Promise<unknown>) => void start()) as never);
     await screen.findByRole("heading", { name: "KCNA" });
 
-    await user.click(within(cardFor("KCNA")).getByRole("button", { name: "Choose a mode" }));
+    await user.click(within(cardFor("KCNA")).getByRole("button", { name: /^Load KCNA/ }));
     await user.click(await screen.findByRole("button", { name: "Cancel" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
@@ -315,8 +369,8 @@ describe("choosing an exam", () => {
       ((start: () => Promise<unknown>) => void start()) as never,
     );
     await screen.findByRole("heading", { name: "KCNA" });
-    await user.click(within(cardFor("KCNA")).getByRole("button", { name: "Choose a mode" }));
-    await user.click(await screen.findByRole("button", { name: "Load it" }));
+    await user.click(within(cardFor("KCNA")).getByRole("button", { name: /^Load KCNA/ }));
+    await user.click(await screen.findByRole("button", { name: "Load KCNA" }));
     await waitFor(() => expect(switchCalls).toEqual(["kcna-mock"]));
 
     banks = catalog("kcna-mock");
@@ -338,8 +392,8 @@ describe("choosing an exam", () => {
       ((start: () => Promise<unknown>) => void start()) as never,
     );
     await screen.findByRole("heading", { name: "KCNA" });
-    await user.click(within(cardFor("KCNA")).getByRole("button", { name: "Choose a mode" }));
-    await user.click(await screen.findByRole("button", { name: "Load it" }));
+    await user.click(within(cardFor("KCNA")).getByRole("button", { name: /^Load KCNA/ }));
+    await user.click(await screen.findByRole("button", { name: "Load KCNA" }));
     await waitFor(() => expect(switchCalls).toEqual(["kcna-mock"]));
 
     rerender(
@@ -359,7 +413,7 @@ describe("a hosted seat", () => {
     renderExams(0, noop as never, "mcq");
     await screen.findByRole("heading", { name: "KCNA" });
 
-    expect(within(cardFor("KCNA")).getByRole("button", { name: "Choose a mode" })).toBeTruthy();
+    expect(within(cardFor("KCNA")).getByRole("button", { name: /^Load KCNA/ })).toBeTruthy();
     expect(within(cardFor("CKAD")).queryByRole("button")).toBeNull();
   });
 
@@ -369,7 +423,7 @@ describe("a hosted seat", () => {
 
     const card = cardFor("CKAD");
     expect(within(card).getByText("Not in this seat")).toBeTruthy();
-    expect(within(card).getByText(/end this session and start a practical one/i)).toBeTruthy();
+    expect(within(card).getByText(/end this session and start a hands-on one/i)).toBeTruthy();
   });
 
   test("the mirror: a hands-on seat is not offered the question bank", async () => {
@@ -385,7 +439,7 @@ describe("a hosted seat", () => {
     await screen.findByRole("heading", { name: "CKAD" });
 
     expect(within(cardFor("CKAD")).getByRole("button", { name: "Choose a mode" })).toBeTruthy();
-    expect(within(cardFor("KCNA")).getByRole("button", { name: "Choose a mode" })).toBeTruthy();
+    expect(within(cardFor("KCNA")).getByRole("button", { name: /^Load KCNA/ })).toBeTruthy();
   });
 
   test("a seat offers its own exam and no other, even of the same engine", async () => {
@@ -406,7 +460,7 @@ describe("a hosted seat", () => {
     await screen.findByRole("heading", { name: "CKAD" });
 
     expect(within(cardFor("CKAD")).getByText("Not in this seat")).toBeTruthy();
-    expect(within(cardFor("KCNA")).getByRole("button", { name: "Choose a mode" })).toBeTruthy();
+    expect(within(cardFor("KCNA")).getByRole("button", { name: /^Load KCNA/ })).toBeTruthy();
   });
 });
 
@@ -430,7 +484,7 @@ describe("a device that cannot sit a hands-on exam", () => {
     renderExams();
     await screen.findByRole("heading", { name: "KCNA" });
 
-    expect(within(cardFor("KCNA")).getByRole("button", { name: "Choose a mode" })).toBeTruthy();
+    expect(within(cardFor("KCNA")).getByRole("button", { name: /^Load KCNA/ })).toBeTruthy();
   });
 
   test("a narrowed desktop window is not refused", async () => {
@@ -447,5 +501,37 @@ describe("a device that cannot sit a hands-on exam", () => {
     await screen.findByRole("heading", { name: "CKAD" });
 
     expect(within(cardFor("CKAD")).getByText("Not in this seat")).toBeTruthy();
+  });
+});
+
+describe("a catalog that will not load", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ error: "conductor timeout" }), { status: 502 })),
+    );
+  });
+
+  afterEach(() => {
+    setHostedDeployment(false);
+  });
+
+  test("self-hosted, the plain sentence leads and the operator hint follows", async () => {
+    renderExams();
+    const alert = await screen.findByRole("alert");
+    const body = alert.querySelector(".catalog-error-body") as HTMLElement;
+    expect(body).toHaveTextContent(/^The exam services did not answer\./);
+    expect(body).toHaveTextContent(/docker compose ps conductor/);
+    expect(body).toHaveTextContent(/conductor timeout/);
+  });
+
+  test("hosted, it says what to do next without any docker advice", async () => {
+    setHostedDeployment(true);
+    renderExams();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/Retry in a moment/);
+    expect(alert).toHaveTextContent(/history is not affected/);
+    expect(alert).not.toHaveTextContent(/docker/);
+    expect(alert).toHaveTextContent(/conductor timeout/);
   });
 });

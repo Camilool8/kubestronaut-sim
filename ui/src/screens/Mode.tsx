@@ -14,6 +14,7 @@ import { ExamIntro, markIntroSeen } from "../components/ExamIntro";
 import { ExamTips } from "../components/ExamTips";
 import { Icon } from "../components/Icon";
 import { parseDomainsParam } from "../lib/attemptHistory";
+import { useHostedDeployment } from "../lib/deployment";
 import { formatDuration } from "../lib/format";
 import { navigate, useRoute } from "../lib/useHashRoute";
 import { useAsync } from "../lib/useAsync";
@@ -246,6 +247,7 @@ export function Mode({ bankId, catalogVersion, onSessionChange, onPreparing }: M
   const [introOpen, setIntroOpen] = useState(false);
   const [tipsOpen, setTipsOpen] = useState(false);
 
+  const hosted = useHostedDeployment();
   const examState = useAsync((signal) => getExam(signal), [catalogVersion]);
   const exam = examState.data;
   const isMcq = exam?.examType === "mcq";
@@ -311,7 +313,7 @@ export function Mode({ bankId, catalogVersion, onSessionChange, onPreparing }: M
         loading={<p className="page-loading">{strings.app.working}</p>}
         error={(message, reload) => (
           <div className="catalog-error" role="alert">
-            <p className="catalog-error-body">{strings.mode.examFailed(message)}</p>
+            <p className="catalog-error-body">{strings.mode.examFailed(message, hosted)}</p>
             <button type="button" className="btn" onClick={reload}>
               {strings.exams.catalogRetry}
             </button>

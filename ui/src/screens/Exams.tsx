@@ -13,6 +13,7 @@ import { CertMark, hasCertMark } from "../components/CertMark";
 import { Dialog } from "../components/Dialog";
 import { useDesktopGate } from "../components/DesktopRequired";
 import { pathStatus } from "../lib/attemptHistory";
+import { useHostedDeployment } from "../lib/deployment";
 import { formatDuration } from "../lib/format";
 import { navigate } from "../lib/useHashRoute";
 import { useAsync } from "../lib/useAsync";
@@ -23,10 +24,10 @@ function engineTint(bank: BankEntry): string {
   return bank.examType === "mcq" ? "mcq" : "hands-on";
 }
 
-function engineName(bank: BankEntry): string {
-  if (bank.examType === "mcq") return strings.exams.engineMcq;
-  if (bank.examType === "hands-on") return strings.exams.enginePractical;
-  return strings.exams.engineUnknown;
+function formatName(bank: BankEntry): string {
+  if (bank.examType === "mcq") return strings.exams.formatMcq;
+  if (bank.examType === "hands-on") return strings.exams.formatPractical;
+  return strings.exams.formatUnknown;
 }
 
 function examHeading(bank: BankEntry): string {
@@ -44,26 +45,16 @@ function examStats(bank: BankEntry): [string, ReactNode][] {
   }
   if (bank.questionCount) {
     const pooled = (bank.poolCount ?? 0) > bank.questionCount;
-    const label = pooled
-      ? strings.exams.drawnLabel
-      : bank.examType === "mcq"
-        ? strings.exams.questionsLabel
-        : strings.exams.tasksLabel;
+    const label =
+      bank.examType === "mcq" ? strings.exams.questionsLabel : strings.exams.tasksLabel;
     stats.push([
-      label,
-      pooled ? (
-        <>
-          {bank.questionCount} <span className="exam-stat-of">/ {bank.poolCount}</span>
-        </>
-      ) : (
-        bank.questionCount
-      ),
+      pooled ? strings.exams.drawnFrom(label, bank.poolCount ?? 0) : label,
+      bank.questionCount,
     ]);
   }
   if (bank.passingScore) {
     stats.push([strings.exams.passingLabel, `${bank.passingScore}%`]);
   }
-  stats.push([strings.exams.engineLabel, <span className="exam-stat-engine">{engineName(bank)}</span>]);
   return stats;
 }
 
@@ -102,17 +93,32 @@ function ExamAttempts({ exam }: { exam: CatalogExam }) {
   );
 }
 
-function ExamCard({ bank, onChoose }: { bank: CatalogExam; onChoose: () => void }) {
+interface ExamCardProps {
+  bank: CatalogExam;
+
+  loaded: boolean;
+  onChoose: () => void;
+  onLoad: () => void;
+}
+
+function ExamCard({ bank, loaded, onChoose, onLoad }: ExamCardProps) {
   return (
     <li>
-      <article className="exam-card" data-engine={engineTint(bank)}>
+      <article
+        className="exam-card"
+        data-engine={engineTint(bank)}
+        data-loaded={loaded ? "" : undefined}
+      >
         <div className="exam-card-head">
           <ExamAvatar bank={bank} />
           <div className="exam-card-name">
-            <h2>{examHeading(bank)}</h2>
+            <div className="exam-card-title">
+              <h2>{examHeading(bank)}</h2>
+              <span className="exam-format">{formatName(bank)}</span>
+            </div>
             <p>{examSubtitle(bank)}</p>
           </div>
-          <span className="exam-badge exam-badge-live">{strings.exams.live}</span>
+          {loaded && <span className="exam-badge exam-badge-loaded">{strings.exams.loaded}</span>}
         </div>
 
         <dl className="exam-stats">
@@ -131,9 +137,15 @@ function ExamCard({ bank, onChoose }: { bank: CatalogExam; onChoose: () => void 
         )}
 
         <div className="exam-card-actions">
-          <button type="button" className="btn btn-primary" onClick={onChoose}>
-            {strings.exams.choose}
-          </button>
+          {loaded ? (
+            <button type="button" className="btn btn-primary" onClick={onChoose}>
+              {strings.exams.choose}
+            </button>
+          ) : (
+            <button type="button" className="btn" onClick={onLoad}>
+              {strings.exams.load(examHeading(bank), bank.examType === "mcq")}
+            </button>
+          )}
         </div>
       </article>
     </li>
@@ -189,7 +201,7 @@ function seatFor(
 
       comingSoon: false,
       note: strings.exams.wrongSeatNote(
-        needs === "mcq" ? strings.exams.engineMcq : strings.exams.enginePractical,
+        needs === "mcq" ? strings.exams.formatMcq : strings.exams.formatPractical,
       ),
     };
   });
@@ -235,6 +247,7 @@ export function Exams({
   const pendingMode = useRef<string | null>(null);
 
   const blocked = useDesktopGate() === "blocked";
+  const hosted = useHostedDeployment();
 
   const catalogState = useAsync((signal) => getCatalog(signal), [catalogVersion]);
   const active = catalogState.data?.active;
@@ -251,13 +264,7 @@ export function Exams({
     navigate(`/exams/${target}/mode`);
   }, [active]);
 
-  const chooseMode = (bank: CatalogExam) => {
-    if (bank.id === active) {
-      navigate(`/exams/${bank.id}/mode`);
-      return;
-    }
-    setConfirm(bank);
-  };
+  const chooseMode = (bank: CatalogExam) => navigate(`/exams/${bank.id}/mode`);
 
   const handleConfirm = () => {
     if (!confirm) return;
@@ -285,7 +292,7 @@ export function Exams({
         error={(message, reload) => (
           <div className="catalog-error" role="alert">
             <p className="catalog-error-title">{strings.exams.catalogErrorTitle}</p>
-            <p className="catalog-error-body">{strings.exams.catalogErrorBody(message)}</p>
+            <p className="catalog-error-body">{strings.exams.catalogErrorBody(message, hosted)}</p>
             <button type="button" className="btn" onClick={reload}>
               {strings.exams.catalogRetry}
             </button>
@@ -297,6 +304,8 @@ export function Exams({
           const shown = deviceFor(offered, blocked);
           const live = shown.filter((b) => b.available);
           const soon = shown.filter((b) => !b.available);
+          const buildable = loaded.exams.filter((b) => b.available).length;
+          const comingSoon = loaded.exams.length - buildable;
           return (
             <>
               <header className="page-head">
@@ -310,10 +319,15 @@ export function Exams({
                       <span className="coverage-label">{strings.exams.coverageLabel}</span>
                       <span className="coverage-value">
                         {strings.exams.coverage(
-                          loaded.summary.passedCount,
-                          loaded.summary.trackCount,
+                          Math.min(loaded.summary.passedCount, buildable),
+                          buildable,
                         )}
                       </span>
+                      {comingSoon > 0 && (
+                        <span className="coverage-note">
+                          {strings.exams.coverageSoon(comingSoon)}
+                        </span>
+                      )}
                     </div>
 
                     <span className="coverage-bar" aria-hidden="true">
@@ -325,12 +339,20 @@ export function Exams({
                 )}
               </header>
 
-              {loaded.exams.length === 0 && <p className="page-empty">{strings.exams.empty}</p>}
+              {loaded.exams.length === 0 && (
+                <p className="page-empty">{strings.exams.empty(hosted)}</p>
+              )}
 
               {live.length > 0 && (
                 <ul className="exam-grid" aria-label={strings.exams.liveListLabel}>
                   {live.map((b) => (
-                    <ExamCard key={b.id} bank={b} onChoose={() => chooseMode(b)} />
+                    <ExamCard
+                      key={b.id}
+                      bank={b}
+                      loaded={b.id === loaded.active}
+                      onChoose={() => chooseMode(b)}
+                      onLoad={() => setConfirm(b)}
+                    />
                   ))}
                 </ul>
               )}
@@ -376,7 +398,15 @@ export function Exams({
           onClose={() => setConfirm(null)}
         >
 
-          <p>{active ? strings.lobby.switchConfirmBody : strings.lobby.buildConfirmBody}</p>
+          <p>
+            {confirm.examType === "mcq"
+              ? active
+                ? strings.lobby.switchConfirmBodyMcq
+                : strings.lobby.buildConfirmBodyMcq
+              : active
+                ? strings.lobby.switchConfirmBody
+                : strings.lobby.buildConfirmBody}
+          </p>
           <div className="confirm-actions">
             <button className="btn" onClick={() => setConfirm(null)} disabled={switching}>
               {strings.lobby.cancel}
@@ -386,8 +416,8 @@ export function Exams({
               {switching
                 ? strings.control.starting
                 : active
-                  ? strings.lobby.switchConfirm
-                  : strings.lobby.buildConfirm}
+                  ? strings.lobby.switchConfirm(examHeading(confirm))
+                  : strings.lobby.buildConfirm(examHeading(confirm))}
             </button>
           </div>
         </Dialog>
