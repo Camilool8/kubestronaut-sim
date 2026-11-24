@@ -180,6 +180,7 @@ type prepareBody struct {
 	PoolDigest    string   `json:"poolDigest"`
 	DomainFilter  []string `json:"domainFilter"`
 	PoolChanged   bool     `json:"poolChanged"`
+	AwaitStart    bool     `json:"awaitStart"`
 }
 
 func (ts *testServer) session(t *testing.T) sessionBody {

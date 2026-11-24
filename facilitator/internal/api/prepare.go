@@ -21,7 +21,11 @@ var errPreparingCancelled = errors.New("the attempt was cancelled while its envi
 
 var errClusterHoldsAnotherDraw = errors.New("the exam environment is still set up for an earlier attempt's questions; reset the environment before starting a different attempt")
 
-var errPreparationLost = errors.New("the exam service restarted while an attempt's environment was being prepared, and that attempt cannot be resumed — reset the environment before starting a new one")
+var errPreparationLost = errors.New("the exam service restarted while an attempt's environment was being prepared or waiting to start, and that attempt cannot be resumed; reset the environment before starting a new one")
+
+var errNothingPrepared = errors.New("no attempt is waiting to start; choose a mode to prepare one")
+
+var errNotReady = errors.New("the exam environment is still being prepared; the attempt can start once it is ready")
 
 type SeedState string
 
@@ -62,6 +66,9 @@ type prep struct {
 	dur       time.Duration
 	draw      session.Draw
 	startedAt time.Time
+
+	awaitStart bool
+	readyAt    time.Time
 }
 
 type preparingInfo struct {
@@ -72,6 +79,11 @@ type preparingInfo struct {
 	StartedAt     string `json:"startedAt"`
 	Seed          string `json:"seed,omitempty"`
 	PoolDigest    string `json:"poolDigest,omitempty"`
+
+	DurationSeconds int    `json:"durationSeconds"`
+	AwaitStart      bool   `json:"awaitStart,omitempty"`
+	Ready           bool   `json:"ready,omitempty"`
+	ReadyAt         string `json:"readyAt,omitempty"`
 }
 
 type prepareResponse struct {
@@ -84,6 +96,7 @@ type prepareResponse struct {
 	PoolDigest    string   `json:"poolDigest"`
 	DomainFilter  []string `json:"domainFilter,omitempty"`
 	PoolChanged   bool     `json:"poolChanged,omitempty"`
+	AwaitStart    bool     `json:"awaitStart,omitempty"`
 }
 
 func (s *server) seedRequired() bool {
@@ -94,7 +107,7 @@ func (s *server) seedRequired() bool {
 	return s.ex.Type != exam.TypeMCQ && exam.Pooled(s.ex)
 }
 
-func (s *server) beginPrepare(ctx context.Context, mode string, dur time.Duration, draw session.Draw) (prep, error) {
+func (s *server) beginPrepare(ctx context.Context, mode string, dur time.Duration, draw session.Draw, awaitStart bool) (prep, error) {
 	s.prepMu.Lock()
 	if s.prep != nil {
 		s.prepMu.Unlock()
@@ -103,7 +116,7 @@ func (s *server) beginPrepare(ctx context.Context, mode string, dur time.Duratio
 
 	s.prepGen++
 	gen := s.prepGen
-	s.prep = &prep{gen: gen, mode: mode, dur: dur, draw: draw, startedAt: time.Now()}
+	s.prep = &prep{gen: gen, mode: mode, dur: dur, draw: draw, startedAt: time.Now(), awaitStart: awaitStart}
 
 	s.prepError = ""
 	s.prepMu.Unlock()
@@ -152,6 +165,10 @@ func (s *server) watchPrepare(p prep) {
 		case status.State == SeedRunning:
 			errs = 0
 		case status.State == SeedDone:
+			if p.awaitStart {
+				s.markReady(p.gen)
+				return
+			}
 			s.startPreparedAttempt(p)
 			return
 		case status.State == SeedFailed:
@@ -173,6 +190,39 @@ func (s *server) startPreparedAttempt(p prep) {
 		return
 	}
 	s.clearPrep(p.gen, "")
+}
+
+func (s *server) markReady(gen uint64) {
+	s.prepMu.Lock()
+	defer s.prepMu.Unlock()
+
+	if s.prep == nil || s.prep.gen != gen {
+		return
+	}
+	s.prep.readyAt = time.Now()
+	log.Printf("facilitator: %d question(s) seeded; waiting for the candidate to start the clock", len(s.prep.draw.QuestionIDs))
+}
+
+func (s *server) beginReadyAttempt() (session.Snapshot, error) {
+	s.prepMu.Lock()
+	defer s.prepMu.Unlock()
+
+	if s.prep == nil {
+		if snap := s.mgr.Snapshot(); snap.State == "running" {
+			return snap, nil
+		}
+		return session.Snapshot{}, errNothingPrepared
+	}
+	if s.prep.readyAt.IsZero() {
+		return session.Snapshot{}, errNotReady
+	}
+	snap, err := s.mgr.StartDraw(s.prep.mode, s.prep.dur, s.prep.draw)
+	if err != nil {
+		return session.Snapshot{}, err
+	}
+	s.prep = nil
+	s.prepError = ""
+	return snap, nil
 }
 
 func (s *server) failPrepare(gen uint64, msg string) {
@@ -271,6 +321,7 @@ func (s *server) controlProxy() http.Handler {
 
 		if rec.status >= 200 && rec.status < 300 {
 			s.clearSeeded()
+			s.cancelPrep()
 		}
 	})
 }
@@ -386,12 +437,19 @@ func (s *server) prepSnapshot() (*preparingInfo, string) {
 	if s.prep == nil {
 		return nil, s.prepError
 	}
-	return &preparingInfo{
-		JobID:         s.prep.jobID,
-		Mode:          s.prep.mode,
-		QuestionCount: len(s.prep.draw.QuestionIDs),
-		StartedAt:     s.prep.startedAt.UTC().Format(time.RFC3339Nano),
-		Seed:          s.prep.draw.Seed,
-		PoolDigest:    s.prep.draw.PoolDigest,
-	}, s.prepError
+	info := &preparingInfo{
+		JobID:           s.prep.jobID,
+		Mode:            s.prep.mode,
+		QuestionCount:   len(s.prep.draw.QuestionIDs),
+		StartedAt:       s.prep.startedAt.UTC().Format(time.RFC3339Nano),
+		Seed:            s.prep.draw.Seed,
+		PoolDigest:      s.prep.draw.PoolDigest,
+		DurationSeconds: int(s.prep.dur.Seconds()),
+		AwaitStart:      s.prep.awaitStart,
+	}
+	if !s.prep.readyAt.IsZero() {
+		info.Ready = true
+		info.ReadyAt = s.prep.readyAt.UTC().Format(time.RFC3339Nano)
+	}
+	return info, s.prepError
 }
