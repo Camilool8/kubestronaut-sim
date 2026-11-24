@@ -14,9 +14,21 @@ export function KeyboardSettings({ onClose, onShowHelp }: KeyboardSettingsProps)
   const reservedId = useId();
   const singleId = useId();
   const ref = useRef<HTMLDivElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
 
   useSyncExternalStore(desktopKeymap.subscribe, desktopKeymap.getVersion, desktopKeymap.getVersion);
   const singleKeys = useSingleKeyShortcuts();
+
+  useEffect(() => {
+    const active = document.activeElement;
+    openerRef.current = active instanceof HTMLElement && active !== document.body ? active : null;
+  }, []);
+
+  const showHelp = () => {
+    const opener = openerRef.current;
+    if (opener?.isConnected) opener.focus({ preventScroll: true });
+    onShowHelp?.();
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -80,7 +92,7 @@ export function KeyboardSettings({ onClose, onShowHelp }: KeyboardSettingsProps)
       )}
 
       {onShowHelp && (
-        <button className="btn" onClick={onShowHelp}>
+        <button className="btn" onClick={showHelp}>
           {strings.keyboard.helpOpen}
         </button>
       )}

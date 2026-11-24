@@ -35,6 +35,21 @@ describe("KeyboardSettings", () => {
     expect(screen.getByRole("button", { name: strings.keyboard.helpOpen })).toBeInTheDocument();
   });
 
+  test("showing the shortcuts hands focus back to whatever opened the settings", async () => {
+    setPlatform("Win32");
+    const user = userEvent.setup();
+    const onShowHelp = vi.fn();
+    render(<button type="button">Menu</button>);
+    const opener = screen.getByRole("button", { name: "Menu" });
+    opener.focus();
+    render(<KeyboardSettings onClose={() => {}} onShowHelp={onShowHelp} />);
+
+    await user.click(screen.getByRole("button", { name: strings.keyboard.helpOpen }));
+
+    expect(onShowHelp).toHaveBeenCalledTimes(1);
+    expect(opener).toHaveFocus();
+  });
+
   test("the switch persists across a reload", async () => {
     const user = userEvent.setup();
     render(<KeyboardSettings onClose={() => {}} />);
