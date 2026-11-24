@@ -1037,7 +1037,7 @@ button.nav-menu-item:hover {
 }
 
 .mode-card-on {
-  border: 2px solid var(--accent);
+  border-color: var(--accent);
   box-shadow: var(--shadow-accent);
 }
 

@@ -63,7 +63,7 @@
   --shadow-2: 0 8px 26px rgba(16, 23, 40, 0.13);
   --shadow-3: 0 18px 40px rgba(16, 23, 40, 0.18);
 
-  --shadow-accent: 0 6px 20px rgba(43, 95, 217, 0.14);
+  --shadow-accent: 0 0 0 1px var(--accent), var(--shadow-1);
 
 
   --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -233,7 +233,6 @@
   --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.45);
   --shadow-2: 0 8px 26px rgba(0, 0, 0, 0.55);
   --shadow-3: 0 18px 40px rgba(0, 0, 0, 0.62);
-  --shadow-accent: 0 6px 20px rgba(43, 95, 217, 0.4);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -298,6 +297,5 @@
     --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.45);
     --shadow-2: 0 8px 26px rgba(0, 0, 0, 0.55);
     --shadow-3: 0 18px 40px rgba(0, 0, 0, 0.62);
-    --shadow-accent: 0 6px 20px rgba(43, 95, 217, 0.4);
   }
 }
