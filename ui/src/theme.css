@@ -3692,7 +3692,8 @@ button.nav-menu-item:hover {
   padding: var(--space-5);
 }
 
-.desktop-required-card h1 {
+.desktop-required-card h1,
+.desktop-required-card h2 {
   margin: 0 0 var(--space-3);
   font-size: var(--text-3xl);
   letter-spacing: var(--tracking-tight);
@@ -4015,6 +4016,11 @@ button.nav-menu-item:hover {
   height: 100%;
 }
 
+h1[tabindex="-1"]:focus,
+h2[tabindex="-1"]:focus {
+  outline: none;
+}
+
 @media (prefers-reduced-motion: no-preference) {
 
   .screen {
@@ -4224,6 +4230,8 @@ button.nav-menu-item:hover {
   text-transform: uppercase;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+  margin: 0;
+  line-height: inherit;
 }
 
 .mcq-domain {

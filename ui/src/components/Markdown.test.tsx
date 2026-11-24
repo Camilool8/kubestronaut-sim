@@ -266,3 +266,40 @@ describe("Markdown wrapper: pane layout and prose styling do not share a class",
     expect(paneRule![1]).not.toMatch(/\bpre\b|\bcode\b/);
   });
 });
+
+describe("Markdown heading levels never skip", () => {
+  test("a document that opens at ### still starts at the level it is given", async () => {
+    render(<Markdown>{"### Scenario\n\nText."}</Markdown>);
+    expect(await screen.findByRole("heading", { level: 2, name: "Scenario" })).toBeInTheDocument();
+  });
+
+  test("a jump inside the document closes up to one level at a time", async () => {
+    render(<Markdown>{"# Task\n\n### Detail\n\n## Notes"}</Markdown>);
+    expect(await screen.findByRole("heading", { level: 2, name: "Task" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 3, name: "Detail" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 3, name: "Notes" })).toBeInTheDocument();
+  });
+
+  test("under an h2 the caller asks for h3, and nothing lands at h2", async () => {
+    render(<Markdown headingLevel={3}>{"## Steps\n\n#### Hint"}</Markdown>);
+    expect(await screen.findByRole("heading", { level: 3, name: "Steps" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 4, name: "Hint" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 2 })).toBeNull();
+  });
+
+  test("deep documents stop at h6", async () => {
+    render(<Markdown headingLevel={5}>{"# A\n\n## B\n\n### C"}</Markdown>);
+    expect(await screen.findByRole("heading", { level: 5, name: "A" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 6, name: "B" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 6, name: "C" })).toBeInTheDocument();
+  });
+});
+
+describe("Markdown code blocks", () => {
+  test("the scrollable block is reachable by keyboard and named for what it holds", async () => {
+    render(<Markdown>{"```yaml\nkind: Pod\n```"}</Markdown>);
+    const block = await screen.findByLabelText(/code block, yaml/i);
+    expect(block.tagName).toBe("PRE");
+    expect(block).toHaveAttribute("tabindex", "0");
+  });
+});

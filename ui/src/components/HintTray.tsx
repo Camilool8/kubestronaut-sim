@@ -80,14 +80,14 @@ export function HintTray({ questionId, hintCount }: HintTrayProps) {
       {hints.map((h) => (
         <section key={h.tier} className="hint">
           <h3>{strings.hints.heading(h.tier, h.total)}</h3>
-          <Markdown>{h.markdown}</Markdown>
+          <Markdown headingLevel={4}>{h.markdown}</Markdown>
         </section>
       ))}
 
       {solution !== null && (
         <section className="hint hint-solution">
           <h3>{strings.hints.showSolution}</h3>
-          <Markdown>{solution}</Markdown>
+          <Markdown headingLevel={4}>{solution}</Markdown>
         </section>
       )}
 

@@ -324,7 +324,7 @@ export function Mode({ bankId, catalogVersion, onSessionChange, onPreparing }: M
           }
 
           if (blocked) {
-            return <DesktopRequired verdict="blocked" />;
+            return <DesktopRequired verdict="blocked" headingLevel={2} />;
           }
           const modes = loaded.modes?.length ? loaded.modes : DEFAULT_MODES;
           const fullSeconds =

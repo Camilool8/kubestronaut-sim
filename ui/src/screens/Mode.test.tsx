@@ -496,8 +496,9 @@ describe("a device that cannot sit this exam", () => {
     renderMode();
 
     expect(
-      await screen.findByRole("heading", { level: 1, name: /needs a desktop/i }),
+      await screen.findByRole("heading", { level: 2, name: /needs a desktop/i }),
     ).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
 
     expect(screen.queryByRole("heading", { name: strings.modes.exam.label })).toBeNull();
     expect(screen.queryByRole("button", { name: /start/i })).toBeNull();
@@ -509,7 +510,7 @@ describe("a device that cannot sit this exam", () => {
     renderMode();
 
     expect(await screen.findByRole("heading", { name: strings.modes.exam.label })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { level: 1, name: /needs a desktop/i })).toBeNull();
+    expect(screen.queryByRole("heading", { level: 2, name: /needs a desktop/i })).toBeNull();
   });
 
   test("a narrowed desktop window still gets the mode cards", async () => {
@@ -517,14 +518,14 @@ describe("a device that cannot sit this exam", () => {
     renderMode();
 
     expect(await screen.findByRole("heading", { name: strings.modes.exam.label })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { level: 1, name: /needs a desktop/i })).toBeNull();
+    expect(screen.queryByRole("heading", { level: 2, name: /needs a desktop/i })).toBeNull();
   });
 
   test("no attempt can be started from it", async () => {
     matchMediaMock([TOUCH_ONLY_QUERY]);
     renderMode();
 
-    await screen.findByRole("heading", { level: 1, name: /needs a desktop/i });
+    await screen.findByRole("heading", { level: 2, name: /needs a desktop/i });
     expect(startCalls).toEqual([]);
   });
 });

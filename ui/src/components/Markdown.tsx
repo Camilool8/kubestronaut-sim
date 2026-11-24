@@ -80,7 +80,7 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
           {strings.markdown.copyBlock}
         </button>
       </figcaption>
-      <pre>
+      <pre tabIndex={0} aria-label={strings.focus.codeBlockLabel(displayLanguage)}>
         {html === null ? (
           <code className={className}>{body}</code>
         ) : (
@@ -107,13 +107,6 @@ const SHARED_COMPONENTS = {
       {children}
     </a>
   ),
-
-  h1: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
-  h2: ({ children }: { children?: ReactNode }) => <h3>{children}</h3>,
-  h3: ({ children }: { children?: ReactNode }) => <h4>{children}</h4>,
-  h4: ({ children }: { children?: ReactNode }) => <h5>{children}</h5>,
-  h5: ({ children }: { children?: ReactNode }) => <h6>{children}</h6>,
-  h6: ({ children }: { children?: ReactNode }) => <h6>{children}</h6>,
 
   table: ({ children }: { children?: ReactNode }) => (
     <div className="md-table-scroll">
@@ -151,15 +144,19 @@ const MarkdownRenderer = lazy(() => import("./MarkdownRenderer"));
 export function Markdown({
   children,
   copyable = true,
+  headingLevel = 2,
 }: {
   children: string;
   copyable?: boolean;
+  headingLevel?: number;
 }) {
   const components: MarkdownComponents = copyable ? COMPONENTS : COMPONENTS_STATIC;
   return (
     <div className="md">
       <Suspense fallback={null}>
-        <MarkdownRenderer components={components}>{children}</MarkdownRenderer>
+        <MarkdownRenderer components={components} headingBase={headingLevel}>
+          {children}
+        </MarkdownRenderer>
       </Suspense>
     </div>
   );

@@ -1155,4 +1155,16 @@ export const strings = {
 
     banner: (date: string) => `Sat on ${date}. This is a record, not a live session.`,
   },
+
+  focus: {
+    singleKeysToggle: "Single-key shortcuts",
+    singleKeysHint:
+      "Keys like F, G, [ and ] act without a modifier. Switch this off if you use speech input or press them by accident.",
+    singleKeysOff: "Single-key shortcuts are off. Switch them back on in Keyboard settings.",
+    keyboardSettings: "Keyboard settings",
+    questionAnnounce: (n: number, total: number) => `Question ${n} of ${total}`,
+    taskAnnounce: (n: number, total: number, title: string) =>
+      `Task ${n} of ${total}: ${title}`,
+    codeBlockLabel: (language: string) => `Code block, ${language}`,
+  },
 } as const;

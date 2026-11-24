@@ -26,7 +26,7 @@ export function ExamTips({ onClose }: { onClose: () => void }) {
           )}
         >
 
-          {(markdown) => <Markdown>{markdown}</Markdown>}
+          {(markdown) => <Markdown headingLevel={3}>{markdown}</Markdown>}
         </Async>
       </div>
 
