@@ -1237,18 +1237,30 @@ button.nav-menu-item:hover {
 }
 
 .timer-low {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   color: var(--danger);
+  background: var(--danger-soft);
   border-color: var(--danger);
-  animation: timer-pulse 1.5s ease-in-out infinite;
 }
 
-@keyframes timer-pulse {
-  0%,
-  100% {
-    opacity: 1;
+.timer-low-icon {
+  font-size: 1.05em;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .timer-low {
+    animation: timer-low-enter 1.2s var(--ease-out) 3;
   }
-  50% {
-    opacity: 0.55;
+}
+
+@keyframes timer-low-enter {
+  from {
+    box-shadow: 0 0 0 0 var(--danger-bar);
+  }
+  to {
+    box-shadow: 0 0 0 6px transparent;
   }
 }
 

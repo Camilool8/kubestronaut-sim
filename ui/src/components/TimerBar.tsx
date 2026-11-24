@@ -73,6 +73,7 @@ export function TimerBar({
         <span className="mode-chip">{strings.modes[session.mode].label}</span>
       )}
       <div className={`timer${isLow ? " timer-low" : ""}`} role="timer">
+        {isLow && <Icon name="clock" className="timer-low-icon" />}
         <TimerReadout untimed={untimed} remaining={remaining} elapsed={elapsed} />
       </div>
       <button
