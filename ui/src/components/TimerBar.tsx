@@ -22,6 +22,8 @@ interface TimerBarProps {
 
 const LOW_TIME_THRESHOLD_SECONDS = 5 * 60;
 
+export const END_EXAM_BUTTON_ID = "end-exam-button";
+
 const WARNING_LADDER: { fraction: number; kind: "info" | "warning" }[] = [
   { fraction: 0.25, kind: "info" },
   { fraction: 0.125, kind: "warning" },
@@ -58,6 +60,8 @@ export function TimerBar({
     }
   }, [remaining, untimed, session.durationSeconds]);
 
+  useEffect(() => () => toastStore.dismissKey("time-warning"), []);
+
   return (
     <NavBar
       home={false}
@@ -77,6 +81,7 @@ export function TimerBar({
         <TimerReadout untimed={untimed} remaining={remaining} elapsed={elapsed} />
       </div>
       <button
+        id={END_EXAM_BUTTON_ID}
         type="button"
         className="btn btn-primary navbar-submit"
         onClick={onEndClick}

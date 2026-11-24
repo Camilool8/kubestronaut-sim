@@ -4,7 +4,6 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -28,6 +27,7 @@ import { KeyboardSettings } from "../components/KeyboardSettings";
 import { ShortcutHelp } from "../components/ShortcutHelp";
 import { ClipboardPanel } from "../components/ClipboardPanel";
 import { CheckList } from "../components/CheckList";
+import { ErrorBoundary, PaneFallback } from "../components/ErrorBoundary";
 import { Icon } from "../components/Icon";
 import { desktopKeymap } from "../lib/desktopKeymap";
 import { clipboardSync } from "../lib/clipboardSync";
@@ -39,9 +39,12 @@ import { marksStore } from "../components/marksStore";
 import { isTypingTarget } from "../lib/typing";
 import { strings } from "../strings";
 
-const DesktopViewport = lazy(() =>
-  import("../components/DesktopViewport").then((m) => ({ default: m.DesktopViewport })),
-);
+const loadDesktopViewport = () =>
+  import("../components/DesktopViewport").then((m) => ({ default: m.DesktopViewport }));
+
+let DesktopViewport = lazy(loadDesktopViewport);
+
+const EXAM_TOAST_KEYS = ["desktop", "practice-grade", "clipboard-blocked", "copy-value", "copy-block"];
 
 // QuestionPanel is memoized, and a session poll re-renders Exam every 10
 // seconds with a fresh `fetchedAt`. One shared empty array keeps the
@@ -153,6 +156,13 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
     return () => clipboardSync.stop();
   }, []);
 
+  useEffect(
+    () => () => {
+      for (const key of EXAM_TOAST_KEYS) toastStore.dismissKey(key);
+    },
+    [],
+  );
+
   const [introOpen, setIntroOpen] = useState(() => {
     if (introSeen()) return false;
     markIntroSeen();
@@ -231,23 +241,10 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
     [examStatus, examError, reloadExam],
   );
 
-  const desktopDownRef = useRef(false);
-  const handleDesktopState = useCallback((state: string) => {
-    if (state === "disconnected") {
-      desktopDownRef.current = true;
-      toastStore.push({
-        kind: "warning",
-        message: strings.toast.desktopReconnecting,
-        dedupeKey: "desktop",
-      });
-    } else if (state === "connected" && desktopDownRef.current) {
-      desktopDownRef.current = false;
-      toastStore.push({
-        kind: "info",
-        message: strings.toast.desktopRestored,
-        dedupeKey: "desktop",
-      });
-    }
+  const [desktopMounts, setDesktopMounts] = useState(0);
+  const retryDesktop = useCallback(() => {
+    DesktopViewport = lazy(loadDesktopViewport);
+    setDesktopMounts((n) => n + 1);
   }, []);
 
   return (
@@ -311,20 +308,27 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
 
         <section className="desktop-pane" aria-label={strings.exam.desktopTitle}>
           {session.state === "running" && (
-            <Suspense
-              fallback={
-                <div className="desktop-viewport">
-                  <div className="desktop-status" role="status">
-                    <p>{strings.desktop.connecting}</p>
-                    <div className="desktop-status-bar">
-                      <PendingBar />
+            <ErrorBoundary
+              key={desktopMounts}
+              fallback={() => (
+                <PaneFallback title={strings.paneError.desktopTitle} onRetry={retryDesktop} />
+              )}
+            >
+              <Suspense
+                fallback={
+                  <div className="desktop-viewport">
+                    <div className="desktop-status" role="status">
+                      <p>{strings.desktop.connecting}</p>
+                      <div className="desktop-status-bar">
+                        <PendingBar />
+                      </div>
                     </div>
                   </div>
-                </div>
-              }
-            >
-              <DesktopViewport onStateChange={handleDesktopState} />
-            </Suspense>
+                }
+              >
+                <DesktopViewport session={session} fetchedAt={fetchedAt} />
+              </Suspense>
+            </ErrorBoundary>
           )}
         </section>
       </div>
