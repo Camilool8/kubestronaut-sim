@@ -314,3 +314,19 @@ describe("the touch layer names classes that exist", () => {
     ]);
   });
 });
+
+describe("the screen wrapper never becomes a containing block for fixed overlays", () => {
+  test("its entrance animation does not keep a transform once it has finished", async () => {
+    const css = await readThemeCss();
+    const bodies = [...css.matchAll(/(?:^|\n)\s*\.screen\s*\{([^}]*)\}/g)].map((m) => m[1]);
+    const animated = bodies.filter((b) => b.includes("animation"));
+
+    expect(animated.length, "the .screen entrance animation was renamed or removed").toBeGreaterThan(0);
+    for (const body of animated) {
+      expect(
+        body,
+        "a forwards fill keeps the transform applied, so every position: fixed scrim inside the screen is laid out against it",
+      ).not.toMatch(/\b(both|forwards)\b/);
+    }
+  });
+});

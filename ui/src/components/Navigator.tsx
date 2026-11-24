@@ -1,5 +1,6 @@
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { useFocusTrap } from "../lib/useFocusTrap";
 import { Icon } from "./Icon";
 import { marksStore } from "./marksStore";
@@ -61,7 +62,7 @@ export function Navigator({
 
   useSyncExternalStore(marksStore.subscribe, marksStore.getVersion);
 
-  useFocusTrap(ref, onDismiss, asSheet);
+  useFocusTrap(ref, onDismiss, asSheet, { modal: asSheet });
 
   useEffect(() => {
     const grid = gridRef.current;
@@ -313,12 +314,12 @@ export function Navigator({
   );
 
   if (!asSheet) return panel;
-  return (
-    <>
-
+  return createPortal(
+    <div className="navigator-layer">
       <div className="navigator-scrim" aria-hidden="true" onClick={onDismiss} />
       {panel}
-    </>
+    </div>,
+    document.body,
   );
 }
 

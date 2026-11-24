@@ -4018,7 +4018,7 @@ button.nav-menu-item:hover {
 @media (prefers-reduced-motion: no-preference) {
 
   .screen {
-    animation: screen-in var(--dur-base) var(--ease-out) both;
+    animation: screen-in var(--dur-base) var(--ease-out) backwards;
   }
 
   .confirm-overlay,
