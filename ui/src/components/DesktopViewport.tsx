@@ -25,7 +25,7 @@ export const ESCALATE_AFTER_MS = 30_000;
 
 export function isLeaveChord(event: KeyboardEvent): boolean {
   return (
-    (event.key === "Escape" || event.code === "Escape") &&
+    (event.key === "End" || event.code === "End") &&
     event.ctrlKey &&
     event.altKey &&
     event.shiftKey &&

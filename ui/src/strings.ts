@@ -429,7 +429,7 @@ export const strings = {
     connecting: "Connecting to the exam desktop…",
 
     skip: "Skip past the exam desktop to Submit",
-    regionLabel: "Exam desktop. Press Ctrl+Alt+Shift+Esc to move focus out of it.",
+    regionLabel: "Exam desktop. Press Ctrl+Alt+Shift+End to move focus out of it.",
     lostTitle: "The exam desktop is not connected",
     lostWorkSafe:
       "Your cluster and everything you have done on it are intact. Only the view of the desktop is interrupted.",
@@ -617,7 +617,7 @@ export const strings = {
       ["F", "Flag this question, or the tile you are on"],
       ["?", "This list"],
       ["Esc", "Close a panel or dialog"],
-      ["Ctrl + Alt + Shift + Esc", "Leave the exam desktop, which keeps Tab for itself (Control + Option + Shift + Esc on a Mac)"],
+      ["Ctrl + Alt + Shift + End", "Leave the exam desktop, which keeps Tab for itself (Control + Option + Shift + Fn + Right arrow on a Mac laptop)"],
       ["← / →", "Resize the question panel (when the divider has focus)"],
       ["Shift + ← / →", "Resize in bigger steps"],
       ["Home / End", "Narrowest / widest panel"],

@@ -180,8 +180,8 @@ describe("DesktopViewport keyboard access", () => {
     inner.addEventListener("keydown", reached);
 
     const event = new KeyboardEvent("keydown", {
-      key: "Escape",
-      code: "Escape",
+      key: "End",
+      code: "End",
       ctrlKey: true,
       altKey: true,
       shiftKey: true,
@@ -209,10 +209,17 @@ describe("DesktopViewport keyboard access", () => {
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Submit exam" }));
   });
 
-  test("plain Escape and Ctrl+Shift+Escape stay with the desktop", () => {
-    const plain = new KeyboardEvent("keydown", { key: "Escape" });
-    const partial = new KeyboardEvent("keydown", { key: "Escape", ctrlKey: true, shiftKey: true });
+  test("plain End, Ctrl+Shift+End and the old Escape chord stay with the desktop", () => {
+    const plain = new KeyboardEvent("keydown", { key: "End" });
+    const partial = new KeyboardEvent("keydown", { key: "End", ctrlKey: true, shiftKey: true });
+    const escape = new KeyboardEvent("keydown", {
+      key: "Escape",
+      ctrlKey: true,
+      altKey: true,
+      shiftKey: true,
+    });
     expect(isLeaveChord(plain)).toBe(false);
     expect(isLeaveChord(partial)).toBe(false);
+    expect(isLeaveChord(escape)).toBe(false);
   });
 });
