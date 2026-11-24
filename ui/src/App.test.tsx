@@ -813,3 +813,170 @@ describe("an attempt whose tasks are still being set up", () => {
     expect(screen.queryByRole("button", { name: /^Choose/ })).toBeNull();
   });
 });
+
+describe("App start gate and tab titles", () => {
+  const certExam = { ...exam, name: "cka-mock-01", title: "CKA Mock Exam 01", certification: "CKA" };
+
+  const preparingSession: SessionSnapshot = {
+    ...idleSession,
+    bank: "cka-mock-01",
+    preparing: {
+      jobId: "job-9",
+      mode: "exam",
+      questionCount: 16,
+      startedAt: "2026-08-02T10:14:03Z",
+      durationSeconds: 7200,
+      awaitStart: true,
+    },
+  };
+
+  const readySession: SessionSnapshot = {
+    ...preparingSession,
+    preparing: { ...preparingSession.preparing!, ready: true, readyAt: "2026-08-02T10:17:03Z" },
+  };
+
+  const runningSession: SessionSnapshot = {
+    ...idleSession,
+    bank: "cka-mock-01",
+    state: "running",
+    startedAt: new Date().toISOString(),
+    remainingSeconds: 3377,
+  };
+
+  let sessions: SessionSnapshot[];
+  let begins: number;
+
+  function stubGate() {
+    begins = 0;
+    let served = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const json = (body: unknown, status = 200) =>
+          new Response(JSON.stringify(body), { status });
+        if (url.endsWith("/api/session/begin") && init?.method === "POST") {
+          begins++;
+          sessions = [runningSession];
+          served = 0;
+          return json(runningSession);
+        }
+        if (url.endsWith("/api/control/status")) return json({ busy: false });
+        if (url.endsWith("/api/me")) return json({ error: "not found" }, 404);
+        if (url.endsWith("/api/boot")) return json(readyBoot);
+        if (url.endsWith("/api/session")) {
+          const next = sessions[Math.min(served, sessions.length - 1)];
+          served++;
+          return json(next);
+        }
+        if (url.endsWith("/api/exam")) return json(certExam);
+        if (url.endsWith("/api/results")) return json({ state: "grading" }, 202);
+        if (url.endsWith("/api/catalog")) return json(catalog);
+        return json({});
+      }),
+    );
+  }
+
+  function setHidden(hidden: boolean) {
+    Object.defineProperty(document, "hidden", { configurable: true, value: hidden });
+    document.dispatchEvent(new Event("visibilitychange"));
+  }
+
+  beforeEach(() => {
+    matchMediaMock([]);
+    localStorage.setItem("sim.tourDone", "1");
+    document.title = "kubestronaut-sim";
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(document, "hidden");
+    localStorage.removeItem("sim.tourDone");
+  });
+
+  test("the lobby is titled for what it is", async () => {
+    sessions = [{ ...idleSession, bank: "cka-mock-01" }];
+    stubGate();
+    render(<App />);
+
+    await waitFor(() => expect(document.title).toBe("Exams · kubestronaut-sim"));
+  });
+
+  test("a preparation that finishes waits on the ready screen and does not start the clock", async () => {
+    sessions = [preparingSession];
+    stubGate();
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Setting up your tasks" }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(document.title).toBe("Preparing CKA · kubestronaut-sim"));
+    sessions = [readySession];
+
+    expect(
+      await screen.findByRole(
+        "heading",
+        { level: 1, name: "Your 16 tasks are ready" },
+        { timeout: 4000 },
+      ),
+    ).toBeInTheDocument();
+    expect(document.title).toBe("Ready to start · CKA");
+    expect(screen.queryByRole("timer")).toBeNull();
+    expect(begins).toBe(0);
+  });
+
+  test("Start the clock begins the attempt, and the tab then counts down", async () => {
+    sessions = [readySession];
+    stubGate();
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Start the clock" }));
+
+    expect(await screen.findByRole("timer")).toBeInTheDocument();
+    expect(begins).toBe(1);
+    await waitFor(() => expect(document.title).toMatch(/^0:5\d:\d\d · CKA$/));
+  });
+
+  test("a hidden tab still learns the environment is ready, and says so in its title", async () => {
+    sessions = [preparingSession];
+    stubGate();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(<App />);
+
+    await screen.findByRole("heading", { level: 1, name: "Setting up your tasks" });
+    setHidden(true);
+    sessions = [readySession];
+
+    await vi.advanceTimersByTimeAsync(6_000);
+
+    await waitFor(() => expect(document.title).toBe("Ready to start · CKA"));
+    expect(begins).toBe(0);
+  });
+
+  test("a first-time candidate meets the walkthrough on the ready screen, before any clock", async () => {
+    localStorage.removeItem("sim.tourDone");
+    sessions = [readySession];
+    stubGate();
+    render(<App />);
+
+    expect(await screen.findByRole("dialog", { name: "How this exam works" })).toBeInTheDocument();
+    expect(screen.queryByRole("timer")).toBeNull();
+    expect(begins).toBe(0);
+  });
+
+  test("results are titled with the certification", async () => {
+    sessions = [{ ...idleSession, bank: "cka-mock-01", state: "ended", endReason: "submitted" }];
+    stubGate();
+    render(<App />);
+
+    await waitFor(() => expect(document.title).toBe("Results · CKA"));
+  });
+});

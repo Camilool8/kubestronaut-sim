@@ -153,11 +153,11 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
     return () => clipboardSync.stop();
   }, []);
 
-  const [introOpen, setIntroOpen] = useState(() => {
-    if (introSeen()) return false;
+  const [introOpen, setIntroOpen] = useState(() => !introSeen());
+  const closeIntro = useCallback(() => {
     markIntroSeen();
-    return true;
-  });
+    setIntroOpen(false);
+  }, []);
 
   useEffect(() => {
     marksStore.setScope(session.startedAt);
@@ -396,7 +396,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
       )}
       {introOpen && (
         <ExamIntro
-          onClose={() => setIntroOpen(false)}
+          onClose={closeIntro}
           durationSeconds={exam?.durationSeconds}
         />
       )}
