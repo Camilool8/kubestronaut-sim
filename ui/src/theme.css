@@ -3732,6 +3732,7 @@ button.nav-menu-item:hover {
 .control-hint {
   color: var(--text-muted);
   font-size: var(--text-s);
+  text-wrap: pretty;
 }
 
 .control-actions {
@@ -3753,6 +3754,7 @@ button.nav-menu-item:hover {
   margin: 0;
   color: var(--text-secondary);
   line-height: 1.6;
+  text-wrap: pretty;
 }
 
 .ready-facts {
@@ -4829,6 +4831,7 @@ h2[tabindex="-1"]:focus {
   font-size: var(--text-xs);
   color: var(--text-muted);
   text-align: center;
+  text-wrap: balance;
   flex: 1 1 12rem;
   min-width: 0;
 }
