@@ -1765,7 +1765,7 @@ button.nav-menu-item:hover {
 .navigator-tile[aria-current="true"] {
   background: var(--accent-soft);
   border-color: var(--accent);
-  box-shadow: inset 3px 0 0 var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 .navigator-tile-flag {
@@ -1828,7 +1828,7 @@ button.nav-menu-item:hover {
 .navigator-swatch-current {
   background: var(--accent-soft);
   border-color: var(--accent);
-  box-shadow: inset 2px 0 0 var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 .navigator-keys {
@@ -4970,7 +4970,7 @@ h2[tabindex="-1"]:focus {
 .mcq-option-on:hover {
   border-color: var(--accent);
   background: var(--accent-soft);
-  box-shadow: inset 3px 0 0 var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 .mcq-option input {

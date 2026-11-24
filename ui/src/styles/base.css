@@ -75,10 +75,19 @@ h3 {
 @media (forced-colors: active) {
 
   .navigator-tile[aria-current="true"],
+  .navigator-swatch-current,
+  .mcq-option-on,
   .mode-card-on,
   .question-mark[aria-pressed="true"] {
     outline: 2px solid Highlight;
     outline-offset: -3px;
+  }
+
+  .mcq-question .mcq-option-on .mcq-option-letter {
+    forced-color-adjust: none;
+    background: Highlight;
+    border-color: Highlight;
+    color: HighlightText;
   }
 
   .navigator-tile.is-done {
