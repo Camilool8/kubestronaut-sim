@@ -718,8 +718,12 @@ func (m *Manager) persistLocked() error {
 		return fmt.Errorf("session: marshal: %w", err)
 	}
 
-	dir := filepath.Dir(m.path)
-	tmp, err := os.CreateTemp(dir, ".session-*.tmp")
+	return writeFileAtomic(m.path, ".session-*.tmp", data)
+}
+
+func writeFileAtomic(path, pattern string, data []byte) error {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, pattern)
 	if err != nil {
 		return fmt.Errorf("session: create temp file in %s: %w", dir, err)
 	}
@@ -734,9 +738,9 @@ func (m *Manager) persistLocked() error {
 		os.Remove(tmpPath)
 		return fmt.Errorf("session: close %s: %w", tmpPath, err)
 	}
-	if err := os.Rename(tmpPath, m.path); err != nil {
+	if err := os.Rename(tmpPath, path); err != nil {
 		os.Remove(tmpPath)
-		return fmt.Errorf("session: rename %s to %s: %w", tmpPath, m.path, err)
+		return fmt.Errorf("session: rename %s to %s: %w", tmpPath, path, err)
 	}
 	return nil
 }
