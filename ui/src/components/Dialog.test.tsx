@@ -62,3 +62,53 @@ describe("Dialog", () => {
     expect(opener).toHaveFocus();
   });
 });
+
+describe("Dialog layering", () => {
+  test("portals to the body, so no transformed ancestor can contain it", () => {
+    const { container } = render(
+      <div style={{ transform: "translateY(0)" }}>
+        <Dialog title="Erase?" onClose={() => {}}>
+          <button>Cancel</button>
+        </Dialog>
+      </div>,
+    );
+    const overlay = screen.getByRole("dialog").parentElement!;
+    expect(overlay).toHaveClass("confirm-overlay");
+    expect(overlay.parentElement).toBe(document.body);
+    expect(container.contains(overlay)).toBe(false);
+  });
+
+  test("the page behind it is inert while it is open and live again after", async () => {
+    const onClose = vi.fn();
+    const { container, rerender } = render(
+      <>
+        <button>Behind</button>
+        <Dialog title="Erase?" onClose={onClose}>
+          <button>Cancel</button>
+        </Dialog>
+      </>,
+    );
+    expect(container).toHaveAttribute("inert");
+
+    rerender(<button>Behind</button>);
+    expect(container).not.toHaveAttribute("inert");
+  });
+
+  test("a parent re-render with a fresh onClose keeps focus on the button the user reached", async () => {
+    const user = userEvent.setup();
+    const ui = (n: number) => (
+      <Dialog title={`Poll ${n}`.slice(0, 4)} onClose={() => void n}>
+        <button>Cancel</button>
+        <button>End Exam</button>
+      </Dialog>
+    );
+    const { rerender } = render(ui(0));
+    await user.tab();
+    const end = screen.getByRole("button", { name: "End Exam" });
+    expect(end).toHaveFocus();
+
+    rerender(ui(1));
+    rerender(ui(2));
+    expect(end).toHaveFocus();
+  });
+});
