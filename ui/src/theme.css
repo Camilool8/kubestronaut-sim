@@ -289,7 +289,14 @@
 
 .navbar-subtitle {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-1);
+  min-width: 0;
+  max-height: calc(1lh + 2px);
+  overflow: hidden;
   padding-inline: var(--space-2);
+  font-size: var(--text-xs);
 }
 
 .navbar-subtitle .mode-chip {
@@ -308,13 +315,13 @@
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1023px) {
   .navbar-exam .exam-progress-track {
     display: none;
   }
 }
 
-@media (max-width: 48rem) {
+@media (max-width: 900px) {
   .navbar-exam .exam-progress {
     display: none;
   }
@@ -346,6 +353,19 @@
 @media (max-width: 480px) {
   .navbar-exam .navbar-tail .info-button {
     display: none;
+  }
+
+  .navbar-exam .timer {
+    padding-inline: 0.4em;
+    letter-spacing: 0;
+  }
+
+  .btn.navbar-submit {
+    padding-inline: var(--space-2);
+  }
+
+  .navbar-exam .navbar-tail {
+    gap: var(--space-1);
   }
 }
 

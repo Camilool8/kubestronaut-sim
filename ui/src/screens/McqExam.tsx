@@ -275,7 +275,7 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
         fetchedAt={fetchedAt}
         title={exam?.title ?? strings.exam.fallbackTitle}
         onEndClick={() => setConfirmOpen(true)}
-        barExtras={
+        status={
           questions.length > 0 && (
             <span className="exam-progress-text mcq-answered">
               {compact ? (

@@ -17,6 +17,8 @@ interface TimerBarProps {
 
   barExtras?: React.ReactNode;
 
+  status?: React.ReactNode;
+
   extras?: React.ReactNode;
 }
 
@@ -36,6 +38,7 @@ export function TimerBar({
   title,
   onEndClick,
   barExtras,
+  status,
   extras,
 }: TimerBarProps) {
   const firedRef = useRef<Set<number>>(new Set());
@@ -73,7 +76,14 @@ export function TimerBar({
       home={false}
       className="navbar-exam"
       trail={[{ label: title }]}
-      subtitle={phone ? modeChip : undefined}
+      subtitle={
+        phone && (modeChip || status) ? (
+          <>
+            {modeChip}
+            {status}
+          </>
+        ) : undefined
+      }
       menuExtra={
         extras ? (
           <NavMenuSection label={strings.header.menuExam}>{extras}</NavMenuSection>
@@ -81,6 +91,7 @@ export function TimerBar({
       }
     >
       {barExtras}
+      {!phone && status}
       {!phone && modeChip}
       <div className={`timer${isLow ? " timer-low" : ""}`} role="timer">
         {isLow && <Icon name="clock" className="timer-low-icon" />}
