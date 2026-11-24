@@ -223,8 +223,9 @@ describe("McqExam answering", () => {
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText(/1 question is unanswered/)).toBeInTheDocument();
 
-    expect(screen.getByText("Q2", { selector: ".submit-review-ids" })).toBeInTheDocument();
-    expect(screen.queryByText("q02", { selector: ".submit-review-ids" })).not.toBeInTheDocument();
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: "Go to question 2" })).toBeInTheDocument();
+    expect(within(dialog).queryByText(/q02/)).not.toBeInTheDocument();
   });
 
   test("a training attempt submits a session, not an exam", async () => {
@@ -538,5 +539,116 @@ describe("McqExam on a phone", () => {
 
     expect(screen.queryByRole("dialog", { name: /questions/i })).toBeNull();
     expect(screen.getByRole("button", { name: /^Q1/ })).toBeInTheDocument();
+  });
+});
+
+describe("McqExam keyboard and review", () => {
+  const putsFor = (log: FetchLogEntry[]) =>
+    log.filter((e) => e.method === "PUT" && e.url.includes("/answer"));
+
+  test("a letter key picks that option on the current question", async () => {
+    const log = stubFetch();
+    const user = userEvent.setup();
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+    await screen.findByText("Which component persists cluster state?");
+
+    await user.keyboard("b");
+
+    await waitFor(() => expect(screen.getByRole("radio", { name: /etcd/i })).toBeChecked());
+    expect(putsFor(log).slice(-1)[0]?.body).toEqual({ selected: [1] });
+  });
+
+  test("a digit key picks that option too, and a key past the last option does nothing", async () => {
+    const log = stubFetch();
+    const user = userEvent.setup();
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+    await screen.findByText("Which component persists cluster state?");
+
+    await user.keyboard("3");
+    await waitFor(() => expect(screen.getByRole("radio", { name: /kube-proxy/i })).toBeChecked());
+
+    await user.keyboard("4");
+    await user.keyboard("d");
+    expect(putsFor(log)).toHaveLength(1);
+  });
+
+  test("on a select-all question a letter toggles that option", async () => {
+    const log = stubFetch();
+    const user = userEvent.setup();
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+    await screen.findByText("Which component persists cluster state?");
+    await user.keyboard("]");
+    await screen.findByText(/container interface standards/);
+
+    await user.keyboard("a");
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: /CNI/ })).toBeChecked());
+    await user.keyboard("c");
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: /CRI/ })).toBeChecked());
+    await user.keyboard("a");
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: /CNI/ })).not.toBeChecked());
+    expect(putsFor(log).slice(-1)[0]?.body).toEqual({ selected: [2] });
+  });
+
+  test("F still flags rather than picking a sixth option", async () => {
+    const log = stubFetch();
+    const user = userEvent.setup();
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+    await screen.findByText("Which component persists cluster state?");
+
+    await user.keyboard("f");
+    expect(marksStore.isMarked("q01")).toBe(true);
+    expect(putsFor(log)).toHaveLength(0);
+  });
+
+  test("answer keys stay out of the way while the question grid is open", async () => {
+    const log = stubFetch();
+    const user = userEvent.setup();
+    const { container } = render(
+      <McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />,
+    );
+    await screen.findByText("Which component persists cluster state?");
+
+    await user.keyboard("g");
+    await waitFor(() => expect(container.querySelector("#mcq-jump")).not.toBeNull());
+    await user.keyboard("a");
+    expect(putsFor(log)).toHaveLength(0);
+  });
+
+  test("? opens a shortcut sheet that lists the answer keys and no desktop section", async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+    await screen.findByText("Which component persists cluster state?");
+
+    await user.keyboard("?");
+
+    const sheet = await screen.findByRole("dialog", { name: strings.keyboard.helpTitle });
+    expect(within(sheet).getByText(/Pick that answer/)).toBeInTheDocument();
+    expect(within(sheet).queryByText(strings.keyboard.helpDesktop)).toBeNull();
+  });
+
+  test("the bar says how many are answered, as text a screen reader can reach", async () => {
+    stubFetch({ q01: [1] });
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+
+    const count = await screen.findByText("1 of 2 answered");
+    expect(count.closest("[aria-hidden='true']")).toBeNull();
+  });
+
+  test("each unanswered question in the submit review is a way back to it", async () => {
+    stubFetch({ q01: [1] });
+    const user = userEvent.setup();
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+    await screen.findByText("Which component persists cluster state?");
+    await openMenu(user);
+    await user.click(screen.getByRole("button", { name: /submit exam/i }));
+    const dialog = await screen.findByRole("dialog");
+
+    expect(within(dialog).getByText(/left on the clock/)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Go to question 2" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(await screen.findByText(/container interface standards/)).toBeInTheDocument();
   });
 });

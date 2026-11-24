@@ -202,11 +202,11 @@ describe("the mode cards", () => {
     expect(within(training).getByText("Hints and reference solutions").textContent).toContain(
       "Yes:",
     );
-    expect(within(training).getByText("Kept as an attempt").textContent).toContain("No:");
+    expect(within(training).getByText("Kept in your history").textContent).toContain("No:");
 
     const real = within(cardFor("Exam")).getByRole("list", { name: "What this mode allows" });
     expect(within(real).getByText("Hints and reference solutions").textContent).toContain("No:");
-    expect(within(real).getByText("Kept as an attempt").textContent).toContain("Yes:");
+    expect(within(real).getByText("Kept in your history").textContent).toContain("Yes:");
   });
 
   test("exactly one card is recommended, and it says so", async () => {

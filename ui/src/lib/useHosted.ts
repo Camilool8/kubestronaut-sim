@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { getMe, type Me } from "../api";
+import { setHostedDeployment } from "./deployment";
 import { usePoll } from "./usePoll";
 
 export type HostedState =
@@ -38,9 +39,11 @@ export function useHosted(): { state: HostedState; refresh: () => void } {
         const me = await getMe();
         if (me === null) {
           cadence.current = null;
+          setHostedDeployment(false);
           setState({ status: "local" });
           return;
         }
+        setHostedDeployment(true);
         setState({ status: "hosted", me });
         cadence.current = cadenceFor(me);
       } catch (err) {

@@ -19,6 +19,7 @@ import {
 } from "../api";
 import { useAsync } from "../lib/useAsync";
 import { useExamClock } from "../lib/useExamClock";
+import { useHostedDeployment } from "../lib/deployment";
 import { TimerBar } from "../components/TimerBar";
 import { TimerReadout } from "../components/TimerReadout";
 import { QuestionPanel } from "../components/QuestionPanel";
@@ -26,6 +27,7 @@ import { Dialog } from "../components/Dialog";
 import { NavMenuItem } from "../components/NavMenu";
 import { KeyboardSettings } from "../components/KeyboardSettings";
 import { ShortcutHelp } from "../components/ShortcutHelp";
+import { SubmitReview } from "../components/SubmitReview";
 import { ClipboardPanel } from "../components/ClipboardPanel";
 import { CheckList } from "../components/CheckList";
 import { Icon } from "../components/Icon";
@@ -163,6 +165,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
     marksStore.setScope(session.startedAt);
   }, [session.startedAt]);
 
+  const hosted = useHostedDeployment();
   const examState = useAsync((signal) => getExam(signal), []);
   const exam = examState.data;
   const questions = exam?.questions ?? NO_QUESTIONS;
@@ -176,16 +179,23 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
     return () => controller.abort();
   }, [selectedId]);
 
+  const reviewItem = (q: ExamQuestionInfo, i: number) => ({
+    id: q.id,
+    label: String(i + 1),
+    jumpLabel: strings.exam.reviewJumpTask(i + 1),
+  });
   const reviewMarked = confirmOpen
-    ? questions.flatMap((q, i) =>
-        marksStore.isMarked(q.id) ? [strings.exam.taskNumber(i + 1)] : [],
-      )
+    ? questions.flatMap((q, i) => (marksStore.isMarked(q.id) ? [reviewItem(q, i)] : []))
     : [];
   const reviewUnseen = confirmOpen
-    ? questions.flatMap((q, i) =>
-        marksStore.isViewed(q.id) ? [] : [strings.exam.taskNumber(i + 1)],
-      )
+    ? questions.flatMap((q, i) => (marksStore.isViewed(q.id) ? [] : [reviewItem(q, i)]))
     : [];
+
+  const closeConfirm = useCallback(() => setConfirmOpen(false), []);
+  const jumpToTask = useCallback((id: string) => {
+    setConfirmOpen(false);
+    setPickedId(id);
+  }, []);
 
   const handleConfirmEnd = async () => {
     setEnding(true);
@@ -220,7 +230,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
     () =>
       examStatus === "error" ? (
         <div className="pane-error" role="alert">
-          <p className="error-text">{strings.exam.questionsFailed(examError ?? "")}</p>
+          <p className="error-text">{strings.exam.questionsFailed(examError ?? "", hosted)}</p>
           <button className="btn" onClick={reloadExam}>
             {strings.questionPanel.retry}
           </button>
@@ -228,7 +238,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
       ) : (
         <p className="question-empty-note">{strings.exam.loadingQuestions}</p>
       ),
-    [examStatus, examError, reloadExam],
+    [examStatus, examError, reloadExam, hosted],
   );
 
   const desktopDownRef = useRef(false);
@@ -330,28 +340,29 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
       </div>
 
       {confirmOpen && (
-        <Dialog title={strings.exam.confirmTitle(session.mode)} onClose={() => setConfirmOpen(false)}>
+        <Dialog title={strings.exam.confirmTitle(session.mode)} onClose={closeConfirm}>
           <p>{strings.exam.confirmBody(session.mode)}</p>
 
-          {(reviewMarked.length > 0 || reviewUnseen.length > 0) && (
-            <div className="submit-review">
-              {reviewMarked.length > 0 && (
-                <p>
-                  {strings.exam.reviewMarked(reviewMarked.length)}{" "}
-                  <span className="submit-review-ids">{reviewMarked.join(", ")}</span>
-                </p>
-              )}
-              {reviewUnseen.length > 0 && (
-                <p>
-                  {strings.exam.reviewUnseen(reviewUnseen.length)}{" "}
-                  <span className="submit-review-ids">{reviewUnseen.join(", ")}</span>
-                </p>
-              )}
-            </div>
-          )}
+          <SubmitReview
+            session={session}
+            fetchedAt={fetchedAt}
+            groups={[
+              {
+                key: "marked",
+                heading: strings.exam.reviewMarked(reviewMarked.length),
+                items: reviewMarked,
+              },
+              {
+                key: "unseen",
+                heading: strings.exam.reviewUnseen(reviewUnseen.length),
+                items: reviewUnseen,
+              },
+            ]}
+            onJump={jumpToTask}
+          />
           {endError && <p className="error-text">{endError}</p>}
           <div className="confirm-actions">
-            <button className="btn" onClick={() => setConfirmOpen(false)} disabled={ending}>
+            <button className="btn" onClick={closeConfirm} disabled={ending}>
               {strings.exam.cancel}
             </button>
             <button className="btn btn-danger" onClick={handleConfirmEnd} disabled={ending}>

@@ -15,6 +15,7 @@ import { ResultsBanner } from "../components/ResultsBanner";
 import { rollupDomains } from "../components/resultsModel";
 import { TaskVerdicts } from "../components/TaskVerdicts";
 import { drillHref } from "../lib/attemptHistory";
+import { isHostedDeployment } from "../lib/deployment";
 import { formatElapsed } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 import { navigate, useRoute } from "../lib/useHashRoute";
@@ -80,6 +81,7 @@ export function Score({ onNewAttempt, endReason, mode }: ScoreProps) {
         status: "error",
         message: strings.score.gradingTimedOut(
           lastError.current ?? formatElapsed(GRADING_POLL_MS * GRADING_POLL_MAX_ATTEMPTS),
+          isHostedDeployment(),
         ),
       });
     }
@@ -93,11 +95,11 @@ export function Score({ onNewAttempt, endReason, mode }: ScoreProps) {
     try {
       const result = await endSession();
       if (!result.ok) {
-        setResponse({ status: "error", message: strings.score.retryFailed(result.error) });
+        setResponse({ status: "error", message: strings.score.retryFailed(result.error, isHostedDeployment()) });
         return;
       }
     } catch (err) {
-      setResponse({ status: "error", message: strings.score.retryFailed(String(err)) });
+      setResponse({ status: "error", message: strings.score.retryFailed(String(err), isHostedDeployment()) });
       return;
     }
 

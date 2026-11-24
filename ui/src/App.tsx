@@ -36,6 +36,7 @@ import { HostedSignIn } from "./screens/HostedSignIn";
 import { HostedStart } from "./screens/HostedStart";
 import { Review } from "./screens/Review";
 import { useHosted } from "./lib/useHosted";
+import { isHostedDeployment } from "./lib/deployment";
 import type { Me } from "./api";
 import { navigate, useRoute } from "./lib/useHashRoute";
 import { usePoll } from "./lib/usePoll";
@@ -263,7 +264,7 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
     } else {
       toastStore.push({
         kind: "warning",
-        message: strings.control.actionFailed(result.error),
+        message: strings.control.actionFailed(result.error, isHostedDeployment()),
         dedupeKey: "control-action",
       });
       const current = await getControlStatus().catch(() => null);
@@ -293,7 +294,7 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
       } catch (err) {
         toastStore.push({
           kind: "warning",
-          message: strings.control.actionFailed(String(err)),
+          message: strings.control.actionFailed(String(err), isHostedDeployment()),
           dedupeKey: "control-action",
         });
       }

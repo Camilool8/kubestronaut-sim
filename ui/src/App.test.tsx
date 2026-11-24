@@ -142,15 +142,15 @@ describe("App control polling", () => {
   test("re-polls immediately when a job starts instead of waiting out the idle timer", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByText("Path to Kubestronaut", { selector: "h1" });
+    await screen.findByText("Exams", { selector: "h1" });
 
     await waitFor(() => expect(statusPolls).toBeGreaterThan(0));
     const pollsBeforeSwitch = statusPolls;
     controlStatus = runningStatus;
 
     const card = screen.getByRole("heading", { name: "CKA Mock Exam 01" }).closest("article") as HTMLElement;
-    await user.click(within(card).getByRole("button", { name: "Choose a mode" }));
-    await user.click(screen.getByRole("button", { name: "Load it" }));
+    await user.click(within(card).getByRole("button", { name: /^Load CKA Mock Exam 01 / }));
+    await user.click(screen.getByRole("button", { name: "Load CKA Mock Exam 01" }));
 
     await waitFor(
       () => {
@@ -266,14 +266,14 @@ describe("App control failures", () => {
     );
 
     render(<App />);
-    await screen.findByText("Path to Kubestronaut", { selector: "h1" });
+    await screen.findByText("Exams", { selector: "h1" });
     const card = screen.getByRole("heading", { name: "CKA Mock Exam 01" }).closest("article") as HTMLElement;
-    await user.click(within(card).getByRole("button", { name: "Choose a mode" }));
-    await user.click(screen.getByRole("button", { name: "Load it" }));
+    await user.click(within(card).getByRole("button", { name: /^Load CKA Mock Exam 01 / }));
+    await user.click(screen.getByRole("button", { name: "Load CKA Mock Exam 01" }));
 
     expect(await screen.findByText(/control plane/i)).toBeInTheDocument();
 
-    const confirm = screen.getByRole("button", { name: "Load it" });
+    const confirm = screen.getByRole("button", { name: "Load CKA Mock Exam 01" });
     expect(confirm).toBeInTheDocument();
     await waitFor(() => expect(confirm).not.toBeDisabled());
   });
@@ -436,17 +436,17 @@ describe("App session polling", () => {
     );
 
     render(<App />);
-    await screen.findByText("Path to Kubestronaut", { selector: "h1" });
+    await screen.findByText("Exams", { selector: "h1" });
 
     sessionDown = true;
     window.dispatchEvent(new Event("focus"));
 
-    expect(await screen.findByText(/cannot reach facilitator/i)).toBeInTheDocument();
+    expect(await screen.findByText(/can.t reach the exam services/i)).toBeInTheDocument();
 
     sessionDown = false;
     window.dispatchEvent(new Event("focus"));
     await waitFor(() =>
-      expect(screen.queryByText(/cannot reach facilitator/i)).toBeNull(),
+      expect(screen.queryByText(/can.t reach the exam services/i)).toBeNull(),
     );
   });
 });
@@ -552,7 +552,7 @@ describe("App boot gate", () => {
     stubBoot(readyBoot);
     render(<App />);
 
-    await screen.findByText("Path to Kubestronaut", { selector: "h1" });
+    await screen.findByText("Exams", { selector: "h1" });
     expect(screen.queryByText("Building your exam environment")).not.toBeInTheDocument();
   });
 

@@ -212,7 +212,7 @@ function QuestionPanelBody({
               questions={toNavigator(questions)}
               selectedId={selectedId}
 
-              progress="opened"
+              progress="viewed"
               onSelect={(id) => {
                 onSelect(id);
                 closeJump(true);
@@ -344,6 +344,6 @@ function toNavigator(questions: ExamQuestionInfo[]): NavigatorQuestion[] {
       .filter(Boolean)
       .join(", "),
 
-    done: marksStore.isViewed(q.id),
+    reached: marksStore.isViewed(q.id),
   }));
 }
