@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>kubestronaut-sim — a local exam simulator for the Kubestronaut certifications</title>
+    <title>kubestronaut-sim: a local exam simulator for the Kubestronaut certifications</title>
     <meta
       name="description"
-      content="An open-source exam simulator for the Kubestronaut certifications. One command builds the exam environment on your own machine — a timed sitting, a real Linux desktop, and a score graded on what your cluster actually does."
+      content="An open-source exam simulator for the Kubestronaut certifications. One command builds the exam environment on your own machine: a timed sitting, a real Linux desktop, and a score graded on what your cluster actually does."
     />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 
@@ -17,7 +17,7 @@
     <meta property="og:title" content="kubestronaut-sim" />
     <meta
       property="og:description"
-      content="A timed sitting, a real Linux desktop, and a score graded on what your cluster actually does — on your own machine, no account. CKAD, CKA and KCNA have full banks today."
+      content="A timed sitting, a real Linux desktop, and a score graded on what your cluster actually does, on your own machine with no account. CKAD, CKA and KCNA have full banks today."
     />
     <meta property="og:url" content="https://camilool8.github.io/kubestronaut-sim/" />
     <meta
@@ -29,7 +29,7 @@
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="kubestronaut-sim. Rehearse the Kubernetes exams on a real cluster. Five tilted orbits circle the wordmark — CKAD, CKA and KCNA lit and live, KCSA and CKS still dark and coming soon."
+      content="kubestronaut-sim. Rehearse the Kubernetes exams on a real cluster. Five tilted orbits circle the wordmark: CKAD, CKA and KCNA lit and live, KCSA and CKS still dark and coming soon."
     />
     <meta name="twitter:card" content="summary_large_image" />
 
@@ -68,7 +68,7 @@
             <span class="gh-label">GitHub</span>
             <span id="gh-stars" class="gh-stars" hidden></span>
           </a>
-          <button type="button" id="menu-btn" class="menu-btn" aria-label="Menu">
+          <button type="button" id="menu-btn" class="menu-btn" aria-label="Menu" aria-expanded="false" aria-controls="mobile-menu">
             <span id="menu-icon-open"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg></span>
             <span id="menu-icon-close" hidden><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
           </button>
@@ -108,9 +108,8 @@
         </div>
         <div class="hero-inner">
           <div class="hero-copy">
-            <div class="hero-badge">OPEN SOURCE · APACHE-2.0 · NO ACCOUNT, NO SERVICE</div>
             <h1 class="hero-title">Rehearse the Kubernetes exams on a real cluster.</h1>
-            <p class="hero-lede">One command builds the exam environment on your own machine — a timed sitting, a real Linux desktop, and a score graded on what your cluster actually does. CKAD, CKA and KCNA have full banks today.</p>
+            <p class="hero-lede">One command builds the exam environment on your own machine: a timed sitting, a real Linux desktop, and a score graded on what your cluster actually does. CKAD, CKA and KCNA have full banks today.</p>
             <div class="hero-ctas">
               <a class="btn-primary" href="https://github.com/Camilool8/kubestronaut-sim">Get it on GitHub</a>
               <a class="btn-secondary" href="https://github.com/Camilool8/kubestronaut-sim/tree/main/docs">Read the docs</a>
@@ -130,10 +129,10 @@
               <div class="term-body">
                 <div class="term-line"><span class="t-prompt">$ </span><span class="t-cmd" id="cmd-doctor">./sim doctor</span><span class="t-note"> # preflight: RAM, disk, cgroups</span></div>
                 <div class="term-line"><span class="t-prompt">$ </span><span class="t-cmd" id="cmd-up">./sim up</span><span class="t-note"> # up in seconds</span></div>
-                <div class="term-line"><span class="t-prompt">$ </span><span class="t-cmd" id="cmd-open">xdg-open </span><span class="t-url">http://localhost:8080</span><span class="t-cursor" aria-hidden="true"></span></div>
+                <div class="term-line"><span class="t-prompt">$ </span><span class="t-cmd" id="cmd-open">xdg-open </span><span class="t-url">http://localhost:8080</span></div>
               </div>
             </div>
-            <div class="hero-reqs">Docker + ~9GB free RAM (~12GB for the CKA bank) · Windows, macOS, Linux · nothing is built until you pick an exam</div>
+            <div class="hero-reqs"><p class="hero-license">Open source under Apache-2.0. No account, no service.</p><p>Docker + ~9GB free RAM (~12GB for the CKA bank) · Windows, macOS, Linux · nothing is built until you pick an exam</p></div>
           </div>
         </div>
         <div class="orbit-caption">KCNA + CKAD + CKA in flight · <span class="banks-live">3 of 5</span> banks live</div>
@@ -141,14 +140,13 @@
 
       <section id="sitting" class="section-sitting">
         <div class="sitting-inner">
-          <div data-reveal="1" class="section-eyebrow">ONE SITTING, END TO END</div>
           <h2 data-reveal="1" class="sitting-title">Pick an exam. Pick how hard. Sit it. Read the verdicts.</h2>
           <div class="sitting-grid">
             <div data-reveal="1">
               <button type="button" class="shot-card" data-shot="1" title="View full size">
                 <div class="shot-frame">
-                  <img class="shot-dark" src="shots/mode-dark.webp" alt="Mode screen: Training, Mastery and Exam side by side with domain chips to narrow the draw" width="1600" height="1000">
-                  <img class="shot-light" src="shots/mode-light.webp" alt="" aria-hidden="true" width="1600" height="1000">
+                  <img class="shot-dark" loading="lazy" decoding="async" src="shots/mode-dark.webp" alt="Mode screen: Training, Mastery and Exam side by side with domain chips to narrow the draw" width="1600" height="1000">
+                  <img class="shot-light" loading="lazy" decoding="async" src="shots/mode-light.webp" alt="Mode screen: Training, Mastery and Exam side by side with domain chips to narrow the draw" width="1600" height="1000">
                 </div>
               </button>
               <p class="shot-caption"><b>01 · Choose the clock.</b> Training is untimed with two-tier hints and solutions on demand. Mastery is half the real clock. Exam is the real thing: full duration, no help, graded when you submit. Chips narrow the draw to the domains you want to drill.</p>
@@ -156,8 +154,8 @@
             <div data-reveal="1">
               <button type="button" class="shot-card" data-shot="1" title="View full size">
                 <div class="shot-frame">
-                  <img class="shot-dark" src="shots/exam-dark.webp" alt="Exam view: task on the left, Linux desktop with terminal and Kubernetes docs on the right" width="1600" height="1000">
-                  <img class="shot-light" src="shots/exam-light.webp" alt="" aria-hidden="true" width="1600" height="1000">
+                  <img class="shot-dark" loading="lazy" decoding="async" src="shots/exam-dark.webp" alt="Exam view: task on the left, Linux desktop with terminal and Kubernetes docs on the right" width="1600" height="1000">
+                  <img class="shot-light" loading="lazy" decoding="async" src="shots/exam-light.webp" alt="Exam view: task on the left, Linux desktop with terminal and Kubernetes docs on the right" width="1600" height="1000">
                 </div>
               </button>
               <p class="shot-caption"><b>02 · Work like the day itself.</b> The task on the left; a full Linux desktop on the right, terminal already open on the instance the question names. Firefox reaches the allowlisted documentation and nothing else. Clipboard works both ways.</p>
@@ -165,17 +163,17 @@
             <div data-reveal="1">
               <button type="button" class="shot-card" data-shot="1" title="View full size">
                 <div class="shot-frame">
-                  <img class="shot-dark" src="shots/score-dark.webp" alt="Score screen: pass against threshold, domain breakdown weakest first, per-task verdicts" width="1600" height="1000">
-                  <img class="shot-light" src="shots/score-light.webp" alt="" aria-hidden="true" width="1600" height="1000">
+                  <img class="shot-dark" loading="lazy" decoding="async" src="shots/score-dark.webp" alt="Score screen: pass against threshold, domain breakdown weakest first, per-task verdicts" width="1600" height="1000">
+                  <img class="shot-light" loading="lazy" decoding="async" src="shots/score-light.webp" alt="Score screen: pass against threshold, domain breakdown weakest first, per-task verdicts" width="1600" height="1000">
                 </div>
               </button>
-              <p class="shot-caption"><b>03 · Get a score you can act on.</b> Weighted to the published curriculum, domain breakdown ordered weakest first, and every task carries the checks that scored it — with full solutions to review.</p>
+              <p class="shot-caption"><b>03 · Get a score you can act on.</b> Weighted to the published curriculum, domain breakdown ordered weakest first, and every task carries the checks that scored it, with full solutions to review.</p>
             </div>
             <div data-reveal="1">
               <button type="button" class="shot-card" data-shot="1" title="View full size">
                 <div class="shot-frame">
-                  <img class="shot-dark" src="shots/progress-dark.webp" alt="Progress screen: a card per certification, attempt history, weakest domains across attempts" width="1600" height="1040">
-                  <img class="shot-light" src="shots/progress-light.webp" alt="" aria-hidden="true" width="1600" height="1040">
+                  <img class="shot-dark" loading="lazy" decoding="async" src="shots/progress-dark.webp" alt="Progress screen: a card per certification, attempt history, weakest domains across attempts" width="1600" height="1040">
+                  <img class="shot-light" loading="lazy" decoding="async" src="shots/progress-light.webp" alt="Progress screen: a card per certification, attempt history, weakest domains across attempts" width="1600" height="1040">
                 </div>
               </button>
               <p class="shot-caption"><b>04 · Watch the weak domains close.</b> Every graded attempt is kept on its own volume. The weakest-domains list is built from all of them, and a drill is one click from there. <code>./sim down</code> then <code>up</code> resumes an attempt mid-sitting.</p>
@@ -187,14 +185,13 @@
       <section class="section-verdict">
         <div class="verdict-inner">
           <div data-reveal="1" class="verdict-copy">
-            <div class="section-eyebrow">GRADED ON BEHAVIOUR</div>
             <h2 class="verdict-title">When a check fails, it shows you why.</h2>
-            <p class="verdict-lede">Hands-on answers are graded on what the cluster does — a NetworkPolicy that actually denies (Calico, not kindnet), an Ingress the controller really routes — never on the shape of your YAML.</p>
+            <p class="verdict-lede">Hands-on answers are graded on what the cluster does: a NetworkPolicy that actually denies (Calico, not kindnet), an Ingress the controller really routes. Never on the shape of your YAML.</p>
             <p class="verdict-lede">A failed check puts your cluster state beside the expected one and explains the difference, so the review is where the learning happens.</p>
             <p class="verdict-note">Every question ships a reference solution; a fresh environment must grade 0 and the references must grade 100%.</p>
           </div>
           <div data-reveal="1" class="verdict-panel">
-            <div class="verdict-head"><span class="verdict-badge">✕ FAILED</span> q19 · 10_service — selector is 'app=inventory-api', want app=inventory</div>
+            <div class="verdict-head"><span class="verdict-badge">✕ FAILED</span> q19 · 10_service: selector is 'app=inventory-api', want app=inventory</div>
             <div class="verdict-diff">
               <div class="verdict-col">
                 <div class="verdict-label verdict-label-bad">YOUR CLUSTER STATE</div>
@@ -220,7 +217,7 @@ spec:
         <div class="exams-inner">
           <div data-reveal="1" class="exams-head">
             <h2 class="exams-title">An honest draw, every attempt</h2>
-            <div class="exams-total">All <b class="qtotal">167</b> questions original — no exam dumps. Banks are CC BY-SA 4.0.</div>
+            <div class="exams-total">All <b class="qtotal">167</b> questions original, no exam dumps. Banks are CC BY-SA 4.0.</div>
           </div>
           <ul class="exam-grid">
             <li data-reveal="1" class="exam-card" data-bank="ckad-mock-01">
@@ -233,7 +230,7 @@ spec:
                 <span class="fact fact-draw"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"></path><path d="M9 7h6M9 11h6M9 15h4"></path></svg>17 of 44 drawn</span>
                 <span class="fact fact-pass"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>66% to pass</span>
               </div>
-              <p class="exam-card-desc">Hands-on, on a two-node Kubernetes 1.37 cluster. Each draw is stratified to the published domain weights and mixed across quick, core and deep tasks — so a sitting is never a wall of long multi-step questions.</p>
+              <p class="exam-card-desc">Hands-on, on a two-node Kubernetes 1.37 cluster. Each draw is stratified to the published domain weights and mixed across quick, core and deep tasks, so a sitting is never a wall of long multi-step questions.</p>
             </li>
             <li data-reveal="1" class="exam-card" data-bank="cka-mock-01">
               <div class="exam-card-head">
@@ -245,7 +242,7 @@ spec:
                 <span class="fact fact-draw"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"></path><path d="M9 7h6M9 11h6M9 15h4"></path></svg>16 of 26 drawn</span>
                 <span class="fact fact-pass"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>66% to pass</span>
               </div>
-              <p class="exam-card-desc">Hands-on, on a five-node Kubernetes 1.37 cluster with root ssh to every node — control plane included. Disruptive tasks (scheduler repair, CNI install, kubeadm upgrade, etcd restore) get their own auxiliary clusters, and Gateway API routes are graded through a real controller.</p>
+              <p class="exam-card-desc">Hands-on, on a five-node Kubernetes 1.37 cluster with root ssh to every node, control plane included. Disruptive tasks (scheduler repair, CNI install, kubeadm upgrade, etcd restore) get their own auxiliary clusters, and Gateway API routes are graded through a real controller.</p>
             </li>
             <li data-reveal="1" class="exam-card" data-bank="kcna-mock">
               <div class="exam-card-head">
@@ -265,7 +262,7 @@ spec:
                 <span class="cert-chip" data-cert="KCSA"><svg class="cert-mark" data-cert="KCSA" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4.4" y="10.6" width="15.2" height="10.2" rx="2.4"/><path d="M7.9 10.6V7.9a4.1 4.1 0 0 1 8.2 0v2.7"/><circle cx="12" cy="15.7" r="1.7" fill="currentColor" stroke="none"/></svg>KCSA</span>
                 <span class="cert-chip" data-cert="CKS"><svg class="cert-mark" data-cert="CKS" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 2.9l7.4 2.8v6c0 4.7-3.2 7.1-7.4 8.4-4.2-1.3-7.4-3.7-7.4-8.4v-6z"/><path d="M9.1 11.9l2 2 3.8-3.9"/></svg>CKS</span>
               </div>
-              <div class="exam-soon-note">In the catalog with the reason each can't be sat yet. The <a href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/bank-spec.md">bank format is documented</a> — write one, and the same gates that check ours check yours.</div>
+              <div class="exam-soon-note">In the catalog with the reason each can't be sat yet. The <a href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/bank-spec.md">bank format is documented</a>: write one, and the same gates that check ours check yours.</div>
             </li>
           </ul>
         </div>
@@ -275,13 +272,13 @@ spec:
         <div class="cli-inner">
           <div data-reveal="1" class="cli-head">
             <h2 class="cli-title">The whole CLI is nine subcommands</h2>
-            <div class="cli-note">Sitting, grading, resets and progress happen in the browser — the CLI is for the stack itself.</div>
+            <div class="cli-note">Sitting, grading, resets and progress happen in the browser; the CLI is for the stack itself.</div>
           </div>
           <div data-reveal="1" class="cli-grid">
             <div class="cli-card"><span class="cli-name">up</span><div class="cli-desc">stack up; nothing is built until you pick an exam</div></div>
             <div class="cli-card"><span class="cli-name">down</span><div class="cli-desc">stop; attempt state survives</div></div>
             <div class="cli-card"><span class="cli-name">reset</span><div class="cli-desc">fresh attempt on the same bank</div></div>
-            <div class="cli-card"><span class="cli-name">purge</span><div class="cli-desc">reclaim disk; attempt history survives — <code>--all</code> alone destroys it</div></div>
+            <div class="cli-card"><span class="cli-name">purge</span><div class="cli-desc">reclaim disk; attempt history survives; <code>--all</code> alone destroys it</div></div>
             <div class="cli-card"><span class="cli-name">doctor</span><div class="cli-desc">preflight: Docker, RAM, disk, cgroups, line endings</div></div>
             <div class="cli-card"><span class="cli-name">ssh</span><div class="cli-desc">shell on an instance, default instance-1</div></div>
             <div class="cli-card"><span class="cli-name">status</span><div class="cli-desc">docker compose ps</div></div>
@@ -307,13 +304,12 @@ spec:
           <a class="footer-link" href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/bank-spec.md">bank-spec.md</a>
           <a class="footer-link" href="https://github.com/Camilool8/kubestronaut-sim/blob/main/docs/TROUBLESHOOTING.md">TROUBLESHOOTING.md</a>
         </div>
-        <div class="footer-legal">Built by <a href="https://cjoga.cloud">Camilo Joga</a>. An independent open-source study tool — not affiliated with, endorsed by, or associated with the CNCF, The Linux Foundation, or PSI. Kubernetes and the certification names are trademarks of The Linux Foundation. Simulator: Apache-2.0 · Question banks: CC BY-SA 4.0.</div>
+        <div class="footer-legal">Built by <a href="https://cjoga.cloud">Camilo Joga</a>. An independent open-source study tool, not affiliated with, endorsed by, or associated with the CNCF, The Linux Foundation, or PSI. Kubernetes and the certification names are trademarks of The Linux Foundation. Simulator: Apache-2.0 · Question banks: CC BY-SA 4.0.</div>
       </div>
     </footer>
 
     <div id="ks-lb" class="ks-lb" role="dialog" aria-modal="true" aria-label="Screenshot gallery" hidden>
       <div class="lb-body">
-        <img id="lb-img" class="lb-img" src="" alt="">
         <div class="lb-caption">
           <div class="lb-meta"><span id="lb-title"></span><span id="lb-count" class="lb-count"></span></div>
           <div id="lb-desc" class="lb-desc"></div>
@@ -338,6 +334,11 @@ spec:
           $$("[data-set-theme]").forEach((b) => {
             b.classList.toggle("is-active", b.dataset.setTheme === t);
             b.setAttribute("aria-pressed", String(b.dataset.setTheme === t));
+          });
+          const tc = t === "system" ? null : (t === "dark" ? "#101728" : "#f6f8fc");
+          $$('meta[name="theme-color"]').forEach((m) => {
+            if (!m.dataset.content) m.dataset.content = m.content;
+            m.content = tc || m.dataset.content;
           });
           if (KS.orbitSync) KS.orbitSync();
         };
@@ -395,10 +396,14 @@ spec:
         const menuBtn = $("#menu-btn"), menu = $("#mobile-menu");
         const setMenu = (open) => {
           menu.hidden = !open;
+          menuBtn.setAttribute("aria-expanded", String(open));
           $("#menu-icon-open").hidden = open;
           $("#menu-icon-close").hidden = !open;
         };
         menuBtn.addEventListener("click", () => setMenu(menu.hidden));
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape" && !menu.hidden) { setMenu(false); menuBtn.focus(); }
+        });
         $$("#mobile-menu a").forEach((a) => a.addEventListener("click", () => setMenu(false)));
 
         /* ---- stars ---- */
@@ -534,14 +539,22 @@ spec:
 
         const buildOrbGrads = () => {
           const orb = _orb, ctx = orb.ctx, dark = orb.dark;
-          orb.backR = dark ? 560 : 510;
+          orb.backR = dark ? 560 : 540;
           const back = ctx.createRadialGradient(0, 0, 0, 0, 0, orb.backR);
           if (dark) {
             back.addColorStop(0, "rgba(6,11,26,0.55)"); back.addColorStop(0.45, "rgba(6,11,26,0.42)");
             back.addColorStop(0.75, "rgba(6,11,26,0.18)"); back.addColorStop(1, "rgba(6,11,26,0)");
           } else {
-            back.addColorStop(0, "rgba(8,13,31,0.94)"); back.addColorStop(0.6, "rgba(8,13,31,0.9)");
-            back.addColorStop(0.85, "rgba(10,16,38,0.6)"); back.addColorStop(1, "rgba(10,16,38,0)");
+            const edge = [[0, "8,13,31", 0.95], [0.64, "9,15,38", 0.93], [0.78, "17,31,84", 0.74], [0.9, "48,82,188", 0.26], [1, "96,130,226", 0]];
+            edge.forEach((e) => back.addColorStop(e[0], "rgba(" + e[1] + "," + e[2] + ")"));
+            orb.edgeLUT = [];
+            for (let i = 0; i < 64; i++) {
+              const t = i / 63;
+              let j = 1;
+              while (j < edge.length - 1 && edge[j][0] < t) j++;
+              const f = (t - edge[j - 1][0]) / (edge[j][0] - edge[j - 1][0]);
+              orb.edgeLUT.push(Math.max(0, Math.min(1, (edge[j - 1][2] + (edge[j][2] - edge[j - 1][2]) * f) / 0.93)));
+            }
           }
           const photon = ctx.createLinearGradient(100, 0, -100, 0);
           photon.addColorStop(0, "rgba(255,255,255,0.28)"); photon.addColorStop(0.45, "rgba(255,255,255,0.55)"); photon.addColorStop(1, "rgba(255,255,255,1)");
@@ -552,7 +565,7 @@ spec:
           shadow.addColorStop(0, "rgba(4,6,14,1)"); shadow.addColorStop(0.6, "rgba(4,6,14,1)"); shadow.addColorStop(1, "rgba(4,6,14,0)");
           const blobs = dark
             ? [[-270, 120, 320, "96,132,255", 0.055], [250, -100, 300, "120,190,255", 0.05], [-40, -230, 260, "110,150,250", 0.04]]
-            : [[-240, 110, 230, "96,132,255", 0.11], [220, -90, 210, "120,190,255", 0.09], [-30, -200, 180, "110,150,250", 0.07]];
+            : [[-170, 70, 190, "96,132,255", 0.08], [160, -60, 170, "120,190,255", 0.07], [-20, -140, 140, "110,150,250", 0.05]];
           const neb = blobs.map((b) => {
             const g2 = ctx.createRadialGradient(b[0], b[1], 0, b[0], b[1], b[2]);
             g2.addColorStop(0, "rgba(" + b[3] + "," + b[4] + ")");
@@ -577,6 +590,10 @@ spec:
           ctx.setTransform(orb.scale, 0, 0, orb.scale, 0, 0);
           ctx.clearRect(0, 0, g.DW, g.DH);
           const sq = orb.dark ? 0.5 : 0.36;
+          const pa = orb.dark ? null : (x, y) => {
+            const xr = x * cosT + y * sinT, yr = (y * cosT - x * sinT) / sq;
+            return orb.edgeLUT[Math.min(63, Math.floor(Math.hypot(xr, yr) / orb.backR * 63))];
+          };
           ctx.save();
           ctx.translate(CX, CY); ctx.rotate(TILT); ctx.scale(1, sq);
           ctx.fillStyle = grads.back; ctx.fillRect(-orb.backR, -orb.backR, orb.backR * 2, orb.backR * 2);
@@ -596,8 +613,9 @@ spec:
             const st = orb.stars[i];
             if (st.rr > smax) continue;
             const fade = 1 - (st.rr / smax) * (st.rr / smax);
-            ctx.globalAlpha = (orb.dark ? 0.5 : 0.85) * fade * (0.65 + 0.35 * Math.sin(t * st.sp + st.tw));
-            ctx.fillRect(st.u * cosT - st.v * sq * sinT - st.sz / 2, st.u * sinT + st.v * sq * cosT - st.sz / 2, st.sz, st.sz);
+            const sx = st.u * cosT - st.v * sq * sinT, sy = st.u * sinT + st.v * sq * cosT;
+            ctx.globalAlpha = (orb.dark ? 0.5 : 0.85) * fade * (0.65 + 0.35 * Math.sin(t * st.sp + st.tw)) * (pa ? pa(sx, sy) : 1);
+            ctx.fillRect(sx - st.sz / 2, sy - st.sz / 2, st.sz, st.sz);
           }
           ctx.globalCompositeOperation = "source-over";
           ctx.globalAlpha = 1;
@@ -623,12 +641,15 @@ spec:
               const u1 = p.r * c1, v1 = p.r * s1, u0 = p.r * c0, v0 = p.r * s0;
               const boost = Math.min(1.95, Math.max(0.14, 1 - 0.9 * c1));
               const flick = 0.86 + 0.18 * Math.sin(t * 1.3 + p.seed);
-              ctx.globalAlpha = Math.min(0.9, p.a * boost * flick * lightBoost);
+              const x1 = u1 * cosT - v1 * K * sinT, y1 = u1 * sinT + v1 * K * cosT + p.h;
+              const edgeA = pa ? pa(x1, y1) : 1;
+              if (edgeA <= 0.01) continue;
+              ctx.globalAlpha = Math.min(0.9, p.a * boost * flick * lightBoost) * edgeA;
               ctx.strokeStyle = p.col;
               ctx.lineWidth = p.w;
               ctx.beginPath();
               ctx.moveTo(u0 * cosT - v0 * K * sinT, u0 * sinT + v0 * K * cosT + p.h);
-              ctx.lineTo(u1 * cosT - v1 * K * sinT, u1 * sinT + v1 * K * cosT + p.h);
+              ctx.lineTo(x1, y1);
               ctx.stroke();
             }
           };
@@ -665,17 +686,39 @@ spec:
                 ctx.globalCompositeOperation = "lighter";
                 for (let k = 12; k >= 1; k--) {
                   const a = proj(s.r, phi + 0.6 * (k - 1) / 12), b = proj(s.r, phi + 0.6 * k / 12);
-                  ctx.globalAlpha = Math.min(0.9, 0.55 * (1.06 - k / 12) * lightBoost);
-                  ctx.strokeStyle = "rgb(186,212,255)";
+                  const on = pa ? pa(a[0], a[1]) : 1;
+                  const base = Math.min(0.9, 0.55 * (1.06 - k / 12) * lightBoost);
                   ctx.lineWidth = 0.7 + 2.2 * (1 - k / 12);
-                  ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+                  ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
+                  ctx.globalCompositeOperation = "lighter";
+                  ctx.globalAlpha = base * on;
+                  ctx.strokeStyle = "rgb(186,212,255)";
+                  ctx.stroke();
+                  if (on < 0.99) {
+                    ctx.globalCompositeOperation = "source-over";
+                    ctx.globalAlpha = base * 0.8 * (1 - on);
+                    ctx.strokeStyle = "rgb(43,95,217)";
+                    ctx.stroke();
+                  }
                 }
+                ctx.globalCompositeOperation = "lighter";
                 const tw = 0.82 + 0.18 * Math.sin(t * 2.2 + s.r);
+                const on = pa ? pa(x, y) : 1;
                 const glow = [[9, 0.16, "rgb(150,190,255)"], [4.5, 0.4, "rgb(190,215,255)"], [2.1, 1, "rgb(248,251,255)"]];
                 for (let k = 0; k < glow.length; k++) {
-                  ctx.globalAlpha = Math.min(1, glow[k][1] * tw * lightBoost);
+                  ctx.globalAlpha = Math.min(1, glow[k][1] * tw * lightBoost) * on;
                   ctx.fillStyle = glow[k][2];
                   ctx.beginPath(); ctx.arc(x, y, glow[k][0], 0, 2 * Math.PI); ctx.fill();
+                }
+                if (on < 0.99) {
+                  ctx.globalCompositeOperation = "source-over";
+                  const ink = [[7, 0.14, "rgb(43,95,217)"], [2.6, 1, "rgb(31,76,184)"]];
+                  for (let k = 0; k < ink.length; k++) {
+                    ctx.globalAlpha = ink[k][1] * (1 - on);
+                    ctx.fillStyle = ink[k][2];
+                    ctx.beginPath(); ctx.arc(x, y, ink[k][0], 0, 2 * Math.PI); ctx.fill();
+                  }
+                  ctx.globalCompositeOperation = "lighter";
                 }
                 if (orb.labels) {
                   ctx.globalCompositeOperation = "source-over";
@@ -853,7 +896,10 @@ spec:
         };
 
         /* ---- lightbox ---- */
-        const lb = $("#ks-lb"), lbImg = $("#lb-img");
+        const lb = $("#ks-lb"), lbImg = document.createElement("img");
+        lbImg.id = "lb-img"; lbImg.className = "lb-img"; lbImg.alt = "";
+        $(".lb-body").prepend(lbImg);
+        const lbBehind = $$(".skip-link, .site-header, #main, .site-footer");
         let shots = [], shotI = 0, lbY = 0, lastShotBtn = null;
         const lbRender = () => {
           const sh = shots[shotI];
@@ -885,6 +931,7 @@ spec:
           shotI = Math.max(0, cards.indexOf(btn));
           lbRender();
           lb.hidden = false;
+          lbBehind.forEach((el) => { el.inert = true; });
           /* freeze <html>, not <body>: fixing the body de-sticks the header and drops
              the scrollbar, reflowing the page behind the fading overlay */
           lbY = window.scrollY;
@@ -895,6 +942,7 @@ spec:
         };
         const closeShot = () => {
           lb.hidden = true;
+          lbBehind.forEach((el) => { el.inert = false; });
           document.documentElement.style.overflowY = "";
           document.body.style.paddingRight = "";
           window.scrollTo({ top: lbY, behavior: "instant" });
@@ -909,6 +957,13 @@ spec:
         document.addEventListener("keydown", (e) => {
           if (lb.hidden) return;
           if (e.key === "Escape") closeShot();
+          else if (e.key === "Tab") {
+            const stops = $$("button", lb);
+            const i = stops.indexOf(document.activeElement);
+            const next = e.shiftKey ? (i <= 0 ? stops.length - 1 : i - 1) : (i + 1) % stops.length;
+            e.preventDefault();
+            stops[next].focus();
+          }
           else if (e.key === "ArrowRight") lbGo(1);
           else if (e.key === "ArrowLeft") lbGo(-1);
         });

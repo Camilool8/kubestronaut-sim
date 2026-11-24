@@ -7,7 +7,7 @@
   --bg: #f6f8fc; --surface: #ffffff; --raised: #eef1f6; --border: #d7dde8; --border-strong: #708197;
   --text: #101728; --body: #2c3546; --secondary: #4a5568; --muted: #5a6478; --subtle: #5e6878;
   --accent: #2b5fd9; --accent-hover: #1f4cb8; --accent-contrast: #ffffff;
-  --success: #1f8a54; --success-soft: #e7f5ee; --progress: #0d93ac;
+  --success: #17774a; --success-soft: #e7f5ee; --progress: #0d93ac;
   --shadow: 0 8px 26px rgba(16, 23, 40, 0.13);
   --header-bg: rgba(246, 248, 252, 0.85);
   --star: rgba(16, 23, 40, 0.35);
@@ -63,7 +63,6 @@ a:active, button:active { transform: translateY(1px); }
 a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--text); }
 @keyframes ksRise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-@keyframes ksBlink { 0%, 55% { opacity: 1; } 56%, 100% { opacity: 0; } }
 @keyframes ksTwinkleA { 0%, 100% { opacity: 0.9; } 50% { opacity: 0.25; } }
 @keyframes ksTwinkleB { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
@@ -74,6 +73,10 @@ a:hover { color: var(--text); }
    <svg> root elements the way it does for HTML elements; force it so the
    menu icon swap (JS toggles the hidden attribute) actually hides them. */
 svg[hidden] { display: none; }
+p, .shot-caption, .exam-card-desc { text-wrap: pretty; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.term :focus-visible, .ks-lb :focus-visible { outline-color: #7ba3f8; }
+::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); color: var(--text); }
 
 /* ---- skip link ---- */
 .skip-link {
@@ -288,13 +291,6 @@ svg[hidden] { display: none; }
   position: relative;
   pointer-events: auto;
 }
-.hero-badge {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  color: var(--success);
-  animation: ksRise 0.6s ease both;
-}
 .hero-title {
   font-size: var(--h1);
   line-height: 1.06;
@@ -374,7 +370,7 @@ svg[hidden] { display: none; }
   cursor: pointer;
   border: 1px solid transparent;
   background: transparent;
-  color: #5d6b7f;
+  color: #8391a6;
   transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 }
 .os-tab[aria-pressed="true"] { border-color: #3d4d6b; background: #1c2536; color: #dfe5ee; }
@@ -400,12 +396,13 @@ svg[hidden] { display: none; }
   overflow-x: auto;
 }
 .term-line { white-space: nowrap; }
-.t-prompt { color: #5d6b7f; }
+.t-prompt { color: #8391a6; }
 .t-cmd { color: #f0f4fa; }
-.t-note { display: var(--term-note); color: #5d6b7f; }
+.t-note { display: var(--term-note); color: #8391a6; }
 .t-url { color: #8fd6a8; }
-.t-cursor { display: inline-block; width: 8px; height: 15px; background: #8fd6a8; vertical-align: -2px; animation: ksBlink 1.2s steps(1) infinite; }
 
+.hero-reqs p { margin: 0; }
+.hero-reqs .hero-license { color: var(--secondary); margin-bottom: 4px; }
 .hero-reqs {
   font-size: 13px;
   color: var(--subtle);
@@ -421,23 +418,16 @@ svg[hidden] { display: none; }
   color: var(--subtle);
 }
 
-/* ---- shared section eyebrow ---- */
-.section-eyebrow {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  color: var(--accent);
-}
-
 /* ---- sitting gallery ---- */
 .section-sitting { border-bottom: 1px solid var(--border); scroll-margin-top: 70px; }
 .sitting-inner { padding: var(--sec-pad-y) var(--pad-x); max-width: 1200px; margin: 0 auto; box-sizing: border-box; }
 .sitting-title {
   font-size: var(--h2);
+  line-height: 1.15;
   font-weight: 600;
   color: var(--text);
   letter-spacing: -0.015em;
-  margin: 10px 0 0;
+  margin: 0;
   text-wrap: balance;
 }
 .sitting-grid { display: grid; grid-template-columns: var(--grid-2); gap: 32px 28px; margin-top: 36px; }
@@ -486,6 +476,7 @@ svg[hidden] { display: none; }
   letter-spacing: -0.015em;
   line-height: 1.15;
   margin: 0;
+  text-wrap: balance;
 }
 .verdict-lede { font-size: 15.5px; line-height: 1.65; color: var(--secondary); margin: 0; }
 .verdict-note { font-size: 13.5px; color: var(--subtle); margin: 0; }
@@ -541,7 +532,7 @@ svg[hidden] { display: none; }
 }
 .lb-caption { margin-top: 18px; text-align: center; max-width: 76ch; animation: ksRise 0.35s ease 0.05s both; }
 .lb-meta { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; letter-spacing: 0.06em; color: #8fb0f0; }
-.lb-count { color: #5d6b7f; }
+.lb-count { color: #8391a6; }
 .lb-desc {
   font-size: 13.5px;
   line-height: 1.6;
@@ -616,7 +607,7 @@ svg[hidden] { display: none; }
 }
 .exam-facts {
   display: flex;
-  gap: 16px;
+  gap: 6px 12px;
   margin-top: 10px;
   font-family: "IBM Plex Mono", monospace;
   font-size: 12.5px;
@@ -626,13 +617,14 @@ svg[hidden] { display: none; }
 .fact { display: inline-flex; align-items: center; gap: 5px; }
 .exam-card-desc { font-size: 13.5px; color: var(--muted); margin: 14px 0 0; line-height: 1.6; }
 .exam-soon {
+  grid-column: 1 / -1;
   border: 1px dashed var(--border-strong);
   border-radius: 10px;
-  padding: 26px;
+  padding: 22px 26px;
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-  justify-content: center;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
 }
 .exam-soon-eyebrow { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--subtle); }
 .exam-soon-chips { display: flex; gap: 10px; }
@@ -646,7 +638,7 @@ svg[hidden] { display: none; }
   font-size: 13px;
   color: var(--muted);
 }
-.exam-soon-note { font-size: 13px; color: var(--subtle); line-height: 1.55; }
+.exam-soon-note { flex: 1 1 320px; font-size: 13px; color: var(--subtle); line-height: 1.55; }
 .exam-card .cert-mark { width: 22px; height: 22px; }
 .cert-chip .cert-mark { width: 16px; height: 16px; }
 
@@ -688,3 +680,10 @@ svg[hidden] { display: none; }
 .footer-links { display: flex; gap: 10px 24px; font-size: 13.5px; margin-top: 8px; flex-wrap: wrap; justify-content: center; }
 .footer-link { color: var(--muted); padding: 6px 0; }
 .footer-legal { font-size: 12px; color: var(--subtle); max-width: 82ch; margin-top: 16px; line-height: 1.6; }
+
+@media (max-width: 1020px) {
+  :root[data-theme="light"] { --orb-opacity: 0.2; }
+}
+@media (max-width: 1020px) and (prefers-color-scheme: light) {
+  :root:not([data-theme]) { --orb-opacity: 0.2; }
+}
