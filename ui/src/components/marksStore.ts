@@ -5,11 +5,12 @@ interface Persisted {
   marked: string[];
 }
 
-class MarksStore {
+export class MarksStore {
   private storageKey: string | null = null;
   private viewed = new Set<string>();
   private marked = new Set<string>();
   private listeners = new Set<() => void>();
+  private watching = false;
 
   private version = 0;
 
@@ -21,16 +22,16 @@ class MarksStore {
   getVersion = (): number => this.version;
 
   setScope(scope: string): void {
+    if (!scope) {
+      if (this.storageKey !== null) this.reset();
+      return;
+    }
     const key = KEY_PREFIX + scope;
     if (key === this.storageKey) return;
     this.storageKey = key;
-    this.viewed = new Set();
-    this.marked = new Set();
-    const raw = read(key);
-    if (raw) {
-      for (const id of raw.viewed) this.viewed.add(id);
-      for (const id of raw.marked) this.marked.add(id);
-    }
+    this.load(read(key));
+    dropOtherAttempts(key);
+    this.watch();
     this.notify();
   }
 
@@ -59,6 +60,23 @@ class MarksStore {
     this.notify();
   }
 
+  private load(raw: Persisted | null): void {
+    this.viewed = new Set(raw?.viewed ?? []);
+    this.marked = new Set(raw?.marked ?? []);
+  }
+
+  private watch(): void {
+    if (this.watching || typeof window === "undefined") return;
+    this.watching = true;
+    window.addEventListener("storage", this.onStorage);
+  }
+
+  private onStorage = (event: StorageEvent): void => {
+    if (!this.storageKey || event.key !== this.storageKey) return;
+    this.load(parse(event.newValue));
+    this.notify();
+  };
+
   private persist(): void {
     if (!this.storageKey) return;
     write(this.storageKey, {
@@ -73,10 +91,9 @@ class MarksStore {
   }
 }
 
-function read(key: string): Persisted | null {
+function parse(raw: string | null): Persisted | null {
+  if (!raw) return null;
   try {
-    const raw = window.sessionStorage.getItem(key);
-    if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<Persisted>;
     return {
       viewed: Array.isArray(parsed.viewed) ? parsed.viewed : [],
@@ -87,9 +104,32 @@ function read(key: string): Persisted | null {
   }
 }
 
+function read(key: string): Persisted | null {
+  try {
+    const stored = parse(window.localStorage.getItem(key));
+    if (stored) return stored;
+  } catch {}
+  try {
+    return parse(window.sessionStorage.getItem(key));
+  } catch {
+    return null;
+  }
+}
+
 function write(key: string, value: Persisted): void {
   try {
-    window.sessionStorage.setItem(key, JSON.stringify(value));
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+}
+
+function dropOtherAttempts(keep: string): void {
+  try {
+    const stale: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (key && key.startsWith(KEY_PREFIX) && key !== keep) stale.push(key);
+    }
+    for (const key of stale) window.localStorage.removeItem(key);
   } catch {}
 }
 
