@@ -2497,7 +2497,7 @@ button.nav-menu-item:hover {
 
 .results-stat-label {
   font-size: var(--text-xs);
-  color: var(--ink-faint);
+  color: var(--ink-muted);
 }
 
 .results-stat-rule {
