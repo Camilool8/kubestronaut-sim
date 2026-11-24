@@ -37,6 +37,11 @@ export interface PreparingAttempt {
   startedAt: string;
   seed?: string;
   poolDigest?: string;
+
+  durationSeconds?: number;
+  awaitStart?: boolean;
+  ready?: boolean;
+  readyAt?: string;
 }
 
 export interface ExamQuestionInfo {
@@ -419,7 +424,7 @@ export async function startSession(
   const res = await request("/api/session/start", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, awaitStart: true }),
     signal,
   });
   if (res.status === 409) {
@@ -437,6 +442,7 @@ export async function startSession(
       seed?: string;
       poolDigest?: string;
       poolChanged?: boolean;
+      awaitStart?: boolean;
     };
     return {
       ok: true,
@@ -448,6 +454,7 @@ export async function startSession(
         startedAt: "",
         seed: body.seed,
         poolDigest: body.poolDigest,
+        awaitStart: body.awaitStart === true,
       },
       poolChanged: body.poolChanged === true,
     };
@@ -473,6 +480,17 @@ export async function putFocus(
     throw await apiError(res);
   }
   return { ok: true };
+}
+
+export async function beginSession(signal?: AbortSignal): Promise<SessionActionResponse> {
+  const res = await request("/api/session/begin", { method: "POST", signal });
+  if (res.status === 409) {
+    return { ok: false, error: await readError(res) };
+  }
+  if (!res.ok) {
+    throw await apiError(res);
+  }
+  return { ok: true, session: (await res.json()) as SessionSnapshot };
 }
 
 export async function endSession(signal?: AbortSignal): Promise<SessionActionResponse> {

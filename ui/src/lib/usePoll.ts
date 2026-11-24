@@ -19,6 +19,8 @@ export interface PollOptions {
   // Any change restarts the loop with an immediate run, for the cases where
   // something the app just did makes the current wait obsolete.
   restartKey?: unknown;
+
+  background?: boolean;
 }
 
 export function usePoll(
@@ -26,7 +28,7 @@ export function usePoll(
   interval: PollInterval,
   options: PollOptions = {},
 ): void {
-  const { enabled = true, restartKey } = options;
+  const { enabled = true, restartKey, background = false } = options;
 
   // Both are read at tick time, never closed over by the loop, so a caller can
   // write `fn` and `interval` inline against fresh props without restarting
@@ -61,13 +63,13 @@ export function usePoll(
       }
       // A hidden tab gets no timer at all. onVisibility restarts the loop when
       // the tab comes back, so nothing is lost by not queueing one.
-      if (document.hidden) return;
+      if (document.hidden && !background) return;
       timer = window.setTimeout(tick, Math.max(0, ms));
     };
 
     const tick = async () => {
       timer = 0;
-      if (stopped || finished || inFlight || document.hidden) return;
+      if (stopped || finished || inFlight || (document.hidden && !background)) return;
       inFlight = true;
       try {
         await fnRef.current();
@@ -90,7 +92,7 @@ export function usePoll(
 
     const onVisibility = () => {
       if (document.hidden) {
-        clearPending();
+        if (!background) clearPending();
       } else {
         wake();
       }
@@ -107,5 +109,5 @@ export function usePoll(
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("focus", wake);
     };
-  }, [enabled, restartKey]);
+  }, [enabled, restartKey, background]);
 }

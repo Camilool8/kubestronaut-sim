@@ -89,7 +89,7 @@ let exam: ExamInfo = ckad;
 let startStatus = 200;
 let startCalls: string[] = [];
 
-let startBodies: { mode: string; domains?: string[] }[] = [];
+let startBodies: { mode: string; domains?: string[]; awaitStart?: boolean }[] = [];
 const runningSession: SessionSnapshot = {
   state: "running",
   bank: "ckad-mock-01",
@@ -345,7 +345,7 @@ describe("narrowing the draw", () => {
     );
     await user.click(screen.getByRole("button", { name: "Start Exam" }));
 
-    await waitFor(() => expect(startBodies).toEqual([{ mode: "exam" }]));
+    await waitFor(() => expect(startBodies).toEqual([{ mode: "exam", awaitStart: true }]));
   });
 
   test("choosing domains sends them, and says the run will not be a pass", async () => {
@@ -361,7 +361,7 @@ describe("narrowing the draw", () => {
 
     await user.click(screen.getByRole("button", { name: "Start Exam drill" }));
     await waitFor(() =>
-      expect(startBodies).toEqual([{ mode: "exam", domains: ["Services and Networking"] }]),
+      expect(startBodies).toEqual([{ mode: "exam", domains: ["Services and Networking"], awaitStart: true }]),
     );
   });
 
@@ -397,7 +397,7 @@ describe("narrowing the draw", () => {
 
     expect(screen.queryByText(/never reported as a pass/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Start Exam" }));
-    await waitFor(() => expect(startBodies).toEqual([{ mode: "exam" }]));
+    await waitFor(() => expect(startBodies).toEqual([{ mode: "exam", awaitStart: true }]));
   });
 });
 
@@ -412,7 +412,7 @@ describe("a drill deep link", () => {
 
     await user.click(screen.getByRole("button", { name: "Start Exam drill" }));
     await waitFor(() =>
-      expect(startBodies).toEqual([{ mode: "exam", domains: ["Observability"] }]),
+      expect(startBodies).toEqual([{ mode: "exam", domains: ["Observability"], awaitStart: true }]),
     );
   });
 
@@ -429,7 +429,7 @@ describe("a drill deep link", () => {
 
     await user.click(await screen.findByRole("button", { name: "Start Exam drill" }));
     await waitFor(() =>
-      expect(startBodies).toEqual([{ mode: "exam", domains: ["Config, Security"] }]),
+      expect(startBodies).toEqual([{ mode: "exam", domains: ["Config, Security"], awaitStart: true }]),
     );
   });
 
@@ -441,7 +441,7 @@ describe("a drill deep link", () => {
 
     await user.click(await screen.findByRole("button", { name: "Start Exam drill" }));
     await waitFor(() =>
-      expect(startBodies).toEqual([{ mode: "exam", domains: ["Observability"] }]),
+      expect(startBodies).toEqual([{ mode: "exam", domains: ["Observability"], awaitStart: true }]),
     );
   });
 });

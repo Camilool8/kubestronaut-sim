@@ -172,6 +172,30 @@ describe("usePoll in a background tab", () => {
     expect(fn).toHaveBeenCalledTimes(3);
   });
 
+  test("a background poll keeps running while the tab is hidden", async () => {
+    const fn = vi.fn();
+    render(<Poller fn={fn} interval={() => (document.hidden ? 5000 : 1000)} background />);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(fn).toHaveBeenCalledTimes(2);
+
+    setHidden(true);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(fn).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(fn).toHaveBeenCalledTimes(5);
+  });
+
+  test("a background poll enabled in a hidden tab runs at once", async () => {
+    setHidden(true);
+    const fn = vi.fn();
+    render(<Poller fn={fn} interval={2000} background />);
+
+    expect(fn).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(fn).toHaveBeenCalledTimes(3);
+  });
+
   test("coming back to the window reads again rather than serving a stale wait", async () => {
     const fn = vi.fn();
     render(<Poller fn={fn} interval={10_000} />);
