@@ -8,6 +8,7 @@ import { MCQ_COMPACT_QUERY } from "../lib/useMediaQuery";
 import { matchMediaMock } from "../test/setup";
 import type { SessionSnapshot } from "../api";
 import { strings } from "../strings";
+import { singleKeyShortcuts } from "../lib/singleKeyShortcuts";
 
 const session: SessionSnapshot = {
   state: "running",
@@ -310,11 +311,7 @@ describe("McqExam attempt state", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  test("the menu doesn't show an empty 'This attempt' header when there's nothing under it", async () => {
-    // session is exam-mode, not training, and the exam fetch fails, so
-    // questions stays empty: extras must resolve to undefined rather than
-    // a fragment whose children are all false, or the section header
-    // ("This attempt") renders with nothing underneath it.
+  test("with no questions and no practice scoring, the attempt section still has keyboard settings", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
@@ -332,7 +329,11 @@ describe("McqExam attempt state", () => {
     render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
     await openMenu(user);
-    expect(screen.queryByText(strings.header.menuExam)).not.toBeInTheDocument();
+    expect(screen.getByText(strings.header.menuExam)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: strings.focus.keyboardSettings }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: strings.practice.scoreNow })).toBeNull();
   });
 });
 
@@ -538,5 +539,148 @@ describe("McqExam on a phone", () => {
 
     expect(screen.queryByRole("dialog", { name: /questions/i })).toBeNull();
     expect(screen.getByRole("button", { name: /^Q1/ })).toBeInTheDocument();
+  });
+});
+
+describe("McqExam focus and headings", () => {
+  afterEach(() => {
+    singleKeyShortcuts.setEnabled(true);
+    window.localStorage.clear();
+    matchMediaMock([]);
+  });
+
+  const renderExam = () =>
+    render(<McqExam session={session} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+
+  test("Next moves focus to the new question's heading instead of dropping it on the body", async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    renderExam();
+    await screen.findByText("Which component persists cluster state?");
+
+    await user.click(screen.getByRole("button", { name: /next question/i }));
+
+    const heading = await screen.findByRole("heading", { level: 2, name: "Question 2 of 2" });
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(heading).toHaveAttribute("tabindex", "-1");
+  });
+
+  test("the bracket keys and a grid pick land on the heading too", async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    renderExam();
+    await screen.findByText("Which component persists cluster state?");
+
+    await user.keyboard("]");
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { level: 2, name: "Question 2 of 2" })).toHaveFocus(),
+    );
+
+    await user.click(screen.getByRole("button", { name: /show all questions/i }));
+    await user.click(within(document.querySelector<HTMLElement>("#mcq-jump")!).getByRole("button", { name: /^Q1\b/ }));
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { level: 2, name: "Question 1 of 2" })).toHaveFocus(),
+    );
+    expect(document.body).not.toHaveFocus();
+  });
+
+  test("a pick from the phone sheet lands on the heading and gives the page back", async () => {
+    stubFetch();
+    matchMediaMock([MCQ_COMPACT_QUERY]);
+    const user = userEvent.setup();
+    const { container } = renderExam();
+    await screen.findByText(/persists cluster state/);
+
+    await user.click(screen.getByRole("button", { name: /question 1 of 2/i }));
+    const sheet = screen.getByRole("dialog", { name: /questions/i });
+    expect(container).toHaveAttribute("inert");
+
+    await user.click(within(sheet).getByRole("button", { name: /^Q2/ }));
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { level: 2, name: "Question 2 of 2" })).toHaveFocus(),
+    );
+    expect(container).not.toHaveAttribute("inert");
+  });
+
+  test("the screen has one h1, the question is an h2, and the body starts below it", async () => {
+    stubFetch();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        const payload = url.includes("/api/exam")
+          ? examJSON
+          : url.includes("/api/answers")
+            ? { answers: {} }
+            : url.includes("/api/questions/")
+              ? { ...q01JSON, markdown: "## Scenario\n\nWhich component persists cluster state?" }
+              : {};
+        return new Response(JSON.stringify(payload), { status: 200 });
+      }),
+    );
+    renderExam();
+    await screen.findByText("Which component persists cluster state?");
+
+    const h1s = screen.getAllByRole("heading", { level: 1 });
+    expect(h1s).toHaveLength(1);
+    expect(h1s[0]).toHaveTextContent("KCNA Mock Exam");
+    expect(screen.getByRole("heading", { level: 2, name: "Question 1 of 2" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 3, name: "Scenario" })).toBeInTheDocument();
+  });
+
+  test("a session poll re-render leaves focus where it was inside the submit dialog", async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    const { rerender } = renderExam();
+    await screen.findByText("Which component persists cluster state?");
+
+    await user.click(screen.getAllByRole("button", { name: strings.exam.endAttempt("exam") })[0]);
+    const dialog = await screen.findByRole("dialog");
+    const end = within(dialog).getByRole("button", { name: strings.exam.endAttempt("exam") });
+    end.focus();
+
+    for (let i = 1; i <= 3; i++) {
+      rerender(
+        <McqExam session={session} fetchedAt={Date.now() + i * 10_000} onSessionChange={() => {}} />,
+      );
+    }
+    expect(end).toHaveFocus();
+  });
+
+  test("with single-key shortcuts off, F, G and the brackets do nothing and their hints go", async () => {
+    stubFetch();
+    singleKeyShortcuts.setEnabled(false);
+    const user = userEvent.setup();
+    const { container } = renderExam();
+    await screen.findByText("Which component persists cluster state?");
+
+    expect(container.querySelector(".key-hint")).toBeNull();
+
+    await user.keyboard("]");
+    await user.keyboard("g");
+    await user.keyboard("f");
+
+    expect(screen.getByRole("heading", { level: 2, name: "Question 1 of 2" })).toBeInTheDocument();
+    expect(document.querySelector("#mcq-jump")).toBeNull();
+    expect(screen.getByRole("button", { name: strings.questionPanel.mark })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  test("the switch lives in the menu's keyboard settings and is remembered", async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    renderExam();
+    await screen.findByText("Which component persists cluster state?");
+
+    await openMenu(user);
+    await user.click(screen.getByRole("button", { name: strings.focus.keyboardSettings }));
+    const toggle = screen.getByRole("checkbox", { name: strings.focus.singleKeysToggle });
+    expect(toggle).toBeChecked();
+
+    await user.click(toggle);
+    expect(singleKeyShortcuts.enabled).toBe(false);
+    expect(window.localStorage.getItem("sim.singleKeyShortcuts")).toBe("false");
   });
 });

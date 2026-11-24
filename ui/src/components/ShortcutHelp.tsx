@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { desktopKeymap } from "../lib/desktopKeymap";
+import { useSingleKeyShortcuts } from "../lib/singleKeyShortcuts";
 import { Dialog } from "./Dialog";
 import { strings } from "../strings";
 
@@ -11,10 +12,12 @@ export function ShortcutHelp({ onClose }: ShortcutHelpProps) {
   useSyncExternalStore(desktopKeymap.subscribe, desktopKeymap.getVersion, desktopKeymap.getVersion);
   const rows = desktopKeymap.rows();
   const showDesktop = desktopKeymap.isMac && desktopKeymap.enabled;
+  const singleKeys = useSingleKeyShortcuts();
 
   return (
     <Dialog title={strings.keyboard.helpTitle} onClose={onClose}>
       <h3 className="shortcut-group">{strings.keyboard.helpBrowser}</h3>
+      {!singleKeys && <p className="clipboard-hint">{strings.focus.singleKeysOff}</p>}
       <table className="shortcut-table">
         <tbody>
           {strings.keyboard.browserShortcuts.map(([keys, does]) => (

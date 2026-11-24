@@ -5,6 +5,8 @@ import { QuestionPanel } from "./QuestionPanel";
 import { desktopClipboard } from "../lib/desktopClipboard";
 import { toastStore } from "./toastStore";
 import { marksStore } from "./marksStore";
+import { singleKeyShortcuts } from "../lib/singleKeyShortcuts";
+import { strings } from "../strings";
 import type { ExamQuestionInfo } from "../api";
 
 const questions: ExamQuestionInfo[] = [
@@ -403,5 +405,69 @@ describe("QuestionPanel failure and pending states", () => {
     );
 
     expect(screen.getByRole("button", { name: /aurora-staging/ })).toBeInTheDocument();
+  });
+});
+
+describe("QuestionPanel announcements and single-key shortcuts", () => {
+  afterEach(() => {
+    singleKeyShortcuts.setEnabled(true);
+    window.localStorage.clear();
+  });
+
+  test("a task change is announced politely, and the first task on load is not", async () => {
+    const { rerender } = renderNav("q01");
+    const status = screen.getByRole("status");
+    await screen.findByText("Namespaces & quotas");
+    expect(status).toHaveTextContent("");
+    expect(status).toHaveAttribute("aria-live", "polite");
+
+    rerender(<QuestionPanel questions={bank} selectedId="q02" onSelect={() => {}} />);
+    expect(status).toHaveTextContent(strings.focus.taskAnnounce(2, 3, "q02"));
+
+    rerender(<QuestionPanel questions={bank} selectedId="q01" onSelect={() => {}} />);
+    expect(status).toHaveTextContent(strings.focus.taskAnnounce(1, 3, "Namespaces & quotas"));
+  });
+
+  test("the task title is an h2 and the question's own headings start at h3", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ id: "q01", markdown: "# Task\n\n### Detail\n\nDo it." }), {
+          status: 200,
+        }),
+      ),
+    );
+    renderNav("q01");
+    expect(screen.getByRole("heading", { level: 2, name: "Namespaces & quotas" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 3, name: "Task" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 4, name: "Detail" })).toBeInTheDocument();
+  });
+
+  test("switched off, the brackets, G and F do nothing and the key hints go", async () => {
+    singleKeyShortcuts.setEnabled(false);
+    const selected: string[] = [];
+    const { container } = renderNav("q02", (id) => void selected.push(id));
+    await screen.findByRole("button", { name: /question 2 of 3/i });
+
+    expect(container.querySelector(".key-hint")).toBeNull();
+
+    await userEvent.keyboard("]");
+    await userEvent.keyboard("g");
+    await userEvent.keyboard("f");
+
+    expect(selected).toEqual([]);
+    expect(container.querySelector("#question-jump")).toBeNull();
+    expect(marksStore.isMarked("q02")).toBe(false);
+  });
+
+  test("switched back on, they work again without a reload", async () => {
+    singleKeyShortcuts.setEnabled(false);
+    const selected: string[] = [];
+    renderNav("q02", (id) => void selected.push(id));
+    await screen.findByRole("button", { name: /question 2 of 3/i });
+
+    singleKeyShortcuts.setEnabled(true);
+    await userEvent.keyboard("]");
+    expect(selected).toEqual(["q03"]);
   });
 });

@@ -29,7 +29,6 @@ import { ShortcutHelp } from "../components/ShortcutHelp";
 import { ClipboardPanel } from "../components/ClipboardPanel";
 import { CheckList } from "../components/CheckList";
 import { Icon } from "../components/Icon";
-import { desktopKeymap } from "../lib/desktopKeymap";
 import { clipboardSync } from "../lib/clipboardSync";
 import { ExamIntro, introSeen, markIntroSeen } from "../components/ExamIntro";
 import { PanelResizer } from "../components/PanelResizer";
@@ -37,6 +36,7 @@ import { PendingBar } from "../components/Pending";
 import { toastStore } from "../components/toastStore";
 import { marksStore } from "../components/marksStore";
 import { isTypingTarget } from "../lib/typing";
+import { singleKeyShortcuts } from "../lib/singleKeyShortcuts";
 import { strings } from "../strings";
 
 const DesktopViewport = lazy(() =>
@@ -136,6 +136,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "?") return;
+      if (!singleKeyShortcuts.enabled) return;
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       const target = event.target as HTMLElement | null;
       if (target?.closest(".desktop-pane")) return;
@@ -252,6 +253,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
 
   return (
     <div className="exam-layout">
+      <h1 className="sr-only">{exam?.title ?? strings.exam.fallbackTitle}</h1>
       <TimerBar
         session={session}
         fetchedAt={fetchedAt}
@@ -276,17 +278,15 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
               <Icon name="copy" />
             </button>
 
-            {desktopKeymap.isMac && (
-              <button
-                className="info-button"
-                onClick={() => setKeyboardOpen((v) => !v)}
-                aria-expanded={keyboardOpen}
-                aria-label={strings.keyboard.settingsLabel}
-                title={strings.keyboard.settingsLabel}
-              >
-                <Icon name="keyboard" />
-              </button>
-            )}
+            <button
+              className="info-button"
+              onClick={() => setKeyboardOpen((v) => !v)}
+              aria-expanded={keyboardOpen}
+              aria-label={strings.keyboard.settingsLabel}
+              title={strings.keyboard.settingsLabel}
+            >
+              <Icon name="keyboard" />
+            </button>
           </>
         }
         extras={
