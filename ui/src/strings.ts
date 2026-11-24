@@ -117,7 +117,7 @@ export const strings = {
     // the attempt begins, which is minutes of waiting after the button is
     // pressed. Saying so here is worth more than any amount of spinner.
     seedNotice: (drawn: number) =>
-      `Starting draws ${drawn} tasks and sets them up on the cluster first. That takes a few minutes, and your clock does not start until it is done.`,
+      `Starting draws ${drawn} tasks and sets them up on the cluster first, which takes a few minutes. Nothing is timed while that runs: the clock starts when you press Start the clock on the next screen.`,
 
     drawTitle: "What you'll be asked",
     drawPooled: (drawn: number, pool: number) =>
@@ -157,7 +157,7 @@ export const strings = {
     ],
 
     tipTimer:
-      "Training is untimed. Exam and Mastery start their clock the moment you start, and it cannot be paused.",
+      "Training is untimed. In Exam and Mastery the clock starts when you begin the attempt, never while tasks are being set up, and once started it cannot be paused.",
   },
 
   exam: {
@@ -642,7 +642,7 @@ export const strings = {
     hintFast: "Restarting the exam services. Usually a few seconds.",
 
     hintSeed:
-      "Preparing the cluster for the tasks in this draw. Your clock has not started and will not start until this finishes.",
+      "Preparing the cluster for the tasks in this draw. Your clock has not started: when this finishes you start it yourself, so you can leave this tab and come back.",
     stepOf: (step: number, total: number, label: string) =>
       `Step ${step} of ${total}: ${label}`,
     elapsed: (span: string) => `Elapsed ${span}`,
@@ -677,6 +677,42 @@ export const strings = {
         : `Setting up the ${tasks} tasks in this draw on the cluster.`,
 
     elapsed: (span: string) => `Elapsed ${span}`,
+  },
+
+  ready: {
+    title: (tasks: number) =>
+      tasks === 1 ? "Your task is ready" : `Your ${tasks} tasks are ready`,
+    lead: "The cluster is set up for this draw. Nothing is timed yet.",
+    factsLabel: "This attempt",
+    factExam: "Certification",
+    factMode: "Mode",
+    factClock: "Clock",
+    factTasks: "Tasks",
+    clockNote:
+      "The clock starts when you press Start the clock. From then on it runs on the server and cannot be paused.",
+    clockNoteUntimed:
+      "Training has no clock. Press Start when you are ready to see the tasks and the exam desktop.",
+    start: "Start the clock",
+    startUntimed: "Start",
+    starting: "Starting…",
+    beginFailed: (detail: string) => `The attempt did not start (${detail}). Nothing was timed; try again.`,
+    notifyBody: (tasks: number) =>
+      tasks === 1
+        ? "Your task is set up. The clock starts when you press Start the clock."
+        : `Your ${tasks} tasks are set up. The clock starts when you press Start the clock.`,
+  },
+
+  titles: {
+    app: "kubestronaut-sim",
+    exams: "Exams",
+    progress: "Your path",
+    review: "Review",
+    mode: "Choose a mode",
+    booting: "Building the environment",
+    preparing: (exam: string) => (exam ? `Preparing ${exam}` : "Preparing"),
+    ready: "Ready to start",
+    results: "Results",
+    training: "Training",
   },
 
   mobile: {

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Exam, ExamGateControls } from "./Exam";
@@ -6,6 +6,7 @@ import type { SessionSnapshot } from "../api";
 import { clipboardSync } from "../lib/clipboardSync";
 import { marksStore } from "../components/marksStore";
 import { toastStore } from "../components/toastStore";
+import { introSeen, markIntroSeen, resetIntroSeen } from "../components/ExamIntro";
 import { strings } from "../strings";
 
 const runningSession: SessionSnapshot = {
@@ -18,6 +19,10 @@ const runningSession: SessionSnapshot = {
   mode: "exam",
   untimed: false,
 };
+
+beforeEach(() => {
+  markIntroSeen();
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -301,5 +306,36 @@ describe("Exam topbar and focus reporting", () => {
     await user.click(screen.getByRole("button", { name: strings.header.menuLabel }));
     const panel = screen.getByRole("group", { name: strings.header.menuLabel });
     expect(within(panel).queryByRole("button", { name: "Submit exam" })).toBeNull();
+  });
+});
+
+describe("Exam first-time walkthrough", () => {
+  const quietSession: SessionSnapshot = { ...runningSession, state: "idle" };
+  test("is marked seen when it is dismissed, not when it renders", async () => {
+    resetIntroSeen();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ error: "nope" }), { status: 500 })),
+    );
+    const user = userEvent.setup();
+    render(<Exam session={quietSession} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+
+    const dialog = await screen.findByRole("dialog", { name: strings.intro.title });
+    expect(introSeen()).toBe(false);
+
+    await user.click(within(dialog).getByRole("button", { name: strings.intro.done }));
+    expect(screen.queryByRole("dialog", { name: strings.intro.title })).toBeNull();
+    expect(introSeen()).toBe(true);
+  });
+
+  test("stays closed for a candidate who has already seen it", () => {
+    markIntroSeen();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ error: "nope" }), { status: 500 })),
+    );
+    render(<Exam session={quietSession} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+
+    expect(screen.queryByRole("dialog", { name: strings.intro.title })).toBeNull();
   });
 });

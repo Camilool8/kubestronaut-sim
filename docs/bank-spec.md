@@ -203,7 +203,9 @@ entirely for a pooled bank (it still pre-pulls the bank's images, which is
 the slow, network-fragile half and is identical whatever gets drawn), and
 the drawn questions are seeded when the attempt starts instead:
 `POST /api/session/start` answers **202** with a conductor job to watch,
-and the candidate's clock does not begin until that job succeeds. See
+and the candidate's clock does not begin until that job succeeds. The UI
+goes one step further and waits on a ready screen until the candidate
+presses Start. See
 [api.md](api.md) for the contract.
 
 For an author:
