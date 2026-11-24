@@ -3844,6 +3844,12 @@ button.nav-menu-item:hover {
   }
 }
 
+@media (min-width: 48rem) and (max-width: 900px) {
+  .desktop-lost {
+    padding-inline-start: calc(min(85vw, 360px) - 36px + var(--space-5));
+  }
+}
+
 .toast-layer {
   position: fixed;
   bottom: var(--space-4);
