@@ -6,6 +6,7 @@ import { desktopClipboard } from "../lib/desktopClipboard";
 import { pasteChordLabel } from "../lib/desktopKeymap";
 import { formatDuration } from "../lib/format";
 import { isTypingTarget } from "../lib/typing";
+import { singleKeyShortcuts, useSingleKeyShortcuts } from "../lib/singleKeyShortcuts";
 import { strings } from "../strings";
 import { Async } from "./Async";
 import { Icon } from "./Icon";
@@ -39,11 +40,23 @@ function QuestionPanelBody({
   const jumpTriggerRef = useRef<HTMLButtonElement>(null);
 
   useSyncExternalStore(marksStore.subscribe, marksStore.getVersion);
+  const singleKeys = useSingleKeyShortcuts();
 
   const index = questions.findIndex((q) => q.id === selectedId);
   const selected = index === -1 ? undefined : questions[index];
   const prev = index > 0 ? questions[index - 1] : undefined;
   const next = index >= 0 && index < questions.length - 1 ? questions[index + 1] : undefined;
+
+  const [announcedId, setAnnouncedId] = useState(selectedId);
+  const [announcement, setAnnouncement] = useState("");
+  if (announcedId !== selectedId) {
+    setAnnouncedId(selectedId);
+    if (announcedId !== null && selected) {
+      setAnnouncement(
+        strings.focus.taskAnnounce(index + 1, questions.length, selected.title ?? selected.id),
+      );
+    }
+  }
 
   const load = useCallback(
     (signal: AbortSignal) => getQuestion(selectedId as string, signal),
@@ -60,6 +73,7 @@ function QuestionPanelBody({
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.altKey || event.ctrlKey || event.metaKey) return;
+      if (!singleKeyShortcuts.enabled) return;
       const target = event.target as HTMLElement | null;
 
       if (target?.closest(".desktop-pane")) return;
@@ -109,7 +123,9 @@ function QuestionPanelBody({
       className="question-panel"
       aria-label={strings.questionPanel.regionLabel}
     >
-
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </p>
       {questions.length === 0 && <div className="question-empty">{emptyState}</div>}
       {questions.length > 0 && (
         <>
@@ -127,9 +143,11 @@ function QuestionPanelBody({
                   <Icon name={marked ? "flag-filled" : "flag"} />
                   {strings.questionPanel.mark}
 
-                  <kbd className="key-hint" aria-hidden="true">
-                    {strings.questionPanel.markKey}
-                  </kbd>
+                  {singleKeys && (
+                    <kbd className="key-hint" aria-hidden="true">
+                      {strings.questionPanel.markKey}
+                    </kbd>
+                  )}
                 </button>
               )}
             </div>
@@ -154,7 +172,7 @@ function QuestionPanelBody({
                 </div>
               )}
             >
-              {(data) => <Markdown>{data.markdown}</Markdown>}
+              {(data) => <Markdown headingLevel={3}>{data.markdown}</Markdown>}
             </Async>
 
             {mode === "training" && selected && (selected.docsCount ?? 0) > 0 && (
@@ -186,9 +204,11 @@ function QuestionPanelBody({
             >
               <Icon name="grid" className="trigger-glyph" />
               {strings.questionPanel.allTasks}
-              <kbd className="key-hint" aria-hidden="true">
-                {strings.navigator.keyGridKey}
-              </kbd>
+              {singleKeys && (
+                <kbd className="key-hint" aria-hidden="true">
+                  {strings.navigator.keyGridKey}
+                </kbd>
+              )}
               <span className="sr-only">
                 {index >= 0
                   ? strings.navigator.position(index + 1, questions.length)

@@ -164,7 +164,7 @@ export function Explain({ results, questionId, basePath = "/results", live = tru
 
           <div className="explain-solution-body">
             {shown !== null ? (
-              <Markdown>{shown.markdown}</Markdown>
+              <Markdown headingLevel={3}>{shown.markdown}</Markdown>
             ) : !live ? (
               <p className="explain-note">{strings.explain.solutionHistorical}</p>
             ) : solutionError !== null ? (

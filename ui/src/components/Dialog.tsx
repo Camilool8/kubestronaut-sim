@@ -1,4 +1,5 @@
 import { useId, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useFocusTrap } from "../lib/useFocusTrap";
 
 interface DialogProps {
@@ -23,9 +24,9 @@ export function Dialog({
 }: DialogProps) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
-  useFocusTrap(ref, onClose);
+  useFocusTrap(ref, onClose, true, { modal: true });
 
-  return (
+  return createPortal(
     <div className={`confirm-overlay${sheet ? " confirm-overlay-sheet" : ""}`}>
       <div
         ref={ref}
@@ -46,6 +47,7 @@ export function Dialog({
         <h2 id={titleId}>{title}</h2>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

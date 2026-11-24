@@ -88,3 +88,16 @@ describe("DesktopRequired", () => {
     expect(why.compareDocumentPosition(anyway) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
+
+describe("DesktopRequired heading level", () => {
+  test("stands as the page's h1 by default", () => {
+    render(<DesktopRequired verdict="blocked" />);
+    expect(screen.getByRole("heading", { level: 1, name: /needs a desktop/i })).toBeInTheDocument();
+  });
+
+  test("drops to h2 inside a screen that already has one", () => {
+    render(<DesktopRequired verdict="blocked" headingLevel={2} />);
+    expect(screen.getByRole("heading", { level: 2, name: /needs a desktop/i })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+  });
+});

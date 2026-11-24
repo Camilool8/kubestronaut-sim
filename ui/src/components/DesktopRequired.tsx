@@ -27,9 +27,12 @@ interface DesktopRequiredProps {
   verdict: GateVerdict;
 
   children?: React.ReactNode;
+
+  headingLevel?: 1 | 2;
 }
 
-export function DesktopRequired({ verdict, children }: DesktopRequiredProps) {
+export function DesktopRequired({ verdict, children, headingLevel = 1 }: DesktopRequiredProps) {
+  const Heading = headingLevel === 2 ? "h2" : "h1";
   const [, force] = useState(0);
 
   const continueAnyway = () => {
@@ -40,7 +43,7 @@ export function DesktopRequired({ verdict, children }: DesktopRequiredProps) {
   return (
     <div className="desktop-required">
       <div className="desktop-required-card">
-        <h1>{strings.mobile.title}</h1>
+        <Heading>{strings.mobile.title}</Heading>
         {children}
         <p>{strings.mobile.why}</p>
         <ul className="desktop-required-needs">

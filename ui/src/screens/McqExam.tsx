@@ -22,11 +22,13 @@ import {
 } from "../api";
 import { useAsync } from "../lib/useAsync";
 import { isTypingTarget } from "../lib/typing";
+import { singleKeyShortcuts, useSingleKeyShortcuts } from "../lib/singleKeyShortcuts";
 import { MCQ_COMPACT_QUERY, useMediaQuery } from "../lib/useMediaQuery";
 import { Async } from "../components/Async";
 import { TimerBar } from "../components/TimerBar";
 import { NavMenuFact, NavMenuItem } from "../components/NavMenu";
 import { Dialog } from "../components/Dialog";
+import { KeyboardSettings } from "../components/KeyboardSettings";
 import { Icon } from "../components/Icon";
 import { InlineCode, Markdown } from "../components/Markdown";
 import { CheckList } from "../components/CheckList";
@@ -53,6 +55,7 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
   const [scoring, setScoring] = useState(false);
   const [practice, setPractice] = useState<Results | null>(null);
   const [answers, setAnswers] = useState<Record<string, number[]>>({});
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
 
   const examState = useAsync((signal) => getExam(signal), []);
   const exam = examState.data;
@@ -93,6 +96,23 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
       ? questions[index + 1]
       : undefined;
 
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const focusHeading = useRef(false);
+  const goTo = useCallback(
+    (id: string) => {
+      if (id === selectedId) return;
+      focusHeading.current = true;
+      setPickedId(id);
+    },
+    [selectedId],
+  );
+
+  useEffect(() => {
+    if (!focusHeading.current) return;
+    focusHeading.current = false;
+    headingRef.current?.focus();
+  }, [selectedId]);
+
   useEffect(() => {
     if (selectedId) marksStore.markViewed(selectedId);
   }, [selectedId]);
@@ -108,17 +128,18 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "[" && event.key !== "]") return;
       if (event.altKey || event.ctrlKey || event.metaKey) return;
+      if (!singleKeyShortcuts.enabled) return;
       const target = event.target as HTMLElement | null;
       if (isTypingTarget(target)) return;
       if (document.querySelector('[role="dialog"]')) return;
       const step = event.key === "[" ? prev : next;
       if (!step) return;
       event.preventDefault();
-      setPickedId(step.id);
+      goTo(step.id);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [prev, next]);
+  }, [prev, next, goTo]);
 
   const applySelection = useCallback(
     async (qid: string, selection: number[]) => {
@@ -210,6 +231,7 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
 
   return (
     <div className="mcq-layout">
+      <h1 className="sr-only">{exam?.title ?? strings.exam.fallbackTitle}</h1>
       <TimerBar
         session={session}
         fetchedAt={fetchedAt}
@@ -217,20 +239,23 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
         onEndClick={() => setConfirmOpen(true)}
 
         extras={
-          questions.length > 0 || session.mode === "training" ? (
-            <>
-              {questions.length > 0 && (
-                <McqTally questions={questions} answeredCount={answeredCount} />
-              )}
-              {session.mode === "training" && (
-                <NavMenuItem
-                  icon="check"
-                  label={scoring ? strings.practice.scoring : strings.practice.scoreNow}
-                  onSelect={() => void scoreNow()}
-                />
-              )}
-            </>
-          ) : undefined
+          <>
+            {questions.length > 0 && (
+              <McqTally questions={questions} answeredCount={answeredCount} />
+            )}
+            {session.mode === "training" && (
+              <NavMenuItem
+                icon="check"
+                label={scoring ? strings.practice.scoring : strings.practice.scoreNow}
+                onSelect={() => void scoreNow()}
+              />
+            )}
+            <NavMenuItem
+              icon="keyboard"
+              label={strings.focus.keyboardSettings}
+              onSelect={() => setKeyboardOpen(true)}
+            />
+          </>
         }
       />
 
@@ -270,12 +295,15 @@ export function McqExam({ session, fetchedAt, onSessionChange }: McqExamProps) {
             compact={compact}
             prev={prev}
             next={next}
-            onSelect={setPickedId}
+            headingRef={headingRef}
+            onSelect={goTo}
             onAnswer={applySelection}
             onEndExam={() => setConfirmOpen(true)}
           />
         )}
       </div>
+
+      {keyboardOpen && <KeyboardSettings onClose={() => setKeyboardOpen(false)} />}
 
       {confirmOpen && (
         <Dialog
@@ -365,6 +393,7 @@ interface McqQuestionProps {
   compact: boolean;
   prev?: ExamQuestionInfo;
   next?: ExamQuestionInfo;
+  headingRef: React.RefObject<HTMLHeadingElement>;
   onSelect: (id: string) => void;
   onAnswer: (qid: string, selection: number[]) => void;
   onEndExam: () => void;
@@ -381,6 +410,7 @@ function McqQuestion({
   compact,
   prev,
   next,
+  headingRef,
   onSelect,
   onAnswer,
   onEndExam,
@@ -388,6 +418,7 @@ function McqQuestion({
   const [jumpOpen, setJumpOpen] = useState(false);
   const jumpTriggerRef = useRef<HTMLButtonElement>(null);
   useSyncExternalStore(marksStore.subscribe, marksStore.getVersion);
+  const singleKeys = useSingleKeyShortcuts();
 
   const load = useCallback(
     (signal: AbortSignal) => getQuestion(info.id, signal),
@@ -420,6 +451,7 @@ function McqQuestion({
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.altKey || event.ctrlKey || event.metaKey) return;
+      if (!singleKeyShortcuts.enabled) return;
       const target = event.target as HTMLElement | null;
       if (isTypingTarget(target)) return;
       if (document.querySelector('[role="dialog"]')) return;
@@ -445,9 +477,10 @@ function McqQuestion({
     <section className="mcq-question" aria-label={strings.mcq.regionLabel}>
 
       <header className="mcq-head">
-        <span className="mcq-counter">
-          {strings.mcq.questionCounter(index + 1, total)}
-        </span>
+        <h2 className="mcq-counter" ref={headingRef} tabIndex={-1}>
+          <span aria-hidden="true">{strings.mcq.questionCounter(index + 1, total)}</span>
+          <span className="sr-only">{strings.focus.questionAnnounce(index + 1, total)}</span>
+        </h2>
 
         <span className="mcq-domain">{info.domain}</span>
         <button
@@ -457,9 +490,11 @@ function McqQuestion({
         >
           <Icon name={marked ? "flag-filled" : "flag"} />
           {strings.questionPanel.mark}
-          <kbd className="key-hint" aria-hidden="true">
-            {strings.questionPanel.markKey}
-          </kbd>
+          {singleKeys && (
+            <kbd className="key-hint" aria-hidden="true">
+              {strings.questionPanel.markKey}
+            </kbd>
+          )}
         </button>
       </header>
 
@@ -481,7 +516,7 @@ function McqQuestion({
           {(data) => (
             <>
 
-              <Markdown copyable={false}>{data.markdown}</Markdown>
+              <Markdown copyable={false} headingLevel={3}>{data.markdown}</Markdown>
               <fieldset className="mcq-options">
                 <legend>
                   {info.multi ? strings.mcq.selectAll : strings.mcq.selectOne}
@@ -550,9 +585,11 @@ function McqQuestion({
             ) : (
               <>
                 {strings.mcq.navigator}
-                <kbd className="key-hint" aria-hidden="true">
-                  {strings.navigator.keyGridKey}
-                </kbd>
+                {singleKeys && (
+                  <kbd className="key-hint" aria-hidden="true">
+                    {strings.navigator.keyGridKey}
+                  </kbd>
+                )}
               </>
             )}
             <span className="sr-only">
@@ -664,7 +701,7 @@ function McqCheckAnswer({ questionId }: { questionId: string }) {
       </summary>
       {loading && <p>{strings.mcq.loadingAnswer}</p>}
       {error && <p className="error-text">{error}</p>}
-      {solution && <Markdown copyable={false}>{solution.markdown}</Markdown>}
+      {solution && <Markdown copyable={false} headingLevel={3}>{solution.markdown}</Markdown>}
     </details>
   );
 }

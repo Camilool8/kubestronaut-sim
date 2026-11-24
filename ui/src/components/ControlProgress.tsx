@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { getControlLog, type ControlJob, type ControlPhase } from "../api";
 import { controlJobHint, controlJobTitle } from "../lib/controlJob";
 import { formatElapsed } from "../lib/format";
@@ -61,7 +62,7 @@ export function ControlProgress({
     () => (failed ? onDismiss() : onBackground()),
     [failed, onDismiss, onBackground],
   );
-  useFocusTrap(dialogRef, onEscape);
+  useFocusTrap(dialogRef, onEscape, true, { modal: true });
 
   const now = useTick(!failed);
 
@@ -99,7 +100,7 @@ export function ControlProgress({
   const totalElapsed = jobStarted === null ? null : formatElapsed(now - jobStarted);
   const doneCount = job.phases.filter((p) => p.state === "done").length;
 
-  return (
+  return createPortal(
     <div className="control-overlay">
       <div
         ref={dialogRef}
@@ -213,6 +214,7 @@ export function ControlProgress({
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

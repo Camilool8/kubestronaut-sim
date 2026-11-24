@@ -1,4 +1,5 @@
 import { useId, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useFocusTrap } from "../lib/useFocusTrap";
 import { strings } from "../strings";
 
@@ -9,11 +10,11 @@ interface InfoDrawerProps {
 export function InfoDrawer({ onClose }: InfoDrawerProps) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
-  useFocusTrap(ref, onClose);
+  useFocusTrap(ref, onClose, true, { modal: true });
 
   const s = strings.info;
 
-  return (
+  return createPortal(
     <div className="drawer-overlay" onClick={onClose}>
       <div
         ref={ref}
@@ -81,6 +82,7 @@ export function InfoDrawer({ onClose }: InfoDrawerProps) {
           </ul>
         </section>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

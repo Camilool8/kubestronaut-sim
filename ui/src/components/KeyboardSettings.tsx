@@ -1,19 +1,22 @@
 import { useEffect, useId, useRef, useSyncExternalStore } from "react";
 import { desktopKeymap } from "../lib/desktopKeymap";
+import { singleKeyShortcuts, useSingleKeyShortcuts } from "../lib/singleKeyShortcuts";
 import { strings } from "../strings";
 
 interface KeyboardSettingsProps {
   onClose: () => void;
-  onShowHelp: () => void;
+  onShowHelp?: () => void;
 }
 
 export function KeyboardSettings({ onClose, onShowHelp }: KeyboardSettingsProps) {
   const titleId = useId();
   const macId = useId();
   const reservedId = useId();
+  const singleId = useId();
   const ref = useRef<HTMLDivElement>(null);
 
   useSyncExternalStore(desktopKeymap.subscribe, desktopKeymap.getVersion, desktopKeymap.getVersion);
+  const singleKeys = useSingleKeyShortcuts();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -39,31 +42,48 @@ export function KeyboardSettings({ onClose, onShowHelp }: KeyboardSettingsProps)
 
       <div className="keyboard-row">
         <input
-          id={macId}
+          id={singleId}
           type="checkbox"
-          checked={desktopKeymap.enabled}
-          onChange={(e) => desktopKeymap.setEnabled(e.target.checked)}
+          checked={singleKeys}
+          onChange={(e) => singleKeyShortcuts.setEnabled(e.target.checked)}
         />
-        <label htmlFor={macId}>{strings.keyboard.macToggle}</label>
+        <label htmlFor={singleId}>{strings.focus.singleKeysToggle}</label>
       </div>
-      <p className="clipboard-hint">{strings.keyboard.macToggleHint}</p>
+      <p className="clipboard-hint">{strings.focus.singleKeysHint}</p>
 
-      <div className="keyboard-row">
-        <input
-          id={reservedId}
-          type="checkbox"
-          checked={desktopKeymap.reservedEnabled}
-          onChange={(e) => desktopKeymap.setReservedEnabled(e.target.checked)}
-          disabled={!desktopKeymap.enabled}
-        />
-        <label htmlFor={reservedId}>{strings.keyboard.reservedToggle}</label>
-      </div>
+      {desktopKeymap.isMac && (
+        <>
+          <div className="keyboard-row">
+            <input
+              id={macId}
+              type="checkbox"
+              checked={desktopKeymap.enabled}
+              onChange={(e) => desktopKeymap.setEnabled(e.target.checked)}
+            />
+            <label htmlFor={macId}>{strings.keyboard.macToggle}</label>
+          </div>
+          <p className="clipboard-hint">{strings.keyboard.macToggleHint}</p>
 
-      <p className="clipboard-hint">{strings.keyboard.reservedHint}</p>
+          <div className="keyboard-row">
+            <input
+              id={reservedId}
+              type="checkbox"
+              checked={desktopKeymap.reservedEnabled}
+              onChange={(e) => desktopKeymap.setReservedEnabled(e.target.checked)}
+              disabled={!desktopKeymap.enabled}
+            />
+            <label htmlFor={reservedId}>{strings.keyboard.reservedToggle}</label>
+          </div>
 
-      <button className="btn" onClick={onShowHelp}>
-        {strings.keyboard.helpOpen}
-      </button>
+          <p className="clipboard-hint">{strings.keyboard.reservedHint}</p>
+        </>
+      )}
+
+      {onShowHelp && (
+        <button className="btn" onClick={onShowHelp}>
+          {strings.keyboard.helpOpen}
+        </button>
+      )}
     </div>
   );
 }
