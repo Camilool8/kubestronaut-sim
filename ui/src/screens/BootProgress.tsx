@@ -1,6 +1,7 @@
 import { useId } from "react";
 import type { BootStatus } from "../api";
 import { formatElapsed } from "../lib/format";
+import { useHostedDeployment } from "../lib/deployment";
 import { useTick } from "../lib/useTick";
 import { Icon } from "../components/Icon";
 import { strings } from "../strings";
@@ -28,6 +29,7 @@ function parseStamp(stamp: string | undefined): number | null {
 }
 
 export function BootProgress({ boot, onRetry }: BootProgressProps) {
+  const hosted = useHostedDeployment();
   const failed = boot?.state === "failed";
   const titleId = useId();
   const now = useTick(!failed);
@@ -103,7 +105,7 @@ export function BootProgress({ boot, onRetry }: BootProgressProps) {
             <p className="error-text" role="alert">
               {boot?.error}
             </p>
-            <p className="control-hint">{strings.boot.failedHint}</p>
+            <p className="control-hint">{strings.boot.failedHint(hosted)}</p>
             <div className="control-actions">
               <button className="btn btn-primary" onClick={() => void onRetry()}>
                 {strings.boot.retry}

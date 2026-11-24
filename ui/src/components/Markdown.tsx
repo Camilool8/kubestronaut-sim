@@ -1,11 +1,12 @@
 import type { ReactElement, ReactNode } from "react";
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import type { MarkdownComponents } from "./MarkdownRenderer";
 import { desktopClipboard } from "../lib/desktopClipboard";
 import { pasteChordLabel } from "../lib/desktopKeymap";
 import { highlightTo } from "../lib/highlight";
 import { strings } from "../strings";
 import { toastStore } from "./toastStore";
+import { ErrorBoundary, PaneFallback } from "./ErrorBoundary";
 
 function CopyableCode({ children }: { children: ReactNode }) {
   const value = typeof children === "string" ? children : String(children ?? "");
@@ -80,7 +81,7 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
           {strings.markdown.copyBlock}
         </button>
       </figcaption>
-      <pre>
+      <pre tabIndex={0} aria-label={strings.focus.codeBlockLabel(displayLanguage)}>
         {html === null ? (
           <code className={className}>{body}</code>
         ) : (
@@ -107,13 +108,6 @@ const SHARED_COMPONENTS = {
       {children}
     </a>
   ),
-
-  h1: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
-  h2: ({ children }: { children?: ReactNode }) => <h3>{children}</h3>,
-  h3: ({ children }: { children?: ReactNode }) => <h4>{children}</h4>,
-  h4: ({ children }: { children?: ReactNode }) => <h5>{children}</h5>,
-  h5: ({ children }: { children?: ReactNode }) => <h6>{children}</h6>,
-  h6: ({ children }: { children?: ReactNode }) => <h6>{children}</h6>,
 
   table: ({ children }: { children?: ReactNode }) => (
     <div className="md-table-scroll">
@@ -146,21 +140,41 @@ const COMPONENTS_STATIC = {
   code: ({ children, className }: CodeChildProps) => <code className={className}>{children}</code>,
 };
 
-const MarkdownRenderer = lazy(() => import("./MarkdownRenderer"));
+const loadMarkdownRenderer = () => import("./MarkdownRenderer");
+
+let MarkdownRenderer = lazy(loadMarkdownRenderer);
 
 export function Markdown({
   children,
   copyable = true,
+  headingLevel = 2,
 }: {
   children: string;
   copyable?: boolean;
+  headingLevel?: number;
 }) {
   const components: MarkdownComponents = copyable ? COMPONENTS : COMPONENTS_STATIC;
+  const [mounts, setMounts] = useState(0);
+  const retry = useCallback(() => {
+    MarkdownRenderer = lazy(loadMarkdownRenderer);
+    setMounts((n) => n + 1);
+  }, []);
   return (
     <div className="md">
-      <Suspense fallback={null}>
-        <MarkdownRenderer components={components}>{children}</MarkdownRenderer>
-      </Suspense>
+      <ErrorBoundary
+        key={mounts}
+        fallback={() => (
+          <PaneFallback title={strings.paneError.markdownTitle} onRetry={retry}>
+            <pre className="md-plain">{children}</pre>
+          </PaneFallback>
+        )}
+      >
+        <Suspense fallback={null}>
+          <MarkdownRenderer components={components} headingBase={headingLevel}>
+            {children}
+          </MarkdownRenderer>
+        </Suspense>
+      </ErrorBoundary>
     </div>
   );
 }

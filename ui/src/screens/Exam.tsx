@@ -19,6 +19,7 @@ import {
 } from "../api";
 import { useAsync } from "../lib/useAsync";
 import { useExamClock } from "../lib/useExamClock";
+import { useHostedDeployment } from "../lib/deployment";
 import { TimerBar } from "../components/TimerBar";
 import { TimerReadout } from "../components/TimerReadout";
 import { QuestionPanel } from "../components/QuestionPanel";
@@ -26,22 +27,29 @@ import { Dialog } from "../components/Dialog";
 import { NavMenuItem } from "../components/NavMenu";
 import { KeyboardSettings } from "../components/KeyboardSettings";
 import { ShortcutHelp } from "../components/ShortcutHelp";
+import { SubmitReview } from "../components/SubmitReview";
 import { ClipboardPanel } from "../components/ClipboardPanel";
 import { CheckList } from "../components/CheckList";
+import { ErrorBoundary, PaneFallback } from "../components/ErrorBoundary";
 import { Icon } from "../components/Icon";
-import { desktopKeymap } from "../lib/desktopKeymap";
 import { clipboardSync } from "../lib/clipboardSync";
 import { ExamIntro, introSeen, markIntroSeen } from "../components/ExamIntro";
 import { PanelResizer } from "../components/PanelResizer";
+import { TaskPanelToggle, useTaskPanelCollapsed } from "../components/TaskPanelToggle";
 import { PendingBar } from "../components/Pending";
 import { toastStore } from "../components/toastStore";
 import { marksStore } from "../components/marksStore";
 import { isTypingTarget } from "../lib/typing";
+import { singleKeyShortcuts } from "../lib/singleKeyShortcuts";
+import { NARROW_QUERY, useMediaQuery } from "../lib/useMediaQuery";
 import { strings } from "../strings";
 
-const DesktopViewport = lazy(() =>
-  import("../components/DesktopViewport").then((m) => ({ default: m.DesktopViewport })),
-);
+const loadDesktopViewport = () =>
+  import("../components/DesktopViewport").then((m) => ({ default: m.DesktopViewport }));
+
+let DesktopViewport = lazy(loadDesktopViewport);
+
+const EXAM_TOAST_KEYS = ["desktop", "practice-grade", "clipboard-blocked", "copy-value", "copy-block"];
 
 // QuestionPanel is memoized, and a session poll re-renders Exam every 10
 // seconds with a fresh `fetchedAt`. One shared empty array keeps the
@@ -136,6 +144,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "?") return;
+      if (!singleKeyShortcuts.enabled) return;
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       const target = event.target as HTMLElement | null;
       if (target?.closest(".desktop-pane")) return;
@@ -153,21 +162,50 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
     return () => clipboardSync.stop();
   }, []);
 
-  const [introOpen, setIntroOpen] = useState(() => {
-    if (introSeen()) return false;
+  useEffect(
+    () => () => {
+      for (const key of EXAM_TOAST_KEYS) toastStore.dismissKey(key);
+    },
+    [],
+  );
+
+  const [introOpen, setIntroOpen] = useState(() => !introSeen());
+  const closeIntro = useCallback(() => {
     markIntroSeen();
-    return true;
-  });
+    setIntroOpen(false);
+  }, []);
 
   useEffect(() => {
     marksStore.setScope(session.startedAt);
   }, [session.startedAt]);
 
+  const hosted = useHostedDeployment();
   const examState = useAsync((signal) => getExam(signal), []);
   const exam = examState.data;
   const questions = exam?.questions ?? NO_QUESTIONS;
 
   const selectedId = pickedId ?? questions[0]?.id ?? null;
+  const selectedIndex = questions.findIndex((q) => q.id === selectedId);
+
+  const narrow = useMediaQuery(NARROW_QUERY);
+  const [tasksCollapsed, setTasksCollapsed] = useTaskPanelCollapsed();
+  const collapsed = narrow && tasksCollapsed;
+
+  useEffect(() => {
+    if (!collapsed) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "g" && event.key !== "G") return;
+      if (!singleKeyShortcuts.enabled) return;
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".desktop-pane")) return;
+      if (isTypingTarget(target)) return;
+      if (document.querySelector('[role="dialog"]')) return;
+      setTasksCollapsed(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [collapsed, setTasksCollapsed]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -176,16 +214,35 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
     return () => controller.abort();
   }, [selectedId]);
 
+  const reviewItem = (q: ExamQuestionInfo, i: number) => ({
+    id: q.id,
+    label: String(i + 1),
+    jumpLabel: strings.exam.reviewJumpTask(i + 1),
+  });
   const reviewMarked = confirmOpen
-    ? questions.flatMap((q, i) =>
-        marksStore.isMarked(q.id) ? [strings.exam.taskNumber(i + 1)] : [],
-      )
+    ? questions.flatMap((q, i) => (marksStore.isMarked(q.id) ? [reviewItem(q, i)] : []))
     : [];
   const reviewUnseen = confirmOpen
-    ? questions.flatMap((q, i) =>
-        marksStore.isViewed(q.id) ? [] : [strings.exam.taskNumber(i + 1)],
-      )
+    ? questions.flatMap((q, i) => (marksStore.isViewed(q.id) ? [] : [reviewItem(q, i)]))
     : [];
+
+  const closeConfirm = useCallback(() => setConfirmOpen(false), []);
+  const focusTaskTitle = useRef(false);
+  const jumpToTask = useCallback(
+    (id: string) => {
+      setConfirmOpen(false);
+      setTasksCollapsed(false);
+      focusTaskTitle.current = true;
+      setPickedId(id);
+    },
+    [setTasksCollapsed],
+  );
+
+  useEffect(() => {
+    if (!focusTaskTitle.current) return;
+    focusTaskTitle.current = false;
+    document.querySelector<HTMLElement>(".task-title")?.focus();
+  }, [selectedId, confirmOpen]);
 
   const handleConfirmEnd = async () => {
     setEnding(true);
@@ -220,7 +277,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
     () =>
       examStatus === "error" ? (
         <div className="pane-error" role="alert">
-          <p className="error-text">{strings.exam.questionsFailed(examError ?? "")}</p>
+          <p className="error-text">{strings.exam.questionsFailed(examError ?? "", hosted)}</p>
           <button className="btn" onClick={reloadExam}>
             {strings.questionPanel.retry}
           </button>
@@ -228,30 +285,18 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
       ) : (
         <p className="question-empty-note">{strings.exam.loadingQuestions}</p>
       ),
-    [examStatus, examError, reloadExam],
+    [examStatus, examError, reloadExam, hosted],
   );
 
-  const desktopDownRef = useRef(false);
-  const handleDesktopState = useCallback((state: string) => {
-    if (state === "disconnected") {
-      desktopDownRef.current = true;
-      toastStore.push({
-        kind: "warning",
-        message: strings.toast.desktopReconnecting,
-        dedupeKey: "desktop",
-      });
-    } else if (state === "connected" && desktopDownRef.current) {
-      desktopDownRef.current = false;
-      toastStore.push({
-        kind: "info",
-        message: strings.toast.desktopRestored,
-        dedupeKey: "desktop",
-      });
-    }
+  const [desktopMounts, setDesktopMounts] = useState(0);
+  const retryDesktop = useCallback(() => {
+    DesktopViewport = lazy(loadDesktopViewport);
+    setDesktopMounts((n) => n + 1);
   }, []);
 
   return (
     <div className="exam-layout">
+      <h1 className="sr-only">{exam?.title ?? strings.exam.fallbackTitle}</h1>
       <TimerBar
         session={session}
         fetchedAt={fetchedAt}
@@ -276,17 +321,15 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
               <Icon name="copy" />
             </button>
 
-            {desktopKeymap.isMac && (
-              <button
-                className="info-button"
-                onClick={() => setKeyboardOpen((v) => !v)}
-                aria-expanded={keyboardOpen}
-                aria-label={strings.keyboard.settingsLabel}
-                title={strings.keyboard.settingsLabel}
-              >
-                <Icon name="keyboard" />
-              </button>
-            )}
+            <button
+              className="info-button"
+              onClick={() => setKeyboardOpen((v) => !v)}
+              aria-expanded={keyboardOpen}
+              aria-label={strings.keyboard.settingsLabel}
+              title={strings.keyboard.settingsLabel}
+            >
+              <Icon name="keyboard" />
+            </button>
           </>
         }
         extras={
@@ -299,7 +342,16 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
           ) : undefined
         }
       />
-      <div className="exam-body">
+      {narrow && (
+        <TaskPanelToggle
+          panelId="question-panel"
+          collapsed={collapsed}
+          onToggle={() => setTasksCollapsed(!collapsed)}
+          position={selectedIndex + 1}
+          total={questions.length}
+        />
+      )}
+      <div className="exam-body" data-tasks={collapsed ? "collapsed" : undefined}>
         <QuestionPanel
           questions={questions}
           mode={session.mode}
@@ -311,47 +363,55 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
 
         <section className="desktop-pane" aria-label={strings.exam.desktopTitle}>
           {session.state === "running" && (
-            <Suspense
-              fallback={
-                <div className="desktop-viewport">
-                  <div className="desktop-status" role="status">
-                    <p>{strings.desktop.connecting}</p>
-                    <div className="desktop-status-bar">
-                      <PendingBar />
+            <ErrorBoundary
+              key={desktopMounts}
+              fallback={() => (
+                <PaneFallback title={strings.paneError.desktopTitle} onRetry={retryDesktop} />
+              )}
+            >
+              <Suspense
+                fallback={
+                  <div className="desktop-viewport">
+                    <div className="desktop-status" role="status">
+                      <p>{strings.desktop.connecting}</p>
+                      <div className="desktop-status-bar">
+                        <PendingBar />
+                      </div>
                     </div>
                   </div>
-                </div>
-              }
-            >
-              <DesktopViewport onStateChange={handleDesktopState} />
-            </Suspense>
+                }
+              >
+                <DesktopViewport session={session} fetchedAt={fetchedAt} />
+              </Suspense>
+            </ErrorBoundary>
           )}
         </section>
       </div>
 
       {confirmOpen && (
-        <Dialog title={strings.exam.confirmTitle(session.mode)} onClose={() => setConfirmOpen(false)}>
+        <Dialog title={strings.exam.confirmTitle(session.mode)} onClose={closeConfirm}>
           <p>{strings.exam.confirmBody(session.mode)}</p>
 
-          {(reviewMarked.length > 0 || reviewUnseen.length > 0) && (
-            <div className="submit-review">
-              {reviewMarked.length > 0 && (
-                <p>
-                  {strings.exam.reviewMarked(reviewMarked.length)}{" "}
-                  <span className="submit-review-ids">{reviewMarked.join(", ")}</span>
-                </p>
-              )}
-              {reviewUnseen.length > 0 && (
-                <p>
-                  {strings.exam.reviewUnseen(reviewUnseen.length)}{" "}
-                  <span className="submit-review-ids">{reviewUnseen.join(", ")}</span>
-                </p>
-              )}
-            </div>
-          )}
+          <SubmitReview
+            session={session}
+            fetchedAt={fetchedAt}
+            groups={[
+              {
+                key: "marked",
+                heading: strings.exam.reviewMarked(reviewMarked.length),
+                items: reviewMarked,
+              },
+              {
+                key: "unseen",
+                heading: strings.exam.reviewUnseen(reviewUnseen.length),
+                items: reviewUnseen,
+              },
+            ]}
+            onJump={jumpToTask}
+          />
           {endError && <p className="error-text">{endError}</p>}
           <div className="confirm-actions">
-            <button className="btn" onClick={() => setConfirmOpen(false)} disabled={ending}>
+            <button className="btn" onClick={closeConfirm} disabled={ending}>
               {strings.exam.cancel}
             </button>
             <button className="btn btn-danger" onClick={handleConfirmEnd} disabled={ending}>
@@ -396,7 +456,7 @@ export function Exam({ session, fetchedAt, onSessionChange }: ExamProps) {
       )}
       {introOpen && (
         <ExamIntro
-          onClose={() => setIntroOpen(false)}
+          onClose={closeIntro}
           durationSeconds={exam?.durationSeconds}
         />
       )}

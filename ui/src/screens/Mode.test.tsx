@@ -89,7 +89,7 @@ let exam: ExamInfo = ckad;
 let startStatus = 200;
 let startCalls: string[] = [];
 
-let startBodies: { mode: string; domains?: string[] }[] = [];
+let startBodies: { mode: string; domains?: string[]; awaitStart?: boolean }[] = [];
 const runningSession: SessionSnapshot = {
   state: "running",
   bank: "ckad-mock-01",
@@ -202,11 +202,11 @@ describe("the mode cards", () => {
     expect(within(training).getByText("Hints and reference solutions").textContent).toContain(
       "Yes:",
     );
-    expect(within(training).getByText("Kept as an attempt").textContent).toContain("No:");
+    expect(within(training).getByText("Kept in your history").textContent).toContain("No:");
 
     const real = within(cardFor("Exam")).getByRole("list", { name: "What this mode allows" });
     expect(within(real).getByText("Hints and reference solutions").textContent).toContain("No:");
-    expect(within(real).getByText("Kept as an attempt").textContent).toContain("Yes:");
+    expect(within(real).getByText("Kept in your history").textContent).toContain("Yes:");
   });
 
   test("exactly one card is recommended, and it says so", async () => {
@@ -345,7 +345,7 @@ describe("narrowing the draw", () => {
     );
     await user.click(screen.getByRole("button", { name: "Start Exam" }));
 
-    await waitFor(() => expect(startBodies).toEqual([{ mode: "exam" }]));
+    await waitFor(() => expect(startBodies).toEqual([{ mode: "exam", awaitStart: true }]));
   });
 
   test("choosing domains sends them, and says the run will not be a pass", async () => {
@@ -361,7 +361,7 @@ describe("narrowing the draw", () => {
 
     await user.click(screen.getByRole("button", { name: "Start Exam drill" }));
     await waitFor(() =>
-      expect(startBodies).toEqual([{ mode: "exam", domains: ["Services and Networking"] }]),
+      expect(startBodies).toEqual([{ mode: "exam", domains: ["Services and Networking"], awaitStart: true }]),
     );
   });
 
@@ -397,7 +397,7 @@ describe("narrowing the draw", () => {
 
     expect(screen.queryByText(/never reported as a pass/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Start Exam" }));
-    await waitFor(() => expect(startBodies).toEqual([{ mode: "exam" }]));
+    await waitFor(() => expect(startBodies).toEqual([{ mode: "exam", awaitStart: true }]));
   });
 });
 
@@ -412,7 +412,7 @@ describe("a drill deep link", () => {
 
     await user.click(screen.getByRole("button", { name: "Start Exam drill" }));
     await waitFor(() =>
-      expect(startBodies).toEqual([{ mode: "exam", domains: ["Observability"] }]),
+      expect(startBodies).toEqual([{ mode: "exam", domains: ["Observability"], awaitStart: true }]),
     );
   });
 
@@ -429,7 +429,7 @@ describe("a drill deep link", () => {
 
     await user.click(await screen.findByRole("button", { name: "Start Exam drill" }));
     await waitFor(() =>
-      expect(startBodies).toEqual([{ mode: "exam", domains: ["Config, Security"] }]),
+      expect(startBodies).toEqual([{ mode: "exam", domains: ["Config, Security"], awaitStart: true }]),
     );
   });
 
@@ -441,7 +441,7 @@ describe("a drill deep link", () => {
 
     await user.click(await screen.findByRole("button", { name: "Start Exam drill" }));
     await waitFor(() =>
-      expect(startBodies).toEqual([{ mode: "exam", domains: ["Observability"] }]),
+      expect(startBodies).toEqual([{ mode: "exam", domains: ["Observability"], awaitStart: true }]),
     );
   });
 });
@@ -496,8 +496,9 @@ describe("a device that cannot sit this exam", () => {
     renderMode();
 
     expect(
-      await screen.findByRole("heading", { level: 1, name: /needs a desktop/i }),
+      await screen.findByRole("heading", { level: 2, name: /needs a desktop/i }),
     ).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
 
     expect(screen.queryByRole("heading", { name: strings.modes.exam.label })).toBeNull();
     expect(screen.queryByRole("button", { name: /start/i })).toBeNull();
@@ -509,7 +510,7 @@ describe("a device that cannot sit this exam", () => {
     renderMode();
 
     expect(await screen.findByRole("heading", { name: strings.modes.exam.label })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { level: 1, name: /needs a desktop/i })).toBeNull();
+    expect(screen.queryByRole("heading", { level: 2, name: /needs a desktop/i })).toBeNull();
   });
 
   test("a narrowed desktop window still gets the mode cards", async () => {
@@ -517,14 +518,14 @@ describe("a device that cannot sit this exam", () => {
     renderMode();
 
     expect(await screen.findByRole("heading", { name: strings.modes.exam.label })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { level: 1, name: /needs a desktop/i })).toBeNull();
+    expect(screen.queryByRole("heading", { level: 2, name: /needs a desktop/i })).toBeNull();
   });
 
   test("no attempt can be started from it", async () => {
     matchMediaMock([TOUCH_ONLY_QUERY]);
     renderMode();
 
-    await screen.findByRole("heading", { level: 1, name: /needs a desktop/i });
+    await screen.findByRole("heading", { level: 2, name: /needs a desktop/i });
     expect(startCalls).toEqual([]);
   });
 });

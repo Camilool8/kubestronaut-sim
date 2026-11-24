@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { readBaseCss, readThemeCss, ruleBody, usedClassNames } from "../test/readCss";
+import { readBaseCss, readThemeCss, readTokensCss, ruleBody, usedClassNames } from "../test/readCss";
 
 describe("full-height chain", () => {
   test("the chain reaches #root, or every screen root's percentage collapses", async () => {
@@ -65,6 +65,56 @@ describe("the navbar does not shrink with the page below it", () => {
     expect(bar, "the navbar's own rule was renamed or removed").not.toBeNull();
     expect(bar).toContain("height: 56px");
     expect(bar).toContain("flex-shrink: 0");
+  });
+});
+
+describe("the exam bar yields width instead of overprinting", () => {
+  test("the environment line gives up its width before anything else in the bar", async () => {
+    const css = await readThemeCss();
+    const env = ruleBody(css, ".exam-env");
+
+    expect(env, "the env line's own rule was renamed or removed").not.toBeNull();
+    expect(
+      env,
+      "without inline-size containment the line's full text counts toward the bar's minimum, and the title is squeezed to nothing",
+    ).toContain("contain: inline-size");
+    expect(env).toContain("min-width: 0");
+  });
+
+  test("the exam title keeps a floor, and the lead clips rather than paints over the tail", async () => {
+    const css = await readThemeCss();
+    const lead = ruleBody(css, ".navbar-exam .navbar-lead");
+
+    expect(lead, "the exam bar's lead rule was renamed or removed").not.toBeNull();
+    expect(lead).toMatch(/min-width: (?!0)[\d.]+rem/);
+    expect(ruleBody(css, ".navbar-lead")).toContain("overflow: clip");
+    expect(ruleBody(css, ".navbar-tail")).toContain("flex-shrink: 0");
+  });
+});
+
+describe("the type floor", () => {
+  const remOf = (tokens: string, name: string) =>
+    Number(new RegExp(`--${name}: ([\\d.]+)rem;`).exec(tokens)?.[1] ?? NaN);
+
+  test("the two smallest tiers are 11px and 12px", async () => {
+    const tokens = await readTokensCss();
+    expect(remOf(tokens, "text-2xs") * 16).toBeGreaterThanOrEqual(11);
+    expect(remOf(tokens, "text-xs") * 16).toBeGreaterThanOrEqual(12);
+  });
+
+  test("the 11px tier is only set on uppercase, tracked micro-labels", async () => {
+    const css = (await readThemeCss()).replace(/\/\*[\s\S]*?\*\//g, "");
+    const allowed = new Set([".navigator-tile-flag", ".mode-badge", ".tv-verdict", ".explain-verdict"]);
+    const offenders: string[] = [];
+    for (const rule of css.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+      const selector = rule[1].replace(/\s+/g, " ").trim();
+      const body = rule[2];
+      if (!body.includes("var(--text-2xs)") || allowed.has(selector)) continue;
+      if (!body.includes("text-transform: uppercase") || !body.includes("letter-spacing")) {
+        offenders.push(selector);
+      }
+    }
+    expect(offenders, "functional text belongs on --text-xs (12px) or above").toEqual([]);
   });
 });
 
@@ -312,5 +362,21 @@ describe("the touch layer names classes that exist", () => {
     expect(owners, "touch-action: none disables pinch zoom on whatever it names").toEqual([
       ".panel-resizer",
     ]);
+  });
+});
+
+describe("the screen wrapper never becomes a containing block for fixed overlays", () => {
+  test("its entrance animation does not keep a transform once it has finished", async () => {
+    const css = await readThemeCss();
+    const bodies = [...css.matchAll(/(?:^|\n)\s*\.screen\s*\{([^}]*)\}/g)].map((m) => m[1]);
+    const animated = bodies.filter((b) => b.includes("animation"));
+
+    expect(animated.length, "the .screen entrance animation was renamed or removed").toBeGreaterThan(0);
+    for (const body of animated) {
+      expect(
+        body,
+        "a forwards fill keeps the transform applied, so every position: fixed scrim inside the screen is laid out against it",
+      ).not.toMatch(/\b(both|forwards)\b/);
+    }
   });
 });

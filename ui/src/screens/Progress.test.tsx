@@ -180,6 +180,32 @@ afterEach(() => {
   window.history.replaceState(null, "", window.location.pathname);
 });
 
+describe("a history that will not load", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ error: "upstream 502" }), { status: 502 })),
+    );
+  });
+
+  test("self-hosted, it leads with the plain sentence and keeps the operator hint after it", async () => {
+    renderProgress();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/^Your history did not load\./);
+    expect(alert).toHaveTextContent(/docker compose ps facilitator/);
+    expect(alert).toHaveTextContent(/upstream 502/);
+  });
+
+  test("hosted, it never tells a candidate to run docker", async () => {
+    render(<Progress catalogVersion={0} hosted />);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/^Your history did not load\./);
+    expect(alert).toHaveTextContent(/nothing is lost/);
+    expect(alert).not.toHaveTextContent(/docker/);
+    expect(alert).toHaveTextContent(/upstream 502/);
+  });
+});
+
 describe("the certification path", () => {
   test("one card per exam, each saying which of the four states it is in", async () => {
     renderProgress();
@@ -187,7 +213,7 @@ describe("the certification path", () => {
 
     expect(within(cardFor("KCNA")).getByText("Passed")).toBeInTheDocument();
     expect(within(cardFor("CKAD")).getByText("In progress")).toBeInTheDocument();
-    expect(within(cardFor("CKS")).getByText("Not built")).toBeInTheDocument();
+    expect(within(cardFor("CKS")).getByText("Coming soon")).toBeInTheDocument();
 
     expect(within(cardFor("KCNA")).getByText("88%")).toBeInTheDocument();
     expect(within(cardFor("KCNA")).getByText("2 attempts · 12 Mar 2026")).toBeInTheDocument();
@@ -234,7 +260,7 @@ describe("the attempt table", () => {
 
     expect(within(row).queryByText("pass")).not.toBeInTheDocument();
     expect(
-      screen.getByText(/does not count toward the path/),
+      screen.getByText(/does not count toward your Kubestronaut path/),
     ).toBeInTheDocument();
   });
 
@@ -342,6 +368,27 @@ describe("the weak-domain panel", () => {
 });
 
 describe("the record itself", () => {
+  test("an empty record offers nothing to erase", async () => {
+    history = { attempts: [], summary: { ...summary, attempts: 0, weakDomains: [] } };
+    renderProgress();
+    expect(await screen.findByText(/Nothing graded yet/)).toBeInTheDocument();
+
+    expect(screen.queryByRole("button", { name: "Erase history" })).toBeNull();
+  });
+
+  test("erasing sits with the record it destroys, away from the primary action", async () => {
+    renderProgress();
+    const table = await screen.findByRole("table");
+
+    const erase = screen.getByRole("button", { name: "Erase history" });
+    const panel = table.closest("section") as HTMLElement;
+    expect(panel).toContainElement(erase);
+
+    const header = screen.getByRole("heading", { level: 1, name: "Progress" }).closest("header");
+    expect(header).not.toContainElement(erase);
+    expect(within(header as HTMLElement).getByRole("button", { name: "New session" })).toBeTruthy();
+  });
+
   test("erasing is confirmed first, and nothing is deleted by the dialog opening", async () => {
     const user = userEvent.setup();
     renderProgress();

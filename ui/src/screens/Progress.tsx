@@ -198,14 +198,6 @@ export function Progress({ catalogVersion, hosted = false }: ProgressProps) {
           />
             </>
           )}
-          <button
-            type="button"
-            className="btn btn-danger"
-            onClick={() => setErasing(true)}
-            disabled={busy !== null}
-          >
-            {strings.progress.erase}
-          </button>
           <button type="button" className="btn btn-primary" onClick={() => navigate("/exams")}>
             {strings.progress.newSession}
           </button>
@@ -223,7 +215,7 @@ export function Progress({ catalogVersion, hosted = false }: ProgressProps) {
         loading={<p className="page-loading">{strings.app.working}</p>}
         error={(message, reload) => (
           <div className="catalog-error" role="alert">
-            <p className="catalog-error-body">{strings.progress.loadFailed(message)}</p>
+            <p className="catalog-error-body">{strings.progress.loadFailed(message, hosted)}</p>
             <button type="button" className="btn" onClick={reload}>
               {strings.progress.retry}
             </button>
@@ -323,6 +315,16 @@ export function Progress({ catalogVersion, hosted = false }: ProgressProps) {
                       {attempts.some((a) => !a.counted) && (
                         <p className="history-footnote">{strings.progress.uncountedTitle}</p>
                       )}
+                      <div className="history-erase">
+                        <button
+                          type="button"
+                          className="btn btn-danger"
+                          onClick={() => setErasing(true)}
+                          disabled={busy !== null}
+                        >
+                          {strings.progress.erase}
+                        </button>
+                      </div>
                     </>
                   )}
                 </section>

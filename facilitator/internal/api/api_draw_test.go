@@ -28,6 +28,11 @@ type preparingBody struct {
 	QuestionCount int    `json:"questionCount"`
 	StartedAt     string `json:"startedAt"`
 	Seed          string `json:"seed"`
+
+	DurationSeconds int    `json:"durationSeconds"`
+	AwaitStart      bool   `json:"awaitStart"`
+	Ready           bool   `json:"ready"`
+	ReadyAt         string `json:"readyAt"`
 }
 
 type errorBody struct {

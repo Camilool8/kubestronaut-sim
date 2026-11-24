@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ControlProgress } from "./ControlProgress";
 import type { ControlJob } from "../api";
@@ -267,5 +267,54 @@ describe("ControlProgress", () => {
       await user.click(screen.getByRole("button", { name: /retry/i }));
       expect(onRetry).toHaveBeenCalled();
     });
+  });
+});
+
+describe("ControlProgress focus", () => {
+  test("takes focus on open, skipping the log the closed disclosure hides", () => {
+    render(<ControlProgress job={runningJob} {...props} />);
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).toHaveTextContent(/log/i);
+    expect(document.activeElement?.tagName).toBe("SUMMARY");
+  });
+
+  test("Esc and Tab still answer after focus has fallen out to the body", () => {
+    const onBackground = vi.fn();
+    render(<ControlProgress job={runningJob} {...props} onBackground={onBackground} />);
+    const dialog = screen.getByRole("dialog");
+
+    (document.activeElement as HTMLElement).blur();
+    fireEvent.keyDown(document.body, { key: "Tab" });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+
+    (document.activeElement as HTMLElement).blur();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(onBackground).toHaveBeenCalledOnce();
+  });
+
+  test("the 2 s control poll re-rendering it with fresh handlers does not move focus", () => {
+    const { rerender } = render(<ControlProgress job={runningJob} {...props} />);
+    const background = screen.getByRole("button", { name: /background/i });
+    background.focus();
+
+    for (let i = 0; i < 3; i++) {
+      rerender(
+        <ControlProgress
+          job={{ ...runningJob }}
+          onRetry={() => {}}
+          onDismiss={() => {}}
+          onBackground={() => {}}
+        />,
+      );
+    }
+    expect(background).toHaveFocus();
+  });
+
+  test("renders over the whole page and makes the rest of it inert", () => {
+    const { container } = render(<ControlProgress job={runningJob} {...props} />);
+    const overlay = screen.getByRole("dialog").parentElement!;
+    expect(overlay.parentElement).toBe(document.body);
+    expect(container).toHaveAttribute("inert");
   });
 });

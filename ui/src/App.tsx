@@ -18,6 +18,7 @@ import { BootProgress } from "./screens/BootProgress";
 import { Exams } from "./screens/Exams";
 import { Mode } from "./screens/Mode";
 import { Preparing } from "./screens/Preparing";
+import { Ready } from "./screens/Ready";
 import { Exam, ExamGateControls } from "./screens/Exam";
 import { McqExam } from "./screens/McqExam";
 import { Progress } from "./screens/Progress";
@@ -30,12 +31,15 @@ import { ControlProgress } from "./components/ControlProgress";
 import { ToastLayer } from "./components/Toast";
 import { TopProgress } from "./components/TopProgress";
 import { ScreenTransition } from "./components/ScreenTransition";
+import { ExamTabTitle } from "./components/ExamTabTitle";
+import { tabTitle, useDocumentTitle } from "./lib/useDocumentTitle";
 import { toastStore } from "./components/toastStore";
 import { HostedBooting } from "./screens/HostedBooting";
 import { HostedSignIn } from "./screens/HostedSignIn";
 import { HostedStart } from "./screens/HostedStart";
 import { Review } from "./screens/Review";
 import { useHosted } from "./lib/useHosted";
+import { isHostedDeployment } from "./lib/deployment";
 import type { Me } from "./api";
 import { navigate, useRoute } from "./lib/useHashRoute";
 import { usePoll } from "./lib/usePoll";
@@ -48,6 +52,8 @@ const CONTROL_POLL_IDLE_MS = 15_000;
 const BOOT_POLL_MS = 2_000;
 
 const PREPARE_POLL_MS = 1_000;
+
+const PREPARE_POLL_HIDDEN_MS = 5_000;
 
 const SESSION_POLL_MS = 10_000;
 
@@ -63,6 +69,10 @@ export default function App() {
   const route = useRoute();
 
   useSeatLanding(state);
+
+  const ownsTitle =
+    state.status === "unknown" || (state.status === "hosted" && !state.me.authenticated);
+  useDocumentTitle(ownsTitle ? strings.titles.app : null);
 
   if (state.status === "unknown") {
     return (
@@ -114,6 +124,14 @@ function HostedHome({ hosted, route }: { hosted: Hosted; route: ReturnType<typeo
   const trail: Crumb[] = reviewId
     ? [{ label: strings.header.navProgress, to: "/progress" }, { label: strings.review.crumb }]
     : [{ label: onProgress ? strings.header.crumbProgress : strings.hosted.chipLabel }];
+
+  useDocumentTitle(
+    reviewId
+      ? tabTitle(strings.titles.review, strings.titles.app)
+      : onProgress
+        ? tabTitle(strings.titles.progress, strings.titles.app)
+        : strings.titles.app,
+  );
 
   return (
     <>
@@ -207,13 +225,13 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
     }
   }, SESSION_POLL_MS);
 
-  const preparing = session?.preparing !== undefined;
+  const preparing = session?.preparing !== undefined && session.preparing.ready !== true;
   usePoll(
     async () => {
       applySession(await getSession());
     },
-    PREPARE_POLL_MS,
-    { enabled: preparing },
+    () => (document.hidden ? PREPARE_POLL_HIDDEN_MS : PREPARE_POLL_MS),
+    { enabled: preparing, background: true },
   );
 
   const prepareError = session?.prepareError;
@@ -263,7 +281,7 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
     } else {
       toastStore.push({
         kind: "warning",
-        message: strings.control.actionFailed(result.error),
+        message: strings.control.actionFailed(result.error, isHostedDeployment()),
         dedupeKey: "control-action",
       });
       const current = await getControlStatus().catch(() => null);
@@ -293,7 +311,7 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
       } catch (err) {
         toastStore.push({
           kind: "warning",
-          message: strings.control.actionFailed(String(err)),
+          message: strings.control.actionFailed(String(err), isHostedDeployment()),
           dedupeKey: "control-action",
         });
       }
@@ -382,6 +400,32 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
       ? (route.segments[1] ?? null)
       : null;
 
+  const examLabel =
+    (exam?.certification && exam.certification !== "NONE" ? exam.certification : "") ||
+    exam?.title ||
+    "";
+
+  const pageTitle = reviewId
+    ? tabTitle(strings.titles.review, strings.titles.app)
+    : booting
+      ? tabTitle(strings.titles.booting, strings.titles.app)
+      : !session
+        ? strings.titles.app
+        : session.state === "running"
+          ? null
+          : session.state === "ended"
+            ? tabTitle(strings.titles.results, examLabel || strings.titles.app)
+            : session.preparing?.ready
+              ? tabTitle(strings.titles.ready, examLabel || strings.titles.app)
+              : session.preparing
+                ? tabTitle(strings.titles.preparing(examLabel), strings.titles.app)
+                : onProgress
+                  ? tabTitle(strings.titles.progress, strings.titles.app)
+                  : modeBankId
+                    ? tabTitle(strings.titles.mode, examLabel || strings.titles.app)
+                    : tabTitle(strings.titles.exams, strings.titles.app);
+  useDocumentTitle(pageTitle);
+
   let screen = null;
   if (reviewId) {
     screen = <Review attemptId={reviewId} questionId={route.segments[2] ?? null} />;
@@ -396,7 +440,13 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
   } else {
     switch (session.state) {
       case "idle":
-        screen = session.preparing ? (
+        screen = session.preparing?.ready ? (
+          <Ready
+            preparing={session.preparing}
+            examLabel={examLabel}
+            onSessionChange={applySession}
+          />
+        ) : session.preparing ? (
           <Preparing preparing={session.preparing} detail={seedDetail} />
         ) : onProgress ? (
           <Progress catalogVersion={catalogVersion} hosted={hosted !== undefined} />
@@ -506,7 +556,9 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
             booting
               ? "booting"
               : session?.preparing
-                ? "preparing"
+                ? session.preparing.ready
+                  ? "ready"
+                  : "preparing"
                 : `${session?.state ?? "loading"}${
                     onProgress ? ":progress" : modeBankId ? ":mode" : ""
                   }`
@@ -516,6 +568,9 @@ function SimApp({ hosted }: { hosted?: Hosted } = {}) {
         </ScreenTransition>
       </main>
       <ToastLayer />
+      {session?.state === "running" && pageTitle === null && (
+        <ExamTabTitle session={session} fetchedAt={fetchedAt} label={examLabel} />
+      )}
       {showOverlay && overlayJob && (
         <ControlProgress
           job={overlayJob}

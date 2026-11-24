@@ -488,8 +488,16 @@ seed, which is what `./sim` and `tests/smoke.sh` send — they POST with
 no body at all and no `Content-Type`.
 
 ```json
-{"mode": "training", "seed": "a1b2c3", "domains": ["Kubernetes Fundamentals"], "poolDigest": "3f9c1a2b7e04"}
+{"mode": "training", "seed": "a1b2c3", "domains": ["Kubernetes Fundamentals"], "poolDigest": "3f9c1a2b7e04", "awaitStart": true}
 ```
+
+`awaitStart` only matters on a pooled hands-on bank. Absent or false, the
+attempt starts by itself the moment its tasks are seeded, which is what
+`./sim`, `tests/smoke.sh` and `tests/drill.sh` rely on. True, the
+preparation stops at a ready state and waits for
+[POST /api/session/begin](#post-apisessionbegin); the UI always sends it.
+See [The start gate](#the-start-gate). Every other bank starts at once
+and ignores it.
 
 The response is the session shape documented under
 [GET /api/session](#get-apisession), plus `"poolChanged": true` when the
@@ -532,17 +540,21 @@ The 202 body is a preparation, not a session:
 ```json
 {"state": "preparing", "bank": "ckad-mock-01", "mode": "exam", "jobId": "job-7",
  "questionCount": 16, "seed": "a1b2c3", "poolDigest": "0f1e2d3c4b5a",
- "domainFilter": ["Services and Networking"], "poolChanged": true}
+ "domainFilter": ["Services and Networking"], "poolChanged": true, "awaitStart": true}
 ```
 
-`domainFilter` is omitted for a whole-curriculum draw and `poolChanged`
-when false. **Branch on the status code, not the body's shape**: 202 also
+`domainFilter` is omitted for a whole-curriculum draw, `poolChanged`
+when false, and `awaitStart` when the request did not ask for the gate. **Branch on the status code, not the body's shape**: 202 also
 passes an `ok` check, and read as a session it looks like an attempt in
 state `preparing` with a zero clock.
 
 Meanwhile `GET /api/session` reports `state: "idle"` with two extra
 fields — `preparing` (`jobId`, `mode`, `questionCount`, `startedAt`,
-`seed`, `poolDigest`) and, after a failure, `prepareError`. `state` stays
+`seed`, `poolDigest`, `durationSeconds`, plus `awaitStart`, `ready` and
+`readyAt` under [the start gate](#the-start-gate)) and, after a failure,
+`prepareError`. `startedAt` here is when the preparation began, not a
+clock; `durationSeconds` is the clock the attempt will get, 0 for
+Training. `state` stays
 a strict three-way on purpose: a client that has never heard of pooling
 keeps reading a response that is true, and `DELETE /api/session` still
 cancels.
@@ -561,27 +573,115 @@ with `op: "seed"` and one phase, `seed-questions`, whose `detail` counts
 When `preparing` goes:
 
 - `state: "running"` — the attempt is the draw that was seeded, same seed
-  and same ids. Route into it.
+  and same ids. Route into it. Under the start gate this happens only
+  after `POST /api/session/begin`.
 - `state: "idle"` with `prepareError` — show it and stay put. No clock
   ever started, so nothing was lost.
 - `state: "idle"` with no `prepareError` — cancelled. Return to the lobby
   silently; this is not an error.
 
+A facilitator restart does not end a preparation by itself: it is saved
+to disk and resumed, as described in
+[Surviving a facilitator restart](#surviving-a-facilitator-restart).
+
 **`prepareError` can also arrive without this process ever having
-prepared anything.** A preparation lives in memory, so a facilitator that
-restarts mid-preparation loses the draw entirely and cannot resume it —
-there is nothing left to start. On its first `GET /api/session`, a pooled
-hands-on server asks the conductor whether its last job was a `seed`; an
-idle session plus a seed job means the seeding was done for an attempt
-that no longer exists, because a preparation that had *succeeded* would
-have started an attempt, and an attempt is persisted. It then says so
-rather than leaving a poller waiting forever, and the next
-`POST /api/session/start` is refused 409 until the environment is reset —
-the cluster is holding a draw nothing can now enumerate.
+prepared anything.** When no usable saved preparation survives the
+restart, the facilitator falls back to asking. On its first
+`GET /api/session`, a pooled hands-on server asks the conductor whether
+its last job was a `seed`; an idle session plus a seed job, with nothing
+saved, means the seeding was done for an attempt this process can no
+longer enumerate. It then says so rather than leaving a poller waiting
+forever, and the next `POST /api/session/start` is refused 409 until the
+environment is reset.
 
 `DELETE /api/session` cancels and guarantees no attempt starts. It cannot
 stop the conductor's job, so the overlay runs to completion — harmless,
 because `setup.sh` is an idempotent apply.
+
+### The start gate
+
+A preparation started with `"awaitStart": true` does not start the
+attempt when its seed job succeeds. It stays in `preparing` with
+`ready: true` and `readyAt` set: the cluster holds the draw, the draw is
+fixed, and no clock is running. `state` is still `idle`, so every gate in
+[Session-state gates](#session-state-gates) stays closed, the desktop
+included. The attempt starts only when the client calls
+[POST /api/session/begin](#post-apisessionbegin), and `startedAt` is the
+time of that call.
+
+The UI uses it so a candidate who walked away during the few minutes of
+seeding does not come back to a clock that has been running without
+them, and so the first-time walkthrough is read before the clock rather
+than over it.
+
+| While ready | What happens |
+|---|---|
+| `DELETE /api/session` | Cancels. `preparing` goes, nothing starts, and a later begin is 409. |
+| `POST /api/control/reset` or `/switch` succeeds | The cluster no longer holds the draw, so the ready preparation is dropped as if cancelled. A refused reset leaves it in place. |
+| `POST /api/session/start` | 409, as for any preparation in flight. |
+| The facilitator restarts | The ready preparation comes back ready, with its original `readyAt`, once the conductor confirms it still holds the seed job. No clock starts until begin. If the conductor cannot confirm it, the restart is reported through `prepareError` and the next start is 409 until the environment is reset. See [Surviving a facilitator restart](#surviving-a-facilitator-restart). |
+| Nobody presses Start | Nothing. A ready preparation has no expiry: no clock runs and the cluster costs the same idle as it would after an attempt. A hosted seat is still bounded by the hub's own idle and session-length limits. |
+
+A client that never sends `awaitStart` never sees `ready`, and
+`preparing` disappears exactly as described above.
+
+### Surviving a facilitator restart
+
+Once the conductor has accepted the seed job, the facilitator saves the
+preparation to `prep.json` in the same directory as the session file
+(`/session/prep.json` with the default `SESSION_FILE`), using the same
+write-to-a-temp-file-then-rename as the session file
+(`facilitator/internal/session/prep.go`). It holds the seed job id, mode,
+duration, the draw (question ids, seed, pool digest, domain filter),
+`awaitStart`, `ready`, `readyAt` and the preparation's `startedAt`. It is
+rewritten when the seed finishes and removed whenever the preparation
+ends: begin (after the session file is written), `DELETE /api/session`, a
+successful reset or switch through `/api/control/`, a failed seed, and a
+successful auto-start.
+
+On startup, with an idle session, a saved preparation is put back as
+`preparing` without `ready`, so begin is 409 until it is checked. The
+facilitator then reads `GET /api/control/status` and acts on what the
+conductor says about that job id
+(`facilitator/internal/api/prep_persist.go`):
+
+| The conductor reports | Outcome |
+|---|---|
+| The job still running | Watched again. It finishes as it would have without the restart: ready under `awaitStart`, started otherwise. |
+| The job as `lastJob`, nothing running, no error, under `awaitStart` | Ready again, with the saved `readyAt`. The clock starts only at begin. |
+| The job as `lastJob`, nothing running, no error, without `awaitStart` | The attempt starts at resume, and its `startedAt` is the resume time, not the time the seed finished. That client asked for an auto-start, and nobody has seen a clock yet. |
+| The job as `lastJob` with an error | The error becomes `prepareError`, as for a seed that failed in front of the service. |
+| Anything else: another job since, no job at all, or no answer for 120 consecutive tries (at least a minute) | Lost. `prepareError` says the service restarted, and the next start is 409 until the environment is reset. |
+
+The file is not trusted on its own:
+
+- A running or ended session always wins. A `prep.json` beside one is
+  left from a crash between writing the session file and removing
+  `prep.json`; it is deleted without being acted on, so nothing starts
+  twice.
+- A file that cannot be parsed, has another format version, or was made
+  for another bank is deleted, and the conductor probe above decides
+  what to report.
+- A saved draw that no longer fits the loaded bank (its pool digest
+  changed, or a question is gone) is reported as lost: the cluster holds
+  a seed for questions this service no longer serves.
+
+This covers a facilitator container that restarts on its own: a crash,
+an OOM kill, or an image upgrade under Compose, where `session` is a
+named volume. A hosted session Pod runs with `restartPolicy: Never`, so a
+facilitator that dies there is not restarted inside the Pod, and the
+saved preparation is never read.
+
+### POST /api/session/begin
+
+Starts the attempt a gated preparation is holding. No body
+(`facilitator/internal/api/prepare.go`).
+
+| Code | When |
+|---|---|
+| 200 | Started. The body is the session shape from [GET /api/session](#get-apisession), `state: "running"`. Also 200, with the running session, when the attempt has already started: a double click or a retried request lands on the same attempt and never starts a second. |
+| 409 | Nothing is prepared (`no attempt is waiting to start`), the preparation has not finished seeding (`the exam environment is still being prepared`), or the caller declared a coarse pointer on a hands-on exam (`code: "desktop_required"`). |
+| 500 | The started session could not be persisted. The preparation stays ready, so the call can be retried. |
 
 ### The draw
 
@@ -710,7 +810,8 @@ Current session state. Always 200
 ```
 
 Two further fields appear only for a pooled hands-on bank, and only
-between a draw and its clock: `preparing` and `prepareError`. Both are
+between a draw and its clock: `preparing` and `prepareError`. `preparing`
+is never reported beside a running or ended state. Both are
 described under [Preparing an attempt](#preparing-an-attempt); `state`
 stays `idle` while `preparing` is set.
 

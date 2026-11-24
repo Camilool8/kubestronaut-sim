@@ -8,7 +8,7 @@ const questions: NavigatorQuestion[] = Array.from({ length: 12 }, (_, i) => ({
   id: `q${String(i + 1).padStart(2, "0")}`,
   label: `Q${i + 1}`,
   detail: "Kubernetes Fundamentals",
-  done: i < 3,
+  reached: i < 3,
 }));
 
 afterEach(() => {
@@ -108,12 +108,28 @@ describe("Navigator tiles", () => {
   });
 
   test("the hands-on vocabulary never claims an answer", () => {
-    renderNavigator({ progress: "opened" });
+    renderNavigator({ progress: "viewed" });
 
-    expect(tile("Q1")).toHaveAccessibleName(/opened/);
-    expect(tile("Q12")).toHaveAccessibleName(/not opened/);
+    expect(tile("Q1")).toHaveAccessibleName(/viewed/);
+    expect(tile("Q12")).toHaveAccessibleName(/not viewed/);
     expect(screen.queryByText("Answered")).toBeNull();
-    expect(screen.getByText("Opened")).toBeInTheDocument();
+    expect(screen.getByText("Viewed")).toBeInTheDocument();
+  });
+
+  test("a viewed tile is styled as viewed, never as done or answered", () => {
+    renderNavigator({ progress: "viewed" });
+
+    expect(tile("Q1")).toHaveClass("is-viewed");
+    expect(tile("Q1")).not.toHaveClass("is-answered");
+    expect(tile("Q1")).not.toHaveClass("is-done");
+    expect(tile("Q12")).not.toHaveClass("is-viewed");
+  });
+
+  test("an answered tile is styled as answered", () => {
+    renderNavigator();
+
+    expect(tile("Q1")).toHaveClass("is-answered");
+    expect(tile("Q12")).not.toHaveClass("is-answered");
   });
 });
 

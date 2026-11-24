@@ -272,7 +272,7 @@ describe("axe: no WCAG violations", () => {
   });
 
   test("exam question panel", async () => {
-    const { container } = render(
+    render(
       <QuestionPanel
         questions={examQuestions}
         selectedId="q01"
@@ -280,7 +280,7 @@ describe("axe: no WCAG violations", () => {
       />,
     );
     await screen.findByRole("button", { name: /aurora-staging/ });
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("exam question panel with the jump grid open", async () => {
@@ -294,14 +294,14 @@ describe("axe: no WCAG violations", () => {
     );
     await user.click(await screen.findByRole("button", { name: /show all questions/i }));
     expect(container.querySelector("#question-jump")).not.toBeNull();
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("backgrounded job chip", async () => {
-    const { container } = render(
+    render(
       <BackgroundJobChip job={runningJob} bankTitle="CKA Mock Exam 01" onReopen={() => {}} />,
     );
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("panel resizer", async () => {
@@ -313,42 +313,42 @@ describe("axe: no WCAG violations", () => {
       </div>,
     );
     expect(container.querySelector('[role="separator"]')).not.toBeNull();
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("exam selector", async () => {
-    const { container } = render(
+    render(
       <Exams onControlStart={() => {}} catalogVersion={0} onBanksLoaded={() => {}} />,
     );
     await screen.findByText("CKAD", { selector: "h2" });
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("mode selector", async () => {
-    const { container } = render(
+    render(
       <Mode bankId="ckad-mock-01" catalogVersion={0} onSessionChange={() => {}} />,
     );
     await screen.findByRole("button", { name: /start exam/i });
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("progress dashboard", async () => {
-    const { container } = render(<Progress catalogVersion={0} />);
+    render(<Progress catalogVersion={0} />);
     await screen.findByRole("table");
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("exam selector with the switch-confirm dialog open", async () => {
     const user = userEvent.setup();
-    const { container } = render(
+    render(
       <Exams onControlStart={() => {}} catalogVersion={0} onBanksLoaded={() => {}} />,
     );
     await screen.findByText("CKA", { selector: "h2" });
 
-    await user.click(screen.getAllByRole("button", { name: /choose a mode/i })[1]);
+    await user.click(screen.getAllByRole("button", { name: /^Load / })[0]);
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("exam selector catalog error card", async () => {
@@ -363,24 +363,24 @@ describe("axe: no WCAG violations", () => {
         return new Response(JSON.stringify(body), { status: 200 });
       }),
     );
-    const { container } = render(
+    render(
       <Exams onControlStart={() => {}} catalogVersion={0} onBanksLoaded={() => {}} />,
     );
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("score screen with results", async () => {
-    const { container } = render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
     await screen.findByRole("heading", { level: 1, name: /passed/i });
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("score screen deep dive, with the reference solution rendered", async () => {
     const user = userEvent.setup();
-    const { container } = render(<Score onNewAttempt={() => {}} endReason="submitted" />);
+    render(<Score onNewAttempt={() => {}} endReason="submitted" />);
     await screen.findByRole("heading", { level: 1, name: /passed/i });
 
     await user.click(screen.getByText("q01"));
@@ -389,18 +389,18 @@ describe("axe: no WCAG violations", () => {
     expect(await screen.findByText("yaml")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy yaml code block/i })).toBeInTheDocument();
 
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("control progress overlay, running and failed", async () => {
     const user = userEvent.setup();
-    const { container, rerender } = render(
+    const { rerender } = render(
       <ControlProgress job={runningJob} onRetry={() => {}} onDismiss={() => {}} onBackground={() => {}} />,
     );
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
 
     await user.click(screen.getByText(/show build log/i));
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
 
     rerender(
       <ControlProgress
@@ -410,11 +410,11 @@ describe("axe: no WCAG violations", () => {
         onBackground={() => {}}
       />,
     );
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("boot progress, building", async () => {
-    const { container } = render(
+    render(
       <BootProgress
         boot={{
           state: "booting",
@@ -429,11 +429,11 @@ describe("axe: no WCAG violations", () => {
         onRetry={() => {}}
       />,
     );
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("boot progress, failed", async () => {
-    const { container } = render(
+    render(
       <BootProgress
         boot={{
           state: "failed",
@@ -448,11 +448,11 @@ describe("axe: no WCAG violations", () => {
         onRetry={() => {}}
       />,
     );
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("domain breakdown", async () => {
-    const { container } = render(
+    render(
       <DomainBreakdown
         questions={[
           {
@@ -466,65 +466,65 @@ describe("axe: no WCAG violations", () => {
         ]}
       />,
     );
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("hint tray", async () => {
-    const { container } = render(<HintTray questionId="q01" hintCount={2} />);
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    render(<HintTray questionId="q01" hintCount={2} />);
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("clipboard panel", async () => {
-    const { container } = render(<ClipboardPanel onClose={() => {}} />);
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    render(<ClipboardPanel onClose={() => {}} />);
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("keyboard settings popover", async () => {
-    const { container } = render(
+    render(
       <KeyboardSettings onClose={() => {}} onShowHelp={() => {}} />,
     );
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("shortcut help", async () => {
-    const { container } = render(<ShortcutHelp onClose={() => {}} />);
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    render(<ShortcutHelp onClose={() => {}} />);
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("desktop-required gate", async () => {
-    const { container } = render(<DesktopRequired verdict="narrow" />);
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    render(<DesktopRequired verdict="narrow" />);
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("navbar at the top of the app", async () => {
-    const { container } = render(
+    render(
       <NavBar
-        trail={[{ label: "Choose an exam" }]}
+        trail={[{ label: "Exams" }]}
         nav={[
           { label: "Exams", to: "/exams", icon: "grid" },
           { label: "Progress", to: "/progress", icon: "chart", current: true },
         ]}
       />,
     );
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("navbar one step down, with a trail", async () => {
-    const { container } = render(
+    render(
       <NavBar
         trail={[{ label: "Exams", to: "/exams" }, { label: "CKAD" }]}
         nav={[{ label: "Exams", to: "/exams", icon: "grid" }]}
       />,
     );
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("navbar, narrow, with the menu open", async () => {
     matchMediaMock([HEADER_COMPACT_QUERY, MCQ_COMPACT_QUERY]);
     const user = userEvent.setup();
-    const { container } = render(
+    render(
       <NavBar
-        trail={[{ label: "Your path" }]}
+        trail={[{ label: "Progress" }]}
         nav={[
           { label: "Exams", to: "/exams", icon: "grid" },
           { label: "Progress", to: "/progress", icon: "chart", current: true },
@@ -546,34 +546,34 @@ describe("axe: no WCAG violations", () => {
     await user.click(screen.getByRole("button", { name: strings.header.menuLabel }));
     expect(screen.getByRole("button", { name: /Exams/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /End session/ })).toBeInTheDocument();
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("modal dialog", async () => {
-    const { container } = render(
+    render(
       <Dialog title="End the exam?" onClose={() => {}}>
         <p>body</p>
         <button>Cancel</button>
       </Dialog>,
     );
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("info drawer", async () => {
-    const { container } = render(<InfoDrawer onClose={() => {}} />);
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    render(<InfoDrawer onClose={() => {}} />);
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("exam intro card", async () => {
-    const { container } = render(<ExamIntro onClose={() => {}} />);
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    render(<ExamIntro onClose={() => {}} />);
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("toast layer with active toasts", async () => {
     toastStore.push({ kind: "info", message: "Desktop connection restored." });
     toastStore.push({ kind: "warning", message: "5 minutes remaining." });
-    const { container } = render(<ToastLayer />);
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    render(<ToastLayer />);
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   const mcqSession: SessionSnapshot = {
@@ -641,12 +641,12 @@ describe("axe: no WCAG violations", () => {
 
   test("mcq exam screen, single-answer question", async () => {
     stubMcqFetch();
-    const { container } = render(
+    render(
       <McqExam session={mcqSession} fetchedAt={Date.now()} onSessionChange={() => {}} />,
     );
     await screen.findByText("Which component persists cluster state?");
     expect(screen.getByRole("radio", { name: /etcd/ })).toBeInTheDocument();
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("mcq exam screen, multi-select question with the jump grid open", async () => {
@@ -658,27 +658,27 @@ describe("axe: no WCAG violations", () => {
     await screen.findByText("Which component persists cluster state?");
     await user.click(screen.getByRole("button", { name: /show all questions/i }));
     expect(container.querySelector("#mcq-jump")).not.toBeNull();
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("mcq navbar menu, narrow, with the attempt section open", async () => {
     matchMediaMock([HEADER_COMPACT_QUERY, MCQ_COMPACT_QUERY]);
     stubMcqFetch();
     const user = userEvent.setup();
-    const { container } = render(
+    render(
       <McqExam session={mcqSession} fetchedAt={Date.now()} onSessionChange={() => {}} />,
     );
     await screen.findByText("Which component persists cluster state?");
     await user.click(screen.getByRole("button", { name: strings.header.menuLabel }));
     expect(screen.getByRole("button", { name: /submit exam/i })).toBeInTheDocument();
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("mcq navigator as a bottom sheet", async () => {
     matchMediaMock([MCQ_COMPACT_QUERY]);
     stubMcqFetch({ q01: [1] });
     const user = userEvent.setup();
-    const { container } = render(
+    render(
       <McqExam session={mcqSession} fetchedAt={Date.now()} onSessionChange={() => {}} />,
     );
     await screen.findByText("Which component persists cluster state?");
@@ -687,13 +687,13 @@ describe("axe: no WCAG violations", () => {
       "aria-modal",
       "true",
     );
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("mcq submit dialog with the unanswered list", async () => {
     stubMcqFetch({ q01: [1] });
     const user = userEvent.setup();
-    const { container } = render(
+    render(
       <McqExam session={mcqSession} fetchedAt={Date.now()} onSessionChange={() => {}} />,
     );
     await screen.findByText("Which component persists cluster state?");
@@ -701,13 +701,13 @@ describe("axe: no WCAG violations", () => {
     await user.click(screen.getByRole("button", { name: /submit exam/i }));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText(/1 question is unanswered/)).toBeInTheDocument();
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("mcq training check-answer revealed", async () => {
     stubMcqFetch();
     const user = userEvent.setup();
-    const { container } = render(
+    render(
       <McqExam
         session={{ ...mcqSession, mode: "training", untimed: true }}
         fetchedAt={Date.now()}
@@ -717,11 +717,11 @@ describe("axe: no WCAG violations", () => {
     await screen.findByText("Which component persists cluster state?");
     await user.click(screen.getByText(/check answer/i));
     expect(await screen.findByText(/stores cluster state/)).toBeInTheDocument();
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("score answer review (mcq)", async () => {
-    const { container } = render(
+    render(
       <McqAnswerReview
         question={{
           id: "q02",
@@ -737,11 +737,11 @@ describe("axe: no WCAG violations", () => {
         }}
       />,
     );
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("hosted sign-in", async () => {
-    const { container } = render(
+    render(
       <HostedSignIn
         me={{
           authenticated: false,
@@ -751,11 +751,11 @@ describe("axe: no WCAG violations", () => {
         }}
       />,
     );
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("hosted lobby, with a place in the queue", async () => {
-    const { container } = render(
+    render(
       <HostedStart
         me={{
           authenticated: true,
@@ -767,11 +767,11 @@ describe("axe: no WCAG violations", () => {
         onChanged={() => {}}
       />,
     );
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("hosted boot screen", async () => {
-    const { container } = render(
+    render(
       <HostedBooting
         session={{
           kind: "practical",
@@ -784,11 +784,11 @@ describe("axe: no WCAG violations", () => {
         onChanged={() => {}}
       />,
     );
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("the boot screen, rebuilding", async () => {
-    const { container } = render(
+    render(
       <HostedBooting
         session={{
           kind: "practical",
@@ -803,11 +803,11 @@ describe("axe: no WCAG violations", () => {
         onChanged={() => {}}
       />,
     );
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("session chip with a lease running out", async () => {
-    const { container } = render(
+    render(
       <SessionChip
         login="octocat"
         session={{
@@ -820,11 +820,11 @@ describe("axe: no WCAG violations", () => {
         }}
       />,
     );
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("session actions with an active session", async () => {
-    const { container } = render(
+    render(
       <SessionActions
         session={{
           kind: "practical",
@@ -839,13 +839,13 @@ describe("axe: no WCAG violations", () => {
     );
     expect(screen.getByRole("button", { name: strings.hosted.endSession })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: strings.hosted.signOut })).toBeInTheDocument();
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 
   test("end-session confirmation dialog", async () => {
-    const { container } = render(<EndSessionDialog onClose={() => {}} onChanged={() => {}} />);
+    render(<EndSessionDialog onClose={() => {}} onChanged={() => {}} />);
 
     expect(screen.getByRole("dialog")).toHaveTextContent(strings.hosted.endConfirmTitle);
-    expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    expect(await axe(document.body, AXE_OPTS)).toHaveNoViolations();
   });
 });

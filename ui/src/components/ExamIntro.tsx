@@ -58,14 +58,14 @@ export function ExamIntro({
               {i + 1}
             </span>
             <div>
-              <strong>{item.title}</strong> — {item.body}
+              <strong>{item.title}</strong>. {item.body}
             </div>
           </li>
         ))}
       </ol>
 
       <section className="intro-note" aria-label={s.methodTitle}>
-        <strong>{s.methodTitle}</strong> — {s.method}
+        <strong>{s.methodTitle}</strong>. {s.method}
       </section>
 
       <div className="confirm-actions">

@@ -96,7 +96,7 @@ func newHandsOnPoolServer(t *testing.T, seeder api.Seeder, control http.Handler,
 	}
 
 	grader := &fakeGrader{}
-	opts := []api.Option{}
+	opts := []api.Option{api.WithPrepFile(session.PrepPath(sessionPath))}
 	if seeder != nil {
 		opts = append(opts, api.WithSeeder(seeder))
 	}
@@ -180,6 +180,7 @@ type prepareBody struct {
 	PoolDigest    string   `json:"poolDigest"`
 	DomainFilter  []string `json:"domainFilter"`
 	PoolChanged   bool     `json:"poolChanged"`
+	AwaitStart    bool     `json:"awaitStart"`
 }
 
 func (ts *testServer) session(t *testing.T) sessionBody {

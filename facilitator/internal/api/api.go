@@ -48,6 +48,9 @@ type server struct {
 	prepGen   uint64
 	seeded    *seededSet
 	probeOnce sync.Once
+
+	prepFile string
+	prepBank string
 }
 
 func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desktop, control http.Handler, ui fs.FS, boot *bootstate.Reader, practice PracticeGrader, opts ...Option) http.Handler {
@@ -61,6 +64,8 @@ func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desk
 			s.seeded = newSeededSet(ids)
 		}
 	}
+	s.prepBank = mgr.Snapshot().Bank
+	s.restorePrep()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealthz)
@@ -77,6 +82,7 @@ func New(ex *exam.Exam, bankDir string, mgr *session.Manager, grade Grader, desk
 	mux.HandleFunc("PUT /api/questions/{id}/answer", s.handleAnswerPut)
 	mux.HandleFunc("GET /api/answers", s.handleAnswersGet)
 	mux.HandleFunc("POST /api/session/start", s.handleSessionStart)
+	mux.HandleFunc("POST /api/session/begin", s.handleSessionBegin)
 	mux.HandleFunc("PUT /api/session/focus", s.handleSessionFocus)
 	mux.HandleFunc("GET /api/session", s.handleSessionGet)
 	mux.HandleFunc("POST /api/session/end", s.handleSessionEnd)
@@ -682,7 +688,7 @@ func (s *server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if s.seedRequired() {
-		s.startPrepared(w, r, body.Mode, draw, poolChanged)
+		s.startPrepared(w, r, body.Mode, draw, poolChanged, body.AwaitStart)
 		return
 	}
 
@@ -697,7 +703,7 @@ func (s *server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *server) startPrepared(w http.ResponseWriter, r *http.Request, mode string, draw session.Draw, poolChanged bool) {
+func (s *server) startPrepared(w http.ResponseWriter, r *http.Request, mode string, draw session.Draw, poolChanged, awaitStart bool) {
 	if s.seeder == nil {
 
 		writeJSONError(w, http.StatusServiceUnavailable,
@@ -715,7 +721,7 @@ func (s *server) startPrepared(w http.ResponseWriter, r *http.Request, mode stri
 		return
 	}
 
-	p, err := s.beginPrepare(r.Context(), mode, s.durationFor(mode), draw)
+	p, err := s.beginPrepare(r.Context(), mode, s.durationFor(mode), draw, awaitStart)
 	if err != nil {
 		if errors.Is(err, errPreparing) || errors.Is(err, errPreparingCancelled) {
 			writeJSONError(w, http.StatusConflict, err.Error())
@@ -736,7 +742,29 @@ func (s *server) startPrepared(w http.ResponseWriter, r *http.Request, mode stri
 		PoolDigest:    p.draw.PoolDigest,
 		DomainFilter:  p.draw.DomainFilter,
 		PoolChanged:   poolChanged,
+		AwaitStart:    p.awaitStart,
 	})
+}
+
+func (s *server) handleSessionBegin(w http.ResponseWriter, r *http.Request) {
+	if !s.requireExam(w) {
+		return
+	}
+	if s.ex.Type != exam.TypeMCQ && touchOnly(r) {
+		writeJSONErrorCode(w, http.StatusConflict, codeDesktopRequired,
+			"this exam runs a Linux desktop beside the questions, so it needs a desktop browser and a keyboard")
+		return
+	}
+	snap, err := s.beginReadyAttempt()
+	switch {
+	case errors.Is(err, errNothingPrepared), errors.Is(err, errNotReady), errors.Is(err, session.ErrConflict):
+		writeJSONError(w, http.StatusConflict, err.Error())
+		return
+	case err != nil:
+		writeJSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, toSessionResponse(snap))
 }
 
 type startRequest struct {
@@ -747,6 +775,8 @@ type startRequest struct {
 	Domains []string `json:"domains"`
 
 	PoolDigest string `json:"poolDigest"`
+
+	AwaitStart bool `json:"awaitStart"`
 }
 
 func (s *server) handleSessionFocus(w http.ResponseWriter, r *http.Request) {
@@ -798,8 +828,12 @@ func (s *server) handleSessionGet(w http.ResponseWriter, r *http.Request) {
 
 	s.startSeedProbe()
 
+	preparing, prepareError := s.prepSnapshot()
 	resp := toSessionResponse(s.mgr.Snapshot())
-	resp.Preparing, resp.PrepareError = s.prepSnapshot()
+	if resp.State == "idle" {
+		resp.Preparing = preparing
+	}
+	resp.PrepareError = prepareError
 	writeJSON(w, http.StatusOK, resp)
 }
 

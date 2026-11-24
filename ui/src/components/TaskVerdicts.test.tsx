@@ -163,7 +163,7 @@ describe("TaskVerdicts columns", () => {
   test("drops the weight and time columns when no row can fill them", () => {
     render(<TaskVerdicts questions={graded} />);
     expect(screen.queryByText("Weight")).toBeNull();
-    expect(screen.queryByText("Time")).toBeNull();
+    expect(screen.queryByText("Time open")).toBeNull();
     expect(screen.getByText("Verdict")).toBeInTheDocument();
   });
 
@@ -178,7 +178,7 @@ describe("TaskVerdicts columns", () => {
     );
 
     expect(screen.getByText("Weight")).toBeInTheDocument();
-    expect(screen.getByText("Time")).toBeInTheDocument();
+    expect(screen.getByText("Time open")).toBeInTheDocument();
     expect(screen.getByText("7%")).toBeInTheDocument();
     expect(screen.getByText(/8m 41s/)).toBeInTheDocument();
 

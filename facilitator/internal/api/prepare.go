@@ -21,7 +21,11 @@ var errPreparingCancelled = errors.New("the attempt was cancelled while its envi
 
 var errClusterHoldsAnotherDraw = errors.New("the exam environment is still set up for an earlier attempt's questions; reset the environment before starting a different attempt")
 
-var errPreparationLost = errors.New("the exam service restarted while an attempt's environment was being prepared, and that attempt cannot be resumed — reset the environment before starting a new one")
+var errPreparationLost = errors.New("the exam service restarted while an attempt's environment was being prepared or waiting to start, and that attempt cannot be resumed; reset the environment before starting a new one")
+
+var errNothingPrepared = errors.New("no attempt is waiting to start; choose a mode to prepare one")
+
+var errNotReady = errors.New("the exam environment is still being prepared; the attempt can start once it is ready")
 
 type SeedState string
 
@@ -48,6 +52,10 @@ func WithSeeder(s Seeder) Option {
 	return func(srv *server) { srv.seeder = s }
 }
 
+func WithPrepFile(path string) Option {
+	return func(srv *server) { srv.prepFile = path }
+}
+
 const prepPollInterval = 500 * time.Millisecond
 
 const prepMaxPollErrors = 120
@@ -62,6 +70,9 @@ type prep struct {
 	dur       time.Duration
 	draw      session.Draw
 	startedAt time.Time
+
+	awaitStart bool
+	readyAt    time.Time
 }
 
 type preparingInfo struct {
@@ -72,6 +83,11 @@ type preparingInfo struct {
 	StartedAt     string `json:"startedAt"`
 	Seed          string `json:"seed,omitempty"`
 	PoolDigest    string `json:"poolDigest,omitempty"`
+
+	DurationSeconds int    `json:"durationSeconds"`
+	AwaitStart      bool   `json:"awaitStart,omitempty"`
+	Ready           bool   `json:"ready,omitempty"`
+	ReadyAt         string `json:"readyAt,omitempty"`
 }
 
 type prepareResponse struct {
@@ -84,6 +100,7 @@ type prepareResponse struct {
 	PoolDigest    string   `json:"poolDigest"`
 	DomainFilter  []string `json:"domainFilter,omitempty"`
 	PoolChanged   bool     `json:"poolChanged,omitempty"`
+	AwaitStart    bool     `json:"awaitStart,omitempty"`
 }
 
 func (s *server) seedRequired() bool {
@@ -94,7 +111,7 @@ func (s *server) seedRequired() bool {
 	return s.ex.Type != exam.TypeMCQ && exam.Pooled(s.ex)
 }
 
-func (s *server) beginPrepare(ctx context.Context, mode string, dur time.Duration, draw session.Draw) (prep, error) {
+func (s *server) beginPrepare(ctx context.Context, mode string, dur time.Duration, draw session.Draw, awaitStart bool) (prep, error) {
 	s.prepMu.Lock()
 	if s.prep != nil {
 		s.prepMu.Unlock()
@@ -103,7 +120,7 @@ func (s *server) beginPrepare(ctx context.Context, mode string, dur time.Duratio
 
 	s.prepGen++
 	gen := s.prepGen
-	s.prep = &prep{gen: gen, mode: mode, dur: dur, draw: draw, startedAt: time.Now()}
+	s.prep = &prep{gen: gen, mode: mode, dur: dur, draw: draw, startedAt: time.Now(), awaitStart: awaitStart}
 
 	s.prepError = ""
 	s.prepMu.Unlock()
@@ -123,6 +140,7 @@ func (s *server) beginPrepare(ctx context.Context, mode string, dur time.Duratio
 		return prep{}, errPreparingCancelled
 	}
 	s.prep.jobID = jobID
+	s.persistPrepLocked()
 	current := *s.prep
 	s.prepMu.Unlock()
 
@@ -152,6 +170,10 @@ func (s *server) watchPrepare(p prep) {
 		case status.State == SeedRunning:
 			errs = 0
 		case status.State == SeedDone:
+			if p.awaitStart {
+				s.markReady(p.gen, time.Now())
+				return
+			}
 			s.startPreparedAttempt(p)
 			return
 		case status.State == SeedFailed:
@@ -175,6 +197,41 @@ func (s *server) startPreparedAttempt(p prep) {
 	s.clearPrep(p.gen, "")
 }
 
+func (s *server) markReady(gen uint64, at time.Time) {
+	s.prepMu.Lock()
+	defer s.prepMu.Unlock()
+
+	if s.prep == nil || s.prep.gen != gen {
+		return
+	}
+	s.prep.readyAt = at
+	s.persistPrepLocked()
+	log.Printf("facilitator: %d question(s) seeded; waiting for the candidate to start the clock", len(s.prep.draw.QuestionIDs))
+}
+
+func (s *server) beginReadyAttempt() (session.Snapshot, error) {
+	s.prepMu.Lock()
+	defer s.prepMu.Unlock()
+
+	if s.prep == nil {
+		if snap := s.mgr.Snapshot(); snap.State == "running" {
+			return snap, nil
+		}
+		return session.Snapshot{}, errNothingPrepared
+	}
+	if s.prep.readyAt.IsZero() {
+		return session.Snapshot{}, errNotReady
+	}
+	snap, err := s.mgr.StartDraw(s.prep.mode, s.prep.dur, s.prep.draw)
+	if err != nil {
+		return session.Snapshot{}, err
+	}
+	s.prep = nil
+	s.prepError = ""
+	s.persistPrepLocked()
+	return snap, nil
+}
+
 func (s *server) failPrepare(gen uint64, msg string) {
 	if msg == "" {
 		msg = "preparing the exam environment failed"
@@ -192,6 +249,7 @@ func (s *server) clearPrep(gen uint64, msg string) {
 	}
 	s.prep = nil
 	s.prepError = msg
+	s.persistPrepLocked()
 }
 
 func (s *server) prepIsCurrent(gen uint64) bool {
@@ -207,6 +265,7 @@ func (s *server) cancelPrep() {
 	s.prep = nil
 	s.prepError = ""
 	s.prepGen++
+	s.persistPrepLocked()
 }
 
 type seededSet struct {
@@ -271,6 +330,7 @@ func (s *server) controlProxy() http.Handler {
 
 		if rec.status >= 200 && rec.status < 300 {
 			s.clearSeeded()
+			s.cancelPrep()
 		}
 	})
 }
@@ -335,29 +395,41 @@ func (s *server) probeSeeded() {
 	s.prepError = errPreparationLost.Error()
 }
 
-func (s *server) conductorHeldSeedJob() bool {
+type conductorJob struct {
+	ID    string `json:"id"`
+	Op    string `json:"op"`
+	Error string `json:"error"`
+}
+
+type conductorStatus struct {
+	Job     *conductorJob `json:"job"`
+	LastJob *conductorJob `json:"lastJob"`
+}
+
+func (s *server) conductorStatus() (conductorStatus, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), prepPollTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "/api/control/status", nil)
 	if err != nil {
-		return false
+		return conductorStatus{}, err
 	}
 	rec := &bodyRecorder{header: http.Header{}, status: http.StatusOK}
 	s.control.ServeHTTP(rec, req)
 	if rec.status != http.StatusOK {
-		return false
+		return conductorStatus{}, fmt.Errorf("the environment service answered %d", rec.status)
 	}
 
-	var snap struct {
-		Job *struct {
-			Op string `json:"op"`
-		} `json:"job"`
-		LastJob *struct {
-			Op string `json:"op"`
-		} `json:"lastJob"`
-	}
+	var snap conductorStatus
 	if err := json.Unmarshal(rec.body.Bytes(), &snap); err != nil {
+		return conductorStatus{}, err
+	}
+	return snap, nil
+}
+
+func (s *server) conductorHeldSeedJob() bool {
+	snap, err := s.conductorStatus()
+	if err != nil {
 		return false
 	}
 	if snap.Job != nil && snap.Job.Op == seedJobOp {
@@ -386,12 +458,19 @@ func (s *server) prepSnapshot() (*preparingInfo, string) {
 	if s.prep == nil {
 		return nil, s.prepError
 	}
-	return &preparingInfo{
-		JobID:         s.prep.jobID,
-		Mode:          s.prep.mode,
-		QuestionCount: len(s.prep.draw.QuestionIDs),
-		StartedAt:     s.prep.startedAt.UTC().Format(time.RFC3339Nano),
-		Seed:          s.prep.draw.Seed,
-		PoolDigest:    s.prep.draw.PoolDigest,
-	}, s.prepError
+	info := &preparingInfo{
+		JobID:           s.prep.jobID,
+		Mode:            s.prep.mode,
+		QuestionCount:   len(s.prep.draw.QuestionIDs),
+		StartedAt:       s.prep.startedAt.UTC().Format(time.RFC3339Nano),
+		Seed:            s.prep.draw.Seed,
+		PoolDigest:      s.prep.draw.PoolDigest,
+		DurationSeconds: int(s.prep.dur.Seconds()),
+		AwaitStart:      s.prep.awaitStart,
+	}
+	if !s.prep.readyAt.IsZero() {
+		info.Ready = true
+		info.ReadyAt = s.prep.readyAt.UTC().Format(time.RFC3339Nano)
+	}
+	return info, s.prepError
 }

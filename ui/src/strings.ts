@@ -1,7 +1,9 @@
+const detailNote = (detail: string) => (detail ? ` (${detail})` : "");
+
 export const strings = {
   app: {
     loading: "Loading…",
-    cannotReach: (err: string) => `Cannot reach facilitator: ${err}`,
+    cannotReach: (err: string) => `Can't reach the exam services. Still trying.${detailNote(err)}`,
     working: "Loading…",
   },
 
@@ -15,9 +17,9 @@ export const strings = {
     wordmarkTail: "-sim",
     navLabel: "Sections",
 
-    crumbLobby: "Choose an exam",
+    crumbLobby: "Exams",
     crumbResults: "Results",
-    crumbProgress: "Your path",
+    crumbProgress: "Progress",
 
     navExams: "Exams",
     navProgress: "Progress",
@@ -36,35 +38,35 @@ export const strings = {
   },
 
   exams: {
-    title: "Path to Kubestronaut",
-    lead: "Five certifications. Pick one to drill, or resume where you stopped.",
+    title: "Exams",
+    lead: "Pick a certification to practise. One exam is loaded at a time: the loaded one opens straight away, and loading another rebuilds the environment first.",
 
-    coverageLabel: "Progress",
-    coverage: (passed: number, total: number) => `${passed} of ${total} passed`,
-    live: "Live",
-    soon: "Soon",
+    coverageLabel: "Kubestronaut path",
+    coverage: (passed: number, available: number) => `${passed} of ${available} passed`,
+    coverageSoon: (soon: number) => `${soon} more coming soon`,
+    loaded: "Loaded",
+    soon: "Coming soon",
     unavailable: "Unavailable",
     liveListLabel: "Exams you can sit",
-    soonListLabel: "Exams not built yet",
+    soonListLabel: "Exams not available yet",
 
     wrongSeat: "Not in this seat",
     wrongSeatNote: (needs: string) =>
-      `This is a ${needs} exam and you are in the other kind of seat. End this session and start a ${needs.toLowerCase()} one to sit it.`,
+      `This is a ${needs.toLowerCase()} exam and you are in the other kind of seat. End this session and start a ${needs.toLowerCase()} one to sit it.`,
 
     otherExamNote:
-      "You started a session for a different exam, and this environment was built for that one. End the session and start this exam to sit it — your finished attempts are kept either way.",
+      "You started a session for a different exam, and this environment was built for that one. End the session and start this exam to sit it. Your finished attempts are kept either way.",
 
     durationLabel: "Duration",
     passingLabel: "To pass",
-    engineLabel: "Engine",
 
-    drawnLabel: "Drawn / pool",
     tasksLabel: "Tasks",
     questionsLabel: "Questions",
-    enginePractical: "Practical",
+    drawnFrom: (label: string, pool: number) => `${label}, from ${pool}`,
+    formatPractical: "Hands-on",
 
-    engineMcq: "MCQ",
-    engineUnknown: "Not built",
+    formatMcq: "Multiple choice",
+    formatUnknown: "Unknown",
 
     bestLabel: (counted: number) =>
       counted === 1 ? "Best attempt · 1 session" : `Best attempt · ${counted} sessions`,
@@ -77,6 +79,8 @@ export const strings = {
     bestNoScore: "—",
 
     choose: "Choose a mode",
+    load: (name: string, mcq: boolean) =>
+      mcq ? `Load ${name} (a few seconds)` : `Load ${name} (about 3 min)`,
 
     certNames: {
       CKAD: "Certified Kubernetes Application Developer",
@@ -85,12 +89,17 @@ export const strings = {
       KCNA: "Kubernetes and Cloud Native Associate",
       KCSA: "Kubernetes and Cloud Native Security Associate",
     } as Record<string, string>,
-    catalogErrorTitle: "Couldn't load the exam catalog",
-    catalogErrorBody: (detail: string) =>
-      `The control plane did not answer (${detail}). This list comes from the conductor container; check it is up with \`docker compose ps conductor\`.`,
+    catalogErrorTitle: "Couldn't load the exam list",
+    catalogErrorBody: (detail: string, hosted: boolean) =>
+      hosted
+        ? `The exam services did not answer. Retry in a moment; your history is not affected.${detailNote(detail)}`
+        : `The exam services did not answer. Retry in a moment. This list comes from the conductor container; if it keeps failing, check it with \`docker compose ps conductor\`.${detailNote(detail)}`,
     catalogRetry: "Retry",
 
-    empty: "No exams are installed. The banks directory is mounted read-only into the conductor; check it is not empty.",
+    empty: (hosted: boolean) =>
+      hosted
+        ? "No exams are available in this session. Reload the page in a moment."
+        : "No exams are installed. Check that the banks directory mounted into the conductor is not empty.",
   },
 
   mode: {
@@ -104,7 +113,7 @@ export const strings = {
 
     capHelp: "Hints and reference solutions",
     capGrade: "Grade your work without ending the attempt",
-    capRecorded: "Kept as an attempt",
+    capRecorded: "Kept in your history",
     capYes: "Yes:",
     capNo: "No:",
     capListLabel: "What this mode allows",
@@ -117,7 +126,7 @@ export const strings = {
     // the attempt begins, which is minutes of waiting after the button is
     // pressed. Saying so here is worth more than any amount of spinner.
     seedNotice: (drawn: number) =>
-      `Starting draws ${drawn} tasks and sets them up on the cluster first. That takes a few minutes, and your clock does not start until it is done.`,
+      `Starting draws ${drawn} tasks and sets them up on the cluster first, which takes a few minutes. Nothing is timed while that runs: the clock starts when you press Start the clock on the next screen.`,
 
     drawTitle: "What you'll be asked",
     drawPooled: (drawn: number, pool: number) =>
@@ -125,7 +134,7 @@ export const strings = {
     drawPooledMixed: (drawn: number, pool: number) =>
       `${drawn} drawn at random from ${pool}, weighted to the published domain split and mixed across three levels, so an attempt is not a wall of long tasks. A different set every attempt.`,
     drawAll: (n: number) =>
-      `All ${n}, every attempt. This bank has no larger pool behind it yet, so the set does not change between sessions.`,
+      `All ${n}, every attempt. This exam has no larger set behind it yet, so the questions do not change between sessions.`,
 
     drawNarrowed: (drawn: number, pool: number, domains: number) =>
       `${drawn} of ${pool}, from the ${domains === 1 ? "domain" : `${domains} domains`} you picked.`,
@@ -135,12 +144,14 @@ export const strings = {
     allDomains: "All domains",
 
     filteredNote: (chosen: number, total: number) =>
-      `Drawing from ${chosen} of ${total} domains. A narrowed draw is practice, not a full exam: it is graded and kept in your history, but it is never reported as a pass and it does not count toward your path.`,
+      `Drawing from ${chosen} of ${total} domains. A narrowed draw is practice, not a full exam: it is graded and kept in your history, but it is never reported as a pass and it does not count toward your Kubestronaut path.`,
 
-    domainsPool: "Domains in the pool",
+    domainsPool: "Domains it draws from",
     domainsExam: "Domains in this exam",
-    examFailed: (detail: string) =>
-      `Couldn't load this exam (${detail}). The facilitator may still be starting; check it with \`docker compose ps facilitator\`.`,
+    examFailed: (detail: string, hosted: boolean) =>
+      hosted
+        ? `This exam did not load. The exam services may still be starting; retry in a few seconds.${detailNote(detail)}`
+        : `This exam did not load. The facilitator may still be starting; retry in a few seconds, or check it with \`docker compose ps facilitator\`.${detailNote(detail)}`,
 
     wrongExam: "That exam isn't loaded any more. Back to the exam list…",
 
@@ -157,17 +168,20 @@ export const strings = {
     ],
 
     tipTimer:
-      "Training is untimed. Exam and Mastery start their clock the moment you start, and it cannot be paused.",
+      "Training is untimed. In Exam and Mastery the clock starts when you begin the attempt, never while tasks are being set up, and once started it cannot be paused.",
   },
 
   exam: {
     fallbackTitle: "Exam",
     loadingQuestions: "Loading the questions…",
 
-    questionsFailed: (detail: string) =>
-      `Couldn't load the question list (${detail}). The timer and the exam desktop are unaffected. The questions are served by the facilitator, so check it is up with \`docker compose ps facilitator\`.`,
+    questionsFailed: (detail: string, hosted: boolean) =>
+      hosted
+        ? `The question list did not load. Your clock keeps running and nothing you have done is lost. Retry; if it keeps failing, reload the page.${detailNote(detail)}`
+        : `The question list did not load. Your clock keeps running and nothing you have done is lost. Retry; if it keeps failing, check the facilitator with \`docker compose ps facilitator\`.${detailNote(detail)}`,
 
     endAttempt: (mode: string) => (mode === "training" ? "Submit session" : "Submit exam"),
+    endAttemptShort: "Submit",
     ending: "Ending…",
 
     positionShort: (n: number, total: number) => `${n}/${total}`,
@@ -182,9 +196,17 @@ export const strings = {
       n === 1 ? "1 task is marked for review:" : `${n} tasks are marked for review:`,
 
     reviewUnseen: (n: number) =>
-      n === 1 ? "1 task was never opened:" : `${n} tasks were never opened:`,
+      n === 1 ? "1 task was never viewed:" : `${n} tasks were never viewed:`,
 
-    taskNumber: (n: number) => `Task ${n}`,
+    reviewQuestionsMarked: (n: number) =>
+      n === 1 ? "1 question is marked for review:" : `${n} questions are marked for review:`,
+
+    reviewJumpHint: "Select one to go back to it.",
+    reviewJumpTask: (n: number) => `Go to task ${n}`,
+    reviewJumpQuestion: (n: number) => `Go to question ${n}`,
+    reviewTimeLeft: (clock: string) => `${clock} left on the clock.`,
+    reviewUntimed: (span: string) => `No time limit. ${span} so far.`,
+
     confirmBody: (mode: string) =>
       mode === "training"
         ? "This ends the session for good; the desktop locks and your work is scored. A training score is feedback on where you stand, not an exam result."
@@ -195,6 +217,10 @@ export const strings = {
 
     resizePanelValue: (px: number) => `${px} pixels`,
 
+    tasksHide: "Hide tasks",
+    tasksShow: "Show tasks",
+    tasksPosition: (n: number, total: number) => `Task ${n} of ${total}`,
+
     timeRemaining: (spoken: string) => `Time remaining: ${spoken}`,
 
     timeElapsed: (span: string) => `Time elapsed: ${span}`,
@@ -204,10 +230,10 @@ export const strings = {
         ? `Kubernetes ${version} · ${hosts} reachable over ssh`
         : `Kubernetes ${version}`,
 
-    progress: (opened: number, total: number, flagged: number) =>
+    progress: (viewed: number, total: number, flagged: number) =>
       flagged > 0
-        ? `${opened} of ${total} opened · ${flagged} flagged`
-        : `${opened} of ${total} opened`,
+        ? `${viewed} of ${total} tasks viewed · ${flagged} flagged`
+        : `${viewed} of ${total} tasks viewed`,
   },
 
   questionPanel: {
@@ -244,7 +270,7 @@ export const strings = {
 
     targetTimeDerived: (span: string) => `Target ≈${span}`,
     targetTimeDerivedNote:
-      "Derived from this task's share of the exam clock, not a measured time. A pacing budget, not a limit — running over costs no points.",
+      "Derived from this task's share of the exam clock, not a measured time. A pacing budget, not a limit. Running over costs no points.",
 
     workFrom: "Work from",
     copyShort: "Copy",
@@ -262,23 +288,23 @@ export const strings = {
     filterAll: "All",
     filterFlagged: "Flagged",
 
-    filterUnseen: "Unseen",
+    filterUnseen: "Not viewed",
     filterUnanswered: "Unanswered",
     legendCurrent: "Current",
-    legendOpened: "Opened",
+    legendViewed: "Viewed",
     legendAnswered: "Answered",
     legendFlagged: "Flagged",
-    legendUnseen: "Unseen",
+    legendUnseen: "Not viewed",
     legendUnanswered: "Unanswered",
 
-    opened: "opened",
-    unseen: "not opened",
+    viewed: "viewed",
+    unseen: "not viewed",
     answered: "answered",
     unanswered: "unanswered",
     flagged: "flagged for review",
 
     emptyFlagged: "Nothing is flagged. Press F on a tile, or use Mark for review.",
-    emptyUnseen: "Every question has been opened.",
+    emptyUnseen: "Every task has been viewed.",
     emptyUnanswered: "Every question has an answer.",
 
     keyLeft: "Left arrow",
@@ -304,14 +330,12 @@ export const strings = {
   toast: {
     dismiss: "Dismiss notification",
     timeWarning: (minutes: number) => `${minutes} minutes remaining.`,
-    desktopReconnecting: "Desktop connection lost. Reconnecting…",
-    desktopRestored: "Desktop connection restored.",
   },
 
   tips: {
     title: "Exam tips",
     open: "Exam tips",
-    lead: "Technique for this exam, not answers — how to set the terminal up, generate manifests instead of typing them, and find things faster than the documentation can.",
+    lead: "Technique for this exam, not answers: how to set the terminal up, generate manifests instead of typing them, and find things faster than the documentation can.",
     done: "Close",
     failed: (message: string) => `The tips could not be loaded: ${message}`,
   },
@@ -335,7 +359,7 @@ export const strings = {
       },
       {
         title: "Exam desktop",
-        body: "A real Linux desktop. The terminal is already open; ssh to the instance the question names and solve with kubectl — it already points at this cluster on every instance, so there is no context to switch. Firefox is there too, limited to the allowlisted documentation sites.",
+        body: "A real Linux desktop. The terminal is already open; ssh to the instance the question names and solve with kubectl. It already points at this cluster on every instance, so there is no context to switch. Firefox is there too, limited to the allowlisted documentation sites.",
       },
       {
         title: "The countdown",
@@ -349,7 +373,7 @@ export const strings = {
 
     methodTitle: "How grading works",
     method:
-      "Every task is scored by checks that read the state you leave behind — what is on the cluster and on the exam instances when grading runs, never the commands you typed. How you got there does not matter: a kubectl one-liner, an applied manifest and an edit in place all score the same. Each task's share of the exam is on the chip row beside its title.",
+      "Every task is scored by checks that read the state you leave behind: what is on the cluster and on the exam instances when grading runs, never the commands you typed. How you got there does not matter: a kubectl one-liner, an applied manifest and an edit in place all score the same. Each task's share of the exam is on the chip row beside its title.",
   },
 
   info: {
@@ -408,23 +432,48 @@ export const strings = {
   desktop: {
     connecting: "Connecting to the exam desktop…",
 
-    reconnecting: (attempt: number) =>
-      attempt > 1
-        ? `Desktop connection lost. Reconnecting, attempt ${attempt}.`
-        : "Desktop connection lost. Reconnecting…",
-    skip: "Skip past the exam desktop (it captures Tab while focused)",
+    skip: "Skip past the exam desktop to Submit",
+    regionLabel: "Exam desktop. Press Ctrl+Alt+Shift+End to move focus out of it.",
+    lostTitle: "The exam desktop is not connected",
+    lostWorkSafe:
+      "Your cluster and everything you have done on it are intact. Only the view of the desktop is interrupted.",
+    lostClockTimed: "The exam clock is still running",
+    lostClockUntimed: "Elapsed time keeps counting",
+    lostRetrying: "Reconnecting automatically.",
+    stuckTitle: "This is taking longer than usual",
+    stuckCause:
+      "The usual cause is a network that blocks the live connection the desktop needs (WebSockets), as some office, school and hotel networks do. Try a phone hotspot or another network, or switch a VPN on or off.",
+    stuckKeepWorking: "You can keep reading the tasks while this retries. Reloading the page is also safe.",
+    reload: "Reload the desktop",
+    announceLost:
+      "Exam desktop disconnected. Your work is safe and the clock is still running. Reconnecting automatically.",
+    announceStuck:
+      "The exam desktop is still not connected. A Reload the desktop button is now available in the desktop pane.",
+    announceRestored: "Exam desktop connection restored.",
+  },
+
+  paneError: {
+    desktopTitle: "The exam desktop could not be shown",
+    markdownTitle: "This task's formatting could not be loaded. Showing it as plain text.",
+    safe: "The clock, your tasks and your cluster are unaffected. This is usually a brief network problem or a new version of the simulator.",
+    retry: "Try again",
+    reloadPage: "Reload the page",
   },
 
   lobby: {
     switchConfirmTitle: (title: string) => `Load ${title}?`,
     switchConfirmBody:
-      "Only one exam can be loaded at a time. Switching wipes all cluster and instance state and rebuilds from scratch, which usually takes about 2-4 minutes. You can leave the tab open while it runs.",
-    switchConfirm: "Load it",
+      "Only one exam is loaded at a time. Loading this one wipes all cluster and exam-instance state and rebuilds it from scratch, which usually takes about 2-4 minutes. You can leave the tab open while it runs. Your history is not affected.",
+    switchConfirmBodyMcq:
+      "Only one exam is loaded at a time. This one is multiple choice and needs no cluster, so loading it takes a few seconds: it clears any work left on the exam instances and restarts the exam services. Going back to a hands-on exam later rebuilds its cluster, about 2-4 minutes. Your history is not affected.",
+    switchConfirm: (title: string) => `Load ${title}`,
     buildConfirmTitle: (title: string) => `Set up ${title}?`,
     buildConfirmBody:
       "This builds the Kubernetes cluster for this exam and sets up its tasks, which usually takes about 2-4 minutes. You can leave the tab open while it runs, and you can switch to a different exam afterwards.",
+    buildConfirmBodyMcq:
+      "This exam is multiple choice and needs no cluster. Setting it up starts the exam services with its questions, which takes a few seconds. You can switch to a different exam afterwards.",
 
-    buildConfirm: "Build it",
+    buildConfirm: (title: string) => `Set up ${title}`,
     cancel: "Cancel",
   },
 
@@ -440,13 +489,13 @@ export const strings = {
       label: "Mastery",
       badge: "SPEED",
       blurb: (mins: number) =>
-        `${mins} minutes — half the real clock, everything else identical to exam conditions. Clear the tasks at this pace and the real thing will feel slow.`,
+        `${mins} minutes, a shorter clock than the real exam, with everything else as on the day. Clear the tasks at this pace and the real thing will feel slow.`,
     },
     exam: {
       label: "Exam",
       badge: "REAL",
       blurb: (mins: number) =>
-        `${mins} minutes, one attempt at the clock. No hints, and nothing is graded until you submit — the same as the day itself.`,
+        `${mins} minutes, one attempt at the clock. No hints, and nothing is graded until you submit, the same as the day itself.`,
     },
   },
 
@@ -507,6 +556,8 @@ export const strings = {
     answeredLabel: "Progress",
     tally: (answered: number, flagged: number, unseen: number) =>
       `Answered ${answered} · Flagged ${flagged} · Unseen ${unseen}`,
+    answeredCount: (answered: number, total: number) => `${answered} of ${total} answered`,
+    answeredShort: (answered: number) => `${answered} answered`,
 
     saveNote: "Answers save as you go · nothing is graded until submit",
 
@@ -570,9 +621,21 @@ export const strings = {
       ["F", "Flag this question, or the tile you are on"],
       ["?", "This list"],
       ["Esc", "Close a panel or dialog"],
+      ["Ctrl + Alt + Shift + End", "Leave the exam desktop, which keeps Tab for itself (Control + Option + Shift + Fn + Right arrow on a Mac laptop)"],
       ["← / →", "Resize the question panel (when the divider has focus)"],
       ["Shift + ← / →", "Resize in bigger steps"],
       ["Home / End", "Narrowest / widest panel"],
+    ],
+
+    mcqShortcuts: [
+      ["A – D  or  1 – 4", "Pick that answer; on a select-all question, tick or untick it"],
+      ["[  /  ]", "Previous / next question"],
+      ["G", "Show or hide the question grid"],
+      ["Arrows", "Move between tiles, in the grid"],
+      ["1 – 9", "Jump to a tile, in the grid"],
+      ["F", "Flag this question, or the tile you are on"],
+      ["?", "This list"],
+      ["Esc", "Close a panel or dialog"],
     ],
   },
 
@@ -597,8 +660,10 @@ export const strings = {
     progressLabel: "Environment build progress",
     failedTitle: "The exam environment failed to start",
 
-    failedHint:
-      "Nothing was lost: no attempt had started. `docker compose logs k8s-env` has the full output.",
+    failedHint: (hosted: boolean) =>
+      hosted
+        ? "Nothing was lost: no attempt had started. Try building again; if it fails twice, end the session from the menu and start a new one."
+        : "Nothing was lost: no attempt had started. Try building again. The full output is in `docker compose logs k8s-env`.",
     retry: "Try building again",
 
     unreachable: "Waiting for the exam services to start…",
@@ -642,7 +707,7 @@ export const strings = {
     hintFast: "Restarting the exam services. Usually a few seconds.",
 
     hintSeed:
-      "Preparing the cluster for the tasks in this draw. Your clock has not started and will not start until this finishes.",
+      "Preparing the cluster for the tasks in this draw. Your clock has not started: when this finishes you start it yourself, so you can leave this tab and come back.",
     stepOf: (step: number, total: number, label: string) =>
       `Step ${step} of ${total}: ${label}`,
     elapsed: (span: string) => `Elapsed ${span}`,
@@ -660,8 +725,10 @@ export const strings = {
     starting: "Starting…",
     dismiss: "Dismiss",
 
-    actionFailed: (detail: string) =>
-      `Couldn't reach the control plane (${detail}). The conductor container may be down; check it with \`docker compose ps conductor\`.`,
+    actionFailed: (detail: string, hosted: boolean) =>
+      hosted
+        ? `That did not start: the exam services did not answer. Try again in a moment.${detailNote(detail)}`
+        : `That did not start: the control plane did not answer. Try again; if it keeps failing, the conductor container may be down, so check it with \`docker compose ps conductor\`.${detailNote(detail)}`,
     newAttempt: "New attempt",
     newAttemptHint:
       "Wipes all cluster and instance state and returns you to the lobby, where you can retry this exam or pick a different one.",
@@ -679,6 +746,42 @@ export const strings = {
     elapsed: (span: string) => `Elapsed ${span}`,
   },
 
+  ready: {
+    title: (tasks: number) =>
+      tasks === 1 ? "Your task is ready" : `Your ${tasks} tasks are ready`,
+    lead: "The cluster is set up for this draw. Nothing is timed yet.",
+    factsLabel: "This attempt",
+    factExam: "Certification",
+    factMode: "Mode",
+    factClock: "Clock",
+    factTasks: "Tasks",
+    clockNote:
+      "The clock starts when you press Start the clock. From then on it runs on the server and cannot be paused.",
+    clockNoteUntimed:
+      "Training has no clock. Press Start when you are ready to see the tasks and the exam desktop.",
+    start: "Start the clock",
+    startUntimed: "Start",
+    starting: "Starting…",
+    beginFailed: (detail: string) => `The attempt did not start (${detail}). Nothing was timed; try again.`,
+    notifyBody: (tasks: number) =>
+      tasks === 1
+        ? "Your task is set up. The clock starts when you press Start the clock."
+        : `Your ${tasks} tasks are set up. The clock starts when you press Start the clock.`,
+  },
+
+  titles: {
+    app: "kubestronaut-sim",
+    exams: "Exams",
+    progress: "Your path",
+    review: "Review",
+    mode: "Choose a mode",
+    booting: "Building the environment",
+    preparing: (exam: string) => (exam ? `Preparing ${exam}` : "Preparing"),
+    ready: "Ready to start",
+    results: "Results",
+    training: "Training",
+  },
+
   mobile: {
     title: "This exam needs a desktop",
     why: "You work through a full Linux terminal and remote desktop, side by side with the questions, the same split screen as the real exam. That needs a keyboard and room to see both.",
@@ -694,7 +797,7 @@ export const strings = {
     catalogNote:
       "This exam is a Linux terminal and a remote desktop beside the questions. That needs a keyboard and a desktop browser, so it cannot be started from this device.",
     lobbyNote:
-      "This exam is a Linux terminal and a remote desktop beside the questions, so it needs a keyboard and a desktop browser. Starting it here would hold a seat nobody could sit — open the hub on a desktop to take one.",
+      "This exam is a Linux terminal and a remote desktop beside the questions, so it needs a keyboard and a desktop browser. Starting it here would hold a seat nobody could sit. Open the hub on a desktop to take one.",
     sessionRunning:
       "An exam is running. The clock keeps going wherever you are; submit here if you cannot get to a desktop in time.",
 
@@ -711,13 +814,17 @@ export const strings = {
     retry: "Retry",
 
     pollFailed: (detail: string) =>
-      `Still trying to reach the facilitator (${detail}). Retrying every few seconds; leave this tab open.`,
+      `Still trying to reach the grader. Retrying every few seconds; leave this tab open.${detailNote(detail)}`,
 
-    retryFailed: (detail: string) =>
-      `Couldn't ask the facilitator to grade again (${detail}). Check the stack is up with \`docker compose ps\`, then retry.`,
+    retryFailed: (detail: string, hosted: boolean) =>
+      hosted
+        ? `Grading could not be started again. Your submitted work is still there; retry in a moment.${detailNote(detail)}`
+        : `Grading could not be started again. Your submitted work is still there; retry, and if it keeps failing, check the stack with \`docker compose ps\`.${detailNote(detail)}`,
 
-    gradingTimedOut: (detail: string) =>
-      `Gave up waiting for the facilitator to finish grading (${detail}). Check the stack is up with \`docker compose ps\`, then retry.`,
+    gradingTimedOut: (detail: string, hosted: boolean) =>
+      hosted
+        ? `Grading is taking far longer than it should. Your submitted work is still there; retry to ask again.${detailNote(detail)}`
+        : `Grading is taking far longer than it should. Your submitted work is still there; retry, and if it keeps failing, check the stack with \`docker compose ps\`.${detailNote(detail)}`,
 
     eyebrowSeparator: " · ",
     listSeparator: ", ",
@@ -726,9 +833,9 @@ export const strings = {
     drawSeedLabel: "draw seed",
 
     headlinePass: (percent: number, passing: number) =>
-      `Passed — ${percent}% against a ${passing}% threshold`,
+      `Passed: ${percent}% against a ${passing}% threshold`,
     headlineFail: (percent: number, passing: number) =>
-      `Not passed — ${percent}% against a ${passing}% threshold`,
+      `Not passed: ${percent}% against a ${passing}% threshold`,
 
     headlineFiltered: (percent: number) => `${percent}% on a filtered draw`,
     filteredNote: (domains: string) =>
@@ -766,7 +873,7 @@ export const strings = {
     domainTitle: "Domain breakdown",
 
     domainHint:
-      "Weighted to the published curriculum, weakest first — this is where the next hour of study pays most.",
+      "Weighted to the published curriculum, weakest first. This is where the next hour of study pays most.",
 
     domainHintUnweighted:
       "Weakest first, by points. This is where the next hour of study pays most.",
@@ -784,15 +891,15 @@ export const strings = {
     levelHint:
       "The same attempt cut by how long each task was meant to take. Levels are time bands, not a judgement of how clever a task is.",
     levelNames: {
-      quick: "Quick — up to 4 min",
-      core: "Core — 4 to 9 min",
-      deep: "Deep — 9 to 14 min",
+      quick: "Quick · up to 4 min",
+      core: "Core · 4 to 9 min",
+      deep: "Deep · 9 to 14 min",
     } as Record<string, string>,
     levelMeta: (count: number, earned: number, points: number) =>
       `${count} ${count === 1 ? "task" : "tasks"} · ${earned}/${points} pts`,
 
     levelSlump:
-      "Your score falls away as the tasks get longer. That is usually pacing rather than missing knowledge — the fix is to plan a long task into steps before you start typing, not to read more.",
+      "Your score falls away as the tasks get longer. That is usually pacing rather than missing knowledge. The fix is to plan a long task into steps before you start typing, not to read more.",
     levelFlat:
       "Your score holds up across short and long tasks, so length is not what is costing you.",
 
@@ -806,7 +913,7 @@ export const strings = {
     nextDrill: "Drill these domains",
 
     nextDrillHint:
-      "Rebuilds the environment first, then opens the mode screen with these domains picked. A drill is not a full exam — it will not set a best score.",
+      "Rebuilds the environment first, then opens the mode screen with these domains picked. A drill is not a full exam, so it will not set a best score.",
 
     verdictsTitle: "Task verdicts",
 
@@ -823,14 +930,14 @@ export const strings = {
     colNum: "#",
     colTask: "Task",
     colWeight: "Weight",
-    colTime: "Time",
+    colTime: "Time open",
     colVerdict: "Verdict",
 
     metaSeparator: " · ",
 
     srWeight: "Weight",
 
-    srTime: "Task pane open",
+    srTime: "Time this task was open on screen",
     srOverTarget: (over: string, target: string) => `${over} over the ${target} target`,
     overTarget: (over: string) => `+${over}`,
     verdictCorrect: "CORRECT",
@@ -840,7 +947,10 @@ export const strings = {
 
     notRecorded: "—",
     notRecordedLabel: "not recorded",
-    modeNote: (mode: string) => `${mode} attempt: not a comparable exam result.`,
+    modeNoteTraining:
+      "Training attempt: hints and solutions were open to you, so read this score as feedback. Training runs are not kept in your history.",
+    modeNoteSpeed:
+      "Mastery attempt: graded exactly like Exam mode, on a shorter clock, and kept in your history the same way.",
     endReason: (reason: string) =>
       reason === "expired"
         ? "Session ended automatically: time expired."
@@ -865,8 +975,8 @@ export const strings = {
 
     weight: (pct: number) => `weight ${pct < 1 ? "<1" : Math.round(pct)}%`,
 
-    timing: (open: string) => `${open} on this task`,
-    timingTarget: (open: string, target: string) => `${open} · target ${target}`,
+    timing: (open: string) => `Open for ${open}`,
+    timingTarget: (open: string, target: string) => `Open for ${open} · target ${target}`,
     pointsLabel: "Points",
 
     prevTask: (n: number) => `Task ${n}`,
@@ -890,29 +1000,29 @@ export const strings = {
     whyTitle: "Why this scored what it did",
 
     diffLegend:
-      "Both panes show only the fields this check grades, not the whole object — the rest of your answer is not being compared here. Lines marked - are in your state and not in the expected document; lines marked + are in the expected document and not in yours.",
+      "Both panes show only the fields this check grades, not the whole object. The rest of your answer is not being compared here. Lines marked - are in your state and not in the expected document; lines marked + are in the expected document and not in yours.",
 
     lineChanged: "Differs:",
 
     diffIdentical:
-      "These two documents match line for line. Whatever the check measured is not visible in what it captured — the message above names it.",
+      "These two documents match line for line. Whatever the check measured is not visible in what it captured. The message above names it.",
 
     diffTooLong:
       "These documents are too long to compare line by line, so neither pane is marked up. Both are shown in full.",
 
     actualOnlyNote:
-      "There is no expected document to set beside this pane. Either this check grades a reading rather than a document — whether something became ready, how many of a thing there are, or whether two live values still agree — or the object it would compare against was never found. The message above names what it measured.",
+      "There is no expected document to set beside this pane. Either this check grades a reading rather than a document (whether something became ready, how many of a thing there are, or whether two live values still agree), or the object it would compare against was never found. The message above names what it measured.",
 
     expectedOnlyNote:
       "This is what the check was looking for. Nothing was captured from your cluster to sit beside it, which usually means the object does not exist yet.",
 
     correctTitle: "Full marks on this task",
     correctBody:
-      "Every check passed. The reference solution below is still worth a look — it is one way to get here, not the only one, and the grader scored the state you left rather than the route you took.",
+      "Every check passed. The reference solution below is still worth a look: it is one way to get here, not the only one, and the grader scored the state you left rather than the route you took.",
 
     noEvidenceTitle: "No captured state for this task",
     noEvidenceBody:
-      "These checks grade readings rather than documents, so there is nothing to set side by side. The messages above are the evidence — each one names the field it looked at and what it found there — and the reference solution below is the shape they were looking for.",
+      "These checks grade readings rather than documents, so there is nothing to set side by side. The messages above are the evidence (each one names the field it looked at and what it found there), and the reference solution below is the shape they were looking for.",
 
     solutionTitle: "Reference solution",
     solutionLoading: "Loading the reference solution…",
@@ -929,9 +1039,9 @@ export const strings = {
   },
 
   progress: {
-    title: "Your path",
+    title: "Progress",
 
-    lead: "Every attempt this environment has graded. Kept in its own volume rather than in this browser, so a reset, a bank switch and a purge all leave it where it is.",
+    lead: "Every Mastery and Exam attempt graded here. It is stored with the simulator rather than in this browser, so rebuilding the environment or loading another exam leaves it in place.",
 
     leadHosted:
       "Every attempt you have finished here. Kept against your account rather than in the environment, so it outlives every session you start. Open one to read it back in full.",
@@ -951,7 +1061,7 @@ export const strings = {
     erase: "Erase history",
     eraseConfirmTitle: "Erase every attempt?",
     eraseConfirmBody:
-      "This deletes the whole record — every certification, every score. There is no undo and no server-side backup. Export first if you want one.",
+      "This deletes the whole record: every certification, every score. There is no undo and no server-side backup. Export first if you want one.",
     eraseConfirm: "Erase everything",
     eraseBusy: "Erasing…",
     eraseFailed: (detail: string) => `Couldn't erase the history (${detail}).`,
@@ -959,11 +1069,11 @@ export const strings = {
 
     newSession: "New session",
 
-    pathLabel: "Certification path",
+    pathLabel: "Kubestronaut path",
     statusPassed: "Passed",
     statusAttempted: "In progress",
     statusUntouched: "Not started",
-    statusSoon: "Not built",
+    statusSoon: "Coming soon",
 
     noScore: "—",
 
@@ -977,7 +1087,7 @@ export const strings = {
 
     historyTitle: "Attempt history",
     historyEmpty:
-      "Nothing graded yet. Finish an attempt in Mastery or Exam mode and it lands here — Training runs are not recorded.",
+      "Nothing graded yet. Finish an attempt in Mastery or Exam mode and it lands here. Training runs are not kept.",
     colExam: "Exam",
     colMode: "Mode",
     colDate: "Date",
@@ -994,11 +1104,11 @@ export const strings = {
 
     uncounted: "drill",
 
-    uncountedTitle: "A filtered or short draw. It shows here but does not count toward the path.",
+    uncountedTitle: "A drill: a filtered or short draw. It shows here but does not count toward your Kubestronaut path.",
     untimed: "untimed",
 
     weakTitle: "Weakest domains across all attempts",
-    weakHint: "Points earned over points available, drills included — a domain drill is the best evidence you have about a weak domain.",
+    weakHint: "Points earned over points available, drills included. A domain drill is the best evidence you have about a weak domain.",
     weakEmpty: "Nothing to rank yet.",
     weakMeta: (attempts: number) =>
       attempts === 1 ? "from 1 attempt" : `from ${attempts} attempts`,
@@ -1010,8 +1120,10 @@ export const strings = {
     drillUnavailable: (exam: string) =>
       `These domains come from other exams. Load ${exam} to drill them.`,
 
-    loadFailed: (detail: string) =>
-      `Couldn't load your history (${detail}). It is served by the facilitator from its state volume; check it with \`docker compose ps facilitator\`.`,
+    loadFailed: (detail: string, hosted: boolean) =>
+      hosted
+        ? `Your history did not load. It is stored with your account, so nothing is lost; retry in a moment.${detailNote(detail)}`
+        : `Your history did not load. It is stored on disk by the facilitator, so nothing is lost; retry, and if it keeps failing, check it with \`docker compose ps facilitator\`.${detailNote(detail)}`,
     retry: "Retry",
 
     reviewRow: (exam: string, date: string) => `Review the ${exam} attempt from ${date}`,
@@ -1021,7 +1133,7 @@ export const strings = {
     signInTitle: "Sign in to sit an exam",
 
     signInLead:
-      "A hosted session gives you a real cluster for a few hours. Signing in is how your attempts stay yours — every graded exam is kept against your account, and it outlives the environment it was taken in.",
+      "A hosted session gives you a real cluster for a few hours. Signing in is how your attempts stay yours: every graded exam is kept against your account, and it outlives the environment it was taken in.",
     signInGitHub: "Continue with GitHub",
 
     signInScope:
@@ -1029,7 +1141,7 @@ export const strings = {
 
     signInSeats: (used: number, total: number) =>
       used >= total
-        ? `All ${total} hands-on seats are in use right now — you can still join the queue.`
+        ? `All ${total} hands-on seats are in use right now. You can still join the queue.`
         : `${total - used} of ${total} hands-on seats free.`,
     signInSeatsMcq: (free: number) =>
       free > 0 ? `Multiple choice needs no cluster: ${free} seats free.` : "",
@@ -1038,7 +1150,7 @@ export const strings = {
       "This deployment identifies you through the proxy in front of it, and that proxy did not say who you are. There is nothing to sign in to here.",
 
     signInLocal:
-      "Prefer no caps and no queue? The whole thing runs on your own machine — clone the repository and run ./sim up.",
+      "Prefer no caps and no queue? The whole thing runs on your own machine: clone the repository and run ./sim up.",
 
     startTitle: (login: string) => `Ready when you are, ${login}`,
 
@@ -1070,13 +1182,13 @@ export const strings = {
         : `You are number ${position} in the queue.`,
 
     queueHold:
-      "Keep this page open. When a seat reaches you it is held briefly — if nothing claims it, it passes to the next person.",
+      "Keep this page open. When a seat reaches you it is held briefly. If nothing claims it, it passes to the next person.",
     queueLeave: "Leave the queue",
     queueWait: "Wait here",
 
     bootPendingTitle: "Waiting for a slot",
     bootPendingBody:
-      "Your seat is held. Environments are built one at a time — building two at once makes both slow rather than making either fast.",
+      "Your seat is held. Environments are built one at a time: building two at once makes both slow rather than making either fast.",
     bootStartingTitle: "Building your environment",
 
     // `pooled` decides whether the boot may claim task setup at all. A pooled
@@ -1096,12 +1208,12 @@ export const strings = {
       return `${cluster}${setup}. Nothing is lost if you close this tab.${then}`;
     },
     bootStartingBodyMcq:
-      "No cluster to build for a multiple-choice exam — just the question bank and the marker. This takes a few seconds.",
+      "No cluster to build for a multiple-choice exam: just the question bank and the marker. This takes a few seconds.",
     bootElapsed: (elapsed: string) => `${elapsed} so far`,
 
     bootReassure: (elapsedMs: number) => {
       if (elapsedMs < 90_000) return "Pulling images and starting the cluster.";
-      if (elapsedMs < 240_000) return "Still going — the cluster is coming up and the exam images are being pulled.";
+      if (elapsedMs < 240_000) return "Still going. The cluster is coming up and the exam images are being pulled.";
       if (elapsedMs < 600_000)
         return "Taking longer than usual. A first build on a cold node pulls several gigabytes; it is still working.";
       return "This is well past the usual wait. If nothing changes, give up this seat and start again.";
@@ -1122,9 +1234,9 @@ export const strings = {
     rebuildReassure: (elapsedMs: number) => {
       if (elapsedMs < 90_000) return "Tearing down the old cluster and starting a clean one.";
       if (elapsedMs < 240_000)
-        return "Still going — the new cluster is coming up and its questions are being set up.";
+        return "Still going. The new cluster is coming up and its questions are being set up.";
       if (elapsedMs < 600_000)
-        return "Taking longer than usual, but the images are already on this node — this is not a first build. Still working.";
+        return "Taking longer than usual, but the images are already on this node. This is not a first build. Still working.";
       return "This is well past the usual wait, and something may be wrong. Ending the session frees the seat so you can start again.";
     },
 
@@ -1139,7 +1251,7 @@ export const strings = {
     endConfirmTitle: "End this session?",
 
     endConfirmBody:
-      "Your environment is destroyed and the seat goes back to the pool. Attempts you have already finished stay in your history — this only ends the environment.",
+      "Your environment is destroyed and the seat goes back to the pool. Attempts you have already finished stay in your history. This only ends the environment.",
     endConfirm: "End session",
     endCancel: "Keep working",
     endFailed: (detail: string) => `Could not end your session: ${detail}`,
@@ -1154,5 +1266,17 @@ export const strings = {
     retry: "Retry",
 
     banner: (date: string) => `Sat on ${date}. This is a record, not a live session.`,
+  },
+
+  focus: {
+    singleKeysToggle: "Single-key shortcuts",
+    singleKeysHint:
+      "Keys like F, G, [ and ] act without a modifier. Switch this off if you use speech input or press them by accident.",
+    singleKeysOff: "Single-key shortcuts are off. Switch them back on in Keyboard settings.",
+    keyboardSettings: "Keyboard settings",
+    questionAnnounce: (n: number, total: number) => `Question ${n} of ${total}`,
+    taskAnnounce: (n: number, total: number, title: string) =>
+      `Task ${n} of ${total}: ${title}`,
+    codeBlockLabel: (language: string) => `Code block, ${language}`,
   },
 } as const;

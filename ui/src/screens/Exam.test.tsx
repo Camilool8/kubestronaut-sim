@@ -1,11 +1,12 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Exam, ExamGateControls } from "./Exam";
 import type { SessionSnapshot } from "../api";
 import { clipboardSync } from "../lib/clipboardSync";
 import { marksStore } from "../components/marksStore";
 import { toastStore } from "../components/toastStore";
+import { introSeen, markIntroSeen, resetIntroSeen } from "../components/ExamIntro";
 import { strings } from "../strings";
 
 const runningSession: SessionSnapshot = {
@@ -18,6 +19,10 @@ const runningSession: SessionSnapshot = {
   mode: "exam",
   untimed: false,
 };
+
+beforeEach(() => {
+  markIntroSeen();
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -235,11 +240,11 @@ describe("Exam topbar and focus reporting", () => {
     expect(env).toHaveTextContent(/reachable over ssh/);
   });
 
-  test("progress counts what was OPENED, never what was answered", async () => {
+  test("progress counts what was VIEWED, and says so, never what was answered", async () => {
     stubFetch();
     render(<Exam session={idleSession} fetchedAt={Date.now()} onSessionChange={() => {}} />);
 
-    expect(await screen.findByText(/1 of 2 opened/)).toBeInTheDocument();
+    expect(await screen.findByText(/1 of 2 tasks viewed/)).toBeInTheDocument();
     expect(screen.queryByText(/answered/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/complete/i)).not.toBeInTheDocument();
   });
@@ -274,6 +279,41 @@ describe("Exam topbar and focus reporting", () => {
     expect(toastStore.list()).toHaveLength(0);
   });
 
+  test("the submit review shows the clock and turns every unviewed task into a way back", async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    render(<Exam session={idleSession} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+    await screen.findByText("Namespaces & quotas");
+    expect(screen.queryByText("Expose a Deployment")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Submit exam" }));
+    const dialog = await screen.findByRole("dialog");
+
+    expect(within(dialog).getByText(/10:00 left on the clock/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/1 task was never viewed/)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Go to task 2" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const title = await screen.findByRole("heading", { level: 2, name: "Expose a Deployment" });
+    await waitFor(() => expect(title).toHaveFocus());
+  });
+
+  test("a flagged task is listed as a way back too", async () => {
+    stubFetch();
+    marksStore.setScope(idleSession.startedAt);
+    marksStore.toggleMark("q01");
+    const user = userEvent.setup();
+    render(<Exam session={idleSession} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+    await screen.findByText("Namespaces & quotas");
+
+    await user.click(screen.getByRole("button", { name: "Submit exam" }));
+    const dialog = await screen.findByRole("dialog");
+
+    expect(within(dialog).getByText(/1 task is marked for review/)).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Go to task 1" })).toBeInTheDocument();
+  });
+
   test("Submit exam is in the bar, not behind the menu", async () => {
     // runningSession (state: "running") mounts the lazy DesktopViewport,
     // which needs a real ResizeObserver; stub one so its connect effect
@@ -301,5 +341,36 @@ describe("Exam topbar and focus reporting", () => {
     await user.click(screen.getByRole("button", { name: strings.header.menuLabel }));
     const panel = screen.getByRole("group", { name: strings.header.menuLabel });
     expect(within(panel).queryByRole("button", { name: "Submit exam" })).toBeNull();
+  });
+});
+
+describe("Exam first-time walkthrough", () => {
+  const quietSession: SessionSnapshot = { ...runningSession, state: "idle" };
+  test("is marked seen when it is dismissed, not when it renders", async () => {
+    resetIntroSeen();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ error: "nope" }), { status: 500 })),
+    );
+    const user = userEvent.setup();
+    render(<Exam session={quietSession} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+
+    const dialog = await screen.findByRole("dialog", { name: strings.intro.title });
+    expect(introSeen()).toBe(false);
+
+    await user.click(within(dialog).getByRole("button", { name: strings.intro.done }));
+    expect(screen.queryByRole("dialog", { name: strings.intro.title })).toBeNull();
+    expect(introSeen()).toBe(true);
+  });
+
+  test("stays closed for a candidate who has already seen it", () => {
+    markIntroSeen();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ error: "nope" }), { status: 500 })),
+    );
+    render(<Exam session={quietSession} fetchedAt={Date.now()} onSessionChange={() => {}} />);
+
+    expect(screen.queryByRole("dialog", { name: strings.intro.title })).toBeNull();
   });
 });

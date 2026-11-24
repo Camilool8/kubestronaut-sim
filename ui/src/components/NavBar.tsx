@@ -33,9 +33,22 @@ export interface NavBarProps {
   menuExtra?: ReactNode;
 
   home?: boolean;
+
+  className?: string;
+
+  subtitle?: ReactNode;
 }
 
-export function NavBar({ trail, nav, session, children, menuExtra, home = true }: NavBarProps) {
+export function NavBar({
+  trail,
+  nav,
+  session,
+  children,
+  menuExtra,
+  home = true,
+  className,
+  subtitle,
+}: NavBarProps) {
   const [confirming, setConfirming] = useState(false);
   const [about, setAbout] = useState(false);
   const [themePref, cycleTheme] = useTheme();
@@ -54,7 +67,7 @@ export function NavBar({ trail, nav, session, children, menuExtra, home = true }
 
   return (
     <>
-      <header className="navbar">
+      <header className={className ? `navbar ${className}` : "navbar"}>
         <div className="navbar-lead">
 
           {home ? (
@@ -64,7 +77,14 @@ export function NavBar({ trail, nav, session, children, menuExtra, home = true }
           ) : (
             <span className="navbar-home navbar-home-static">{brand}</span>
           )}
-          {trail && trail.length > 0 && <Trail trail={trail} compact={compact} />}
+          {subtitle ? (
+            <div className="navbar-titles">
+              {trail && trail.length > 0 && <Trail trail={trail} compact={compact} />}
+              <span className="navbar-subtitle">{subtitle}</span>
+            </div>
+          ) : (
+            trail && trail.length > 0 && <Trail trail={trail} compact={compact} />
+          )}
         </div>
 
         <div className="navbar-tail">

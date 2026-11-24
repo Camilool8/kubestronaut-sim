@@ -17,7 +17,7 @@ interface PreparingProps {
 
 /**
  * Shown from the moment `POST /api/session/start` answers 202 until the seed
- * job finishes and the attempt begins.
+ * job finishes and the Ready screen takes over.
  *
  * It rides `session.preparing`, which App polls every second, rather than the
  * control-status poll that drives ControlProgress: the control poll sits on a

@@ -22,7 +22,9 @@ export type IconName =
   | "exit"
   | "send"
   | "home"
-  | "book";
+  | "book"
+  | "clock"
+  | "panel";
 
 const SUN_RAYS = [
   "M12 2.4v2.2",
@@ -145,6 +147,18 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <path d="M5 4.8h5.5a2 2 0 0 1 2 2v12a1.6 1.6 0 0 0-1.6-1.6H5z" />
       <path d="M19 4.8h-4.5a2 2 0 0 0-2 2v12a1.6 1.6 0 0 1 1.6-1.6H19z" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 7.5V12l3 2" />
+    </>
+  ),
+  panel: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <path d="M9.5 4.5v15" />
     </>
   ),
 };

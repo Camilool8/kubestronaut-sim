@@ -162,7 +162,7 @@ describe("Score grading failures", () => {
     await user.click(await screen.findByRole("button", { name: "Retry" }));
 
     expect(
-      await screen.findByText(/couldn't ask the facilitator to grade again/i),
+      await screen.findByText(/grading could not be started again/i),
     ).toBeInTheDocument();
 
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
@@ -211,7 +211,7 @@ describe("Score results poll", () => {
     render(<Score onNewAttempt={() => {}} endReason="submitted" />);
 
     expect(
-      await screen.findByText(/still trying to reach the facilitator/i),
+      await screen.findByText(/still trying to reach the grader/i),
     ).toBeInTheDocument();
 
     expect(screen.getByText(/evaluating your exam/i)).toBeInTheDocument();
@@ -234,11 +234,11 @@ describe("Score results poll", () => {
 
     render(<Score onNewAttempt={() => {}} endReason="submitted" />);
     expect(
-      await screen.findByText(/still trying to reach the facilitator/i),
+      await screen.findByText(/still trying to reach the grader/i),
     ).toBeInTheDocument();
 
     await screen.findByText("q01", {}, { timeout: 6_000 });
-    expect(screen.queryByText(/still trying to reach the facilitator/i)).toBeNull();
+    expect(screen.queryByText(/still trying to reach the grader/i)).toBeNull();
   }, 10_000);
 
   test("a grader that never finishes gives up in the end instead of spinning forever", async () => {
@@ -271,7 +271,10 @@ describe("Score results poll", () => {
     // the retry copy and claim it failed to "grade again".
     expect(
       screen.getByText(
-        strings.score.gradingTimedOut(formatElapsed(GRADING_POLL_MS * GRADING_POLL_MAX_ATTEMPTS)),
+        strings.score.gradingTimedOut(
+          formatElapsed(GRADING_POLL_MS * GRADING_POLL_MAX_ATTEMPTS),
+          false,
+        ),
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText(/grade again/i)).toBeNull();
@@ -433,10 +436,13 @@ describe("Score banner", () => {
     expect(screen.getByText(/no pass or fail here/)).toBeInTheDocument();
   });
 
-  test("a mastery attempt says it is not a comparable exam result", async () => {
+  test("a mastery attempt says it is graded like an exam and kept, not that it does not count", async () => {
     stubResults(modernResults);
     render(<Score onNewAttempt={() => {}} endReason="submitted" />);
-    expect(await screen.findByText(/Mastery attempt: not a comparable/)).toBeInTheDocument();
+    const note = await screen.findByText(/^Mastery attempt:/);
+    expect(note).toHaveTextContent(/graded exactly like Exam mode/);
+    expect(note).toHaveTextContent(/kept in your history/);
+    expect(screen.queryByText(/not a comparable/)).toBeNull();
   });
 
   test("the pass threshold is spelled out, not only drawn", async () => {

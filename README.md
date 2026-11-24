@@ -83,7 +83,10 @@ routes.
    rebuilds the environment, and asks first.
 2. **Mode** — Training, Mastery or Exam. They differ in the clock, in
    what help is allowed, and in whether the run is kept as an attempt.
-   [docs/api.md](docs/api.md#attempt-modes) is the table.
+   [docs/api.md](docs/api.md#attempt-modes) is the table. A hands-on
+   exam then sets its drawn tasks up on the cluster, which takes a few
+   minutes, and waits on a ready screen. The clock starts when you
+   press **Start the clock**, not before.
 
    <picture>
      <source media="(prefers-color-scheme: dark)" srcset="site/shots/mode-dark.webp" />

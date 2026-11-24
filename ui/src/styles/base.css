@@ -52,6 +52,7 @@ h2,
 h3 {
   line-height: 1.25;
   letter-spacing: -0.01em;
+  text-wrap: balance;
 }
 
 :focus-visible {
@@ -74,14 +75,29 @@ h3 {
 @media (forced-colors: active) {
 
   .navigator-tile[aria-current="true"],
+  .navigator-swatch-current,
+  .mcq-option-on,
   .mode-card-on,
   .question-mark[aria-pressed="true"] {
     outline: 2px solid Highlight;
     outline-offset: -3px;
   }
 
+  .mcq-question .mcq-option-on .mcq-option-letter {
+    forced-color-adjust: none;
+    background: Highlight;
+    border-color: Highlight;
+    color: HighlightText;
+  }
+
   .navigator-tile.is-done {
     border-width: 3px;
+  }
+
+  .navigator-tile.is-viewed::after,
+  .navigator-swatch-viewed::after {
+    forced-color-adjust: none;
+    background: CanvasText;
   }
 
   .btn:disabled {
