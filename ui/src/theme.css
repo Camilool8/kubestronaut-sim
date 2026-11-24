@@ -470,7 +470,7 @@ button.nav-menu-item:hover {
   margin-left: auto;
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
 
@@ -1182,7 +1182,7 @@ button.nav-menu-item:hover {
 .draw-panel-domains h3 {
   margin: 0 0 var(--space-2);
   font-family: var(--font-mono);
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   font-weight: 600;
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
@@ -1506,7 +1506,7 @@ button.nav-menu-item:hover {
 
 .key-hint {
   font-family: var(--font-mono);
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   color: var(--text-muted);
   border: 1px solid var(--border);
   border-radius: var(--radius-xs);
@@ -1576,7 +1576,7 @@ button.nav-menu-item:hover {
   align-items: center;
   gap: 0.4em;
   font-family: var(--font-mono);
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   color: var(--machine-faint);
   background: transparent;
   border: 1px solid var(--machine-dim);
@@ -1816,7 +1816,7 @@ button.nav-menu-item:hover {
   min-width: 1.5em;
   min-height: 1.4em;
   font-family: var(--font-mono);
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   color: var(--text-muted);
   background: var(--surface-raised);
   border: 1px solid var(--border);
@@ -2356,7 +2356,7 @@ button.nav-menu-item:hover {
   justify-content: space-between;
   margin-top: var(--space-2);
   font-family: var(--font-mono);
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   color: var(--ink-faint);
 }
 
@@ -2418,7 +2418,7 @@ button.nav-menu-item:hover {
 
 .results-next-hint {
   margin-top: var(--space-2);
-  font-size: var(--text-xs);
+  font-size: var(--text-s);
   line-height: 1.55;
   color: var(--text-muted);
 }
@@ -2458,7 +2458,7 @@ button.nav-menu-item:hover {
   background: transparent;
   color: var(--text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   font-weight: 500;
   cursor: pointer;
 }
@@ -2479,7 +2479,7 @@ button.nav-menu-item:hover {
 
 .verdict-table {
 
-  --tv-cols: 44px minmax(0, 1fr) 104px;
+  --tv-cols: 44px minmax(0, 1fr) 112px;
 
   --tv-line: 1.375rem;
   border: 1px solid var(--border);
@@ -2488,15 +2488,15 @@ button.nav-menu-item:hover {
 }
 
 .verdict-table.has-weight {
-  --tv-cols: 44px minmax(0, 1fr) 74px 104px;
+  --tv-cols: 44px minmax(0, 1fr) 74px 112px;
 }
 
 .verdict-table.has-time {
-  --tv-cols: 44px minmax(0, 1fr) 116px 104px;
+  --tv-cols: 44px minmax(0, 1fr) 116px 112px;
 }
 
 .verdict-table.has-weight.has-time {
-  --tv-cols: 44px minmax(0, 1fr) 74px 116px 104px;
+  --tv-cols: 44px minmax(0, 1fr) 74px 116px 112px;
 }
 
 .tv-head {
@@ -2822,7 +2822,7 @@ button.nav-menu-item:hover {
 
 .domain-hint {
   margin: 0;
-  font-size: var(--text-xs);
+  font-size: var(--text-s);
   line-height: 1.5;
   color: var(--text-muted);
 }
@@ -2890,7 +2890,7 @@ button.nav-menu-item:hover {
 
 .domain-meta {
   font-family: var(--font-mono);
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   line-height: 1.5;
   color: var(--text-muted);
 }
@@ -4604,7 +4604,7 @@ button.nav-menu-item:hover {
     order: -1;
     flex: 0 0 100%;
     text-align: center;
-    font-size: var(--text-2xs);
+    font-size: var(--text-xs);
   }
 
   .mcq-footer > .btn:first-of-type {
@@ -4818,7 +4818,7 @@ button.nav-menu-item:hover {
 
 .path-card-meta {
   font-family: var(--font-mono);
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   line-height: 1.5;
   color: var(--text-muted);
 }
@@ -4926,7 +4926,7 @@ button.nav-menu-item:hover {
 
 .history-footnote {
   margin: var(--space-4) 0 0;
-  font-size: var(--text-xs);
+  font-size: var(--text-s);
   line-height: 1.5;
   color: var(--text-muted);
 }
@@ -4945,7 +4945,7 @@ button.nav-menu-item:hover {
 
 .weak-hint {
   margin: 0;
-  font-size: var(--text-xs);
+  font-size: var(--text-s);
   line-height: 1.5;
   color: var(--text-muted);
 }
@@ -5003,7 +5003,7 @@ button.nav-menu-item:hover {
   display: flex;
   gap: var(--space-2);
   font-family: var(--font-mono);
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   color: var(--text-muted);
 }
 
@@ -5157,7 +5157,7 @@ button.nav-menu-item:hover {
   background: var(--neutral-soft);
   color: var(--text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }
 
