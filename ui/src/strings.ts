@@ -270,7 +270,7 @@ export const strings = {
 
     targetTimeDerived: (span: string) => `Target ≈${span}`,
     targetTimeDerivedNote:
-      "Derived from this task's share of the exam clock, not a measured time. A pacing budget, not a limit — running over costs no points.",
+      "Derived from this task's share of the exam clock, not a measured time. A pacing budget, not a limit. Running over costs no points.",
 
     workFrom: "Work from",
     copyShort: "Copy",
@@ -335,7 +335,7 @@ export const strings = {
   tips: {
     title: "Exam tips",
     open: "Exam tips",
-    lead: "Technique for this exam, not answers — how to set the terminal up, generate manifests instead of typing them, and find things faster than the documentation can.",
+    lead: "Technique for this exam, not answers: how to set the terminal up, generate manifests instead of typing them, and find things faster than the documentation can.",
     done: "Close",
     failed: (message: string) => `The tips could not be loaded: ${message}`,
   },
@@ -359,7 +359,7 @@ export const strings = {
       },
       {
         title: "Exam desktop",
-        body: "A real Linux desktop. The terminal is already open; ssh to the instance the question names and solve with kubectl — it already points at this cluster on every instance, so there is no context to switch. Firefox is there too, limited to the allowlisted documentation sites.",
+        body: "A real Linux desktop. The terminal is already open; ssh to the instance the question names and solve with kubectl. It already points at this cluster on every instance, so there is no context to switch. Firefox is there too, limited to the allowlisted documentation sites.",
       },
       {
         title: "The countdown",
@@ -373,7 +373,7 @@ export const strings = {
 
     methodTitle: "How grading works",
     method:
-      "Every task is scored by checks that read the state you leave behind — what is on the cluster and on the exam instances when grading runs, never the commands you typed. How you got there does not matter: a kubectl one-liner, an applied manifest and an edit in place all score the same. Each task's share of the exam is on the chip row beside its title.",
+      "Every task is scored by checks that read the state you leave behind: what is on the cluster and on the exam instances when grading runs, never the commands you typed. How you got there does not matter: a kubectl one-liner, an applied manifest and an edit in place all score the same. Each task's share of the exam is on the chip row beside its title.",
   },
 
   info: {
@@ -797,7 +797,7 @@ export const strings = {
     catalogNote:
       "This exam is a Linux terminal and a remote desktop beside the questions. That needs a keyboard and a desktop browser, so it cannot be started from this device.",
     lobbyNote:
-      "This exam is a Linux terminal and a remote desktop beside the questions, so it needs a keyboard and a desktop browser. Starting it here would hold a seat nobody could sit — open the hub on a desktop to take one.",
+      "This exam is a Linux terminal and a remote desktop beside the questions, so it needs a keyboard and a desktop browser. Starting it here would hold a seat nobody could sit. Open the hub on a desktop to take one.",
     sessionRunning:
       "An exam is running. The clock keeps going wherever you are; submit here if you cannot get to a desktop in time.",
 
@@ -891,9 +891,9 @@ export const strings = {
     levelHint:
       "The same attempt cut by how long each task was meant to take. Levels are time bands, not a judgement of how clever a task is.",
     levelNames: {
-      quick: "Quick — up to 4 min",
-      core: "Core — 4 to 9 min",
-      deep: "Deep — 9 to 14 min",
+      quick: "Quick · up to 4 min",
+      core: "Core · 4 to 9 min",
+      deep: "Deep · 9 to 14 min",
     } as Record<string, string>,
     levelMeta: (count: number, earned: number, points: number) =>
       `${count} ${count === 1 ? "task" : "tasks"} · ${earned}/${points} pts`,
@@ -1000,29 +1000,29 @@ export const strings = {
     whyTitle: "Why this scored what it did",
 
     diffLegend:
-      "Both panes show only the fields this check grades, not the whole object — the rest of your answer is not being compared here. Lines marked - are in your state and not in the expected document; lines marked + are in the expected document and not in yours.",
+      "Both panes show only the fields this check grades, not the whole object. The rest of your answer is not being compared here. Lines marked - are in your state and not in the expected document; lines marked + are in the expected document and not in yours.",
 
     lineChanged: "Differs:",
 
     diffIdentical:
-      "These two documents match line for line. Whatever the check measured is not visible in what it captured — the message above names it.",
+      "These two documents match line for line. Whatever the check measured is not visible in what it captured. The message above names it.",
 
     diffTooLong:
       "These documents are too long to compare line by line, so neither pane is marked up. Both are shown in full.",
 
     actualOnlyNote:
-      "There is no expected document to set beside this pane. Either this check grades a reading rather than a document — whether something became ready, how many of a thing there are, or whether two live values still agree — or the object it would compare against was never found. The message above names what it measured.",
+      "There is no expected document to set beside this pane. Either this check grades a reading rather than a document (whether something became ready, how many of a thing there are, or whether two live values still agree), or the object it would compare against was never found. The message above names what it measured.",
 
     expectedOnlyNote:
       "This is what the check was looking for. Nothing was captured from your cluster to sit beside it, which usually means the object does not exist yet.",
 
     correctTitle: "Full marks on this task",
     correctBody:
-      "Every check passed. The reference solution below is still worth a look — it is one way to get here, not the only one, and the grader scored the state you left rather than the route you took.",
+      "Every check passed. The reference solution below is still worth a look: it is one way to get here, not the only one, and the grader scored the state you left rather than the route you took.",
 
     noEvidenceTitle: "No captured state for this task",
     noEvidenceBody:
-      "These checks grade readings rather than documents, so there is nothing to set side by side. The messages above are the evidence — each one names the field it looked at and what it found there — and the reference solution below is the shape they were looking for.",
+      "These checks grade readings rather than documents, so there is nothing to set side by side. The messages above are the evidence (each one names the field it looked at and what it found there), and the reference solution below is the shape they were looking for.",
 
     solutionTitle: "Reference solution",
     solutionLoading: "Loading the reference solution…",
@@ -1133,7 +1133,7 @@ export const strings = {
     signInTitle: "Sign in to sit an exam",
 
     signInLead:
-      "A hosted session gives you a real cluster for a few hours. Signing in is how your attempts stay yours — every graded exam is kept against your account, and it outlives the environment it was taken in.",
+      "A hosted session gives you a real cluster for a few hours. Signing in is how your attempts stay yours: every graded exam is kept against your account, and it outlives the environment it was taken in.",
     signInGitHub: "Continue with GitHub",
 
     signInScope:
@@ -1141,7 +1141,7 @@ export const strings = {
 
     signInSeats: (used: number, total: number) =>
       used >= total
-        ? `All ${total} hands-on seats are in use right now — you can still join the queue.`
+        ? `All ${total} hands-on seats are in use right now. You can still join the queue.`
         : `${total - used} of ${total} hands-on seats free.`,
     signInSeatsMcq: (free: number) =>
       free > 0 ? `Multiple choice needs no cluster: ${free} seats free.` : "",
@@ -1150,7 +1150,7 @@ export const strings = {
       "This deployment identifies you through the proxy in front of it, and that proxy did not say who you are. There is nothing to sign in to here.",
 
     signInLocal:
-      "Prefer no caps and no queue? The whole thing runs on your own machine — clone the repository and run ./sim up.",
+      "Prefer no caps and no queue? The whole thing runs on your own machine: clone the repository and run ./sim up.",
 
     startTitle: (login: string) => `Ready when you are, ${login}`,
 
@@ -1182,13 +1182,13 @@ export const strings = {
         : `You are number ${position} in the queue.`,
 
     queueHold:
-      "Keep this page open. When a seat reaches you it is held briefly — if nothing claims it, it passes to the next person.",
+      "Keep this page open. When a seat reaches you it is held briefly. If nothing claims it, it passes to the next person.",
     queueLeave: "Leave the queue",
     queueWait: "Wait here",
 
     bootPendingTitle: "Waiting for a slot",
     bootPendingBody:
-      "Your seat is held. Environments are built one at a time — building two at once makes both slow rather than making either fast.",
+      "Your seat is held. Environments are built one at a time: building two at once makes both slow rather than making either fast.",
     bootStartingTitle: "Building your environment",
 
     // `pooled` decides whether the boot may claim task setup at all. A pooled
@@ -1208,12 +1208,12 @@ export const strings = {
       return `${cluster}${setup}. Nothing is lost if you close this tab.${then}`;
     },
     bootStartingBodyMcq:
-      "No cluster to build for a multiple-choice exam — just the question bank and the marker. This takes a few seconds.",
+      "No cluster to build for a multiple-choice exam: just the question bank and the marker. This takes a few seconds.",
     bootElapsed: (elapsed: string) => `${elapsed} so far`,
 
     bootReassure: (elapsedMs: number) => {
       if (elapsedMs < 90_000) return "Pulling images and starting the cluster.";
-      if (elapsedMs < 240_000) return "Still going — the cluster is coming up and the exam images are being pulled.";
+      if (elapsedMs < 240_000) return "Still going. The cluster is coming up and the exam images are being pulled.";
       if (elapsedMs < 600_000)
         return "Taking longer than usual. A first build on a cold node pulls several gigabytes; it is still working.";
       return "This is well past the usual wait. If nothing changes, give up this seat and start again.";
@@ -1234,9 +1234,9 @@ export const strings = {
     rebuildReassure: (elapsedMs: number) => {
       if (elapsedMs < 90_000) return "Tearing down the old cluster and starting a clean one.";
       if (elapsedMs < 240_000)
-        return "Still going — the new cluster is coming up and its questions are being set up.";
+        return "Still going. The new cluster is coming up and its questions are being set up.";
       if (elapsedMs < 600_000)
-        return "Taking longer than usual, but the images are already on this node — this is not a first build. Still working.";
+        return "Taking longer than usual, but the images are already on this node. This is not a first build. Still working.";
       return "This is well past the usual wait, and something may be wrong. Ending the session frees the seat so you can start again.";
     },
 
@@ -1251,7 +1251,7 @@ export const strings = {
     endConfirmTitle: "End this session?",
 
     endConfirmBody:
-      "Your environment is destroyed and the seat goes back to the pool. Attempts you have already finished stay in your history — this only ends the environment.",
+      "Your environment is destroyed and the seat goes back to the pool. Attempts you have already finished stay in your history. This only ends the environment.",
     endConfirm: "End session",
     endCancel: "Keep working",
     endFailed: (detail: string) => `Could not end your session: ${detail}`,
