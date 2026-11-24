@@ -5,7 +5,7 @@ import { Icon } from "./Icon";
 import { NavBar } from "./NavBar";
 import { NavMenuSection } from "./NavMenu";
 import { TimerReadout } from "./TimerReadout";
-import { HEADER_COMPACT_QUERY, useMediaQuery } from "../lib/useMediaQuery";
+import { HEADER_COMPACT_QUERY, MCQ_COMPACT_QUERY, useMediaQuery } from "../lib/useMediaQuery";
 import { strings } from "../strings";
 import { toastStore } from "./toastStore";
 
@@ -40,6 +40,7 @@ export function TimerBar({
 }: TimerBarProps) {
   const firedRef = useRef<Set<number>>(new Set());
   const compact = useMediaQuery(HEADER_COMPACT_QUERY);
+  const phone = useMediaQuery(MCQ_COMPACT_QUERY);
 
   const { remaining, elapsed, untimed } = useExamClock(session, fetchedAt);
   const isLow = !untimed && remaining < LOW_TIME_THRESHOLD_SECONDS;
@@ -62,10 +63,17 @@ export function TimerBar({
 
   useEffect(() => () => toastStore.dismissKey("time-warning"), []);
 
+  const modeChip =
+    session.mode && session.mode !== "exam" ? (
+      <span className="mode-chip">{strings.modes[session.mode].label}</span>
+    ) : null;
+
   return (
     <NavBar
       home={false}
+      className="navbar-exam"
       trail={[{ label: title }]}
+      subtitle={phone ? modeChip : undefined}
       menuExtra={
         extras ? (
           <NavMenuSection label={strings.header.menuExam}>{extras}</NavMenuSection>
@@ -73,9 +81,7 @@ export function TimerBar({
       }
     >
       {barExtras}
-      {session.mode && session.mode !== "exam" && (
-        <span className="mode-chip">{strings.modes[session.mode].label}</span>
-      )}
+      {!phone && modeChip}
       <div className={`timer${isLow ? " timer-low" : ""}`} role="timer">
         {isLow && <Icon name="clock" className="timer-low-icon" />}
         <TimerReadout untimed={untimed} remaining={remaining} elapsed={elapsed} />
@@ -83,15 +89,12 @@ export function TimerBar({
       <button
         id={END_EXAM_BUTTON_ID}
         type="button"
-        className="btn btn-primary navbar-submit"
+        className="btn navbar-submit"
         onClick={onEndClick}
-        // Set unconditionally so the accessible name does not depend on the
-        // viewport: at compact widths the visible label is dropped and the
-        // icon carries the button alone.
         aria-label={strings.exam.endAttempt(session.mode)}
       >
         <Icon name="send" />
-        {!compact && strings.exam.endAttempt(session.mode)}
+        {compact ? strings.exam.endAttemptShort : strings.exam.endAttempt(session.mode)}
       </button>
     </NavBar>
   );

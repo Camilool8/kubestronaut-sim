@@ -181,6 +181,7 @@ export const strings = {
         : `The question list did not load. Your clock keeps running and nothing you have done is lost. Retry; if it keeps failing, check the facilitator with \`docker compose ps facilitator\`.${detailNote(detail)}`,
 
     endAttempt: (mode: string) => (mode === "training" ? "Submit session" : "Submit exam"),
+    endAttemptShort: "Submit",
     ending: "Ending…",
 
     positionShort: (n: number, total: number) => `${n}/${total}`,
