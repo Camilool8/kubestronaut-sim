@@ -580,17 +580,19 @@ When `preparing` goes:
 - `state: "idle"` with no `prepareError` — cancelled. Return to the lobby
   silently; this is not an error.
 
+A facilitator restart does not end a preparation by itself: it is saved
+to disk and resumed, as described in
+[Surviving a facilitator restart](#surviving-a-facilitator-restart).
+
 **`prepareError` can also arrive without this process ever having
-prepared anything.** A preparation lives in memory, so a facilitator that
-restarts mid-preparation loses the draw entirely and cannot resume it —
-there is nothing left to start. On its first `GET /api/session`, a pooled
-hands-on server asks the conductor whether its last job was a `seed`; an
-idle session plus a seed job means the seeding was done for an attempt
-that no longer exists, because a preparation that had *succeeded* would
-have started an attempt, and an attempt is persisted. It then says so
-rather than leaving a poller waiting forever, and the next
-`POST /api/session/start` is refused 409 until the environment is reset —
-the cluster is holding a draw nothing can now enumerate.
+prepared anything.** When no usable saved preparation survives the
+restart, the facilitator falls back to asking. On its first
+`GET /api/session`, a pooled hands-on server asks the conductor whether
+its last job was a `seed`; an idle session plus a seed job, with nothing
+saved, means the seeding was done for an attempt this process can no
+longer enumerate. It then says so rather than leaving a poller waiting
+forever, and the next `POST /api/session/start` is refused 409 until the
+environment is reset.
 
 `DELETE /api/session` cancels and guarantees no attempt starts. It cannot
 stop the conductor's job, so the overlay runs to completion — harmless,
@@ -617,11 +619,58 @@ than over it.
 | `DELETE /api/session` | Cancels. `preparing` goes, nothing starts, and a later begin is 409. |
 | `POST /api/control/reset` or `/switch` succeeds | The cluster no longer holds the draw, so the ready preparation is dropped as if cancelled. A refused reset leaves it in place. |
 | `POST /api/session/start` | 409, as for any preparation in flight. |
-| The facilitator restarts | The ready preparation lived in memory and is lost. The restart is reported through `prepareError` exactly as a lost preparation is (above), no clock starts, and the next start is 409 until the environment is reset. |
+| The facilitator restarts | The ready preparation comes back ready, with its original `readyAt`, once the conductor confirms it still holds the seed job. No clock starts until begin. If the conductor cannot confirm it, the restart is reported through `prepareError` and the next start is 409 until the environment is reset. See [Surviving a facilitator restart](#surviving-a-facilitator-restart). |
 | Nobody presses Start | Nothing. A ready preparation has no expiry: no clock runs and the cluster costs the same idle as it would after an attempt. A hosted seat is still bounded by the hub's own idle and session-length limits. |
 
 A client that never sends `awaitStart` never sees `ready`, and
 `preparing` disappears exactly as described above.
+
+### Surviving a facilitator restart
+
+Once the conductor has accepted the seed job, the facilitator saves the
+preparation to `prep.json` in the same directory as the session file
+(`/session/prep.json` with the default `SESSION_FILE`), using the same
+write-to-a-temp-file-then-rename as the session file
+(`facilitator/internal/session/prep.go`). It holds the seed job id, mode,
+duration, the draw (question ids, seed, pool digest, domain filter),
+`awaitStart`, `ready`, `readyAt` and the preparation's `startedAt`. It is
+rewritten when the seed finishes and removed whenever the preparation
+ends: begin (after the session file is written), `DELETE /api/session`, a
+successful reset or switch through `/api/control/`, a failed seed, and a
+successful auto-start.
+
+On startup, with an idle session, a saved preparation is put back as
+`preparing` without `ready`, so begin is 409 until it is checked. The
+facilitator then reads `GET /api/control/status` and acts on what the
+conductor says about that job id
+(`facilitator/internal/api/prep_persist.go`):
+
+| The conductor reports | Outcome |
+|---|---|
+| The job still running | Watched again. It finishes as it would have without the restart: ready under `awaitStart`, started otherwise. |
+| The job as `lastJob`, nothing running, no error, under `awaitStart` | Ready again, with the saved `readyAt`. The clock starts only at begin. |
+| The job as `lastJob`, nothing running, no error, without `awaitStart` | The attempt starts at resume, and its `startedAt` is the resume time, not the time the seed finished. That client asked for an auto-start, and nobody has seen a clock yet. |
+| The job as `lastJob` with an error | The error becomes `prepareError`, as for a seed that failed in front of the service. |
+| Anything else: another job since, no job at all, or no answer for 120 consecutive tries (at least a minute) | Lost. `prepareError` says the service restarted, and the next start is 409 until the environment is reset. |
+
+The file is not trusted on its own:
+
+- A running or ended session always wins. A `prep.json` beside one is
+  left from a crash between writing the session file and removing
+  `prep.json`; it is deleted without being acted on, so nothing starts
+  twice.
+- A file that cannot be parsed, has another format version, or was made
+  for another bank is deleted, and the conductor probe above decides
+  what to report.
+- A saved draw that no longer fits the loaded bank (its pool digest
+  changed, or a question is gone) is reported as lost: the cluster holds
+  a seed for questions this service no longer serves.
+
+This covers a facilitator container that restarts on its own: a crash,
+an OOM kill, or an image upgrade under Compose, where `session` is a
+named volume. A hosted session Pod runs with `restartPolicy: Never`, so a
+facilitator that dies there is not restarted inside the Pod, and the
+saved preparation is never read.
 
 ### POST /api/session/begin
 
